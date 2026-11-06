@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 
 #include "envoy/common/time.h"
 
@@ -22,11 +23,11 @@ void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
   idle_sessions_.RemoveSessionFromList(session);
 }
 
-void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
+uint64_t SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
   const size_t max_sessions_to_terminate =
       std::min(MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
-  size_t num_terminated;
-  for (num_terminated = 0; num_terminated < max_sessions_to_terminate; ++num_terminated) {
+  uint64_t num_terminated = 0;
+  for (; num_terminated < max_sessions_to_terminate; ++num_terminated) {
     IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
     absl::Duration time_since_enqueue = absl::FromChrono(
         dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
@@ -39,6 +40,7 @@ void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
     idle_sessions_.RemoveSessionFromList(next_session);
   }
   ENVOY_LOG(debug, "Terminated {} idle sessions.", num_terminated);
+  return num_terminated;
 };
 
 size_t SessionIdleList::MaxSessionsToTerminateInOneRound(bool is_saturated) const {

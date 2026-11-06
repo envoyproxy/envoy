@@ -309,8 +309,8 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
   quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
 }
 
-void ActiveQuicListener::onCloseIdleHttpConnections(bool is_saturated) {
-  quic_dispatcher_->closeIdleQuicConnections(is_saturated);
+uint64_t ActiveQuicListener::onCloseIdleHttpConnections(bool is_saturated) {
+  return quic_dispatcher_->closeIdleQuicConnections(is_saturated);
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(

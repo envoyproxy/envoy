@@ -600,7 +600,7 @@ public:
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
   MOCK_METHOD(std::optional<uint32_t>, workerId, (), (const));
-  MOCK_METHOD(void, closeIdleHttpConnections, (bool), (override));
+  MOCK_METHOD(uint64_t, closeIdleHttpConnections, (bool), (override));
 
   uint64_t num_handler_connections_{};
 };

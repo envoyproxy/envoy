@@ -308,16 +308,22 @@ TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
   };
 
   // 1. Transition to scaling (active)
-  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
+  EXPECT_CALL(*handler, closeIdleHttpConnections(false)).WillOnce(Return(2));
   trigger_and_advance(OverloadActionState(UnitFloat(0.5)));
+  EXPECT_EQ(
+      2U, api_->rootScope().counterFromStatName(stat_names_.close_idle_http_connections_).value());
 
   // 2. Transition to saturated
-  EXPECT_CALL(*handler, closeIdleHttpConnections(true));
+  EXPECT_CALL(*handler, closeIdleHttpConnections(true)).WillOnce(Return(5));
   trigger_and_advance(OverloadActionState::saturated());
+  EXPECT_EQ(
+      7U, api_->rootScope().counterFromStatName(stat_names_.close_idle_http_connections_).value());
 
   // 3. Transition back to inactive
   EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
   trigger_and_advance(OverloadActionState::inactive());
+  EXPECT_EQ(
+      7U, api_->rootScope().counterFromStatName(stat_names_.close_idle_http_connections_).value());
 }
 
 } // namespace

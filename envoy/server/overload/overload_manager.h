@@ -66,6 +66,9 @@ class OverloadActionStatsNameValues {
 public:
   // Count of the number of streams the reset streams action has reset
   const std::string ResetStreamsCount = "envoy.overload_actions.reset_high_memory_stream.count";
+  // Count of the number of idle connections closed by the close idle http connections action
+  const std::string CloseIdleHttpConnectionsCount =
+      "envoy.overload_actions.close_idle_http_connections.count";
 };
 
 using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;

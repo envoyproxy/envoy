@@ -737,9 +737,9 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
   getIdleList()->set_min_time_before_termination_allowed(absl::Hours(1));
   time_system_.advanceTimeAndRun(std::chrono::seconds(10), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
+  EXPECT_EQ(2u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true));
   EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
-  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
+  EXPECT_EQ(1u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true));
   EXPECT_EQ(0u, envoy_quic_dispatcher_.NumSessions());
 }
 
@@ -766,13 +766,13 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
   EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
 
   // Sessions have not reach the minimal idle time yet.
-  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false));
   EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
 
   // Advance time to make sessions idle.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
+  EXPECT_EQ(1u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false));
   EXPECT_EQ(2u, envoy_quic_dispatcher_.NumSessions());
 }
 

@@ -78,7 +78,7 @@ public:
                                Network::ConnectionDrainEvent drain_event) override;
   void onListenerDrainStart(Network::ConnectionDrainEvent drain_event) override;
 
-  void onCloseIdleHttpConnections(bool is_saturated) override;
+  uint64_t onCloseIdleHttpConnections(bool is_saturated) override;
 
 protected:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
