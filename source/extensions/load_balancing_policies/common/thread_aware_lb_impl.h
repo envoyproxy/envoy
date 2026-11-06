@@ -47,7 +47,10 @@ public:
       }
       absl::string_view hash_key = val.string_value();
       if (hash_key.empty()) {
-        hash_key = use_hostname ? host->hostname() : host->address()->asString();
+        // Hosts in STATIC and EDS clusters are not required to provide a hostname: fall back to
+        // the resolved address instead of hashing every such host onto the same empty key.
+        hash_key = use_hostname && !host->hostname().empty() ? host->hostname()
+                                                             : host->address()->asString();
       }
       return hash_key;
     }
