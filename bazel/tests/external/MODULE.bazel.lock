@@ -1058,7 +1058,7 @@
     },
     "@@aspect_rules_js+//npm:extensions.bzl%pnpm": {
       "general": {
-        "bzlTransitiveDigest": "Gpj235uM6s5aUeBTTJtNdacA80LWlHvgfFeHUGiv/TQ=",
+        "bzlTransitiveDigest": "PNe3/0HY1epelZv6BUsg9Rt8mY98XgMoBaB7BYPIkh8=",
         "usagesDigest": "kbjSw2REjlSC0HtTZDf2p+l/dmiMt3NHLoiWEXYAoQI=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_bazel_lib+,bazel_lib bazel_lib+",
@@ -1172,7 +1172,7 @@
     },
     "@@emsdk+//:emscripten_deps.bzl%emscripten_deps": {
       "general": {
-        "bzlTransitiveDigest": "Hy0z+n6whxwn7n6QM4y2DSjknKnMy9j8Br+I8hS/Rwo=",
+        "bzlTransitiveDigest": "sk0TtHdO8doqMGpnHKhCu7WAGTPCHA6s+mO2IXxyQmQ=",
         "usagesDigest": "UkYjyEB96a8Qjbl+R4LBgwf+MLOeeletlxBF22hcn1c=",
         "recordedInputs": [
           "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
@@ -2039,7 +2039,7 @@
     },
     "@@rules_rust+//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "lcgHQ6fQLt/Y4OEz/Re6zaDH/GdyHKwZqRB+aSc0EQY=",
+        "bzlTransitiveDigest": "bwGx8lzzwHSdB5yH+wrcPJ6wkyvNEAjwrOqN7a4iUt4=",
         "usagesDigest": "+xr3f1ewo4VN0JZZlHeH6XP9L+y0pK5+0aldnWk0Z5o=",
         "recordedInputs": [
           "REPO_MAPPING:apple_support+,bazel_skylib bazel_skylib+",
