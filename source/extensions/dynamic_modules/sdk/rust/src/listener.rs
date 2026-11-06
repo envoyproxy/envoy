@@ -1565,7 +1565,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 
 // Listener Filter Event Hook Implementations
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_config_new")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -1613,7 +1613,7 @@ pub(crate) fn init_listener_filter_config<
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
 ) {
@@ -1635,7 +1635,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
   envoy_filter_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
@@ -1663,7 +1663,7 @@ pub(crate) fn envoy_dynamic_module_on_listener_filter_new_impl(
   wrap_into_c_void_ptr!(filter)
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_on_accept")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_accept(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
@@ -1679,7 +1679,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_accept(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_on_data")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_data(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
@@ -1696,7 +1696,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_data(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_get_max_read_bytes")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
@@ -1715,7 +1715,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_on_close")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_close(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
@@ -1730,7 +1730,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_close(
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_destroy")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
 ) {
@@ -1743,7 +1743,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_scheduled")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_scheduled(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
@@ -1759,7 +1759,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_scheduled(
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_config_scheduled")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
   _filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
   filter_config_module_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
@@ -1783,7 +1783,7 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
 ///
 /// Caller must ensure `filter_ptr`, `headers`, and `body_chunks` point to valid memory for the
 /// provided sizes, and that the pointed-to data lives for the duration of this call.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_listener_filter_http_callout_done")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_done(
   envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,

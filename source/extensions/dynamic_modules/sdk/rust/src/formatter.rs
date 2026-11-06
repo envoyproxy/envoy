@@ -322,7 +322,7 @@ thread_local! {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_formatter_config_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_new(
   _formatter_config_envoy_ptr: abi::envoy_dynamic_module_type_formatter_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -371,7 +371,7 @@ pub fn envoy_dynamic_module_on_formatter_config_new_impl(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_formatter_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_destroy(
   config_ptr: *const c_void,
 ) {
@@ -387,7 +387,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_formatter_parse")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_parse(
   config_ptr: *const c_void,
   command: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -424,7 +424,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_parse(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_formatter_provider_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_provider_destroy(
   provider_ptr: *const c_void,
 ) {
@@ -440,7 +440,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_provider_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_formatter_format")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_formatter_format(
   provider_ptr: *const c_void,
   formatter_context_envoy_ptr: *mut c_void,

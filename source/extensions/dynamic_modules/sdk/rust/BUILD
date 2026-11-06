@@ -1,45 +1,18 @@
-load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_static_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",
 )
 load("//bazel:toolchains.bzl", "LLVM_MAJOR")
-load(":symbol_prefix.bzl", "symbol_prefix_env")
 
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
 exports_files(["Cargo.toml"])
-
-# Provides the Rust allocator shim (__rust_alloc etc) and std runtime exactly
-# once in the final C++ link. All other in-binary Rust code must be rlibs
-# (see envoy_rust_static_module in dynamic_modules.bzl).
-rust_static_library(
-    name = "rust_runtime",
-    srcs = ["runtime.rs"],
-    edition = "2021",
-    visibility = ["//visibility:public"],
-)
-
-string_flag(
-    name = "symbol_prefix",
-    build_setting_default = "",
-)
-
-config_setting(
-    name = "unprefixed",
-    flag_values = {":symbol_prefix": ""},
-)
-
-symbol_prefix_env(
-    name = "symbol_prefix_env",
-    prefix = ":symbol_prefix",
-)
 
 cargo_build_script(
     name = "build_script",
@@ -70,7 +43,6 @@ cargo_build_script(
         },
         "//conditions:default": {},
     }),
-    build_script_env_files = [":symbol_prefix_env"],
     data = [
         ":abi/abi.h",
     ] + select({
@@ -97,16 +69,8 @@ cargo_build_script(
 rust_library(
     name = "envoy_proxy_dynamic_modules_rust_sdk",
     srcs = glob(["src/**/*.rs"]),
-    # Generated compile data makes rules_rust rebase the crate root into the
-    # configuration's output directory. Its crate hash must differ per prefix,
-    # isolating Rust-mangled factory state as well as the exported C hooks.
-    compile_data = [":symbol_prefix_env"],
     edition = "2021",
     deps = all_crate_deps(
         normal = True,
     ) + [":build_script"],
-    alwayslink = select({
-        ":unprefixed": False,
-        "//conditions:default": True,
-    }),
 )

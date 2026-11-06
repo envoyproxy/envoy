@@ -1865,7 +1865,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 
 // Network Filter Event Hook Implementations
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_config_new")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -1910,7 +1910,7 @@ pub(crate) fn init_network_filter_config<EC: EnvoyNetworkFilterConfig, ENF: Envo
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
 ) {
@@ -1932,7 +1932,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
   envoy_filter_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
@@ -1959,7 +1959,7 @@ pub(crate) fn envoy_dynamic_module_on_network_filter_new_impl(
   wrap_into_c_void_ptr!(filter)
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_new_connection")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_new_connection(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
@@ -1978,7 +1978,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_new_connection(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_read")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_read(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
@@ -2000,7 +2000,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_read(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_write")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_write(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
@@ -2022,7 +2022,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_write(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_event")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_event(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
@@ -2038,7 +2038,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_event(
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_destroy")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
@@ -2051,7 +2051,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_destroy(
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_http_callout_done")]
+#[no_mangle]
 /// # Safety
 /// Caller must ensure `filter_ptr`, `headers`, and `body_chunks` point to valid memory for the
 /// provided sizes, and that the pointed-to data lives for the duration of this call.
@@ -2106,7 +2106,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_http_callout_don
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_scheduled")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_scheduled(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
@@ -2122,7 +2122,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_scheduled(
   });
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_network_filter_config_scheduled")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
   event_id: u64,
@@ -2142,9 +2142,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
   });
 }
 
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark"
-)]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
@@ -2162,9 +2160,7 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_above_write_buffer_high
   });
 }
 
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark"
-)]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
   envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,

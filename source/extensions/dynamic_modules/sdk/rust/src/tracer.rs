@@ -577,7 +577,7 @@ unsafe fn envoy_buffer_to_str(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_config_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
   config_envoy_ptr: abi::envoy_dynamic_module_type_tracer_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -612,7 +612,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
 ) {
@@ -632,7 +632,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_start_span")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
   config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
   span_envoy_ptr: abi::envoy_dynamic_module_type_tracer_span_envoy_ptr,
@@ -666,7 +666,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_set_operation")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_operation(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   operation: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -682,7 +682,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_operation(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_set_tag")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_tag(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   key: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -700,7 +700,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_tag(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_log")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_log(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   timestamp_ns: i64,
@@ -717,7 +717,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_log(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_finish")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_finish(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
 ) {
@@ -731,7 +731,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_finish(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_inject_context")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_inject_context(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   span_envoy_ptr: abi::envoy_dynamic_module_type_tracer_span_envoy_ptr,
@@ -747,7 +747,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_inject_context(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_spawn_child")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -777,7 +777,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_set_sampled")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_sampled(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   sampled: bool,
@@ -792,7 +792,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_sampled(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_use_local_decision")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_use_local_decision(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
 ) -> bool {
@@ -807,7 +807,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_use_local_decision(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_get_baggage")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_baggage(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   key: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -846,7 +846,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_baggage(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_set_baggage")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_baggage(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   key: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -864,7 +864,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_set_baggage(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_get_trace_id")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_trace_id(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
@@ -901,7 +901,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_trace_id(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_get_span_id")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_span_id(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
   value_out: *mut abi::envoy_dynamic_module_type_module_buffer,
@@ -938,7 +938,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_span_id(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_tracer_span_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_destroy(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
 ) {
@@ -960,7 +960,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_destroy(
 #[macro_export]
 macro_rules! declare_tracer_init_functions {
   ($f:ident, $new_tracer_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(

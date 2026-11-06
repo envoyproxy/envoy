@@ -194,7 +194,7 @@ pub trait MatcherConfig: Sized + Send + Sync + 'static {
 #[macro_export]
 macro_rules! declare_matcher {
   ($config_type:ty) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_matcher_config_new")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_matcher_config_new(
       _config_envoy_ptr: *mut ::std::ffi::c_void,
       name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
@@ -224,7 +224,7 @@ macro_rules! declare_matcher {
       })
     }
 
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_matcher_config_destroy")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_matcher_config_destroy(
       config_ptr: *const ::std::ffi::c_void,
     ) {
@@ -236,7 +236,7 @@ macro_rules! declare_matcher {
       });
     }
 
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_matcher_match")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_matcher_match(
       config_ptr: *const ::std::ffi::c_void,
       matcher_input_envoy_ptr: *mut ::std::ffi::c_void,

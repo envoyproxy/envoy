@@ -222,7 +222,7 @@ fn module_buffer(s: &str) -> abi::envoy_dynamic_module_type_module_buffer {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_health_checker_config_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_new(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -258,7 +258,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_health_checker_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_health_checker_config_module_ptr,
 ) {
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_health_checker_session_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_new(
   config_ptr: abi::envoy_dynamic_module_type_health_checker_config_module_ptr,
   session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_health_checker_session_on_interval")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_interval(
   session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
   session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
@@ -322,7 +322,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_inter
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_health_checker_session_on_timeout")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_timeout(
   session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
 ) {
@@ -341,7 +341,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_timeo
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_health_checker_session_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_destroy(
   session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
 ) {

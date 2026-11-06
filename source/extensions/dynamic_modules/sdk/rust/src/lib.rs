@@ -5,10 +5,6 @@
 #![allow(dead_code)]
 #![allow(clippy::unnecessary_cast)]
 
-include!(concat!(env!("OUT_DIR"), "/export_name.rs"));
-#[doc(hidden)]
-pub use __export_name_impl as __export_name;
-
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
@@ -130,7 +126,7 @@ pub mod abi {
 #[macro_export]
 macro_rules! declare_init_functions {
   ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -159,7 +155,7 @@ macro_rules! declare_init_functions {
     }
   };
   ($f:ident, $new_http_filter_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -628,7 +624,7 @@ macro_rules! drop_wrapped_c_void_ptr {
 #[macro_export]
 macro_rules! declare_network_filter_init_functions {
   ($f:ident, $new_network_filter_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -766,7 +762,7 @@ macro_rules! declare_network_filter_init_functions {
 #[macro_export]
 macro_rules! declare_all_init_functions {
   ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         $(
@@ -949,7 +945,7 @@ pub static NEW_NETWORK_FILTER_CONFIG_FUNCTION: OnceLock<
 #[macro_export]
 macro_rules! declare_listener_filter_init_functions {
   ($f:ident, $new_listener_filter_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1015,7 +1011,7 @@ pub static NEW_LISTENER_FILTER_CONFIG_FUNCTION: OnceLock<
 #[macro_export]
 macro_rules! declare_udp_listener_filter_init_functions {
   ($f:ident, $new_udp_listener_filter_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1130,7 +1126,7 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 #[macro_export]
 macro_rules! declare_bootstrap_init_functions {
   ($f:ident, $new_bootstrap_extension_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1219,7 +1215,7 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 #[macro_export]
 macro_rules! declare_formatter_init_functions {
   ($f:ident, $new_formatter_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1301,7 +1297,7 @@ pub static NEW_STAT_SINK_CONFIG_FUNCTION: OnceLock<NewStatSinkConfigFunction> = 
 #[macro_export]
 macro_rules! declare_stat_sink_init_functions {
   ($f:ident, $new_stat_sink_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1439,7 +1435,7 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 #[macro_export]
 macro_rules! declare_cluster_init_functions {
   ($f:ident, $new_cluster_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1551,7 +1547,7 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 #[macro_export]
 macro_rules! declare_load_balancer_init_functions {
   ($f:ident, $new_lb_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1633,7 +1629,7 @@ pub static NEW_CERT_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewCertValidatorConfigFu
 #[macro_export]
 macro_rules! declare_cert_validator_init_functions {
   ($f:ident, $new_cert_validator_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1758,7 +1754,7 @@ pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFuncti
 #[macro_export]
 macro_rules! declare_dns_resolver_init_functions {
   ($f:ident, $new_dns_resolver_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -1828,7 +1824,7 @@ pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
 #[macro_export]
 macro_rules! declare_transport_socket_init_functions {
   ($f:ident, $new_transport_socket_factory_config_fn:expr) => {
-    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
+    #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(

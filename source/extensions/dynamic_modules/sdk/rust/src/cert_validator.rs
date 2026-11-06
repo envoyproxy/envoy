@@ -248,7 +248,7 @@ use crate::{drop_wrapped_c_void_ptr, wrap_into_c_void_ptr, NEW_CERT_VALIDATOR_CO
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_cert_validator_config_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -289,7 +289,7 @@ pub(crate) fn init_cert_validator_config(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_cert_validator_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
 ) {
@@ -308,9 +308,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_cert_validator_do_verify_cert_chain"
-)]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
   config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
@@ -378,7 +376,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_c
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
   handshaker_provides_certificates: bool,
@@ -405,7 +403,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_m
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_cert_validator_update_digest")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
   out_data: *mut abi::envoy_dynamic_module_type_module_buffer,

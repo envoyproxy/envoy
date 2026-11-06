@@ -505,7 +505,7 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
 
 // UDP Listener Filter Event Hook Implementations
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_udp_listener_filter_config_new")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -556,7 +556,7 @@ pub(crate) fn init_udp_listener_filter_config<
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_udp_listener_filter_config_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
 ) {
@@ -578,7 +578,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_dest
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_udp_listener_filter_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
   envoy_filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
@@ -606,7 +606,7 @@ pub(crate) fn envoy_dynamic_module_on_udp_listener_filter_new_impl(
   wrap_into_c_void_ptr!(filter)
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_udp_listener_filter_on_data")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_on_data(
   envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
@@ -622,7 +622,7 @@ pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_on_data(
   })
 }
 
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_udp_listener_filter_destroy")]
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
 ) {

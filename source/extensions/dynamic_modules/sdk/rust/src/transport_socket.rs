@@ -451,9 +451,7 @@ fn fill_string_buffer_out(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_transport_socket_factory_config_new"
-)]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config_new(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr,
   socket_name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -502,9 +500,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_transport_socket_factory_config_destroy"
-)]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config_destroy(
   factory_config_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
 ) {
@@ -526,7 +522,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_factory_config
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_new")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_new(
   factory_config_ptr: abi::envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
@@ -550,7 +546,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_destroy")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_destroy(
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
 ) {
@@ -567,7 +563,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_set_callbacks")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_set_callbacks(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -589,7 +585,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_set_callbacks(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_on_connected")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_on_connected(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -611,7 +607,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_on_connected(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_do_read")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_read(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -632,7 +628,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_read(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_do_write")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_write(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -654,7 +650,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_do_write(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_close")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_close(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -677,7 +673,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_close(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_get_protocol")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_protocol(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -701,9 +697,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_protocol(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_transport_socket_get_failure_reason"
-)]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_failure_reason(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -727,7 +721,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_get_failure_re
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!("envoy_dynamic_module_on_transport_socket_can_flush_close")]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_can_flush_close(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
@@ -750,9 +744,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_can_flush_clos
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[export_name = crate::__export_name!(
-  "envoy_dynamic_module_on_transport_socket_start_secure_transport"
-)]
+#[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_transport_socket_start_secure_transport(
   transport_socket_envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
   transport_socket_module_ptr: abi::envoy_dynamic_module_type_transport_socket_module_ptr,
