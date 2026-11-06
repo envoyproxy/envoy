@@ -488,6 +488,7 @@ case $CI_TARGET in
             --define admin_functionality=disabled \
             --@envoy//bazel:jemalloc=True \
             -c fastbuild \
+            -- \
             "${TEST_TARGETS[@]}" \
             -@envoy//test/extensions/dynamic_modules/http:http_integration_test
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
