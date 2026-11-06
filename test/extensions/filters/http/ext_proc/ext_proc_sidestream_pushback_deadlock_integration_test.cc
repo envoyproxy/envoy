@@ -62,8 +62,8 @@ class ExtProcSidestreamPushbackDeadlockTest : public ExtProcIntegrationTest {
 protected:
   // Flow control 2 stays on in both runs, so the only difference between the runs is flow
   // control 3.
-  void setSidestreamFlowControl(bool fc3_enabled) {
-    const std::string fc3_value = fc3_enabled ? "true" : "false";
+  void setSidestreamFlowControl(bool flow_control_3_enabled) {
+    const std::string fc3_value = flow_control_3_enabled ? "true" : "false";
     scoped_runtime_.mergeValues(
         {{std::string(kFc2Flag), "true"}, {std::string(kFc3Flag), fc3_value}});
     config_helper_.addRuntimeOverride(kFc2Flag, "true");
@@ -108,7 +108,7 @@ protected:
                         "\n  downstream HTTP/2 flush timeouts: ", counterValue(kFlushTimeouts));
   }
 
-  void runRequestBodyScanningWithSlowReader(bool fc3_enabled) {
+  void runRequestBodyScanningWithSlowReader(bool flow_control_3_enabled) {
     constexpr uint64_t kChunkSize = 4 * 1024;
     // Enough chunks to overflow ext_proc's request chunk queue (the 16 KiB buffer limit) if the
     // server's replies are not delivered.
@@ -116,7 +116,7 @@ protected:
     constexpr uint64_t kRequestBodySize = kChunkSize * (1 + kChunksAfterPause);
     constexpr uint64_t kResponseBodySize = 256 * 1024;
 
-    setSidestreamFlowControl(fc3_enabled);
+    setSidestreamFlowControl(flow_control_3_enabled);
     config_helper_.setBufferLimits(kBufferLimit, kBufferLimit);
     auto* processing_mode = proto_config_.mutable_processing_mode();
     processing_mode->set_request_header_mode(ProcessingMode::SKIP);
@@ -176,8 +176,8 @@ protected:
     const bool upload_delivered =
         upstream_request_->waitForData(*dispatcher_, kRequestBodySize, 5s);
     EXPECT_TRUE(upload_delivered)
-        << "Upload stalled with FC3 " << (fc3_enabled ? "on" : "off") << ": the upstream got "
-        << upstream_request_->bodyLength() << " of " << kRequestBodySize
+        << "Upload stalled with FC3 " << (flow_control_3_enabled ? "on" : "off")
+        << ": the upstream got " << upstream_request_->bodyLength() << " of " << kRequestBodySize
         << " request body bytes. The ext_proc server received and answered " << messages_answered
         << " request_body messages (end_of_stream seen: " << saw_end_of_stream
         << "), but Envoy never delivered the replies." << flowControlSummary();
@@ -228,7 +228,7 @@ protected:
     return 5 + reply.ByteSizeLong();
   }
 
-  void runFullDuplexWithPassThroughServer(bool fc3_enabled) {
+  void runFullDuplexWithPassThroughServer(bool flow_control_3_enabled) {
     constexpr uint64_t kChunkSize = 16 * 1024;
     constexpr int kRequestChunks = 32;
     constexpr int kChunksBeforeResponse = 2;
@@ -237,7 +237,7 @@ protected:
     // HTTP/2 receive window on both ends of the side stream.
     constexpr uint32_t kSidestreamWindow = 65535;
 
-    setSidestreamFlowControl(fc3_enabled);
+    setSidestreamFlowControl(flow_control_3_enabled);
     config_helper_.setBufferLimits(kBufferLimit, kBufferLimit);
     // The ext_proc server's receive window: once the server stops reading, Envoy can send it
     // at most 64 KiB more.
@@ -379,7 +379,7 @@ protected:
     // reading the response, the downstream buffer drains, the side stream resumes, and the upload
     // completes.
     client_upload(kRequestChunks);
-    if (fc3_enabled) {
+    if (flow_control_3_enabled) {
       test_server_->waitForCounter(std::string(kSidestreamPaused), testing::Ge(1), 10s,
                                    dispatcher_.get());
     }
@@ -390,7 +390,8 @@ protected:
 
     // Correct behavior: the upload completes...
     const bool upload_completed = upstream_request_->complete();
-    EXPECT_TRUE(upload_completed) << "Upload deadlocked with FC3 " << (fc3_enabled ? "on" : "off")
+    EXPECT_TRUE(upload_completed) << "Upload deadlocked with FC3 "
+                                  << (flow_control_3_enabled ? "on" : "off")
                                   << ": the upstream got " << upstream_request_->bodyLength()
                                   << " of " << kRequestBodySize
                                   << " request body bytes. Pass-through server stopped reading: "
@@ -399,7 +400,7 @@ protected:
                                   << flowControlSummary();
     EXPECT_EQ(0, counterValue(kIdleTimeouts)) << flowControlSummary();
     EXPECT_EQ(0, counterValue(kFlushTimeouts)) << flowControlSummary();
-    if (fc3_enabled) {
+    if (flow_control_3_enabled) {
       EXPECT_GE(counterValue(kSidestreamPaused), 1);
     } else {
       EXPECT_EQ(0, counterValue(kSidestreamPaused));
@@ -430,14 +431,14 @@ TEST_P(ExtProcSidestreamPushbackDeadlockTest, RequestBodyScanningWithSlowReaderF
   if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
   }
-  runRequestBodyScanningWithSlowReader(/*fc3_enabled=*/false);
+  runRequestBodyScanningWithSlowReader(/*flow_control_3_enabled=*/false);
 }
 
 TEST_P(ExtProcSidestreamPushbackDeadlockTest, RequestBodyScanningWithSlowReaderFc3On) {
   if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
   }
-  runRequestBodyScanningWithSlowReader(/*fc3_enabled=*/true);
+  runRequestBodyScanningWithSlowReader(/*flow_control_3_enabled=*/true);
 }
 
 // Control run: without flow control 3, FULL_DUPLEX_STREAMED in both directions works with a
@@ -446,14 +447,14 @@ TEST_P(ExtProcSidestreamPushbackDeadlockTest, FullDuplexWithPassThroughServerFc3
   if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
   }
-  runFullDuplexWithPassThroughServer(/*fc3_enabled=*/false);
+  runFullDuplexWithPassThroughServer(/*flow_control_3_enabled=*/false);
 }
 
 TEST_P(ExtProcSidestreamPushbackDeadlockTest, FullDuplexWithPassThroughServerFc3On) {
   if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
   }
-  runFullDuplexWithPassThroughServer(/*fc3_enabled=*/true);
+  runFullDuplexWithPassThroughServer(/*flow_control_3_enabled=*/true);
 }
 
 } // namespace
