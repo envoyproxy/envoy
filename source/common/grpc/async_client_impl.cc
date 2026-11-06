@@ -146,6 +146,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     options_.setSendXff(!parent_.skip_envoy_headers_);
   }
 
+  // Internal gRPC async clients use HTTP/2 by default.
+  if (!options_.protocol.has_value()) {
+    options_.setProtocol(Http::Protocol::Http2);
+  }
+
   // Configure the maximum frame length
   decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
 
