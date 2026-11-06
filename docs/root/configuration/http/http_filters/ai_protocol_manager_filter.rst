@@ -565,6 +565,41 @@ client's path variables are replaced.
 Use header mutations only for non-secret API headers; pass credentials via
 ``request_headers_to_add`` or :ref:`credential_injector <config_http_filters_credential_injector>`.
 
+.. _config_http_filters_ai_protocol_manager_dynamic_modules:
+
+Dynamic modules
+~~~~~~~~~~~~~~~
+
+The :ref:`dynamic module AI filter
+<envoy_v3_api_msg_extensions.http.ai_filters.dynamic_modules.v3.DynamicModuleAiFilter>` runs an
+AI filter implemented in a :ref:`dynamic module <arch_overview_dynamic_modules>`. The module sees
+the parsed request and can read or modify the payload, read the request's wire API, read or
+modify the request headers, read or write filter state, and reject the request with a local
+reply.
+
+.. code-block:: yaml
+
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      filters:
+      - name: envoy.http.ai_filters.dynamic_modules
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.dynamic_modules.v3.DynamicModuleAiFilter
+          dynamic_module_config:
+            name: my_module
+          filter_name: guardrail
+
+The module addresses the payload by JSON pointer (RFC 6901) and exchanges values as JSON text.
+Strings longer than :ref:`inline_string_threshold_bytes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.inline_string_threshold_bytes>`
+are offloaded to the external buffer rather than held in memory, and a read of a value that is or
+holds one fails; raise the threshold for a module that inspects message content. A module may
+replace an offloaded value. A header the module rewrites reaches the upstream, but changing a
+header the route was selected on does not select another route. A module that fails the request
+ends it with a 502.
+
 Response token-usage extraction
 -------------------------------
 

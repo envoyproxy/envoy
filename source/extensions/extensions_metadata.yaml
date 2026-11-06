@@ -2438,6 +2438,13 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.dynamic_modules:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.http.ai_filters.dynamic_modules.v3.DynamicModuleAiFilter
 envoy.http.ai_filters.model_router:
   categories:
   - envoy.http.ai_filters

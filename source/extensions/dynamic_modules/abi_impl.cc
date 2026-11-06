@@ -1893,6 +1893,49 @@ WEAK_STUB(envoy_dynamic_module_type_metrics_result,
           envoy_dynamic_module_type_metrics_result_Success,
           envoy_dynamic_module_type_access_logger_config_envoy_ptr, size_t, uint64_t)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_get_filter_state_bytes, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_get_request_header_value, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_ai_filter_json_result,
+          envoy_dynamic_module_callback_ai_filter_get_request_json,
+          envoy_dynamic_module_type_ai_filter_json_result_Unavailable,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_get_request_protocol, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_remove_request_header, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_ai_filter_json_result,
+          envoy_dynamic_module_callback_ai_filter_remove_request_json,
+          envoy_dynamic_module_type_ai_filter_json_result_Unavailable,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_send_local_reply, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, uint32_t,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_ai_filter_set_request_header, false,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_ai_filter_json_result,
+          envoy_dynamic_module_callback_ai_filter_set_request_json,
+          envoy_dynamic_module_type_ai_filter_json_result_Unavailable,
+          envoy_dynamic_module_type_ai_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_specifier_get_attribute_bool, false,
           envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_attribute_id, bool*)
