@@ -248,6 +248,12 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
+  status = jwks_data_->verifyCriticalHeaders(*jwt_);
+  if (status != Status::Ok) {
+    doneWithStatus(status);
+    return;
+  }
+
   const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
 
   if (!sub_allowed) {

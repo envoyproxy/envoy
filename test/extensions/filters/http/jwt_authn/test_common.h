@@ -338,6 +338,18 @@ const char GoodToken[] = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc
                          "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
                          "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
 
+// Header:  {"alg":"RS256","typ":"JWT","crit":["exp-extension"],"exp-extension":true}
+// Payload: same as GoodToken
+const char CritToken[] = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImNyaXQiOlsiZXhwLWV4dGVuc2lvbi"
+                         "JdLCJleHAtZXh0ZW5zaW9uIjp0cnVlfQ.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY"
+                         "29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXV"
+                         "kIjoiZXhhbXBsZV9zZXJ2aWNlIn0.mFEI4kF6xaIHNs9ild90c5iR0_H3Yy5iySHg2"
+                         "YoUIu29wsrROL6PiHqnt2Si5zXWokBzxe-AYfn119o-EPkBug7PQ8rjfMdLqQqH81x"
+                         "IufnXh7ppSKTSIvYSLQO1DDCS1Q0M0DVPL1uYgR7Zmx6nnjqkK7A7CjJVHzISyk7An"
+                         "Ki3t61DeA9fLspi3IhA_Sngyol2lx917QHwa4svbztwaov1cISvtfffWWHQxZ0Tcnf"
+                         "vWczKOxpa3t9BoqGcZzpPBtsMuhHwhhRGMm-ad3Vg5L9mMOJNz1AyKuwSBM9VXmiFc"
+                         "n3TFbAALGDbkLx20LqXOLOhlnJ9bHqMlbFMW3wEQw";
+
 // Payload:
 // {
 //   "iss": "https://example.com",

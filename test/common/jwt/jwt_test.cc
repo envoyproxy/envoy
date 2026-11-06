@@ -244,6 +244,63 @@ TEST(JwtParseTest, TestParseHeaderNonStringX5tIgnored) {
   EXPECT_EQ(jwt.x5t_, "");
 }
 
+TEST(JwtParseTest, TestParseHeaderCrit) {
+  // Header:  {"alg":"RS256","crit":["exp-extension"],"exp-extension":true}
+  const std::string jwt_text =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsiZXhwLWV4dGVuc2lvbiJdLCJleHAtZXh0ZW5zaW9uIjp0cnVlfQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::Ok);
+  EXPECT_EQ(crit, std::vector<std::string>{"exp-extension"});
+
+  // A JWT without "crit" has no critical headers.
+  ASSERT_EQ(jwt.parseFromString(good_jwt), Status::Ok);
+  crit.clear();
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::Ok);
+  EXPECT_TRUE(crit.empty());
+}
+
+TEST(JwtParseTest, TestParseHeaderBadCrit) {
+  // Header:  {"alg":"RS256","crit":"exp-extension","exp-extension":true}
+  const std::string bad_crit_not_list =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOiJleHAtZXh0ZW5zaW9uIiwiZXhwLWV4dGVuc2lvbiI6dHJ1ZX0."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":[]}
+  const std::string bad_crit_empty =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOltdfQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":[1]}
+  const std::string bad_crit_not_string =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsxXX0."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":["kid"],"kid":"abc"}
+  const std::string bad_crit_registered =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsia2lkIl0sImtpZCI6ImFiYyJ9."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":["exp-extension"]}
+  const std::string bad_crit_missing =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsiZXhwLWV4dGVuc2lvbiJdfQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  for (const auto& jwt_text : {bad_crit_not_list, bad_crit_empty, bad_crit_not_string,
+                               bad_crit_registered, bad_crit_missing}) {
+    // Parsing ignores "crit", so only getCriticalHeaders reports it.
+    Jwt jwt;
+    ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+    std::vector<std::string> crit;
+    EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
+  }
+}
+
 TEST(JwtParseTest, TestParsePayloadBadBase64) {
   /*
    * jwt with payload replaced by

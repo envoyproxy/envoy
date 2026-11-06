@@ -55,6 +55,9 @@ public:
               : JwtProvider::Algorithm_Name(static_cast<JwtProvider::Algorithm>(alg)));
     }
 
+    allowed_critical_headers_.insert(jwt_provider_.critical_headers().allowed().begin(),
+                                     jwt_provider_.critical_headers().allowed().end());
+
     if (jwt_provider_.has_subjects()) {
       sub_matcher_.emplace(jwt_provider_.subjects(), context);
     }
@@ -202,6 +205,23 @@ public:
     return allowed_algorithms_.empty() || allowed_algorithms_.contains(alg);
   }
 
+  Status verifyCriticalHeaders(const JwtVerify::Jwt& jwt) const override {
+    if (!jwt_provider_.has_critical_headers()) {
+      return Status::Ok;
+    }
+    std::vector<std::string> crit;
+    const Status status = jwt.getCriticalHeaders(&crit);
+    if (status != Status::Ok) {
+      return status;
+    }
+    for (const auto& param : crit) {
+      if (!allowed_critical_headers_.contains(param)) {
+        return Status::JwtCritHeaderNotAllowed;
+      }
+    }
+    return Status::Ok;
+  }
+
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
 
   bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
@@ -258,6 +278,7 @@ private:
   std::optional<Matchers::StringMatcherImpl> sub_matcher_;
   std::optional<absl::Duration> max_exp_;
   absl::flat_hash_set<std::string> allowed_algorithms_;
+  absl::flat_hash_set<std::string> allowed_critical_headers_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
