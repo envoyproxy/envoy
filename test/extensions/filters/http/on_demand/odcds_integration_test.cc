@@ -392,6 +392,13 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", {}, {});
 
+  auto h = test_server_->histogram("cluster.new_cluster.odcds.discovery_time");
+  ASSERT_NE(nullptr, h);
+  EXPECT_EQ("cluster.odcds.discovery_time", h->tagExtractedName());
+  ASSERT_EQ(1, h->tags().size());
+  EXPECT_EQ(Config::TagNames::get().CLUSTER_NAME, h->tags()[0].name_);
+  EXPECT_EQ("new_cluster", h->tags()[0].value_);
+
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
@@ -656,6 +663,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
+  EXPECT_EQ(nullptr, test_server_->histogram("cluster.new_cluster.odcds.discovery_time"));
 
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
@@ -693,6 +701,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryForNonexistentCluster) {
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
+  EXPECT_EQ(nullptr, test_server_->histogram("cluster.new_cluster.odcds.discovery_time"));
 
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();

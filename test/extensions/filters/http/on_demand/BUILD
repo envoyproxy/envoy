@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/upstream:upstream_mocks",
