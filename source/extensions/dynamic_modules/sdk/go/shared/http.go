@@ -110,6 +110,12 @@ const (
 	FilterStateStreamSharingSharedWithUpstreamConnectionOnce
 )
 
+// FilterStateObjectDestroyer is optionally implemented by values passed to SetFilterStateObject.
+// OnFilterStateObjectDestroy is called once when Envoy destroys the filter state entry.
+type FilterStateObjectDestroyer interface {
+	OnFilterStateObjectDestroy()
+}
+
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
 // valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
 // because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
@@ -307,6 +313,14 @@ type HttpFilterHandle interface {
 	// its type. Unlike the getter methods, this does not read or serialize the stored object.
 	HasFilterState(key string) bool
 
+	// SetFilterStateObject stores a Go value in the filter state without serializing it.
+	// Returns false if the filter state is not accessible or the key exists with a different
+	// lifespan; the value is destroyed in that case.
+	SetFilterStateObject(key string, value any, lifeSpan FilterStateLifeSpan) bool
+
+	// GetFilterStateObject returns the value stored with SetFilterStateObject under the given key.
+	GetFilterStateObject(key string) (any, bool)
+
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
 	// Returns data value if found, otherwise nil.
@@ -433,6 +447,10 @@ type HttpFilterHandle interface {
 	// graceful is true, a graceful drain is initiated before closing.
 	SendGoAwayAndClose(graceful bool)
 
+	// DrainConnectionUponCompletion marks the downstream connection to be drained once the
+	// current HTTP stream completes.
+	DrainConnectionUponCompletion()
+
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
@@ -539,16 +557,20 @@ type HttpFilterHandle interface {
 	StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool, timeoutMs uint64,
 		cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
 
-	// SendHttpStreamData sends data on an existing HTTP stream. Returns true if the data was
-	// sent successfully.
+	// SendHttpStreamData sends data on an existing HTTP stream. Returns false if the stream does
+	// not exist, and true otherwise. When Envoy reset the stream and did not call the reset
+	// callback yet, the data is dropped, and the reset callback follows unless the filter is
+	// destroyed first.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// from a scheduled function, so that it runs on the thread where the stream is being
 	// processed.
 	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
 
-	// SendHttpStreamTrailers sends trailers on an existing HTTP stream. Returns true if the
-	// trailers were sent successfully.
+	// SendHttpStreamTrailers sends trailers on an existing HTTP stream. Returns false if the
+	// stream does not exist, and true otherwise. When Envoy reset the stream and did not call the
+	// reset callback yet, the trailers are dropped, and the reset callback follows unless the
+	// filter is destroyed first.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// from a scheduled function, so that it runs on the thread where the stream is being
@@ -649,11 +671,15 @@ type HttpFilterConfigHandle interface {
 		timeoutMs uint64, cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
 
 	// SendHttpStreamData sends data on an existing HTTP stream started via StartHttpStream.
-	// Returns true if the data was sent successfully.
+	// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+	// and did not call the reset callback yet, the data is dropped, and the reset callback
+	// follows unless the configuration is destroyed first.
 	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
 
 	// SendHttpStreamTrailers sends trailers on an existing HTTP stream started via StartHttpStream.
-	// Returns true if the trailers were sent successfully.
+	// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+	// and did not call the reset callback yet, the trailers are dropped, and the reset callback
+	// follows unless the configuration is destroyed first.
 	SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool
 
 	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.

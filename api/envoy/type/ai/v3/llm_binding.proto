@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package envoy.type.ai.v3;
 
-import "google/protobuf/struct.proto";
+import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.ai.v3";
 option java_outer_classname = "LlmBindingProto";
@@ -19,39 +19,39 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: LLM binding]
 
 // How a provider carries an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` on
-// HTTP, where that differs from the API's own: the request path, and edits to the request body.
-// The API itself -- its schemas, stream events and usage -- does not change.
+// HTTP, where that differs from the API's own: the request path, and edits to the request body
+// and headers. The API itself -- its schemas, stream events and usage -- does not change.
 //
 // Claude on Vertex AI:
 //
 // .. code-block:: yaml
 //
 //   uri_pattern: "/v1/projects/my-project/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}"
-//   mutations:
-//   - { body_field: model }
-//   - { body_field: anthropic_version, value: vertex-2023-10-16, keep_existing: true }
+//   body_mutations:
+//   - remove: model
+//   - append:
+//       record: { key: anthropic_version, value: vertex-2023-10-16 }
+//       action: ADD_IF_ABSENT
+//   header_mutations:
+//   - remove: anthropic-version
 //
-// On the way out, the path is rendered from the request and the mutations are applied in order.
-// On the way in, the model and streaming mode the path names are written into the body and the
-// body fields the mutations write are removed, so the API's own document is transcoded.
+// The Anthropic API itself, which Envoy defines as the binding of ``ANTHROPIC_MESSAGES``:
+//
+// .. code-block:: yaml
+//
+//   uri_pattern: "/v1/messages"
+//   header_mutations:
+//   - append:
+//       header: { key: anthropic-version, value: "2023-06-01" }
+//       append_action: ADD_IF_ABSENT
+//
+// A binding's mutations apply on top of the API's, so the Vertex binding removes the API's
+// version header, which Vertex does not take, by naming it. On the way out, the path is rendered
+// from the request and the mutations are applied in order, headers first. On the way in, the
+// model and streaming mode the path names are written into the body and the body fields and
+// headers the mutations write are removed, so the API's own document is transcoded.
 message LLMBinding {
-  // One edit to the request body: a field is written, or removed when ``value`` is unset or null.
-  message Mutation {
-    oneof target {
-      option (validate.required) = true;
-
-      // A top-level member of the request body.
-      string body_field = 1 [(validate.rules).string = {min_len: 1}];
-    }
-
-    // The value to write. In a string, ``{name}`` is replaced by a value of the request:
-    // ``{model}`` by the body's model, any other name by a path variable the client's path holds,
-    // such as ``{project}``. When unset or null, the field is removed.
-    google.protobuf.Value value = 2;
-
-    // Write ``value`` only where the field is absent, rather than replace it.
-    bool keep_existing = 3;
-  }
+  reserved 2;
 
   // The request path, as a :ref:`URI pattern
   // <config_http_filters_ai_protocol_manager_transcoder_instructions>`: a two-way map between the
@@ -63,7 +63,62 @@ message LLMBinding {
   // API's own path is used.
   string uri_pattern = 1;
 
-  // Edits to the request body, applied in order. When empty, the API's own edits apply, such as
-  // removing ``model`` and ``stream`` for Gemini.
-  repeated Mutation mutations = 2;
+  // Ordered edits to the request headers, applied after the API's own edits and before
+  // ``body_mutations``. One that names a header the API's edits also name replaces that edit; the
+  // API's other edits still apply. So a binding that only adds a header keeps, say, Gemini's
+  // removal of ``model`` and ``stream`` from the body, and overrides one of the API's edits by
+  // naming its target.
+  //
+  // Of a :ref:`HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`,
+  // this is what is accepted. The rest is rejected for now, so that accepting it later changes no
+  // binding's meaning.
+  //
+  // .. list-table::
+  //    :header-rows: 1
+  //
+  //    * - Field
+  //      - Effect
+  //    * - ``remove``
+  //      - Removes the header.
+  //    * - ``append`` with ``append_action: OVERWRITE_IF_EXISTS_OR_ADD``
+  //      - Sets the header to ``header.value``.
+  //    * - ``append`` with ``append_action: ADD_IF_ABSENT``
+  //      - Sets the header only where the request has none.
+  //    * - ``append`` with ``append_action`` unset (``APPEND_IF_EXISTS_OR_ADD``) or ``OVERWRITE_IF_EXISTS``
+  //      - Rejected: the action is named.
+  //    * - ``remove_on_match``, ``header.raw_value``, the deprecated ``append`` flag
+  //      - Rejected.
+  //
+  // The value is not a format string. Only ``{model}``, the body's model, and the client's path
+  // variables, such as ``{project}``, are replaced; a binding can arrive through filter state
+  // built from request data, so it is never evaluated as one. Pseudo-headers (``:path`` is
+  // ``uri_pattern``'s), ``host``, ``content-length`` and ``transfer-encoding`` are not accepted.
+  // Credentials do not belong here: a binding is configuration, not a secret.
+  repeated config.common.mutation_rules.v3.HeaderMutation header_mutations = 3;
+
+  // Ordered edits to the top-level members of the request body, applied after the API's own
+  // edits and after ``header_mutations``, replacing the API's edits to the same fields as
+  // ``header_mutations`` do for headers.
+  //
+  // Of a :ref:`KeyValueMutation <envoy_v3_api_msg_config.core.v3.KeyValueMutation>`, this is what
+  // is accepted, as for a header.
+  //
+  // .. list-table::
+  //    :header-rows: 1
+  //
+  //    * - Field
+  //      - Effect
+  //    * - ``remove``
+  //      - Removes the field.
+  //    * - ``append`` with ``action: OVERWRITE_IF_EXISTS_OR_ADD``
+  //      - Sets the field to ``record.value``, any JSON value.
+  //    * - ``append`` with ``action: ADD_IF_ABSENT``
+  //      - Sets the field only where the body has none.
+  //    * - ``append`` with ``action`` unset (``APPEND_IF_EXISTS_OR_ADD``) or ``OVERWRITE_IF_EXISTS``
+  //      - Rejected: the action is named.
+  //    * - ``append`` with a null or unset ``record.value``, or with the deprecated ``entry``
+  //      - Rejected: ``remove`` removes a field.
+  //
+  // In a string value, ``{name}`` is replaced as in ``header_mutations``, and nothing else is.
+  repeated config.core.v3.KeyValueMutation body_mutations = 4;
 }

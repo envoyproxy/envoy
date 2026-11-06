@@ -14,7 +14,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
-#include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
@@ -109,10 +108,8 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
         aliases.contains(it->alias_) ||
         (check_answered_ids && config_update_info_->vhdsResourceIdAnswered(it->alias_));
     if (answered) {
-      // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
-      auto host_header = Http::RequestHeaderMapImpl::create();
-      host_header->setHost(VhdsSubscription::aliasToDomainName(it->alias_));
-      const bool host_exists = config->virtualHostExists(*host_header);
+      const bool host_exists =
+          config->virtualHostExists(VhdsSubscription::aliasToDomainName(it->alias_));
       std::weak_ptr<Http::RouteConfigUpdatedCallback> current_cb(it->cb_);
       it->thread_local_dispatcher_.post([current_cb, host_exists] {
         if (auto cb = current_cb.lock()) {
@@ -147,8 +144,9 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
         if (!maybe_still_alive.lock()) {
           return;
         }
-        const std::string alias = VhdsSubscription::domainNameToAlias(
-            config_update_info_->protobufConfigurationCast().name(), for_domain);
+        const auto config =
+            std::static_pointer_cast<const ConfigImpl>(config_update_info_->parsedConfiguration());
+        const std::string alias = VhdsSubscription::domainNameToAlias(config->name(), for_domain);
         // TODO(wbpcode): this local-answer block and the publish loop in onConfigUpdate() are
         // duplicated and may could be refactored into a shared helper.
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
@@ -157,11 +155,7 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
           // reflects that answer, so the request can be answered locally. The delta subscription
           // to the alias is persistent: if the virtual host appears or changes later, the server
           // pushes an update on its own.
-          const auto config = std::static_pointer_cast<const ConfigImpl>(
-              config_update_info_->parsedConfiguration());
-          auto host_header = Http::RequestHeaderMapImpl::create();
-          host_header->setHost(VhdsSubscription::aliasToDomainName(alias));
-          const bool host_exists = config->virtualHostExists(*host_header);
+          const bool host_exists = config->virtualHostExists(for_domain);
           thread_local_dispatcher.post([route_config_updated_cb, host_exists] {
             if (auto cb = route_config_updated_cb.lock()) {
               (*cb)(host_exists);

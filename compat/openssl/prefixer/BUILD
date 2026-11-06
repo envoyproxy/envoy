@@ -1,7 +1,14 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
 
 licenses(["notice"])  # Apache 2
+
+# GCC's libstdc++ for the prefixer, from a hermetic GCC repository that a host GCC override does
+# not replace. It is available when Envoy is a dependency too; set this flag to use another.
+label_flag(
+    name = "libstdcxx",
+    build_setting_default = "@gcc_runtime_linux_x86_64//:libstdcxx",
+)
 
 cc_binary(
     name = "prefixer",
@@ -11,23 +18,23 @@ cc_binary(
     ] + ([LIBLLVM] if LIBLLVM else []),
     copts = [
         "-fno-rtti",  # Required by libclang-cpp
-        # Use libstdc++ for ABI compatibility with libclang-cpp
-        "-stdlib=libstdc++",
-        # -isystem paths for the LLVM headers and the libstdc++ headers from the
-        # sysroot. These reference external repositories by their on-disk
-        # (canonical) name as materialised by bzlmod.
-        "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/sysroot/usr/include/c++/13",
-        "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/sysroot/usr/include/x86_64-linux-gnu/c++/13",
+        # Use the hermetic GCC toolchain's libstdc++ (headers via :libstdcxx) for ABI
+        # compatibility with libclang-cpp, not the toolchain's libc++. With -nostdinc++
+        # the toolchain's -stdlib=libc++ has no effect, so silence its warning.
+        "-nostdinc++",
+        "-Wno-unused-command-line-argument",
     ],
     linkopts = [
         "$(location " + LIBCLANG_CPP + ")",
     ] + (["$(location " + LIBLLVM + ")"] if LIBLLVM else []) + [
         "-Wl,-rpath,$$ORIGIN/../lib",
-        # Use libstdc++ for ABI compatibility with libclang-cpp
-        "-stdlib=libstdc++",
-        # Explicitly link libstdc++ runtime (needed since toolchain defaults to libc++)
-        "-lstdc++",
+        # libstdc++.a comes from :libstdcxx (statically, so the tool does not need the host's
+        # libstdc++.so.6); stop the driver adding its own C++ library.
+        "-nostdlib++",
     ],
     visibility = ["//visibility:public"],
-    deps = ["@llvm_toolchain_llvm//:clang_tooling_headers"],
+    deps = [
+        ":libstdcxx",
+        "@llvm_toolchain_llvm//:clang_tooling_headers",
+    ],
 )

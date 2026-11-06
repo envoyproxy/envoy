@@ -75,6 +75,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":dns_filter_test_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/udp/dns_filter:config",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",

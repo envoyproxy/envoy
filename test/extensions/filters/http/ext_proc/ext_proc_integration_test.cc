@@ -5113,6 +5113,9 @@ TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormal) {
 }
 
 TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithHeaderDelay) {
+  // The header response is delayed past this timeout; FULL_DUPLEX_STREAMED must not have a
+  // message timer running.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   performStandAloneModeOverrideNormal(ProcessingMode::STREAMED, /*delay_header_response=*/true);
 }
 
@@ -6231,6 +6234,69 @@ TEST_P(ExtProcIntegrationTest, FullDuplexStreamedBodyChunking) {
 
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ(response->body(), "mutated_response");
+}
+
+TEST_P(ExtProcIntegrationTest, StreamedBodyCompleteBeforeHeadersUnsetChunkSizeParity) {
+  auto* processing_mode = proto_config_.mutable_processing_mode();
+  processing_mode->set_request_header_mode(ProcessingMode::SEND);
+  processing_mode->set_response_header_mode(ProcessingMode::SEND);
+  processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+  processing_mode->set_response_body_mode(ProcessingMode::STREAMED);
+
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  LoggingTestFilterConfig logging_config;
+  logging_config.set_expected_response_body_call_count(1);
+  config_option.logging_filter_config = logging_config;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  // Send complete request body before request_headers response arrives. When
+  // max_streamed_body_chunk_size is unset, handleCompleteBodyAvailable() uses
+  // BufferedBodyCallback, which applies header_mutation from the BodyResponse.
+  auto response = sendDownstreamRequestWithBody("request_body", std::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [&](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_EQ(body.body(), "request_body");
+        EXPECT_TRUE(body.end_of_stream());
+        auto* header_mut =
+            body_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        header_mut->mutable_append()->set_value(false);
+        header_mut->mutable_header()->set_key("x-req-body-header");
+        header_mut->mutable_header()->set_raw_value("from-req-body");
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("mutated_request_body");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-req-body-header", "from-req-body"));
+  EXPECT_EQ(upstream_request_->body().toString(), "mutated_request_body");
+
+  // Send response headers and complete response body before response_headers response arrives.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Buffer::OwnedImpl resp_data("response_body");
+  upstream_request_->encodeData(resp_data, true);
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [&](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_EQ(body.body(), "response_body");
+        EXPECT_TRUE(body.end_of_stream());
+        auto* header_mut =
+            body_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        header_mut->mutable_append()->set_value(false);
+        header_mut->mutable_header()->set_key("x-resp-body-header");
+        header_mut->mutable_header()->set_raw_value("from-resp-body");
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("mutated_response_body");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-resp-body-header", "from-resp-body"));
+  EXPECT_EQ(response->body(), "mutated_response_body");
 }
 
 } // namespace ExternalProcessing

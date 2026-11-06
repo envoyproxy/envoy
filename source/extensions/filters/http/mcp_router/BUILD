@@ -13,8 +13,11 @@ envoy_cc_library(
     name = "session_codec_lib",
     srcs = ["session_codec.cc"],
     hdrs = ["session_codec.h"],
+    external_deps = ["ssl"],
     deps = [
         "//source/common/common:base64_lib",
+        "//source/common/common:empty_string",
+        "//source/common/crypto:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -104,6 +107,7 @@ envoy_cc_extension(
     deps = [
         ":mcp_router_lib",
         "//envoy/registry",
+        "//source/common/config:datasource_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],

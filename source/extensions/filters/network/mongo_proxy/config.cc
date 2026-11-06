@@ -22,7 +22,6 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
 
   ASSERT(!proto_config.stat_prefix().empty());
 
-  const std::string stat_prefix = fmt::format("mongo.{}", proto_config.stat_prefix());
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
     access_log = std::make_shared<AccessLog>(
@@ -41,7 +40,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
         std::vector<std::string>(proto_config.commands().begin(), proto_config.commands().end());
   }
 
-  auto stats = std::make_shared<MongoStats>(context.scope(), stat_prefix, commands);
+  auto stats = std::make_shared<MongoStats>(context.scope(), proto_config.stat_prefix(), commands);
   const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
   const uint32_t max_bson_depth =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_bson_depth, 100);

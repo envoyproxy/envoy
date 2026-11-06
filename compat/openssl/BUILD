@@ -954,6 +954,7 @@ cc_library(
     ],
     linkopts = ["-ldl"],
     linkstatic = True,
+    copts = ["-fvisibility=hidden"],
     visibility = ["//visibility:public"],
 )
 

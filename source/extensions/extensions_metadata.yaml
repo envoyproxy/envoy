@@ -615,7 +615,7 @@ envoy.filters.http.grpc_json_transcoder:
 envoy.filters.http.grpc_stats:
   categories:
   - envoy.filters.http
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream
   status: stable
   type_urls:
   - envoy.extensions.filters.http.grpc_stats.v3.FilterConfig
@@ -1032,7 +1032,7 @@ envoy.filters.network.redis_proxy:
 envoy.filters.network.sni_cluster:
   categories:
   - envoy.filters.network
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.network.sni_cluster.v3.SniCluster
@@ -1461,6 +1461,13 @@ envoy.udp_packet_writer.gso:
   status: stable
   type_urls:
   - envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+envoy.queue_policy.adaptive_lifo:
+  categories:
+  - envoy.queue_policy
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.queue_policy.adaptive_lifo.v3.AdaptiveLifoQueuePolicyConfig
 envoy.queue_policy.fifo:
   categories:
   - envoy.queue_policy
@@ -1694,7 +1701,7 @@ envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
+  status: stable
 envoy.tls.handshakers.dynamic_modules:
   categories:
   - envoy.tls_handshakers
@@ -1908,7 +1915,7 @@ envoy.upstreams.http.udp:
   categories:
   - envoy.upstreams
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
 envoy.upstreams.tcp.generic:
   categories:
   - envoy.upstreams
@@ -2342,6 +2349,13 @@ envoy.load_balancing_policies.override_host:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
+envoy.load_balancing_policies.host_allowlist:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.host_allowlist.v3.HostAllowlist
 envoy.load_balancing_policies.wrr_locality:
   categories:
   - envoy.load_balancing_policies
@@ -2424,6 +2438,13 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.model_router:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.model_router.v3.ModelRouter
 envoy.http.ai_filters.request_info:
   categories:
   - envoy.http.ai_filters
@@ -2431,6 +2452,13 @@ envoy.http.ai_filters.request_info:
   status: alpha
   type_urls:
   - envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+envoy.http.ai_filters.route_selector:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.route_selector.v3.RouteSelector
 envoy.http.ai_filters.schema_validation:
   categories:
   - envoy.http.ai_filters
@@ -2503,8 +2531,10 @@ envoy.config_mux.sotw_grpc_mux_factory:
 envoy.filters.http.set_filter_state:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.set_filter_state.v3.Config
 envoy.filters.network.set_filter_state:

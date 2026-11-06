@@ -78,9 +78,6 @@ public:
       vhds_subscription_->updateOnDemand(alias);
     }
   }
-  const Protobuf::Message& protobufConfiguration() const override {
-    return base_.protobufConfiguration();
-  }
   Rds::ConfigConstSharedPtr parsedConfiguration() const override {
     return base_.parsedConfiguration();
   }
@@ -99,17 +96,12 @@ public:
     const auto it = requested_vhds_resource_ids_.find(resource_id);
     return it != requested_vhds_resource_ids_.end() ? it->second : false;
   }
-  const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() const override {
-    ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(
-        &RouteConfigUpdateReceiverImpl::protobufConfiguration()));
-    return static_cast<const envoy::config::route::v3::RouteConfiguration&>(
-        RouteConfigUpdateReceiverImpl::protobufConfiguration());
-  }
 
 private:
-  const Protobuf::Message& latestProtobufConfiguration() const {
-    return base_.warming_state_.route_config_proto_ ? *base_.warming_state_.route_config_proto_
-                                                    : *base_.route_config_proto_;
+  const Protobuf::Any& latestRouteConfigurationAny() const {
+    return base_.warming_state_.route_config_any_.has_value()
+               ? *base_.warming_state_.route_config_any_
+               : base_.route_config_any_;
   }
 
   absl::StatusOr<VhdsSubscriptionPtr>

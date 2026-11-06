@@ -148,7 +148,7 @@ def envoy_cc_fuzz_test(
             Label("//test/fuzz:fuzz_runner_lib"),
             _TEST_VERSION_LINKSTAMP,
         ],
-        tags = tags,
+        tags = tags + ["skip_on_windows"],
         **kwargs
     )
 
@@ -179,7 +179,7 @@ def envoy_cc_fuzz_test(
             ],
         }) + deprecate_repository("envoy_cc_fuzz_test", repository),
         size = size,
-        tags = ["fuzz_target"] + tags,
+        tags = ["fuzz_target"] + tags + ["skip_on_windows"],
     )
 
     fuzzing_decoration(
@@ -226,7 +226,8 @@ def envoy_cc_test(
         flaky = False,
         env = {},
         rbe_pool = None,
-        exec_properties = {}):
+        exec_properties = {},
+        target_compatible_with = []):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
     exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     cc_test(
@@ -258,6 +259,7 @@ def envoy_cc_test(
         flaky = flaky,
         env = envoy_test_env(env),
         exec_properties = exec_properties,
+        target_compatible_with = target_compatible_with,
     )
 
 # Envoy C++ test targets loading dynamic modules should be specified with this macro.

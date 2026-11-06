@@ -14,3 +14,8 @@ ignored_cves:
 
 # We don't use the affected feature in Envoy's context.
 - CVE-2026-58055
+
+# C-only: heap overflow in msgpack_unpacker_expand_buffer (src/unpack.c), reached via the
+# msgpack_unpacker_reserve_buffer C API. Envoy uses the header-only C++ library (msgpack-cxx)
+# and only packs (fluentd access logger/tracer); the C unpacker is neither built nor called.
+- CVE-2026-72854

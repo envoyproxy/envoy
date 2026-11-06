@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
@@ -1487,9 +1488,9 @@ void Filter::sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data
     return;
   }
 
+  const uint64_t max_chunk_size = *max_streamed_body_chunk_size_;
   while (data.length() > 0) {
-    const uint64_t chunk_length =
-        std::min(static_cast<uint64_t>(*max_streamed_body_chunk_size_), data.length());
+    const uint64_t chunk_length = std::min(max_chunk_size, data.length());
     Buffer::OwnedImpl chunk_buffer;
     // Incrementally drain data buffer.
     chunk_buffer.move(data, chunk_length);
@@ -1786,7 +1787,7 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   ImmediateResponse invalid_mutation_response;
   invalid_mutation_response.mutable_status()->set_code(
       static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
-  invalid_mutation_response.set_details(std::string(processing_status.message()));
+  invalid_mutation_response.set_details(processing_status.message());
   sendImmediateResponse(invalid_mutation_response);
 }
 

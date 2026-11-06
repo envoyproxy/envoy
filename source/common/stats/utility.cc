@@ -44,25 +44,36 @@ absl::string_view Utility::sanitizeStatsName(absl::string_view name, std::string
   return name;
 }
 
+namespace {
+struct StatNameSanitizer {
+  StatNameSanitizer(bool sanitize) : sanitize_(sanitize) {}
+  absl::string_view sanitize(absl::string_view name) {
+    return sanitize_ ? Utility::sanitizeStatsName(name, buffer) : name;
+  }
+  std::string buffer;
+  bool sanitize_{};
+};
+} // namespace
+
 TaggedStatName::TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name,
-                               TagStringViewSpan tags, absl::string_view name)
+                               TagStringViewSpan tags, absl::string_view name, bool sanitize)
     : tag_pool_(symbol_table) {
   tag_pool_.reserve(tags.size() * 2 + 2);
 
-  std::string buffer;
-  base_name_ = tag_pool_.add(Utility::sanitizeStatsName(base_name, buffer));
+  StatNameSanitizer sanitizer(sanitize);
+  base_name_ = tag_pool_.add(sanitizer.sanitize(base_name));
   if (tags.empty()) {
     name_ = base_name_;
   } else {
     ASSERT(!name.empty(), "When tags are supplied, the caller must supply the tagged name with the "
                           "tag values interleaved.");
-    name_ = tag_pool_.add(Utility::sanitizeStatsName(name, buffer));
+    name_ = tag_pool_.add(sanitizer.sanitize(name));
   }
 
   tags_.reserve(tags.size());
   for (const TagStringView& tag : tags) {
-    tags_.push_back({tag_pool_.add(Utility::sanitizeStatsName(tag.first, buffer)),
-                     tag_pool_.add(Utility::sanitizeStatsName(tag.second, buffer))});
+    tags_.push_back({tag_pool_.add(sanitizer.sanitize(tag.first)),
+                     tag_pool_.add(sanitizer.sanitize(tag.second))});
   }
 }
 
@@ -184,6 +195,16 @@ Counter& counterFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.counterFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName());
 }
 
+Counter& counterFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                    StatNameSpan names) {
+  const StatNameJoiner base_joined(base_names, scope.constSymbolTable());
+  if (tags.empty()) {
+    return scope.counterFromTaggedName(base_joined.statName(), std::nullopt, StatName());
+  }
+  const StatNameJoiner joined(names, scope.constSymbolTable());
+  return scope.counterFromTaggedName(base_joined.statName(), tags, joined.statName());
+}
+
 Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements, Gauge::ImportMode import_mode,
                          StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
@@ -210,6 +231,16 @@ Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, His
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.histogramFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName(),
                                        unit);
+}
+
+Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                        StatNameSpan names, Histogram::Unit unit) {
+  const StatNameJoiner base_joined(base_names, scope.constSymbolTable());
+  if (tags.empty()) {
+    return scope.histogramFromTaggedName(base_joined.statName(), std::nullopt, StatName(), unit);
+  }
+  const StatNameJoiner joined(names, scope.constSymbolTable());
+  return scope.histogramFromTaggedName(base_joined.statName(), tags, joined.statName(), unit);
 }
 
 TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,

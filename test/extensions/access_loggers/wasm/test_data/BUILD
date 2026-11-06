@@ -3,6 +3,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary")
 
 licenses(["notice"])  # Apache 2
@@ -28,4 +29,5 @@ envoy_cc_test_library(
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = ["test_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )

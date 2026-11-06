@@ -55,9 +55,10 @@ public:
   MongoStats(Stats::Scope& scope, absl::string_view prefix,
              const std::vector<std::string>& commands);
 
-  void incCounter(const Stats::ElementVec& names);
-  void recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
-                       uint64_t sample);
+  void incCounter(Stats::StatNameSpan base_names, Stats::StatNameTagSpan tags,
+                  Stats::StatNameSpan names);
+  void recordHistogram(Stats::StatNameSpan base_names, Stats::StatNameTagSpan tags,
+                       Stats::StatNameSpan names, Stats::Histogram::Unit unit, uint64_t sample);
 
   /**
    * Finds or creates a StatName by string, taking a global lock if needed.
@@ -69,14 +70,14 @@ public:
     return stat_name_set_->getBuiltin(str, fallback);
   }
 
-private:
-  Stats::ElementVec addPrefix(const Stats::ElementVec& names);
+  Stats::SymbolTable& symbolTable() { return scope_->symbolTable(); }
 
-  Stats::Scope& scope_;
+private:
+  // mongo.(<stat_prefix>.)*: the scope carries the stat prefix as the tag of every stat.
+  Stats::ScopeSharedPtr scope_;
   Stats::StatNameSetPtr stat_name_set_;
 
 public:
-  const Stats::StatName prefix_;
   const Stats::StatName callsite_;
   const Stats::StatName cmd_;
   const Stats::StatName collection_;
@@ -89,6 +90,10 @@ public:
   const Stats::StatName scatter_get_;
   const Stats::StatName total_;
   const Stats::StatName unknown_command_;
+  // The tag names of the per-callsite, per-command and per-collection tags.
+  const Stats::StatName callsite_tag_;
+  const Stats::StatName cmd_tag_;
+  const Stats::StatName collection_tag_;
   // Created once at configuration load and shared by every filter instance, so that creating a
   // filter per connection does not re-resolve all the stats in the scope.
   MongoProxyStats proxy_stats_;

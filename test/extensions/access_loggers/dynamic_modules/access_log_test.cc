@@ -152,9 +152,7 @@ TEST_F(DynamicModuleAccessLogTest, DynamicModuleAccessLogCreation) {
   tls.setDispatcher(&dispatcher);
 
   // Use allocateSlotMock to get a properly functioning slot.
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Invoke([&tls]() {
-    return tls.allocateSlotMock();
-  }));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce([&tls]() { return tls.allocateSlotMock(); });
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Server::MockOptions> options;

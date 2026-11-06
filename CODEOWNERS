@@ -114,7 +114,7 @@
 # AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
-/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
+/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123 @wbpcode
 # admission control extension.
 /*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
@@ -175,7 +175,7 @@
 /*/extensions/filters/network/echo @yanavlasov @UNOWNED
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @UNOWNED
-/*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010 @nezdolik
+/*/extensions/filters/udp/udp_proxy @mattklein123 @nezdolik @antonkanug
 /*/extensions/clusters/aggregate @yxue @mattklein123
 /*/extensions/clusters/composite @agrawroh @yanavlasov @wbpcode
 /*/extensions/clusters/mcp_multicluster @yanavlasov @botengyao @agrawroh
@@ -401,6 +401,7 @@
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 /*/extensions/load_balancing_policies/wrr_locality @wbpcode @efimki
 /*/extensions/load_balancing_policies/load_aware_locality @tonya11en @jukie @nezdolik
+/*/extensions/load_balancing_policies/host_allowlist @soumya-acharya @yanavlasov
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -459,7 +460,9 @@
 /*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
 # AI filters (run by the AI Protocol Manager)
 /*/extensions/http/ai_filters/common @botengyao @penguingao
+/*/extensions/http/ai_filters/model_router @botengyao @penguingao @rblaze
 /*/extensions/http/ai_filters/request_info @botengyao @penguingao
+/*/extensions/http/ai_filters/route_selector @botengyao @penguingao @rblaze
 /*/extensions/http/ai_filters/schema_validation @botengyao @penguingao
 /*/extensions/http/ai_filters/transcoder @botengyao @penguingao @ginama18
 # HTTP body size limit filter
@@ -477,6 +480,7 @@
 /*/extensions/router/cluster_specifiers/priority_group @wbpcode @kanurag94
 
 # Queue policy
+/*/extensions/queue_policy/adaptive_lifo @nezdolik @tonya11en @yanavlasov
 /*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
 /*/extensions/queue_policy/fifo @nezdolik @yanavlasov @tonya11en @balrawi-figma
 

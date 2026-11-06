@@ -17,6 +17,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::DoAll;
@@ -880,9 +881,9 @@ TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionAllowedEmitsHelloMap) {
   makeBulkStringArray(*request, {"hello", "2", "AUTH", "user", "mypass"});
 
   Common::Redis::RespValuePtr captured;
-  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce(Invoke([&](Common::Redis::RespValuePtr& r) {
+  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([&](Common::Redis::RespValuePtr& r) {
     captured = std::move(r);
-  }));
+  });
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
   ASSERT_NE(nullptr, captured);
@@ -2407,10 +2408,10 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
 
   // As error faults have zero latency, recorded latency is equal to the delay.
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
     timer_cb_ = timer_cb;
     return timer_;
-  }));
+  });
 
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_NE(nullptr, handle_);
@@ -2453,10 +2454,10 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
   makeBulkStringArray(*request, {GetParam(), "hello"});
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
     timer_cb_ = timer_cb;
     return timer_;
-  }));
+  });
   EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
       .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
 
@@ -4543,6 +4544,30 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.success").value());
+}
+
+// The splitter and per-command stats carry the stat prefix as an explicit tag.
+TEST_F(RedisCommandSplitterImplTest, StatsAreTagged) {
+  auto expect_tags = [&](const std::string& name, const std::string& tag_extracted_name) {
+    const Stats::CounterSharedPtr counter = TestUtility::findCounter(store_, name);
+    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+    EXPECT_EQ(tag_extracted_name, counter->tagExtractedName()) << " for stat '" << name << "'";
+    ASSERT_EQ(1U, counter->tags().size()) << " for stat '" << name << "'";
+    EXPECT_EQ("envoy.redis_prefix", counter->tags()[0].name_) << " for stat '" << name << "'";
+    EXPECT_EQ("foo", counter->tags()[0].value_) << " for stat '" << name << "'";
+  };
+
+  expect_tags("redis.foo.splitter.invalid_request", "redis.splitter.invalid_request");
+  expect_tags("redis.foo.command.get.total", "redis.command.get.total");
+  expect_tags("redis.foo.command.hello.total", "redis.command.hello.total");
+
+  const Stats::Histogram& latency = store_.rootScope()->histogramFromString(
+      "redis.foo.command.get.latency", latency_in_micros_ ? Stats::Histogram::Unit::Microseconds
+                                                          : Stats::Histogram::Unit::Milliseconds);
+  EXPECT_EQ("redis.command.get.latency", latency.tagExtractedName());
+  ASSERT_EQ(1U, latency.tags().size());
+  EXPECT_EQ("envoy.redis_prefix", latency.tags()[0].name_);
+  EXPECT_EQ("foo", latency.tags()[0].value_);
 }
 
 } // namespace CommandSplitter

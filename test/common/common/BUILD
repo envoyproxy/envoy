@@ -231,6 +231,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:linked_object",
+        "//test/test_common:utility_lib",
     ],
 )
 

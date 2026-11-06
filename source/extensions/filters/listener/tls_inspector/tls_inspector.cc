@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener_filter_buffer.h"
@@ -70,11 +69,6 @@ Config::Config(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
                                                    max_client_hello_size_),
                    max_client_hello_size_)) {
-  if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
-    throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
-                                     max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
-  }
-
   SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
   SSL_CTX_set_max_proto_version(ssl_ctx_.get(), TLS_MAX_SUPPORTED_VERSION);
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);

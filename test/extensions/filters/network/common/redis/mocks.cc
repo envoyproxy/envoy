@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -22,14 +21,13 @@ void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toStri
 
 MockEncoder::MockEncoder() {
   ON_CALL(*this, encode(_, _))
-      .WillByDefault(
-          Invoke([this](const Common::Redis::RespValue& value, Buffer::Instance& out) -> void {
-            real_encoder_.encode(value, out);
-          }));
+      .WillByDefault([this](const Common::Redis::RespValue& value, Buffer::Instance& out) -> void {
+        real_encoder_.encode(value, out);
+      });
   ON_CALL(*this, setProtocolVersion(_))
-      .WillByDefault(Invoke([this](Common::Redis::RespProtocolVersion version) -> void {
+      .WillByDefault([this](Common::Redis::RespProtocolVersion version) -> void {
         real_encoder_.setProtocolVersion(version);
-      }));
+      });
 }
 
 MockEncoder::~MockEncoder() = default;
@@ -41,12 +39,12 @@ namespace Client {
 
 MockClient::MockClient() {
   ON_CALL(*this, addConnectionCallbacks(_))
-      .WillByDefault(Invoke([this](Network::ConnectionCallbacks& callbacks) -> void {
+      .WillByDefault([this](Network::ConnectionCallbacks& callbacks) -> void {
         callbacks_.push_back(&callbacks);
-      }));
-  ON_CALL(*this, close()).WillByDefault(Invoke([this]() -> void {
+      });
+  ON_CALL(*this, close()).WillByDefault([this]() -> void {
     raiseEvent(Network::ConnectionEvent::LocalClose);
-  }));
+  });
 }
 
 MockClient::~MockClient() = default;

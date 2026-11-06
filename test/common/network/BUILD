@@ -334,6 +334,7 @@ envoy_cc_test(
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:io_socket_error_lib",
         "//source/common/network:listener_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
@@ -341,6 +342,7 @@ envoy_cc_test(
         "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/common/stats:stats_lib",
         "//test/common/network:listener_impl_test_base_lib",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -431,6 +433,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:base_includes",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//test/mocks/api:api_mocks",
@@ -449,6 +452,7 @@ envoy_cc_test(
     srcs = ["ip_address_parsing_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:base_includes",
         "//source/common/network:ip_address_parsing_lib",
         "//test/test_common:status_utility_lib",
     ],

@@ -797,6 +797,11 @@ TEST(LeafAwaitableTest, SynchronousCompleteInsideOnStartResumesCleanly) {
   EXPECT_EQ(sum, 1000 * 1001 / 2);
 }
 
+} // namespace
+
+// The backtrace helpers have external linkage so they can be symbolized from the exported symbol
+// table. Builds without full debug info (e.g. Windows fastbuild) do not include internal symbols,
+// and Windows symbolization then reports the nearest preceding public symbol instead of failing.
 ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel2(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return std::move(f)();
@@ -811,6 +816,8 @@ ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel0(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return co_await backtraceLevel1(std::move(f));
 }
+
+namespace {
 
 TEST(BacktraceTest, BacktraceWorks) {
   auto exec = std::make_shared<ManualExecutor>();
@@ -913,6 +920,35 @@ TEST(BacktraceClassTest, DumpsSingleLineTrace) {
 
   EXPECT_THAT(*result, SizeIs(1));
   EXPECT_THAT((*result)[0], HasSubstr("#0:"));
+}
+
+TEST(BacktraceClassTest, DumpsTraceToStderr) {
+  auto exec = std::make_shared<ManualExecutor>();
+  auto dump = []() {
+    const bool save_log_to_stderr = Backtrace::logToStderr();
+    const bool save_single_line = Backtrace::singleLine();
+    Backtrace::setLogToStderr(true);
+    Backtrace tracer;
+    for (bool single_line : {false, true}) {
+      Backtrace::setSingleLine(single_line);
+      StartStopRecording recording(GetLogSink());
+      testing::internal::CaptureStderr();
+      tracer.logTrace();
+      const std::string output = testing::internal::GetCapturedStderr();
+      EXPECT_THAT(output, StartsWith("Coroutine Backtrace:\n[backtrace] [stderr] #0: "));
+      EXPECT_THAT(output, HasSubstr("[backtrace] [stderr] #3: "));
+      EXPECT_THAT(recording.messages(), IsEmpty());
+    }
+    Backtrace::setSingleLine(save_single_line);
+    Backtrace::setLogToStderr(save_log_to_stderr);
+    return std::vector<std::string>{};
+  };
+  absl::StatusOr<std::vector<std::string>> result = absl::UnavailableError("unset");
+  DetachedHandle handle = launch(
+      backtraceLevel0(std::move(dump)), exec,
+      [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_OK(result);
 }
 
 TEST(BacktraceClassTest, DumpsMultiLineTrace) {

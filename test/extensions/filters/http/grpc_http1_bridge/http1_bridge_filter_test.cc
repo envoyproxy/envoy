@@ -266,7 +266,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
 
   EXPECT_CALL(decoder_callbacks_,
               addDecodedData(_, true)) // todo: find a better way of testing this
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) { ASSERT_EQ(data.length(), d.length()); })));
+      .WillOnce([&](Buffer::Instance& d, bool) { ASSERT_EQ(data.length(), d.length()); });
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
   Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));

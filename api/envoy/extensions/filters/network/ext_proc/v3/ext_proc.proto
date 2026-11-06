@@ -5,6 +5,7 @@ package envoy.extensions.filters.network.ext_proc.v3;
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -122,4 +123,11 @@ message MetadataOptions {
   // Receiving of typed metadata is not supported.
   // Set to empty or leave unset to disallow writing any received dynamic metadata.
   MetadataNamespaces receiving_namespaces = 2;
+
+  // When set to ``true``, dynamic metadata specified in ``forwarding_namespaces``
+  // is forwarded only on the first ``ProcessingRequest`` of the connection.
+  //
+  // If unset, defaults to ``false`` (dynamic metadata is forwarded on every
+  // ``ProcessingRequest``).
+  google.protobuf.BoolValue send_once = 3;
 }

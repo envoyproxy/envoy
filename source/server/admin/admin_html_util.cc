@@ -103,7 +103,7 @@ AdminHtmlUtil::setResourceProvider(std::unique_ptr<ResourceProvider> resource_pr
 void AdminHtmlUtil::renderHead(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-  std::string buf1, buf2, buf3;
+  std::string buf1, buf2;
   response.addFragments({"<!DOCTYPE html>\n"
                          "<html lang='en'>\n"
                          "<head>\n",

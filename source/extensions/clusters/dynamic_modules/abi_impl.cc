@@ -16,10 +16,13 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/clusters/dynamic_modules/persistent_host_set.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
+using Envoy::Extensions::Clusters::DynamicModules::PersistentHostSet;
 using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::isValidModuleBuffer;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 namespace {
@@ -347,6 +350,30 @@ void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
   getCluster(cluster_envoy_ptr)->usePersistentHostMap();
 }
 
+bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr) {
+  if (cluster_config_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* config = getConfig(cluster_config_envoy_ptr);
+  // The cluster creates its host sets right after on_cluster_config_new returns, which is also when
+  // stat creation freezes.
+  if (config->stat_creation_frozen_) {
+    return false;
+  }
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions must "
+                 "be called on the main thread");
+    return false;
+  }
+  if (!config->persistent_host_partitions_allowed_) {
+    config->persistent_host_partitions_refused_ = true;
+    return false;
+  }
+  config->use_persistent_host_partitions_ = true;
+  return true;
+}
+
 size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
   if (lb_envoy_ptr == nullptr) {
@@ -356,7 +383,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->healthyHosts().size();
+  return host_sets[priority]->hostCounts().healthy;
 }
 
 envoy_dynamic_module_type_cluster_host_envoy_ptr
@@ -391,16 +418,27 @@ bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
   if (priority >= host_sets.size()) {
     return false;
   }
-  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
-  *hosts_size_out = healthy_hosts.size();
+  const auto& host_set = *host_sets[priority];
+  const size_t healthy_count = host_set.hostCounts().healthy;
+  *hosts_size_out = healthy_count;
   // Write nothing when the buffer is too small so a caller cannot act on a partial healthy set.
-  if (healthy_hosts.size() > hosts_capacity) {
+  if (healthy_count > hosts_capacity) {
     return false;
   }
   // The fill loop writes through hosts_out, so reject a null buffer that claims nonzero capacity.
-  if (hosts_out == nullptr && !healthy_hosts.empty()) {
+  if (hosts_out == nullptr && healthy_count != 0) {
     return false;
   }
+  // A persistent host set is walked directly, so this does not build its flat healthy view.
+  if (const auto* persistent = dynamic_cast<const PersistentHostSet*>(&host_set);
+      persistent != nullptr) {
+    size_t i = 0;
+    persistent->forEachHealthyHost([&](const Envoy::Upstream::HostSharedPtr& host) {
+      hosts_out[i++] = const_cast<Envoy::Upstream::Host*>(host.get());
+    });
+    return true;
+  }
+  const auto& healthy_hosts = host_set.healthyHosts();
   for (size_t i = 0; i < healthy_hosts.size(); i++) {
     hosts_out[i] = const_cast<Envoy::Upstream::Host*>(healthy_hosts[i].get());
   }
@@ -435,7 +473,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->hosts().size();
+  return host_sets[priority]->hostCounts().hosts;
 }
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
@@ -447,7 +485,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->degradedHosts().size();
+  return host_sets[priority]->hostCounts().degraded;
 }
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
@@ -1154,6 +1192,48 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
   return true;
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  if (!isValidModuleBuffer(ns) || !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicMetadataStruct(
+      *stream_info, absl::string_view(ns.ptr, ns.length),
+      absl::string_view(serialized_struct.ptr, serialized_struct.length));
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  if (!isValidModuleBuffer(ns) || !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicTypedMetadata(
+      *stream_info, absl::string_view(ns.ptr, ns.length),
+      absl::string_view(serialized_any.ptr, serialized_any.length));
+}
+
 envoy_dynamic_module_type_cluster_scheduler_module_ptr
 envoy_dynamic_module_callback_cluster_scheduler_new(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
@@ -1726,6 +1806,11 @@ envoy_dynamic_module_callback_cluster_http_callout(
     envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_http_callout must be called on the main "
+                 "thread");
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
 
   Envoy::Http::RequestHeaderMapPtr header_map = Envoy::Http::RequestHeaderMapImpl::create();
@@ -1827,6 +1912,46 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
   }
   result->port = static_cast<uint16_t>(ip->port());
   return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* hosts = getLb(lb_envoy_ptr)->healthChangedHosts();
+  if (hosts == nullptr) {
+    return false;
+  }
+  *result = hosts->size();
+  return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, uint32_t* priority,
+    envoy_dynamic_module_type_host_health* health) {
+  if (lb_envoy_ptr == nullptr || priority == nullptr || health == nullptr) {
+    return nullptr;
+  }
+  const auto* hosts = getLb(lb_envoy_ptr)->healthChangedHosts();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return nullptr;
+  }
+  const auto& host = (*hosts)[index];
+  *priority = host->priority();
+  switch (host->coarseHealth()) {
+  case Envoy::Upstream::Host::Health::Unhealthy:
+    *health = envoy_dynamic_module_type_host_health_Unhealthy;
+    break;
+  case Envoy::Upstream::Host::Health::Degraded:
+    *health = envoy_dynamic_module_type_host_health_Degraded;
+    break;
+  case Envoy::Upstream::Host::Health::Healthy:
+    *health = envoy_dynamic_module_type_host_health_Healthy;
+    break;
+  }
+  return const_cast<Envoy::Upstream::Host*>(host.get());
 }
 
 } // extern "C"

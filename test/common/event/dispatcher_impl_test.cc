@@ -15,6 +15,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
@@ -1571,6 +1572,55 @@ TEST(DispatcherWorkerIdTest, ParsedFromNameOnce) {
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_EQ(api->allocateDispatcher("worker_3")->workerId(), 3);
   EXPECT_FALSE(api->allocateDispatcher("main_thread")->workerId().has_value());
+}
+
+TEST(DispatcherImplStatsTest, WorkerStatsAreTagged) {
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Stats::TestUtil::TestStore store;
+  Stats::Scope& scope = *store.rootScope();
+  // The stats are created on the dispatcher's thread: run each dispatcher once to get there.
+  auto initialize = [&](Dispatcher& dispatcher, const std::optional<std::string>& prefix) {
+    dispatcher.initializeStats(scope, prefix);
+    dispatcher.run(Dispatcher::RunType::NonBlock);
+  };
+  // Looks a histogram up by its flat name without creating it.
+  auto histogram = [&](const std::string& name) -> const Stats::Histogram* {
+    return store.findHistogramByString(name).ptr();
+  };
+
+  DispatcherPtr worker = api->allocateDispatcher("worker_3");
+  initialize(*worker, std::nullopt);
+  const Stats::Histogram* worker_loop = histogram("worker_3.dispatcher.loop_duration_us");
+  ASSERT_NE(worker_loop, nullptr);
+  EXPECT_EQ("worker.dispatcher.loop_duration_us", worker_loop->tagExtractedName());
+  EXPECT_THAT(tags_of(*worker_loop),
+              testing::UnorderedElementsAre(testing::Pair("envoy.worker_id", "3")));
+  const Stats::Histogram* worker_poll = histogram("worker_3.dispatcher.poll_delay_us");
+  ASSERT_NE(worker_poll, nullptr);
+  EXPECT_EQ("worker.dispatcher.poll_delay_us", worker_poll->tagExtractedName());
+
+  // An explicit prefix replaces the dispatcher's name entirely.
+  DispatcherPtr main_thread = api->allocateDispatcher("main_thread");
+  initialize(*main_thread, "server.");
+  const Stats::Histogram* main_loop = histogram("server.dispatcher.loop_duration_us");
+  ASSERT_NE(main_loop, nullptr);
+  EXPECT_EQ("server.dispatcher.loop_duration_us", main_loop->tagExtractedName());
+  EXPECT_TRUE(main_loop->tags().empty());
+
+  DispatcherPtr other = api->allocateDispatcher("test_thread");
+  initialize(*other, std::nullopt);
+  const Stats::Histogram* other_loop = histogram("test_thread.dispatcher.loop_duration_us");
+  ASSERT_NE(other_loop, nullptr);
+  EXPECT_EQ("test_thread.dispatcher.loop_duration_us", other_loop->tagExtractedName());
+  EXPECT_TRUE(other_loop->tags().empty());
 }
 
 } // namespace
