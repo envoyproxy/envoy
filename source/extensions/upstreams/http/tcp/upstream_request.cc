@@ -110,7 +110,7 @@ void TcpUpstream::onEvent(Network::ConnectionEvent event) {
       upstream_request_) {
     // If the upstream already delivered end_stream and then closed cleanly (e.g. a user-space
     // socket peer finishing a graceful close while the downstream request half is still open), end
-    // the downstream stream with NO_ERROR rather than recording UpstreamRemoteReset (UC) / 503.
+    // the downstream stream with NO_ERROR rather than recording 'UpstreamRemoteReset (UC)' / 503.
     const bool no_error_reset =
         saw_end_stream_ &&
         upstream_conn_data_->connection().detectedCloseType() ==

@@ -734,7 +734,7 @@ TEST_P(InternalListenerConnectTerminationIntegrationTest,
   EXPECT_FALSE(response->reset());
 
   // Turn 2: upstream closes the tunneled stream. Internal listener closes user-space socket B;
-  // outer HCM closes the downstream H2 stream with NO_ERROR and zero UC flags.
+  // outer 'HCM' closes the downstream H2 stream with 'NO_ERROR' and zero 'UC' flags.
   upstream_request_->encodeResetStream();
   Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
   while (!response->reset() && bound.withinBound()) {
