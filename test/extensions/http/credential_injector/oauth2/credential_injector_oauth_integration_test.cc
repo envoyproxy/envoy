@@ -78,7 +78,22 @@ resources:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void TearDown() override { test_server_.reset(); }
+  void TearDown() override {
+    cleanupUpstreamAndDownstream();
+    test_server_.reset();
+    oauth2_request_.reset();
+    if (fake_oauth2_connection_ != nullptr) {
+      AssertionResult result = fake_oauth2_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_oauth2_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_oauth2_connection_->waitForNoPost();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_oauth2_connection_->waitForDispatcherBarrier();
+      RELEASE_ASSERT(result, result.message());
+      fake_oauth2_connection_.reset();
+    }
+  }
 
   virtual void checkUserAgentInRequest(const Http::RequestHeaderMap& headers) {
     const auto user_agent = headers.getUserAgentValue();
