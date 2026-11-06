@@ -61,3 +61,159 @@
          """,
      toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
  )
+
+diff --git a/src/wasmtime/wasmtime.cc b/src/wasmtime/wasmtime.cc
+--- a/src/wasmtime/wasmtime.cc
++++ b/src/wasmtime/wasmtime.cc
+@@ -19,8 +19,10 @@
+ #include <limits>
+ #include <memory>
+ #include <optional>
++#include <sstream>
+ #include <string>
+ #include <string_view>
++#include <vector>
+ 
+ #include "include/proxy-wasm/limits.h"
+ #include "include/proxy-wasm/word.h"
+@@ -58,6 +60,35 @@
+ using ::wasmtime::Store;
+ using ::wasmtime::Table;
+ using ::wasmtime::TrapResult;
++using ::wasmtime::ValType;
++
++bool equalValTypes(ValType::ListRef actual, const std::vector<ValType> &expected) {
++  if (actual.size() != expected.size()) {
++    return false;
++  }
++  for (size_t i = 0; i < expected.size(); i++) {
++    if (!(actual.begin()[i] == expected[i])) {
++      return false;
++    }
++  }
++  return true;
++}
++
++template <typename Types> std::string printValTypes(const Types &types) {
++  if (types.size() == 0) {
++    return "void";
++  }
++  std::ostringstream out;
++  bool first = true;
++  for (const auto &type : types) {
++    if (!first) {
++      out << " ";
++    }
++    out << ValType(type);
++    first = false;
++  }
++  return out.str();
++}
+ 
+ Engine *engine() {
+   static auto *const engine = []() {
+@@ -390,6 +421,19 @@
+     *function = nullptr;
+     return;
+   }
++  auto type = it->second.type(store_->context());
++  std::vector<ValType> arg_valtypes{::wasmtime::detail::WasmType<Args>::valtype()...};
++  std::vector<ValType> result_valtypes;
++  if (!equalValTypes(type->params(), arg_valtypes) ||
++      !equalValTypes(type->results(), result_valtypes)) {
++    fail(FailState::UnableToInitializeCode,
++         "Bad function signature for: " + std::string(function_name) +
++             ", want: " + printValTypes(arg_valtypes) + " -> " + printValTypes(result_valtypes) +
++             ", but the module exports: " + printValTypes(type->params()) + " -> " +
++             printValTypes(type->results()));
++    *function = nullptr;
++    return;
++  }
+   auto typed_func = it->second.typed<std::tuple<Args...>, std::monostate>(store_->context());
+   if (!typed_func) {
+     *function = nullptr;
+@@ -424,6 +468,19 @@
+     *function = nullptr;
+     return;
+   }
++  auto type = it->second.type(store_->context());
++  std::vector<ValType> arg_valtypes{::wasmtime::detail::WasmType<Args>::valtype()...};
++  std::vector<ValType> result_valtypes{::wasmtime::detail::WasmType<R>::valtype()};
++  if (!equalValTypes(type->params(), arg_valtypes) ||
++      !equalValTypes(type->results(), result_valtypes)) {
++    fail(FailState::UnableToInitializeCode,
++         "Bad function signature for: " + std::string(function_name) +
++             ", want: " + printValTypes(arg_valtypes) + " -> " + printValTypes(result_valtypes) +
++             ", but the module exports: " + printValTypes(type->params()) + " -> " +
++             printValTypes(type->results()));
++    *function = nullptr;
++    return;
++  }
+   auto typed_func = it->second.typed<std::tuple<Args...>, R>(store_->context());
+   if (!typed_func) {
+     *function = nullptr;
+diff --git a/test/wasm_vm_test.cc b/test/wasm_vm_test.cc
+--- a/test/wasm_vm_test.cc
++++ b/test/wasm_vm_test.cc
+@@ -74,6 +74,61 @@
+   EXPECT_EQ(vm_->getEngineName(), engine_);
+ }
+ 
++TEST_P(TestVm, WasmtimeFunctionSignatures) {
++  if (engine_ != "wasmtime") {
++    return;
++  }
++  auto source = readTestWasmFile("abi_export.wasm");
++  ASSERT_TRUE(vm_->load(source, {}, {}));
++  ASSERT_TRUE(vm_->link(""));
++
++  WasmCallVoid<0> abi_version;
++  vm_->getFunction("proxy_abi_version_0_2_0", &abi_version);
++  ASSERT_TRUE(abi_version);
++  abi_version(nullptr);
++  WasmCallWord<2> vm_start;
++  vm_->getFunction("proxy_on_vm_start", &vm_start);
++  ASSERT_TRUE(vm_start);
++  EXPECT_EQ(vm_start(nullptr, Word(0), Word(0)).u32(), 1);
++  EXPECT_FALSE(vm_->isFailed());
++
++  vm_->getFunction("missing_export", &abi_version);
++  EXPECT_FALSE(abi_version);
++  EXPECT_FALSE(vm_->isFailed());
++}
++
++TEST_P(TestVm, WasmtimeBadFunctionSignatures) {
++  if (engine_ != "wasmtime") {
++    return;
++  }
++  auto source = readTestWasmFile("abi_export.wasm");
++  auto check = [&](auto function, std::string_view name, std::string_view signature) {
++    auto vm = makeVm(engine_);
++    ASSERT_TRUE(vm->load(source, {}, {}));
++    ASSERT_TRUE(vm->link(""));
++    FailState fail_state = FailState::Ok;
++    vm->addFailCallback([&](FailState state) { fail_state = state; });
++    vm->getFunction(name, &function);
++    EXPECT_FALSE(function);
++    EXPECT_TRUE(vm->isFailed());
++    EXPECT_EQ(fail_state, FailState::UnableToInitializeCode);
++    EXPECT_TRUE(static_cast<TestIntegration *>(vm->integration().get())
++                    ->isErrorLogged("Bad function signature for: " + std::string(name) +
++                                    ", want: " + std::string(signature)));
++  };
++
++  check(WasmCallVoid<0>([](ContextBase *) {}), "proxy_on_context_create",
++        "void -> void, but the module exports: i32 i32 -> void");
++  check(WasmCallWord<1>{}, "proxy_on_vm_start",
++        "i32 -> i32, but the module exports: i32 i32 -> i32");
++  check(WasmCallVoid<2>{}, "proxy_on_vm_start",
++        "i32 i32 -> void, but the module exports: i32 i32 -> i32");
++  check(WasmCallWord<2>{}, "proxy_on_context_create",
++        "i32 i32 -> i32, but the module exports: i32 i32 -> void");
++  check(WasmCall_fff{}, "proxy_on_vm_start",
++        "f32 f32 -> f32, but the module exports: i32 i32 -> i32");
++}
++
+ TEST_P(TestVm, Memory) {
+   auto source = readTestWasmFile("abi_export.wasm");
+   ASSERT_TRUE(vm_->load(source, {}, {}));
