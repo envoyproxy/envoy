@@ -473,22 +473,30 @@ case $CI_TARGET in
         if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
+        # The wasmtime engine is a Rust staticlib, as are the built-in Rust dynamic modules (hickory
+        # DNS) and the static test modules; each bundles its own Rust runtime and they cannot be
+        # linked into one binary. Nothing outside this leg links wasmtime, so keep those modules out
+        # of it rather than reworking how Rust is linked (main does the latter, #48473).
+        WASMTIME_OPTIONS=(
+            --define wasm=wasmtime
+            --@envoy//source/extensions/network/dns_resolver/hickory:enabled=false)
         echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wasmtime \
+            "${WASMTIME_OPTIONS[@]}" \
             --define admin_functionality=disabled \
             --@envoy//bazel:jemalloc=True \
             -c fastbuild \
-            "${TEST_TARGETS[@]}"
+            "${TEST_TARGETS[@]}" \
+            -@envoy//test/extensions/dynamic_modules/http:http_integration_test
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            "${WASMTIME_OPTIONS[@]}" \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
@@ -497,7 +505,7 @@ case $CI_TARGET in
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            "${WASMTIME_OPTIONS[@]}" \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
@@ -506,7 +514,7 @@ case $CI_TARGET in
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            "${WASMTIME_OPTIONS[@]}" \
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static
