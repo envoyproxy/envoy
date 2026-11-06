@@ -361,7 +361,7 @@ jobs:
         DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
     - name: Login to Docker Hub (read-only)
       if: inputs.container-command != '' && steps.dockerhub.outputs.login == 'true'
-      uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4  # v4.3.0
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
       with:
         username: ${{ vars.DOCKERHUB_USERNAME }}
         password: ${{ secrets.dockerhub-token }}
