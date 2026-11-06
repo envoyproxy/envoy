@@ -553,7 +553,7 @@ impl Cluster for WorkerLocalRebuildCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == WORKER_LOCAL_REBUILD_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }
@@ -667,7 +667,7 @@ impl Cluster for MemberUpdatePackedAddressCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == PACKED_ADDRESS_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }
