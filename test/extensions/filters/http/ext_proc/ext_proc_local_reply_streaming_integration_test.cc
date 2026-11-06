@@ -452,6 +452,7 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, TimeoutWaitingForLocalResponse
 
   // HCM stream_idle_timeout is triggered, and downstream stream is reset, because
   // headers were already sent.
+  response->waitForHeaders();
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(12000));
 
   ASSERT_TRUE(response->waitForReset());

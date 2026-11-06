@@ -104,7 +104,8 @@ public:
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
-class ExtProcIntegrationTest : public HttpIntegrationTest,
+class ExtProcIntegrationTest : public Event::TestUsingSimulatedTime,
+                               public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
@@ -180,7 +181,7 @@ protected:
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
-  void serverSendNewTimeout(const uint64_t timeout_ms);
+  void serverSendNewTimeout(const uint64_t timeout_ms, bool expect_ignored = false);
 
   // The new timeout message is ignored by Envoy due to different reasons, like
   // new_timeout setting is out-of-range, or max_message_timeout is not configured.
