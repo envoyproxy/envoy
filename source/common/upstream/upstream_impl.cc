@@ -37,6 +37,7 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/dns_utils.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
@@ -1112,6 +1113,11 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
                                overprovisioning_factor);
 }
 
+void MainPrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
+  Cleanup cleanup([this]() { pending_cross_priority_hosts_added_.clear(); });
+  PrioritySetImpl::batchHostUpdate(callback);
+}
+
 HostLookupMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   // Check if the host set in the main thread PrioritySet has been updated. This is only pending
   // for the flat backing. The persistent backing publishes a snapshot on every update.
@@ -1148,11 +1154,21 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
       // from a higher priority value to a lower priority value.
       if (existing_host != nullptr && (*existing_host)->priority() == priority) {
         persistent_cross_priority_host_map_.erase(host_address);
+        if (!pending_cross_priority_hosts_added_.empty()) {
+          if (auto pending = pending_cross_priority_hosts_added_.find(host_address);
+              pending != pending_cross_priority_hosts_added_.end()) {
+            persistent_cross_priority_host_map_.insert(host_address, std::move(pending->second));
+            pending_cross_priority_hosts_added_.erase(pending);
+          }
+        }
       }
     }
 
     for (const auto& host : hosts_added) {
-      persistent_cross_priority_host_map_.insert(addressToString(host->address()), host);
+      const auto host_address = addressToString(host->address());
+      if (!persistent_cross_priority_host_map_.insert(host_address, host) && batchUpdateActive()) {
+        pending_cross_priority_hosts_added_.try_emplace(host_address, host);
+      }
     }
 
     // Snapshots share structure with the map, so publishing one is O(1).
@@ -1176,13 +1192,24 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
       // the add operation was already executed and has already moved the metadata of the host
       // from a higher priority value to a lower priority value.
       if (existing_host->second->priority() == priority) {
-        mutable_cross_priority_host_map_->erase(host_address);
+        mutable_cross_priority_host_map_->erase(existing_host);
+        if (!pending_cross_priority_hosts_added_.empty()) {
+          if (auto pending = pending_cross_priority_hosts_added_.find(host_address);
+              pending != pending_cross_priority_hosts_added_.end()) {
+            mutable_cross_priority_host_map_->emplace(host_address, std::move(pending->second));
+            pending_cross_priority_hosts_added_.erase(pending);
+          }
+        }
       }
     }
   }
 
   for (const auto& host : hosts_added) {
-    mutable_cross_priority_host_map_->insert({addressToString(host->address()), host});
+    const auto host_address = addressToString(host->address());
+    if (!mutable_cross_priority_host_map_->emplace(host_address, host).second &&
+        batchUpdateActive()) {
+      pending_cross_priority_hosts_added_.try_emplace(host_address, host);
+    }
   }
 }
 
@@ -1458,11 +1485,18 @@ ClusterInfoImpl::ClusterInfoImpl(
             return runtime_val;
           }())),
       type_(config.type()),
-      drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
+      drain_connections_on_host_removal_(config.ignore_health_on_host_removal() ||
+                                         config.eds_cluster_config().graceful_host_removal()),
+      graceful_host_removal_(config.eds_cluster_config().graceful_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),
+      // With graceful host removal, when active health checking is configured, newly added hosts
+      // are excluded until their first active health check completes, so that hosts awaiting their
+      // first active health check do not count towards the panic threshold, priority and locality
+      // availability while the removed hosts they replace are retained.
       warm_hosts_(!config.health_checks().empty() &&
-                  common_lb_config_->ignore_new_hosts_until_first_hc()),
+                  (common_lb_config_->ignore_new_hosts_until_first_hc() ||
+                   config.eds_cluster_config().graceful_host_removal())),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, wait_for_warm_on_init, true)),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
