@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/ssl/ssl.h"
@@ -37,7 +38,8 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void initializeTest(bool send_tls_alert_on_denial, bool with_tls, bool shadow_mode = false) {
+  void initializeTest(bool send_tls_alert_on_denial, bool with_tls, bool shadow_mode = false,
+                      bool check_on_new_connection = false) {
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -46,7 +48,8 @@ public:
       ConfigHelper::setHttp2(*ext_authz_cluster);
     });
 
-    config_helper_.addConfigModifier([this, send_tls_alert_on_denial, with_tls, shadow_mode](
+    config_helper_.addConfigModifier([this, send_tls_alert_on_denial, with_tls, shadow_mode,
+                                      check_on_new_connection](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* filter_chain = listener->mutable_filter_chains(0);
@@ -57,6 +60,7 @@ public:
                      fake_upstreams_.back()->localAddress());
       ext_authz_config.set_send_tls_alert_on_denial(send_tls_alert_on_denial);
       ext_authz_config.set_shadow_mode(shadow_mode);
+      ext_authz_config.set_check_on_new_connection(check_on_new_connection);
 
       // Save the existing tcp_proxy filter config.
       auto tcp_proxy_filter = filter_chain->filters(0);
@@ -67,6 +71,34 @@ public:
       auto* ext_authz_filter = filter_chain->add_filters();
       ext_authz_filter->set_name("envoy.filters.network.ext_authz");
       std::ignore = ext_authz_filter->mutable_typed_config()->PackFrom(ext_authz_config);
+
+      if (check_on_new_connection) {
+        auto* fallback_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        fallback_cluster->CopyFrom(bootstrap.static_resources().clusters(0));
+        fallback_cluster->set_name("fallback");
+        fallback_cluster->mutable_load_assignment()
+            ->mutable_endpoints(0)
+            ->mutable_lb_endpoints(0)
+            ->mutable_endpoint()
+            ->mutable_address()
+            ->mutable_socket_address()
+            ->set_port_value(fake_upstreams_[0]->localAddress()->ip()->port());
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_config;
+        ASSERT_TRUE(MessageUtil::unpackTo(tcp_proxy_filter.typed_config(), tcp_proxy_config).ok());
+        tcp_proxy_config.set_cluster("fallback");
+        std::ignore = tcp_proxy_filter.mutable_typed_config()->PackFrom(tcp_proxy_config);
+        TestUtility::loadFromYaml(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: envoy.tcp_proxy.cluster
+    format_string:
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(envoy.filters.network.ext_authz:cluster)%"
+)EOF",
+                                  *filter_chain->add_filters());
+      }
 
       filter_chain->add_filters()->CopyFrom(tcp_proxy_filter);
 
@@ -131,12 +163,16 @@ public:
     return fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
   }
 
-  void sendExtAuthzResponse(Grpc::Status::GrpcStatus check_status) {
+  void sendExtAuthzResponse(Grpc::Status::GrpcStatus check_status, bool set_cluster = false) {
     ext_authz_request_->startGrpcStream();
 
     envoy::service::auth::v3::CheckResponse response;
     if (check_status == Grpc::Status::WellKnownGrpcStatus::Ok) {
       response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+      if (set_cluster) {
+        (*response.mutable_dynamic_metadata()->mutable_fields())["cluster"].set_string_value(
+            "cluster_0");
+      }
     } else {
       response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
     }
@@ -167,6 +203,85 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzNetworkIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS,
                          Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(ExtAuthzNetworkIntegrationTest, ServerFirstDynamicClusterSelection) {
+  initializeTest(false, false, false, true);
+  auto client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(waitForExtAuthzConnection());
+  ASSERT_TRUE(waitForExtAuthzRequest());
+  ASSERT_TRUE(ext_authz_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(0U, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok, true);
+
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  ASSERT_TRUE(upstream->write("220 ready\r\n"));
+  client->waitForData("220 ready\r\n");
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  client->close();
+  ASSERT_TRUE(upstream->close());
+  ASSERT_TRUE(upstream->waitForDisconnect());
+  cleanupExtAuthzConnection();
+}
+
+TEST_P(ExtAuthzNetworkIntegrationTest, ServerFirstDenialDoesNotConnectUpstream) {
+  initializeTest(false, false, false, true);
+  auto client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(waitForExtAuthzConnection());
+  ASSERT_TRUE(waitForExtAuthzRequest());
+  ASSERT_TRUE(ext_authz_request_->waitForEndStream(*dispatcher_));
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  client->waitForHalfClose(true);
+  EXPECT_EQ(0U, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  client->close();
+  cleanupExtAuthzConnection();
+}
+
+TEST_P(ExtAuthzNetworkIntegrationTest, TlsServerFirstDynamicClusterSelection) {
+  initializeTest(false, true, false, true);
+  setupSslConnection();
+  ASSERT_TRUE(connect_callbacks_.connected());
+  ASSERT_TRUE(waitForExtAuthzConnection());
+  ASSERT_TRUE(waitForExtAuthzRequest());
+  ASSERT_TRUE(ext_authz_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(0U, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok, true);
+
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  ASSERT_TRUE(upstream->write("220 ready\r\n"));
+  payload_reader_->setDataToWaitFor("220 ready\r\n");
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  ASSERT_TRUE(upstream->close());
+  ASSERT_TRUE(upstream->waitForDisconnect());
+  cleanupExtAuthzConnection();
+}
+
+TEST_P(ExtAuthzNetworkIntegrationTest, ClientFirstDynamicClusterSelection) {
+  initializeTest(false, false, false, true);
+  auto client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(client->write("hello"));
+  ASSERT_TRUE(waitForExtAuthzConnection());
+  ASSERT_TRUE(waitForExtAuthzRequest());
+  ASSERT_TRUE(ext_authz_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(0U, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok, true);
+
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  ASSERT_TRUE(upstream->waitForData(5));
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  client->close();
+  ASSERT_TRUE(upstream->close());
+  ASSERT_TRUE(upstream->waitForDisconnect());
+  cleanupExtAuthzConnection();
+}
 
 // Test that when ext_authz denies with TLS and send_tls_alert_on_denial is true,
 // the connection is closed with a TLS alert.

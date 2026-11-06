@@ -10,6 +10,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/tls/connection_info_impl_base.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -108,14 +109,16 @@ void Filter::callCheck() {
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
+  return checkAuthorization();
+}
+
+Network::FilterStatus Filter::checkAuthorization() {
   if (!filterEnabled(filter_callbacks_->connection().streamInfo().dynamicMetadata())) {
     config_->stats().disabled_.inc();
     return Network::FilterStatus::Continue;
   }
 
   if (status_ == Status::NotStarted) {
-    // By waiting to invoke the check at onData() the call to authorization service will have
-    // sufficient information to fill out the checkRequest_.
     callCheck();
   }
   return filter_return_ == FilterReturn::Stop ? Network::FilterStatus::StopIteration
@@ -123,8 +126,31 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  // Wait till onData() happens.
-  return Network::FilterStatus::Continue;
+  return config_->checkOnNewConnection() ? checkAuthorization() : Network::FilterStatus::Continue;
+}
+
+void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  filter_callbacks_ = &callbacks;
+  filter_callbacks_->connection().addConnectionCallbacks(*this);
+  if (config_->checkOnNewConnection()) {
+    // TCP proxy initializes callbacks before onNewConnection() iteration starts. Keep reads
+    // enabled during authorization, including reads needed for the downstream TLS handshake.
+    constexpr absl::string_view key = "envoy.tcp_proxy.receive_before_connect";
+    auto& filter_state = *filter_callbacks_->connection().streamInfo().filterState();
+    if (filter_state.hasDataWithName(key)) {
+      const auto* receive_before_connect =
+          filter_state.getDataReadOnly<StreamInfo::BoolAccessor>(key);
+      if (receive_before_connect == nullptr || !receive_before_connect->value()) {
+        ENVOY_CONN_LOG(error, "invalid filter state for ext_authz with check_on_new_connection",
+                       filter_callbacks_->connection());
+        filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                              "ext_authz_bad_state_close");
+      }
+    } else {
+      filter_state.setData(key, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+                           StreamInfo::FilterState::LifeSpan::Connection);
+    }
+  }
 }
 
 void Filter::onEvent(Network::ConnectionEvent event) {

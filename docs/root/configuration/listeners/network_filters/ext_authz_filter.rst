@@ -207,8 +207,47 @@ provides access to client certificates when using :ref:`include_peer_certificate
 .. attention::
 
   The ``ON_DOWNSTREAM_DATA`` mode is not suitable for server-first protocols where the server sends
-  the initial greeting (e.g., SMTP, MySQL, POP3). For such protocols, use the default ``IMMEDIATE``
-  mode and accept that upstream connections may be established before authorization completes.
+  the initial greeting (e.g., SMTP, MySQL, POP3). To authorize these connections before opening
+  an upstream connection, use ``check_on_new_connection`` as described below.
+
+Authorization-driven routing for server-first protocols
+------------------------------------------------------
+
+Enable :ref:`check_on_new_connection
+<envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.check_on_new_connection>`
+to authorize before TCP proxy selects its route, without waiting for downstream application data.
+
+For dynamic cluster selection, configure the filters in this order:
+
+* Network external authorization with ``check_on_new_connection: true``.
+* :ref:`Set filter state <config_network_filters_set_filter_state>` with ``on_new_connection``
+  copying the authorization response metadata into ``envoy.tcp_proxy.cluster``.
+* TCP proxy with ``upstream_connect_mode: IMMEDIATE`` (the default).
+
+For example, if the authorization service returns a string ``cluster`` in its dynamic metadata,
+the set-filter-state configuration is:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.filters.network.set_filter_state.v3.Config
+
+  on_new_connection:
+  - object_key: envoy.tcp_proxy.cluster
+    format_string:
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(envoy.filters.network.ext_authz:cluster)%"
+
+Choose an appropriate TCP proxy fallback cluster for connections allowed without routing metadata,
+such as when authorization is disabled or fails open.
+
+.. attention::
+
+  Authorization may run before the TLS handshake completes. Do not use policies that require
+  authenticated client certificate attributes. Metadata from subsequent network filters is also
+  unavailable.
+
+This option sets ``envoy.tcp_proxy.receive_before_connect`` to allow downstream reads, including
+TLS handshake progress. An existing boolean ``true`` is preserved; ``false`` or an incorrectly
+typed value closes the connection.
 
 Metadata Context
 ----------------
