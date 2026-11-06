@@ -73,43 +73,15 @@ void ossl_dlopen(int expected_major, int expected_minor) {
     char ossl_path[PATH_MAX];
     char temp_path[PATH_MAX];
 
-    // Locate the OpenSSL libraries in the runfiles tree. The repository
-    // directory name and layout depend on the build/runtime:
-    //  - WORKSPACE / Bazel 7 nests external repos under the workspace, using the
-    //    apparent name (e.g. {RUNFILES_DIR}/{TEST_WORKSPACE}/external/openssl/...).
-    //  - Bazel 8 places them directly under the runfiles root
-    //    (e.g. {RUNFILES_DIR}/openssl/...).
-    //  - bzlmod materialises them under their canonical name, which is the
-    //    apparent name with a trailing '+' (e.g. .../openssl+/...).
-    // Probe each candidate and use the first that exists, defaulting to the last
-    // so dlopen() reports a sensible path if none are found.
-    const char* repo_names[] = {"openssl", "openssl+"};
-    const size_t num_repo_names = sizeof(repo_names) / sizeof(repo_names[0]);
-    for (size_t i = 0; i < num_repo_names; i++) {
-      snprintf(ossl_path, sizeof(ossl_path), "%s/%s/external/%s/openssl/lib",
-                                              runfiles_dir, test_workspace, repo_names[i]);
-      if (access(ossl_path, F_OK) == 0) {
-        break;
-      }
-      snprintf(ossl_path, sizeof(ossl_path), "%s/%s/openssl/lib",
-                                              runfiles_dir, repo_names[i]);
-      if (access(ossl_path, F_OK) == 0) {
-        break;
-      }
-    }
+    // The shared libraries are built by //compat/openssl:libcrypto and :libssl.
+    // OSSL_RUNFILES_LIB_DIR is their runfiles directory, set by the BUILD file.
+    snprintf(ossl_path, sizeof(ossl_path), "%s/%s", runfiles_dir, OSSL_RUNFILES_LIB_DIR);
 
     strcpy(temp_path, libcrypto_path);
     snprintf(libcrypto_path, sizeof(libcrypto_path), "%s/%s", ossl_path, temp_path);
 
     strcpy(temp_path, libssl_path);
     snprintf(libssl_path, sizeof(libssl_path), "%s/%s", ossl_path, temp_path);
-
-    // When running under bazel, we also need to set the OPENSSL_MODULES
-    // environment variable, so that OpenSSL can find its modules at runtime,
-    // This is needed by some tests that load the legacy provider.
-    char ossl_modules_path[PATH_MAX];
-    snprintf(ossl_modules_path, sizeof(ossl_modules_path), "%s/ossl-modules", ossl_path);
-    setenv("OPENSSL_MODULES", ossl_modules_path, 1);
   }
 
   // Load libcrypto.so first, because libssl.so depends on it.
