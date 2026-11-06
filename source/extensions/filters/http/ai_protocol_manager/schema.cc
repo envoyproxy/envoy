@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -175,8 +177,16 @@ absl::Status Schema::validateNumber(const nlohmann::json& json, absl::string_vie
     return absl::InvalidArgumentError(absl::StrCat(
         "field '", path, "' has invalid type: expected number, got ", jsonTypeName(json)));
   }
-  const double val =
-      json.is_number_float() ? json.get<double>() : static_cast<double>(json.get<int64_t>());
+  // Values above INT64_MAX are stored unsigned; read them as such so they do
+  // not wrap negative.
+  double val = 0;
+  if (json.is_number_float()) {
+    val = json.get<double>();
+  } else if (json.is_number_unsigned()) {
+    val = static_cast<double>(json.get<uint64_t>());
+  } else {
+    val = static_cast<double>(json.get<int64_t>());
+  }
   if (min_number_.has_value() && val < *min_number_) {
     return absl::InvalidArgumentError(
         absl::StrCat("field '", path, "' value ", val, " is less than minimum ", *min_number_));
@@ -192,6 +202,19 @@ absl::Status Schema::validateInteger(const nlohmann::json& json, absl::string_vi
   if (!json.is_number_integer() && !json.is_number_unsigned()) {
     return absl::InvalidArgumentError(absl::StrCat(
         "field '", path, "' has invalid type: expected integer, got ", jsonTypeName(json)));
+  }
+  if (json.is_number_unsigned()) {
+    // get<int64_t>() would wrap 18446744073709551615 to -1 and pass any maximum.
+    // A value above INT64_MAX is over every int64 maximum and under no int64
+    // minimum, so it can be decided here.
+    const uint64_t uval = json.get<uint64_t>();
+    if (uval > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+      if (max_integer_.has_value()) {
+        return absl::InvalidArgumentError(absl::StrCat("field '", path, "' value ", uval,
+                                                       " is greater than maximum ", *max_integer_));
+      }
+      return absl::OkStatus();
+    }
   }
   const int64_t val = json.get<int64_t>();
   if (min_integer_.has_value() && val < *min_integer_) {
