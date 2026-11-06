@@ -34,6 +34,8 @@ _realpath() {
 # shellcheck source=ci/bazel_fun.sh
 . "${CURRENT_SCRIPT_DIR}"/bazel_fun.sh
 
+hermetic_git
+
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
@@ -99,11 +101,12 @@ function cp_binary_for_image_build() {
   fi
 
   # Tools for the tools image. Strip to save size.
-  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  hermetic_strip
+  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  strip bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -111,7 +114,7 @@ function cp_binary_for_image_build() {
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
-  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
+  "${STRIP_BIN}" "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # only if BUILD_REASON exists (running in AZP)
   if [[ "${BUILD_REASON}" ]]; then
@@ -285,8 +288,8 @@ function build_openssl_presubmit() {
     # the target branch itself when history is too shallow for a merge base.
     local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
-        git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
-        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+        "${GIT_BIN}" fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
+        merge_base="$("${GIT_BIN}" merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
     else
         merge_base="HEAD~1"
     fi
@@ -294,7 +297,7 @@ function build_openssl_presubmit() {
     # A failed diff is fatal: an empty file list would otherwise select no tests
     # and report a green job that tested nothing.
     local changed_files
-    if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
+    if ! changed_files="$("${GIT_BIN}" diff --name-only "$merge_base" HEAD)"; then
         echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
         return 1
     fi
@@ -420,7 +423,8 @@ case $CI_TARGET in
     api_compat)
         echo "Checking API for breaking changes to protobuf backwards compatibility..."
         BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
-        COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
+        COMMIT_TITLE=$("${GIT_BIN}" log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' \
+            "${BASE_BRANCH_REF}")
         echo -e "\tUsing base commit ${COMMIT_TITLE}"
         # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -518,18 +522,11 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options)
+    compile_time_options|cto)
         # See `compile-time-options` in `.bazelrc`
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-
-        # Test execution_context build setting transition
-        echo "Building and testing execution_context_enabled tests..."
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild \
-            -- //test/common/common:execution_context_enabled_test
 
         if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
             echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
@@ -541,7 +538,7 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
+        if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
         echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
@@ -659,6 +656,7 @@ case $CI_TARGET in
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
+        hermetic_jq
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         echo "Check bazel registry ..."
         registry_check
@@ -750,7 +748,7 @@ case $CI_TARGET in
             exit 1
         fi
         if [[ -z "$CI_SHA1" ]]; then
-            CI_SHA1="$(git rev-parse HEAD~1)"
+            CI_SHA1="$("${GIT_BIN}" rev-parse HEAD~1)"
             export CI_SHA1
         fi
         ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
@@ -834,6 +832,14 @@ case $CI_TARGET in
         popd
         ;;
 
+    execution_context)
+        # Test the execution_context build setting transition
+        # (see bazel/execution_context_transition.bzl)
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -- //test/common/common:execution_context_enabled_test
+        ;;
+
     external)
         echo "Testing external workspace build..."
         pushd "${ENVOY_SRCDIR}/bazel/tests/external"
@@ -863,17 +869,21 @@ case $CI_TARGET in
             --test_arg="-runs=10"
         ;;
 
-    gcc)
+    gcc|gcc.test_only|gcc.server_only)
         BAZEL_BUILD_OPTIONS+=("--config=gcc")
         echo "gcc toolchain configured: gcc"
-        echo "bazel fastbuild build with gcc..."
-        bazel_envoy_binary_build fastbuild
-        echo "Testing ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild  \
-            --remote_download_minimal \
-            -- "${TEST_TARGETS[@]}"
+        if [[ "$CI_TARGET" != "gcc.test_only" ]]; then
+            echo "bazel fastbuild build with gcc..."
+            bazel_envoy_binary_build fastbuild
+        fi
+        if [[ "$CI_TARGET" != "gcc.server_only" ]]; then
+            echo "Testing ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                -c fastbuild  \
+                --remote_download_minimal \
+                -- "${TEST_TARGETS[@]}"
+        fi
         ;;
 
     info)
@@ -912,7 +922,7 @@ case $CI_TARGET in
         ;;
 
     publish)
-        BUILD_SHA="$(git rev-parse HEAD)"
+        BUILD_SHA="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
@@ -1130,7 +1140,7 @@ case $CI_TARGET in
         # `ENVOY_COMMIT`: The actual last commit of branch/PR
         # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
         #   cancellation, and to discriminate from other branch CI
-        COMMIT="$(git rev-parse HEAD)"
+        COMMIT="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         echo "Trigger workflow (${WORKFLOW})"

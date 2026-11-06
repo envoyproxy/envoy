@@ -27,6 +27,7 @@
 #include "test/common/tls/test_data/fake_ca_cert_info.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
+#include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
 #include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
@@ -1466,7 +1467,7 @@ TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineBytes) {
 }
 
 TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {
-  const std::string yaml = R"EOF(
+  std::string yaml = R"EOF(
     common_tls_context:
       tls_certificates:
         certificate_chain:
@@ -1474,7 +1475,9 @@ TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHas
         private_key:
           filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
       validation_context:
-        verify_certificate_hash: "df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a"
+        verify_certificate_hash: ")EOF";
+  yaml += TEST_SAN_DNS_CERT_256_HASH;
+  yaml += R"EOF("
   )EOF";
   EXPECT_NO_THROW(loadConfigYaml(yaml));
 }

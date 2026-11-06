@@ -8,7 +8,6 @@ build-image:
   sha-ci: 8fdf16ea0d40cb0e4726b13f97df8b73e80e331b206b62b224ceb2498149a1d5
   sha-devtools: 5914ff8694b377cbd137317acb4a0f91c9496e08a17e867743f942e15f4deb83
   sha-docker: 75bc814bc49ea2c4fe8807bd487fdb513b4b1ce9b6cce19bb1781ae9d28f80cf
-  sha-gcc: ca3b98402aa2bb59f44d2b5ff8fc8ccbcedc623dad539ca1a15866762854721a
   sha-mobile: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
   sha-worker: 58abaea3f29aae5340f32dc99fc66c97a6c2fec0902345d03cf6d47684606a1d
   # TODO: remove this dupe (currently used by ci request handler)
@@ -34,6 +33,7 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-execution-context
     - check-build-openssl
     - check-build-openssl-presubmit
     - check-coverage
@@ -120,10 +120,19 @@ run:
   check-build:
     paths:
     - "**/*"
-  docs:
+  check-build-execution-context:
     paths:
-    - "**/*"
-    push: paths
+    - .bazelrc
+    - .bazelversion
+    - bazel/BUILD
+    - bazel/envoy_build_system.bzl
+    - bazel/envoy_internal.bzl
+    - bazel/execution_context_transition.bzl
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
   check-build-openssl:
     paths:
     - "**/*"
@@ -154,6 +163,10 @@ run:
   check-san:
     paths:
     - "**/*"
+  docs:
+    paths:
+    - "**/*"
+    push: paths
   precheck-deps:
     paths:
     - .bazelrc

@@ -44,12 +44,18 @@ jobs:
         mkdir -p ${{ steps.vars.outputs.cve-data-path }}
     - name: Download (sync) from GCS bucket
       run: |
-        gsutil -mq rsync \
+        gsutil -mq rsync -r \
           "gs://${{ vars.GCS_CVE_BUCKET }}" \
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE fetcher
+      env:
+        # Used by the cvelist fetcher to resolve the latest cvelistV5 release
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        bazel run --config=ci //tools/dependency:cve_update
+        bazel run --config=ci --config=cves //tools/dependency:cves.update \
+          --action_env=CVE_UPDATE_NONCE="$(date +%s%N)" \
+          --action_env=GITHUB_TOKEN \
+          ${OVERWRITE_ALL_CVE_DATA:+--action_env=OVERWRITE_ALL_CVE_DATA=1}
     - name: Upload (sync) to GCS bucket
       run: |
         gsutil \

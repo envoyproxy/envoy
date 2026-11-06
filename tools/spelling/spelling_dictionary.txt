@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+aarch
 AI
 Allshard
 FCS
@@ -329,6 +330,7 @@ JWT
 JWTs
 alg
 aud
+audiobook
 crv
 iat
 iss
@@ -1665,8 +1667,10 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
+valkey
 vanishingly
 varchar
 variadic
@@ -1838,3 +1842,4 @@ X25519MLKEM768
 cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
+vendored
