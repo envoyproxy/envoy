@@ -33,6 +33,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 	"github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/api"
 )
 
@@ -58,6 +59,7 @@ func (c *httpCApiImpl) HttpGetAllHeaders(headerPtr uint64) map[string][]string {
 	strs := make([]string, headerNum*2)
 	buf := make([]byte, headerBytes)
 	C.envoyGoClusterSpecifierGetAllHeaders(C.ulonglong(headerPtr), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+	utils.BuildStringsFromBuffer(strs, buf)
 
 	for i := uint64(0); i < headerNum*2; i += 2 {
 		key := strs[i]
