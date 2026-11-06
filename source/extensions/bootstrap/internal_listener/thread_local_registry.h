@@ -3,6 +3,8 @@
 #include "envoy/network/connection_handler.h"
 #include "envoy/thread_local/thread_local_object.h"
 
+#include "source/common/singleton/threadsafe_singleton.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -12,7 +14,12 @@ namespace InternalListener {
 class ThreadLocalRegistryImpl : public ThreadLocal::ThreadLocalObject,
                                 public Network::LocalInternalListenerRegistry {
 public:
-  ThreadLocalRegistryImpl() = default;
+  ThreadLocalRegistryImpl() {
+    ThreadLocalInjectableSingleton<ThreadLocalRegistryImpl>::initialize(this);
+  }
+  ~ThreadLocalRegistryImpl() override {
+    ThreadLocalInjectableSingleton<ThreadLocalRegistryImpl>::clear();
+  }
 
   // Network::LocalInternalListenerRegistry
   void
@@ -38,6 +45,9 @@ private:
   // The typical instance is the ``ConnectionHandlerImpl`` on the same thread.
   Network::InternalListenerManager* manager_{nullptr};
 };
+
+using ThreadLocalRegistryTls = ThreadLocalInjectableSingleton<ThreadLocalRegistryImpl>;
+
 } // namespace InternalListener
 } // namespace Bootstrap
 } // namespace Extensions
