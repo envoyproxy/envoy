@@ -42,6 +42,26 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithS
   cb(filter_callback);
 }
 
+TEST(AlternateProtocolsCacheFilterConfigTest, UpstreamAlternateProtocolsCacheFilter) {
+  NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
+  UpstreamAlternateProtocolsCacheFilterFactory factory;
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(filter_callback, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
+  cb(filter_callback);
+}
+
+TEST(AlternateProtocolsCacheFilterConfigTest, UpstreamFilterIsRegistered) {
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.alternate_protocols_cache");
+  ASSERT_NE(factory, nullptr);
+}
+
 // This test is only for coverage of the deprecated feature check.
 TEST(AlternateProtocolsCacheFilterConfigTest,
      DEPRECATED_FEATURE_TEST(AlternateProtocolsCacheFilterLogging)) {
