@@ -131,7 +131,7 @@ private:
 using ActiveMessageEncoderFilterPtr = std::unique_ptr<ActiveMessageEncoderFilter>;
 
 // ActiveMessage tracks downstream requests for which no response has been received.
-class ActiveMessage : public LinkedObject<ActiveMessage>,
+class ActiveMessage : public IntrusiveListNode<ActiveMessage>,
                       public Event::DeferredDeletable,
                       public StreamHandler,
                       public DubboFilters::FilterChainFactoryCallbacks,

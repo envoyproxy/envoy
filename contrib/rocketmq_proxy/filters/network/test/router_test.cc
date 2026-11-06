@@ -390,11 +390,11 @@ TEST_F(RocketmqRouterTest, ReceivedSendMessageResponseWithDecodeError) {
   buffer.add(json);
 
   EXPECT_CALL(*active_message_, onReset()).WillRepeatedly([&]() -> void {
-    conn_manager_->deferredDelete(**conn_manager_->activeMessageList().begin());
+    conn_manager_->deferredDelete(*conn_manager_->activeMessageList().front());
   });
   EXPECT_CALL(*active_message_, onReset());
 
-  LinkedList::moveIntoList(std::move(active_message_), conn_manager_->activeMessageList());
+  conn_manager_->activeMessageList().push(std::move(active_message_));
   router_->onUpstreamData(buffer, false);
 }
 
