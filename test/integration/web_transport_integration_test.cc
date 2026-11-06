@@ -128,6 +128,81 @@ private:
   std::vector<std::string> datagrams_;
 };
 
+// Session visitor installed on the upstream WebTransport session for the server-initiated case.
+// openStream() opens a bidirectional stream toward the proxy and writes a payload, which the
+// bridge must mirror to a stream opened toward the downstream client.
+class ServerInitiatingSessionVisitor : public webtransport::SessionVisitor {
+public:
+  ServerInitiatingSessionVisitor(webtransport::Session* session, std::string payload)
+      : session_(session), payload_(std::move(payload)) {}
+
+  // The session is already established by the time this visitor is installed, so open immediately.
+  void openStream() {
+    stream_ = session_->OpenOutgoingBidirectionalStream();
+    if (stream_ == nullptr) {
+      return;
+    }
+    stream_->SetVisitor(std::make_unique<EchoStreamVisitor>(stream_));
+    quiche::QuicheMemSlice slice(
+        quiche::QuicheBuffer::Copy(quiche::SimpleBufferAllocator::Get(), payload_));
+    absl::Span<quiche::QuicheMemSlice> span(&slice, 1);
+    write_ok_ = stream_->Writev(span, webtransport::StreamWriteOptions()).ok();
+  }
+
+  bool opened() const { return stream_ != nullptr && write_ok_; }
+
+  void OnSessionReady() override {}
+  void OnSessionClosed(webtransport::SessionErrorCode /*error_code*/,
+                       const std::string& /*error_message*/) override {}
+  void OnIncomingBidirectionalStreamAvailable() override {}
+  void OnIncomingUnidirectionalStreamAvailable() override {}
+  void OnDatagramReceived(absl::string_view /*datagram*/) override {}
+  void OnCanCreateNewOutgoingBidirectionalStream() override {}
+  void OnCanCreateNewOutgoingUnidirectionalStream() override {}
+
+private:
+  webtransport::Session* session_;
+  std::string payload_;
+  webtransport::Stream* stream_{nullptr};
+  bool write_ok_{false};
+};
+
+// Session visitor installed on the downstream client's session: accepts a bidirectional stream
+// opened by the peer (i.e. mirrored by the bridge from the upstream) and captures its bytes.
+class AcceptingSessionVisitor : public webtransport::SessionVisitor {
+public:
+  explicit AcceptingSessionVisitor(webtransport::Session* session) : session_(session) {}
+
+  void OnIncomingBidirectionalStreamAvailable() override {
+    while (webtransport::Stream* stream = session_->AcceptIncomingBidirectionalStream()) {
+      auto visitor = std::make_unique<CaptureStreamVisitor>(stream);
+      captured_.push_back(visitor.get());
+      CaptureStreamVisitor* raw = visitor.get();
+      stream->SetVisitor(std::move(visitor));
+      // Drain anything that arrived before the visitor was installed.
+      raw->OnCanRead();
+    }
+  }
+  void OnSessionReady() override {}
+  void OnSessionClosed(webtransport::SessionErrorCode /*error_code*/,
+                       const std::string& /*error_message*/) override {}
+  void OnIncomingUnidirectionalStreamAvailable() override {}
+  void OnDatagramReceived(absl::string_view /*datagram*/) override {}
+  void OnCanCreateNewOutgoingBidirectionalStream() override {}
+  void OnCanCreateNewOutgoingUnidirectionalStream() override {}
+
+  // True if any accepted stream has received exactly `payload`.
+  bool received(absl::string_view payload) const {
+    return std::any_of(captured_.begin(), captured_.end(),
+                       [&](const CaptureStreamVisitor* v) { return v->received() == payload; });
+  }
+  size_t streamCount() const { return captured_.size(); }
+
+private:
+  webtransport::Session* session_;
+  std::vector<CaptureStreamVisitor*> captured_;
+};
+
 // End-to-end WebTransport bridging: a real HTTP/3 client opens a WebTransport CONNECT that Envoy
 // proxies to an HTTP/3 upstream, and the per-session bridge forwards WebTransport streams/datagrams
 // between the two QUIC sessions. Pinned to HTTP/3 on both hops (WebTransport is HTTP/3 only).
@@ -136,6 +211,19 @@ public:
   void initialize() override {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_support_web_transport",
                                       "true");
+    if (accept_server_initiated_streams_) {
+      // Opt the upstream cluster in to server-initiated bidirectional streams. Default-off, so the
+      // other tests in this file keep exercising the rejecting path.
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        ConfigHelper::HttpProtocolOptions protocol_options;
+        protocol_options.mutable_explicit_http_config()
+            ->mutable_http3_protocol_options()
+            ->mutable_quic_protocol_options()
+            ->set_accept_server_initiated_streams(true);
+        ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                         protocol_options);
+      });
+    }
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
@@ -181,6 +269,29 @@ public:
     EXPECT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(15)));
     return ok;
   }
+
+  // Installs a visitor on the upstream WebTransport session which opens a bidirectional stream
+  // toward the proxy and writes `payload`. Runs on the upstream dispatcher thread.
+  bool openUpstreamInitiatedStream(const std::string& payload) {
+    absl::Notification done;
+    bool ok = false;
+    fake_upstreams_[0]->runOnDispatcherThread([&]() {
+      OptRef<Http::WebTransportSession> session = upstream_request_->webTransportSession();
+      if (session.has_value() && session->rawWebTransportSession() != nullptr) {
+        auto visitor = std::make_unique<ServerInitiatingSessionVisitor>(
+            session->rawWebTransportSession(), payload);
+        ServerInitiatingSessionVisitor* raw = visitor.get();
+        session->setWebTransportVisitor(std::move(visitor));
+        raw->openStream();
+        ok = raw->opened();
+      }
+      done.Notify();
+    });
+    EXPECT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(15)));
+    return ok;
+  }
+
+  bool accept_server_initiated_streams_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, WebTransportIntegrationTest,
@@ -266,6 +377,94 @@ TEST_P(WebTransportIntegrationTest, EchoesBidirectionalStreamThroughBridge) {
     }
   }
   EXPECT_TRUE(echoed) << "received: '" << capture_ptr->received() << "'";
+
+  cleanupUpstreamAndDownstream();
+}
+
+// The upstream opens a bidirectional WebTransport stream toward Envoy; the bridge mirrors it to a
+// stream opened toward the downstream client and forwards the payload. Requires
+// accept_server_initiated_streams on the upstream cluster.
+TEST_P(WebTransportIntegrationTest, EchoesServerInitiatedBidirectionalStreamThroughBridge) {
+  accept_server_initiated_streams_ = true;
+  // The downstream test client must accept the peer-opened stream too, the way a real WebTransport
+  // client does; the H/3 test codec rejects server-initiated streams unless told otherwise.
+  client_accepts_server_initiated_streams_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(webTransportHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
+
+  // Accept peer-opened streams on the downstream client session before the upstream opens one.
+  OptRef<Http::WebTransportSession> client = request_encoder_->getStream().webTransportSession();
+  ASSERT_TRUE(client.has_value());
+  ASSERT_NE(client->rawWebTransportSession(), nullptr);
+  auto accepting = std::make_unique<AcceptingSessionVisitor>(client->rawWebTransportSession());
+  AcceptingSessionVisitor* accepting_ptr = accepting.get();
+  client->setWebTransportVisitor(std::move(accepting));
+
+  const std::string payload = "hello from the server";
+  ASSERT_TRUE(openUpstreamInitiatedStream(payload));
+
+  // Pump the client event loop until the mirrored stream and its payload arrive.
+  Event::TestTimeSystem& time_system = timeSystem();
+  bool got = false;
+  for (int i = 0; i < 200 && !got; i++) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    got = accepting_ptr->received(payload);
+    if (!got) {
+      time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    }
+  }
+  EXPECT_TRUE(got) << "streams accepted: " << accepting_ptr->streamCount();
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Without the option, an upstream-initiated bidirectional stream is not proxied: the downstream
+// client never sees a peer-opened stream. This is the default and guards plain HTTP/3 conformance.
+TEST_P(WebTransportIntegrationTest, ServerInitiatedStreamNotBridgedByDefault) {
+  // Let the downstream client accept peer-opened streams, so that the only thing keeping the
+  // stream from reaching it is Envoy's upstream-side rejection.
+  client_accepts_server_initiated_streams_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(webTransportHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
+
+  OptRef<Http::WebTransportSession> client = request_encoder_->getStream().webTransportSession();
+  ASSERT_TRUE(client.has_value());
+  ASSERT_NE(client->rawWebTransportSession(), nullptr);
+  auto accepting = std::make_unique<AcceptingSessionVisitor>(client->rawWebTransportSession());
+  AcceptingSessionVisitor* accepting_ptr = accepting.get();
+  client->setWebTransportVisitor(std::move(accepting));
+
+  // The upstream can still open the stream on its own session; Envoy just drops it.
+  ASSERT_TRUE(openUpstreamInitiatedStream("hello from the server"));
+
+  Event::TestTimeSystem& time_system = timeSystem();
+  for (int i = 0; i < 50; i++) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+  }
+  EXPECT_EQ(0, accepting_ptr->streamCount());
 
   cleanupUpstreamAndDownstream();
 }
