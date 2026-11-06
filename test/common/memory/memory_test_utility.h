@@ -30,7 +30,8 @@ public:
     Approximate, // Memory usage is available, but variances form canonical expected.
   };
 
-  MemoryTest() : memory_at_construction_(Memory::Stats::totalCurrentlyAllocated()) {}
+  // The mode is read before the baseline, as working it out allocates.
+  MemoryTest() : mode_(mode()), memory_at_construction_(Memory::Stats::totalCurrentlyAllocated()) {}
 
   /**
    * @return the memory execution testability mode for the current compiler, architecture,
@@ -47,10 +48,18 @@ public:
     // Note also that tools like ubsan may report this as an unsigned integer
     // underflow, if run with -fsanitize=unsigned-integer-overflow, though
     // strictly speaking this is legal and well-defined for unsigned integers.
+    //
+    // Without a supported allocator (tcmalloc) there is no meaningful measurement: jemalloc's
+    // stats.allocated moves with its caches and arenas, so callers asserting on exact deltas
+    // would see noise rather than their own allocations.
+    if (mode_ == Mode::Disabled) {
+      return 0;
+    }
     return Memory::Stats::totalCurrentlyAllocated() - memory_at_construction_;
   }
 
 private:
+  const Mode mode_;
   const size_t memory_at_construction_;
 };
 
