@@ -7,6 +7,6 @@ listener closes before the client half-closes, including :ref:`TCP proxy
 listeners, and HCM-terminated ``CONNECT``, while still closing orphaned half-closed peers promptly.
 This behavior is guarded by ``envoy.reloadable_features.enable_send_rst_on_user_space_socket``.
 In addition, a terminated ``CONNECT`` stream whose TCP upstream delivers ``end_stream`` and then
-closes normally is now reset with ``NO_ERROR`` instead of ``INTERNAL_ERROR`` and no longer records
+closes normally is now reset with ``NO_ERROR`` instead of an error and no longer records
 the ``UC`` response flag. This behavior can be reverted by setting
 ``envoy.reloadable_features.tcp_upstream_no_error_reset_after_end_stream`` to ``false``.
