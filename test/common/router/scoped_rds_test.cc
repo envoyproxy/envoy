@@ -332,6 +332,38 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+
+  testing::StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(true));
+  message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& filtered_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(filtered_config_dump));
 }
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
@@ -2566,6 +2598,102 @@ key:
   // The callback should have been invoked with false (no RDS provider for inline scope).
   EXPECT_TRUE(callback_called);
   EXPECT_FALSE(callback_value);
+}
+
+// Verify conflict detection for duplicate scope names within a batch, intra-batch key conflicts,
+// key conflicts with untouched existing scopes, key replacement when the previous owner is
+// removed, and retained-scope filtering during state-of-the-world updates.
+TEST_F(ScopedRdsTest, ConflictDetectionAndRetainedScopeCleanup) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  const auto resource_1 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto resource_2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_initial = TestUtility::decodeResources({resource_1, resource_2});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(2UL, all_scopes_.value());
+
+  // 1. Duplicate scope name in the same batch.
+  const auto dup_name_a = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: dup_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-key-a
+)EOF");
+  const auto dup_name_b = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: dup_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-key-b
+)EOF");
+  const auto decoded_dup_name = TestUtility::decodeResources({dup_name_a, dup_name_b});
+  EXPECT_EQ(srds_subscription_->onConfigUpdate(decoded_dup_name.refvec_, {}, "2").message(),
+            "Error adding/updating scoped route(s): duplicate scoped route configuration "
+            "'dup_scope' found");
+
+  // 2. Intra-batch key conflict between two newly added scopes.
+  const auto batch_key_a = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: batch_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-shared-key
+)EOF");
+  const auto batch_key_b = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: batch_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-shared-key
+)EOF");
+  const auto decoded_batch_key = TestUtility::decodeResources({batch_key_a, batch_key_b});
+  EXPECT_EQ(srds_subscription_->onConfigUpdate(decoded_batch_key.refvec_, {}, "3").message(),
+            "Error adding/updating scoped route(s): scope key conflict found, first scope is "
+            "'batch_scope1', second scope is 'batch_scope2'");
+
+  // 3. Key conflict with an existing untouched scope (foo_scope1).
+  const auto existing_key_conflict = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: conflict_with_existing
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto decoded_existing_conflict = TestUtility::decodeResources({existing_key_conflict});
+  EXPECT_EQ(
+      srds_subscription_->onConfigUpdate(decoded_existing_conflict.refvec_, {}, "4").message(),
+      "Error adding/updating scoped route(s): scope key conflict found, first scope is "
+      "'foo_scope1', second scope is 'conflict_with_existing'");
+
+  // 4. Replacing foo_scope1's key with a new scope while removing foo_scope1 in the same batch,
+  // and retaining foo_scope2 via SotW update.
+  const auto replacement_scope = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1_v2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto decoded_sotw = TestUtility::decodeResources({replacement_scope, resource_2});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_sotw.refvec_, "5"));
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope1_v2"), Key("foo_scope2")));
 }
 
 } // namespace
