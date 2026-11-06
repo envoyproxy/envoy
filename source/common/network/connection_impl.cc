@@ -820,16 +820,24 @@ void ConnectionImpl::onReadReady() {
   }
 
   read_end_stream_ |= result.end_stream_read_;
-  if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
+  if (result.bytes_processed_ != 0 || (result.end_stream_read_ && !read_end_stream_raised_) ||
       (latched_dispatch_buffered_data && read_buffer_->length() > 0)) {
     // Skip onRead if no bytes were processed unless we explicitly want to force onRead for
-    // buffered data. For instance, skip onRead if the connection was closed without producing
-    // more data.
+    // buffered data or raise end_stream for the first time. For instance, skip onRead if the
+    // connection was closed without producing more data or if a peer close() woke the socket after
+    // end_stream was already delivered from an earlier shutdown(SHUT_WR).
     onRead(new_buffer_size);
   }
 
+  // When an in-process peer (e.g. user-space socket) fully closes, read() still returns a clean
+  // EOF so transport sockets (RawBufferSocket, SslSocket) flush all payload bytes with
+  // end_stream=true above. Once read_end_stream_ is reached, close the connection normally rather
+  // than leaving a half-closed survivor leaking until idle timeout.
+  const bool peer_fully_closed = enable_half_close_ && read_end_stream_ && socket_->isOpen() &&
+                                 ioHandle().wasPeerFullyClosed();
+
   // The read callback may have already closed the connection.
-  if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
+  if (result.action_ == PostIoAction::Close || bothSidesHalfClosed() || peer_fully_closed) {
     ENVOY_CONN_LOG(debug, "remote close", *this);
     // This is the typical case where a socket read triggers a connection close.
     // When half-close is disabled, the action_ will be set to close.
