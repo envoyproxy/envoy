@@ -465,6 +465,49 @@ TEST_F(ODCDTest, TestKnownMissingAnswerFlushesQueuedCallbacks) {
   EXPECT_EQ(callback_call_count_, 3);
 }
 
+class ODCDCompressionDisabledTest : public ODCDTest {
+public:
+  void SetUp() override {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.compress_xds_resource_names", "false"},
+         {"envoy.reloadable_features.odcds_missing_cluster_cache", "true"}});
+    ODCDTest::SetUp();
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+TEST_F(ODCDCompressionDisabledTest, TestKnownMissingClusterIgnoredWhileWarming) {
+  const std::string warming_cluster_yaml = R"EOF(
+    name: cluster_foo
+    connect_timeout: 0.250s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  const auto warming_cluster_config = parseClusterFromV3Yaml(warming_cluster_yaml);
+  auto warming_cluster = std::make_shared<testing::NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster->info_->name_ = "cluster_foo";
+  std::function<absl::Status()> cluster_init_callback;
+  EXPECT_CALL(*warming_cluster, initialize(_))
+      .WillOnce(testing::SaveArg<0>(&cluster_init_callback));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(warming_cluster, nullptr)));
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
+
+  auto cb = createCallback();
+  EXPECT_CALL(*odcds_, isKnownMissing(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

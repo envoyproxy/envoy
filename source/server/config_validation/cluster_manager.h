@@ -49,6 +49,10 @@ public:
     return nullptr;
   }
 
+  ThreadLocalCluster* getThreadLocalClusterByResourceName(const Config::XdsResourceName&) override {
+    return nullptr;
+  }
+
   // Gives access to the protected constructor.
   friend ValidationClusterManagerFactory;
 };

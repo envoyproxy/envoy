@@ -52,6 +52,8 @@ public:
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
+  MOCK_METHOD(ThreadLocalCluster*, getThreadLocalClusterByResourceName,
+              (const Config::XdsResourceName& cluster));
   MOCK_METHOD(bool, removeCluster, (absl::string_view cluster, const bool remove_ignored));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());

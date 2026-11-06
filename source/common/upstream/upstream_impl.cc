@@ -1337,6 +1337,13 @@ ClusterInfoImpl::ClusterInfoImpl(
     bool added_via_api, Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
     : runtime_(runtime), name_(config.name()),
+      xds_resource_name_storage_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names")
+              ? std::make_optional(server_context.xdsManager().xdsSymbolTable().encode(name_))
+              : std::nullopt),
+      xds_resource_name_(xds_resource_name_storage_.has_value()
+                             ? xds_resource_name_storage_->resourceName()
+                             : Config::XdsResourceName{}),
       observability_name_(!config.alt_stat_name().empty()
                               ? std::make_unique<std::string>(config.alt_stat_name())
                               : nullptr),
