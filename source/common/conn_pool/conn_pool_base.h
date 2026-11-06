@@ -397,6 +397,7 @@ private:
   size_t pendingStreamCount() const;
   PendingStreamPtr popPendingStream();
   PendingStreamPtr removePendingStream(PendingStream& stream);
+  void dropPendingStream(PendingStreamPtr pending_stream);
 
   Upstream::ClusterConnectivityState& cluster_connectivity_state_;
 
