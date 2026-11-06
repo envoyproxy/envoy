@@ -206,7 +206,8 @@ public:
   WasmResult getProperty(std::string_view path, std::string* result) override;
   WasmResult setProperty(std::string_view path, std::string_view value) override;
   WasmResult setEnvoyFilterState(std::string_view path, std::string_view value,
-                                 StreamInfo::FilterState::LifeSpan life_span);
+                                 StreamInfo::FilterState::LifeSpan life_span,
+                                 StreamInfo::StreamSharingMayImpactPooling stream_sharing);
   WasmResult declareProperty(std::string_view path,
                              Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype);
 
