@@ -27,3 +27,13 @@
      ],
  )
  
+--- a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
++++ b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
+@@ -68,7 +68,6 @@
+         "@cu__log-0.4.29//:log",
+         "@cu__tracing-0.1.44//:tracing",
+         "@cu__wasmtime-45.0.2//:wasmtime",
+-        "@cu__wasmtime-c-api-impl-45.0.2//:build_script_build",
+     ],
+ )
+ 
