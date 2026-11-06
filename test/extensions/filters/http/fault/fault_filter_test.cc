@@ -590,8 +590,10 @@ TEST_F(FaultFilterTest, AbortDryRunWithHttpStatus) {
   envoy::config::core::v3::Metadata dynamic_metadata;
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
-      "world");
+  (*(*filter_metadata["envoy.filters.http.fault"].mutable_fields())["dry_run_abort"]
+        .mutable_struct_value()
+        ->mutable_fields())["http_status"]
+      .set_number_value(429);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.max_active_faults", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -637,6 +639,14 @@ TEST_F(FaultFilterTest, AbortDryRunWithGrpcStatus) {
   fault.mutable_abort()->set_dry_run(true);
   setUpTest(fault);
 
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  (*(*filter_metadata["envoy.filters.http.fault"].mutable_fields())["dry_run_abort"]
+        .mutable_struct_value()
+        ->mutable_fields())["grpc_status"]
+      .set_number_value(5);
+
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.max_active_faults", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
@@ -649,6 +659,8 @@ TEST_F(FaultFilterTest, AbortDryRunWithGrpcStatus) {
       .WillOnce(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.grpc_status", 5))
       .WillOnce(Return(5));
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(dynamic_metadata));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
@@ -660,6 +672,7 @@ TEST_F(FaultFilterTest, AbortDryRunWithGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_dry_run_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
@@ -1103,8 +1116,10 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDryRun) {
 
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
-  (*filter_metadata["envoy.filters.http.fault"].mutable_fields())["hello"].set_string_value(
-      "world");
+  auto& fault_fields = *filter_metadata["envoy.filters.http.fault"].mutable_fields();
+  fault_fields["hello"].set_string_value("world");
+  (*fault_fields["dry_run_abort"].mutable_struct_value()->mutable_fields())["http_status"]
+      .set_number_value(503);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))

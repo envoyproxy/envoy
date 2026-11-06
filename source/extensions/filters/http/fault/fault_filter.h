@@ -215,7 +215,8 @@ private:
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
   void abortWithStatus(Http::Code http_status_code,
                        std::optional<Grpc::Status::GrpcStatus> grpc_status_code);
-  void onAbortDryRun();
+  void onAbortDryRun(Http::Code http_status_code,
+                     std::optional<Grpc::Status::GrpcStatus> grpc_status_code);
   void setFilterMetadata();
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
