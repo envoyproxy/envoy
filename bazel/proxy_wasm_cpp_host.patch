@@ -27,6 +27,7 @@
      ],
  )
  
+
 --- a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
 +++ b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
 @@ -68,7 +68,6 @@
