@@ -527,7 +527,9 @@ configure_make(
         "--disable-shared",
         "--enable-static",
         "--disable-doc",
-        "--disable-cxx",
+        # C++ support stays on, as in the BCR jemalloc module used on main: jemalloc then provides
+        # operator new/delete itself instead of libc++ routing them through whichever malloc
+        # wins at link time, which is what the memory accounting tests observe.
         "--disable-prof",
     ],
     lib_source = "@jemalloc//:all",
