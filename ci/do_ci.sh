@@ -490,7 +490,7 @@ case $CI_TARGET in
             -c fastbuild \
             -- \
             "${TEST_TARGETS[@]}" \
-            -@envoy//test/extensions/dynamic_modules/http:http_integration_test
+            -@envoy//test/extensions/dynamic_modules/http:integration_test
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
