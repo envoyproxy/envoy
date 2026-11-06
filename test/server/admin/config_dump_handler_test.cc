@@ -932,5 +932,32 @@ TEST_P(AdminInstanceTest, ConfigDumpEcdsByResourceAndMask) {
   EXPECT_EQ(expected_json, output);
 }
 
+TEST_P(AdminInstanceTest, ConfigDumpWithEndpointSortsActiveClustersByName) {
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster_z;
+  cluster_z.info_->name_ = "cluster_z";
+  ON_CALL(*cluster_z.info_, addedViaApi()).WillByDefault(Return(false));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster_a;
+  cluster_a.info_->name_ = "cluster_a";
+  ON_CALL(*cluster_a.info_, addedViaApi()).WillByDefault(Return(false));
+
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+  ON_CALL(server_.cluster_manager_, forEachActiveCluster(_))
+      .WillByDefault(testing::Invoke([&](std::function<void(const Upstream::Cluster&)> cb) {
+        cb(cluster_z);
+        cb(cluster_a);
+      }));
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
+  const std::string output = response.toString();
+  const size_t pos_a = output.find("\"cluster_a\"");
+  const size_t pos_z = output.find("\"cluster_z\"");
+  ASSERT_NE(std::string::npos, pos_a);
+  ASSERT_NE(std::string::npos, pos_z);
+  EXPECT_LT(pos_a, pos_z);
+}
+
 } // namespace Server
 } // namespace Envoy

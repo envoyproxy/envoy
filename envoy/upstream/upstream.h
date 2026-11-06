@@ -35,6 +35,10 @@
 #include "fmt/format.h"
 
 namespace Envoy {
+namespace Config {
+class XdsResourceName;
+} // namespace Config
+
 namespace Http {
 class ClientCodecFactory;
 class FilterChainManager;
@@ -1303,6 +1307,13 @@ public:
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the compressed xDS resource name of the cluster when resource name compression is
+   *         enabled, or nullopt otherwise. The returned reference remains valid for the lifetime of
+   *         this ClusterInfo instance.
+   */
+  virtual OptRef<const Config::XdsResourceName> xdsResourceName() const PURE;
 
   /**
    * @return the observability name associated to the cluster. Used in stats, tracing, logging, and

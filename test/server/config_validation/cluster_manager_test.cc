@@ -3,6 +3,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/api/api_impl.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/singleton/manager_impl.h"
@@ -41,6 +42,9 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = *factory.clusterManagerFromProto(bootstrap);
   EXPECT_EQ(nullptr, cluster_manager->getThreadLocalCluster("cluster"));
+  const Config::XdsResourceNameStorage encoded =
+      server_context.xdsManager().xdsSymbolTable().encode("cluster");
+  EXPECT_EQ(nullptr, cluster_manager->getThreadLocalClusterByResourceName(encoded.resourceName()));
 }
 
 } // namespace

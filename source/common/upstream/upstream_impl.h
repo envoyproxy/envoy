@@ -51,6 +51,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -1024,6 +1025,12 @@ public:
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   std::optional<uint16_t> maxResponseHeadersKb() const override { return max_response_headers_kb_; }
   const std::string& name() const override { return name_; }
+  OptRef<const Config::XdsResourceName> xdsResourceName() const override {
+    if (xds_resource_name_storage_.has_value()) {
+      return xds_resource_name_;
+    }
+    return std::nullopt;
+  }
   const std::string& observabilityName() const override {
     if (observability_name_ != nullptr) {
       return *observability_name_;
@@ -1190,6 +1197,8 @@ private:
 
   const Runtime::Loader& runtime_;
   const std::string name_;
+  const std::optional<Config::XdsResourceNameStorage> xds_resource_name_storage_;
+  const Config::XdsResourceName xds_resource_name_;
   const std::unique_ptr<const std::string> observability_name_;
   const std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>

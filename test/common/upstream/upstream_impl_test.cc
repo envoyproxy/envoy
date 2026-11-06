@@ -21,6 +21,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/conn_pool/pending_stream.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
@@ -7843,6 +7844,63 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff
   const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(3, retry_policy->numRetries());
+}
+
+TEST_F(ClusterInfoImplTest, XdsResourceNameWhenEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.compress_xds_resource_names", "true"}});
+
+  auto& symbol_table = server_context_.xdsManager().xdsSymbolTable();
+  const size_t baseline_active = symbol_table.numActiveSymbols();
+
+  const std::string yaml = R"EOF(
+    name: outbound|8080||payments.prod.svc.cluster.local
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  const OptRef<const Config::XdsResourceName> resource_name = cluster->info()->xdsResourceName();
+  ASSERT_TRUE(resource_name.has_value());
+  EXPECT_EQ("outbound|8080||payments.prod.svc.cluster.local",
+            symbol_table.toString(*resource_name));
+  EXPECT_GT(symbol_table.numActiveSymbols(), baseline_active);
+
+  cluster.reset();
+  EXPECT_EQ(baseline_active, symbol_table.numActiveSymbols());
+
+  NiceMock<MockClusterInfo> mock_cluster_info;
+  mock_cluster_info.name_ = "mock.cluster.name";
+  EXPECT_FALSE(mock_cluster_info.xdsResourceName().has_value());
+  mock_cluster_info.setXdsResourceName(symbol_table);
+  ASSERT_TRUE(mock_cluster_info.xdsResourceName().has_value());
+  EXPECT_EQ("mock.cluster.name", symbol_table.toString(*mock_cluster_info.xdsResourceName()));
+}
+
+TEST_F(ClusterInfoImplTest, XdsResourceNameWhenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.compress_xds_resource_names", "false"}});
+
+  auto& symbol_table = server_context_.xdsManager().xdsSymbolTable();
+  const size_t baseline_symbols = symbol_table.numSymbols();
+
+  const std::string yaml = R"EOF(
+    name: outbound|8080||payments.prod.svc.cluster.local
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  ASSERT_NE(cluster, nullptr);
+  ASSERT_NE(cluster->info(), nullptr);
+
+  EXPECT_FALSE(cluster->info()->xdsResourceName().has_value());
+  EXPECT_EQ(baseline_symbols, symbol_table.numSymbols());
 }
 
 } // namespace

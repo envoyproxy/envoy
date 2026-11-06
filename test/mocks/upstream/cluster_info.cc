@@ -84,6 +84,13 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, perConnectionBufferHighWatermarkTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(0)));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, xdsResourceName())
+      .WillByDefault(Invoke([this]() -> OptRef<const Config::XdsResourceName> {
+        if (xds_resource_name_storage_.has_value()) {
+          return xds_resource_name_;
+        }
+        return std::nullopt;
+      }));
   ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
   ON_CALL(*this, edsServiceName()).WillByDefault([this]() -> const std::string& {
     return eds_service_name_.has_value() ? eds_service_name_.value() : Envoy::EMPTY_STRING;

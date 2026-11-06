@@ -167,13 +167,26 @@ public:
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
+    if (compressResourceNames()) {
+      for (auto& cluster : compressed_active_clusters_) {
+        clusters.emplace(cluster.second->cluster_->info()->name(), *cluster.second->cluster_);
+      }
+      return clusters;
+    }
     for (auto& cluster : active_clusters_) {
       clusters.emplace(cluster.first, *cluster.second->cluster_);
     }
     return clusters;
   }
 
-  const ClusterInitializationMap& clusterInitializationMap() const {
+  ClusterInitializationMap clusterInitializationMap() const {
+    if (compressResourceNames()) {
+      ClusterInitializationMap map;
+      for (const auto& [unused_key, cio] : compressed_cluster_initialization_map_) {
+        map.emplace(cio->cluster_info_->name(), cio);
+      }
+      return map;
+    }
     return cluster_initialization_map_;
   }
 

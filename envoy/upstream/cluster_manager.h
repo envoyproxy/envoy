@@ -52,6 +52,7 @@ namespace Config {
 // part of the Envoy::Upstream namespace but should be eventually moved to the
 // Envoy::Config namespace (next to the XdsManager).
 class XdsManager;
+class XdsResourceName;
 } // namespace Config
 
 namespace Upstream {
@@ -416,6 +417,16 @@ public:
    * thread.
    */
   virtual ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) PURE;
+
+  /**
+   * @return ThreadLocalCluster* the thread local cluster matching the given compressed xDS
+   * resource name or nullptr if it does not exist. This is thread safe and avoids symbol table
+   * lookups when resource name compression is enabled.
+   *
+   * NOTE: Same pointer lifetime and warming caveats apply as getThreadLocalCluster().
+   */
+  virtual ThreadLocalCluster*
+  getThreadLocalClusterByResourceName(const Config::XdsResourceName& cluster) PURE;
 
   /**
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
