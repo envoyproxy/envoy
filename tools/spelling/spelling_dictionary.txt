@@ -1622,6 +1622,7 @@ tos
 traceid
 traceparent
 tracestate
+tracestates
 transcode
 transcoded
 transcoder
