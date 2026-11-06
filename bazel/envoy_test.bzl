@@ -175,7 +175,8 @@ def envoy_cc_test(
         flaky = False,
         env = {},
         rbe_pool = None,
-        exec_properties = {}):
+        exec_properties = {},
+        target_compatible_with = []):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
     exec_properties = exec_properties | select({
         repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
@@ -213,6 +214,7 @@ def envoy_cc_test(
             "//conditions:default": {},
         }),
         exec_properties = exec_properties,
+        target_compatible_with = target_compatible_with,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

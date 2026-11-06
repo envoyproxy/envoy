@@ -47,6 +47,13 @@ public:
     // Note also that tools like ubsan may report this as an unsigned integer
     // underflow, if run with -fsanitize=unsigned-integer-overflow, though
     // strictly speaking this is legal and well-defined for unsigned integers.
+    //
+    // Without a supported allocator (tcmalloc) there is no meaningful measurement: jemalloc's
+    // stats.allocated moves with its caches and arenas, so callers asserting on exact deltas
+    // would see noise rather than their own allocations.
+    if (mode() == Mode::Disabled) {
+      return 0;
+    }
     return Memory::Stats::totalCurrentlyAllocated() - memory_at_construction_;
   }
 
