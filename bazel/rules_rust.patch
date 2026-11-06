@@ -33,3 +33,23 @@
          # Parse the path to the file relative to the workspace root so a
          # symlink matching this path can be created within the sysroot.
  
+
+--- rust/toolchain.bzl
++++ rust/toolchain.bzl
+@@ -284,11 +284,12 @@
+                 linker.label,
+             ))
+         linker_bin = linker_files[0]
++        # Keep the linker under lib/rustlib/{triple}/bin: the gcc-ld/ wrappers exec
++        # ../rust-lld relative to themselves, and rustc adds that directory to PATH.
+         dest = "bin"
+-        if "/bin/" in linker_bin.path:
+-            _, _, subdir = linker_bin.path.partition("/bin/")
+-            if subdir:
+-                dest = "bin/{}".format(subdir[:-len("/" + linker_bin.basename)]).rstrip("/")
++        if "/lib/rustlib/" in linker_bin.dirname:
++            idx = linker_bin.dirname.find("/lib/rustlib/")
++            dest = linker_bin.dirname[idx + 1:]
+ 
+         sysroot_linker = _symlink_sysroot_bin(ctx, name, dest, linker_bin)
+         sysroot_linker_files = _symlink_sysroot_tree(ctx, name, linker, linker[DefaultInfo].default_runfiles.files)
