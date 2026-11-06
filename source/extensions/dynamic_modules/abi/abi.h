@@ -16030,9 +16030,9 @@ typedef const void* envoy_dynamic_module_type_stat_sink_config_module_ptr;
  * envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr is an opaque handle to the metric
  * snapshot for a single flush. It is passed to the snapshot read-back callbacks.
  *
- * OWNERSHIP: Envoy owns the pointer. The handle passed to the flush event hook is valid only during
- * that hook. A handle returned by envoy_dynamic_module_callback_stat_sink_snapshot_retain is valid
- * until the module passes it to envoy_dynamic_module_callback_stat_sink_snapshot_release.
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the flush event hook. A handle returned by
+ * envoy_dynamic_module_callback_stat_sink_snapshot_retain is instead valid until the module passes
+ * it to envoy_dynamic_module_callback_stat_sink_snapshot_release.
  */
 typedef void* envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr;
 
@@ -16341,13 +16341,14 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
  * histogram counterpart of the counter tag-extracted-name callback below, with the same buffer
  * and truncation contract. The index is into the snapshot's histogram collection.
  *
- * Like every snapshot callback, these histogram tag callbacks are valid on the handle passed to
- * envoy_dynamic_module_on_stat_sink_flush during that hook, or on a retained handle until it is
- * released. A module aggregating observations from
- * envoy_dynamic_module_on_stat_sink_on_histogram_complete can use the raw name returned by
- * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram to associate those observations
- * with an owned copy of this name and its tags. No tag extraction or histogram statistics
- * computation is performed by these callbacks.
+ * These histogram tag callbacks are only valid during envoy_dynamic_module_on_stat_sink_flush.
+ * A module aggregating observations from envoy_dynamic_module_on_stat_sink_on_histogram_complete
+ * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
+ * to associate those observations with an owned copy of this name and its tags. No tag extraction
+ * or histogram statistics computation is performed by these callbacks.
+ *
+ * They also accept a handle returned by envoy_dynamic_module_callback_stat_sink_snapshot_retain,
+ * on which they are valid until the handle is released.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
