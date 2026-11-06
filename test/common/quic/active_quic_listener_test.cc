@@ -6,6 +6,7 @@
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
@@ -74,6 +75,18 @@ class TestActiveQuicListener : public ActiveQuicListener {
   void onReadReady() override {
     ActiveQuicListener::onReadReady();
     dispatcher().post([this] { dispatcher().exit(); });
+  }
+
+  // With no sessions the listener reads the socket once per event loop. On platforms with recvmmsg
+  // that read returns a batch of packets, but elsewhere (e.g. Windows) it returns only one, and a
+  // CHLO spanning several packets would not be fully read before the loop exits. Read a batch of
+  // the same size one packet at a time there.
+  size_t numPacketsExpectedPerEventLoop() const override {
+    const size_t expected = ActiveQuicListener::numPacketsExpectedPerEventLoop();
+    if (expected == 0 && !Api::OsSysCallsSingleton::get().supportsMmsg()) {
+      return Network::NUM_DATAGRAMS_PER_RECEIVE;
+    }
+    return expected;
   }
 };
 
@@ -168,6 +181,14 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
+    // Some tests send dozens of CHLOs before the listener reads any of them. The default receive
+    // buffer on Windows (64 KiB) is too small to hold them all, and the dropped packets would
+    // never create their sessions.
+    const int receive_buffer_size = 1024 * 1024;
+    ASSERT_EQ(0, listen_socket_
+                     ->setSocketOption(SOL_SOCKET, SO_RCVBUF, &receive_buffer_size,
+                                       sizeof(receive_buffer_size))
+                     .return_value_);
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
                     listener_config_.socket_factories_[0].get()),
                 getListenSocket(_))
@@ -665,6 +686,11 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(ActiveQuicListenerTest, EcnReporting) {
+#ifdef WIN32
+  // Windows does not let a socket set ECN marks for its outgoing packets with IP_TOS or
+  // IPV6_TCLASS, so the client cannot send the marked packets this test needs.
+  GTEST_SKIP() << "Setting ECN marks with IP_TOS/IPV6_TCLASS is not supported on Windows.";
+#endif
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
@@ -679,6 +705,11 @@ TEST_P(ActiveQuicListenerTest, EcnReporting) {
 }
 
 TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
+#ifdef WIN32
+  // Windows does not let a socket set ECN marks for its outgoing packets with IP_TOS or
+  // IPV6_TCLASS, so the client cannot send the marked packets this test needs.
+  GTEST_SKIP() << "Setting ECN marks with IP_TOS/IPV6_TCLASS is not supported on Windows.";
+#endif
   if (local_address_->ip()->version() == Network::Address::IpVersion::v4) {
     return;
   }

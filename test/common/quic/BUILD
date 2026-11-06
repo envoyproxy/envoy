@@ -290,6 +290,7 @@ envoy_cc_test(
         ":test_proof_source_lib",
         ":mock_quic_connection_id_generator_factory_lib",
         ":test_utils_lib",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/http:utility_lib",
         "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
