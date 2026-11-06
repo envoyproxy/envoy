@@ -263,7 +263,6 @@ envoy_cc_test(
     deps = [
         "//source/common/router:scoped_config_lib",
         "//test/mocks/router:router_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

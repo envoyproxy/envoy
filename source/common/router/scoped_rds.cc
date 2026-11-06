@@ -28,7 +28,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/prefix_utility.h"
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -306,35 +305,6 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
   std::list<RdsRouteConfigProviderHelperPtr>& to_be_removed_rds_providers =
       delayed_rds_providers != nullptr ? *delayed_rds_providers : local_to_be_removed_rds_providers;
   std::vector<std::string> exception_msgs;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
-    updated_scopes.reserve(resources.size());
-    const bool map_initially_empty = scoped_route_map_.empty();
-    const bool rds_providers_initially_empty = route_provider_by_scope_.empty();
-    size_t net_new_scopes = map_initially_empty ? resources.size() : 0;
-    size_t net_new_rds_scopes = 0;
-    for (const auto& resource : resources) {
-      const auto& scoped_route =
-          Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
-              resource.get().resource());
-      if (!map_initially_empty && !scoped_route_map_.contains(scoped_route.name())) {
-        ++net_new_scopes;
-      }
-      if (!scoped_route.has_route_configuration() &&
-          (rds_providers_initially_empty ||
-           !route_provider_by_scope_.contains(scoped_route.name()))) {
-        ++net_new_rds_scopes;
-      }
-    }
-    // Reserves sufficient space in the maps to avoid memory allocation and rehashing during
-    // resource processing.
-    if (net_new_scopes > 0) {
-      scoped_route_map_.reserve(scoped_route_map_.size() + net_new_scopes);
-      scope_name_by_hash_.reserve(scope_name_by_hash_.size() + net_new_scopes);
-    }
-    if (net_new_rds_scopes > 0) {
-      route_provider_by_scope_.reserve(route_provider_by_scope_.size() + net_new_rds_scopes);
-    }
-  }
   for (const auto& resource : resources) {
     // Explicit copy so that we can std::move later.
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
@@ -562,6 +532,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
         removeScopes(clean_removed_resources, version_info, &deferred_removed_scope_names);
 
     std::vector<ScopedRouteInfoConstSharedPtr> deferred_updated_scopes;
+    deferred_updated_scopes.reserve(added_resources.size());
     auto status_or_applied = addOrUpdateScopes(
         added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
         version_info, &deferred_updated_scopes, &to_be_removed_rds_providers);
@@ -648,73 +619,6 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg) {
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
-    // All the scope names to be removed or updated.
-    absl::flat_hash_set<absl::string_view> updated_or_removed_scopes;
-    updated_or_removed_scopes.reserve(removed_resources.size() + resources.size());
-    for (const std::string& removed_resource : removed_resources) {
-      updated_or_removed_scopes.insert(removed_resource);
-    }
-    for (const auto& resource : resources) {
-      const auto& scoped_route =
-          Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
-              resource.get().resource());
-      updated_or_removed_scopes.insert(scoped_route.name());
-    }
-
-    absl::flat_hash_set<absl::string_view> scoped_routes;
-    scoped_routes.reserve(resources.size());
-    absl::flat_hash_map<uint64_t, absl::string_view> new_scope_name_by_hash;
-    new_scope_name_by_hash.reserve(resources.size());
-    using Fragment = envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment;
-    for (const auto& resource : resources) {
-      // Throws (thus rejects all) on any error.
-      const auto& scoped_route =
-          Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
-              resource.get().resource());
-      const std::string& scope_name = scoped_route.name();
-      if (!scoped_routes.insert(scope_name).second) {
-        exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
-        return clean_removed_resources;
-      }
-      ScopeKey scope_key;
-      for (const auto& fragment : scoped_route.key().fragments()) {
-        switch (fragment.type_case()) {
-        case Fragment::TypeCase::kStringKey:
-          scope_key.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
-          break;
-        case Fragment::TypeCase::TYPE_NOT_SET: // LCOV_EXCL_LINE
-          PANIC("not implemented");            // LCOV_EXCL_LINE
-        }
-      }
-      const uint64_t key_fingerprint = scope_key.hash();
-      // Check for key conflict within the incoming batch itself.
-      if (!new_scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
-        exception_msg =
-            fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                        new_scope_name_by_hash[key_fingerprint], scope_name);
-        return clean_removed_resources;
-      }
-      // Check for key conflict against existing scopes that are not being updated or removed.
-      auto existing_iter = scope_name_by_hash_.find(key_fingerprint);
-      if (existing_iter != scope_name_by_hash_.end() &&
-          !updated_or_removed_scopes.contains(existing_iter->second)) {
-        exception_msg =
-            fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                        existing_iter->second, scope_name);
-        return clean_removed_resources;
-      }
-    }
-
-    // Only remove resources that are not going to be updated.
-    for (const std::string& removed_resource : removed_resources) {
-      if (!scoped_routes.contains(removed_resource)) {
-        *clean_removed_resources.Add() = removed_resource;
-      }
-    }
-    return clean_removed_resources;
-  }
-
   // All the scope names to be removed or updated.
   absl::flat_hash_set<std::string> updated_or_removed_scopes;
   for (const std::string& removed_resource : removed_resources) {
