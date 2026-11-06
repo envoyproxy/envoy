@@ -114,7 +114,7 @@ public:
       settings.values[quic::SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07] = 1;
     }
 #endif
-    EXPECT_TRUE(quic_session_.OnSettingsFrame(settings));
+    EXPECT_TRUE(quic_session_.OnSettingsFrame(settings, /*wire_order=*/{}));
   }
 
   // Overridden by the WebTransport fixture to negotiate WebTransport during SetUp().
