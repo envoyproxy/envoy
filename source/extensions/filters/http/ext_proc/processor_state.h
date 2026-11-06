@@ -229,6 +229,13 @@ public:
   absl::Status
   handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
 
+  // Standalone mode override is only supported when Envoy is in the waiting for header
+  // response state, and the old body mode is STREAMED or NONE; and the new body mode is
+  // FULL_DUPLEX_STREAMED, and the new trailer mode is SEND.
+  bool handleStandaloneModeOverride(
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
+          old_body_mode);
+
   virtual const Buffer::Instance* bufferedData() const PURE;
   bool hasBufferedData() const { return bufferedData() != nullptr && bufferedData()->length() > 0; }
   virtual void addBufferedData(Buffer::Instance& data) const PURE;
@@ -682,14 +689,6 @@ public:
   bool noExternalProcess() const override {
     return !local_response_started_ && ProcessorState::noExternalProcess();
   }
-
-  // Standalone mode override is only supported when Envoy is in the waiting for request
-  // header response state, and the old request body mode is STREAMED or NONE;
-  // and the new request body mode is FULL_DUPLEX_STREAMED, and the new request
-  // trailer mode is SEND.
-  bool handleStandaloneModeOverride(
-      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
-          old_body_mode);
 
 private:
   void setProcessingModeInternal(
