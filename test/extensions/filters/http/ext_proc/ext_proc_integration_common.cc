@@ -1157,6 +1157,10 @@ void ExtProcIntegrationTest::initializeDownstreamPushbackConfig(
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.async_client_downstream_flow_control2", "true"},
        {"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.async_client_downstream_flow_control2", "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.grpc_side_stream_flow_control_3",
+                                    "true");
 
   config_helper_.setBufferLimits(1024, 1024);
   auto* processing_mode = proto_config_.mutable_processing_mode();
