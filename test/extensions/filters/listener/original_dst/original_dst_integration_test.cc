@@ -1,7 +1,10 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/http/headers.h"
@@ -171,6 +174,61 @@ TEST_P(OriginalDstTcpProxyIntegrationTest, TestManyConnections) {
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
   test_server_->waitForCounter("cluster_manager.cluster_updated", testing::Ge(kMaxConnections));
+}
+
+// The destination port of a connection whose port was translated before it reached Envoy can be set
+// from filter state, and an upstream PROXY protocol header then carries that port.
+TEST_P(OriginalDstTcpProxyIntegrationTest, LocalPortFromFilterState) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* set_filter_state = listener->add_listener_filters();
+    set_filter_state->set_name("envoy.filters.listener.set_filter_state");
+    TestUtility::loadFromYaml(R"EOF(
+"@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.Config
+on_accept:
+- object_key: envoy.filters.listener.original_dst.local_port
+  format_string:
+    text_format_source:
+      inline_string: "443"
+)EOF",
+                              *set_filter_state->mutable_typed_config());
+    auto* original_dst = listener->add_listener_filters();
+    original_dst->set_name("envoy.filters.listener.original_dst");
+    std::ignore = original_dst->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::listener::original_dst::v3::OriginalDst());
+
+    envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
+        proxy_protocol;
+    proxy_protocol.mutable_config()->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
+    proxy_protocol.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
+    std::ignore = proxy_protocol.mutable_transport_socket()->mutable_typed_config()->PackFrom(
+        envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer());
+    auto* transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_protocol);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(tcp_client->write("data"));
+  std::string observed_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\ndata"), &observed_data));
+  if (version_ == Network::Address::IpVersion::v4) {
+    EXPECT_THAT(observed_data, testing::StartsWith("PROXY TCP4 127.0.0.1 127.0.0.1 "));
+  } else {
+    EXPECT_THAT(observed_data, testing::StartsWith("PROXY TCP6 ::1 ::1 "));
+  }
+  EXPECT_THAT(observed_data, testing::EndsWith(" 443\r\ndata"));
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, OriginalDstTcpProxyIntegrationTest,

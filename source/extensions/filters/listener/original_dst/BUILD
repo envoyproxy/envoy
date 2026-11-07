@@ -21,6 +21,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:uint32_accessor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
@@ -42,6 +43,8 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/common/network:filter_state_dst_address_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/listener/original_dst/v3:pkg_cc_proto",
     ],
 )

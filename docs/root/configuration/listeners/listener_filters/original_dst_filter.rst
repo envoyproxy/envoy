@@ -40,6 +40,37 @@ rather than the address at which the listener is listening at. Furthermore, :ref
 destination cluster <arch_overview_service_discovery_types_original_destination>` may be used to
 forward HTTP requests or TCP connections to the restored destination address.
 
+Destination port from filter state
+----------------------------------
+
+On sockets with an IP address, the filter also reads the filter state object
+``envoy.filters.listener.original_dst.local_port``. When it is present, the port of the connection's
+local address is replaced with its value, after the original destination address has been restored
+from the socket option. This is for ports that are translated before the connection reaches Envoy's
+network namespace, where ``SO_ORIGINAL_DST`` cannot see the translation. For example, a Kubernetes
+Service may forward its port 443 to a container port 10443, so that Envoy does not need to bind a
+privileged port. Setting the object to ``443`` with the :ref:`set filter state listener filter
+<config_listener_filters_set_filter_state>`, placed before this filter, makes later processing,
+such as an upstream PROXY protocol header, see port 443 as the destination port. As with an address
+restored from the socket option, a listener with :ref:`use_original_dst
+<envoy_v3_api_field_config.listener.v3.Listener.use_original_dst>` then hands the connection off to
+the listener for the new port, if there is one.
+
+.. code-block:: yaml
+
+  listener_filters:
+  - name: envoy.filters.listener.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.Config
+      on_accept:
+      - object_key: envoy.filters.listener.original_dst.local_port
+        format_string:
+          text_format_source:
+            inline_string: "443"
+  - name: envoy.filters.listener.original_dst
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+
 Internal listeners
 ------------------
 
