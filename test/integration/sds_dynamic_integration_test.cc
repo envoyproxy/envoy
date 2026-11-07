@@ -1507,6 +1507,10 @@ public:
       auto* secret_config =
           tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
       setUpSdsConfig(secret_config, "client_cert", sds_cluster_name_);
+      if (sds_initial_fetch_timeout_.has_value()) {
+        secret_config->mutable_sds_config()->mutable_initial_fetch_timeout()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(sds_initial_fetch_timeout_->count()));
+      }
 
       transport_socket->set_name("envoy.transport_sockets.tls");
       std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
@@ -1581,6 +1585,9 @@ public:
   envoy::config::cluster::v3::Cluster sds_cluster_;
   bool valid_sds_cluster_{true};
   bool use_bootstrap_eds_{false};
+  // Tests where the secret can never be fetched warm the dynamic cluster on this timeout (15s by
+  // default) rather than on a secret.
+  std::optional<std::chrono::milliseconds> sds_initial_fetch_timeout_;
   std::string sds_cluster_name_;
   FakeHttpConnectionPtr sds_connection_;
   FakeStreamPtr sds_stream_;
@@ -1604,6 +1611,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, BasicSuccess) {
     }
   };
   sds_cluster_name_ = "sds_dynamic_cluster.lyft.com";
+  // The dynamic cluster warms on the secret served below, so initialize() must not wait for the
+  // server to finish initializing (it would only return once the SDS initial_fetch_timeout fired).
+  defer_listener_finalization_ = true;
   initialize();
 
   {
@@ -1616,6 +1626,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, BasicSuccess) {
     sds_stream_->startGrpcStream();
     sendSdsResponse2(getClientSecret(), *sds_stream_);
   }
+
+  // The cluster warms on that secret and the listeners come up: the wait initialize() skipped.
+  test_server_->waitUntilListenersReady();
 
   // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
   test_server_->waitForGauge("server.state", Ge(0));
@@ -1648,6 +1661,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, EdsBootStrapCluster) {
   };
   sds_cluster_name_ = "sds_bootstrap_cluster";
   use_bootstrap_eds_ = true;
+  // The dynamic cluster warms on the secret served below, so initialize() must not wait for the
+  // server to finish initializing (it would only return once the SDS initial_fetch_timeout fired).
+  defer_listener_finalization_ = true;
   initialize();
 
   {
@@ -1660,6 +1676,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, EdsBootStrapCluster) {
     sds_stream_->startGrpcStream();
     sendSdsResponse2(getClientSecret(), *sds_stream_);
   }
+
+  // The cluster warms on that secret and the listeners come up: the wait initialize() skipped.
+  test_server_->waitUntilListenersReady();
 
   // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
   test_server_->waitForGauge("server.state", Ge(0));
@@ -1692,6 +1711,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
   };
   sds_cluster_name_ = "non_existent_sds_cluster.lyft.com";
   valid_sds_cluster_ = false;
+  // The secret can never be fetched: the dynamic cluster warms once the SDS initial fetch times
+  // out, which is what lets the server start. Keep that short.
+  sds_initial_fetch_timeout_ = std::chrono::milliseconds(100);
   initialize();
 
   // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
@@ -1726,6 +1748,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
   };
   sds_cluster_name_ = "dynamic";
   valid_sds_cluster_ = false;
+  // The secret can never be fetched: the dynamic cluster warms once the SDS initial fetch times
+  // out, which is what lets the server start. Keep that short.
+  sds_initial_fetch_timeout_ = std::chrono::milliseconds(100);
   initialize();
 
   // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
