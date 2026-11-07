@@ -79,6 +79,11 @@ public:
    */
   void markTunnelDrainingAndDialReplacement();
 
+  /**
+   * @return the parent's source identifiers, used as the /reverse_tunnel/tunnels admin key.
+   */
+  std::string connectionInfo() const;
+
 private:
   // The socket that this IOHandle owns and manages lifetime for.
   Network::ConnectionSocketPtr owned_socket_;
