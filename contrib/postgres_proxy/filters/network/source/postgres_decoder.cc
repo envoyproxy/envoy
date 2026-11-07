@@ -184,6 +184,9 @@ void DecoderImpl::initialize() {
 */
 Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   switch (state_) {
+  case State::RejectedState:
+    data.drain(data.length());
+    return Decoder::Result::Stopped;
   case State::InitState:
     return onDataInit(data, frontend);
   case State::OutOfSyncState:
@@ -245,6 +248,24 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
 
   Decoder::Result result = Decoder::Result::ReadyForNext;
   uint32_t code = data.peekBEInt<uint32_t>(4);
+  // Populate basic attributes and perform rbac
+  if (callbacks_->authorizationEnabled()) {
+    bool ssl_request = code == Postgres::Protocol::SSL_REQUEST_CODE;
+    if (!ssl_request) {
+      message_.resize(message_len_ - 4);
+      data.copyOut(4, message_.size(), message_.data());
+      onStartup();
+      message_.clear();
+    }
+
+    // perform rbac on StartupMessage and SSL passthrough connections
+    if ((!ssl_request || callbacks_->shouldPassthroughSSL()) && !callbacks_->authorizeStartup()) {
+      data.drain(data.length());
+      state_ = State::RejectedState;
+      return Decoder::Result::Stopped;
+    }
+  }
+
   // Startup message with 1234 in the most significant 16 bits indicate request to encrypt.
   if (code >= Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE) {
     encrypted_ = true;
@@ -551,10 +572,14 @@ void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
 // The message format is continuous string of the following format:
 // user<username>database<database-name>application_name<application>encoding<encoding-type>
 void DecoderImpl::onStartup() {
-  // First 4 bytes of startup message contains version code.
-  // It is skipped. After that message contains attributes.
-  attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
-
+  if (callbacks_->authorizationEnabled()) {
+    // keep key/value pair for empty values
+    attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'));
+  } else {
+    // First 4 bytes of startup message contains version code.
+    // It is skipped. After that message contains attributes.
+    attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
+  }
   // If "database" attribute is not found, default it to "user" attribute.
   if (!attributes_.contains("database") && attributes_.contains("user")) {
     attributes_["database"] = attributes_["user"];
