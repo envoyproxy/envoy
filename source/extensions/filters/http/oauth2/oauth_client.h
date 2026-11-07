@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -34,6 +36,7 @@ public:
     Idle,
     PendingAccessToken,               // Async request for access token is in-flight.
     PendingAccessTokenByRefreshToken, // Async request to refresh access token is in-flight.
+    PendingPushedAuthorizationRequest, // Async PAR request (RFC 9126) is in-flight.
     FailureContinue, // Request failed; caller should continue decoding (allow-failed path).
     FailureStop,     // Request failed; caller should stop (local reply or redirect already sent).
   };
@@ -46,6 +49,18 @@ public:
   virtual void asyncRefreshAccessToken(const std::string& refresh_token,
                                        const std::string& client_id, const std::string& secret,
                                        AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+
+  // Raw (unencoded) key/value pairs. The client percent-encodes them.
+  using FormParams = std::vector<std::pair<std::string, std::string>>;
+
+  // Sends the authorization parameters to the PAR endpoint. On success, the returned
+  // request_uri is available from pushedRequestUri().
+  virtual void asyncPushAuthorizationRequest(const FormParams& params,
+                                             const std::string& client_id,
+                                             const std::string& secret,
+                                             AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+
+  virtual const std::string& pushedRequestUri() const PURE;
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
   virtual void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) PURE;
@@ -84,6 +99,14 @@ public:
   void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
                                const std::string& secret, AuthType auth_type) override;
 
+  void asyncPushAuthorizationRequest(const FormParams& params, const std::string& client_id,
+                                     const std::string& secret, AuthType auth_type) override;
+
+  const std::string& pushedRequestUri() const override { return request_uri_; }
+
+  // The PAR endpoint is owned by the filter config, like `uri`. Must be set before a PAR request.
+  void setParEndpoint(const HttpUri& par_endpoint) { par_endpoint_ = &par_endpoint; }
+
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
@@ -119,12 +142,21 @@ private:
   // is tracked here.
   OAuthState state_{OAuthState::Idle};
 
+  // PAR endpoint from the filter config. Null until setParEndpoint() is called.
+  const HttpUri* par_endpoint_{nullptr};
+  // The request_uri returned by the last successful PAR request.
+  std::string request_uri_;
+
   /**
    * Begins execution of an asynchronous request.
    *
    * @param request the HTTP request to be executed.
+   * @param uri the endpoint (cluster and timeout) to send the request to.
    */
-  void dispatchRequest(Http::RequestMessagePtr&& request);
+  void dispatchRequest(Http::RequestMessagePtr&& request, const HttpUri& uri);
+
+  // Parses the PAR response body and stores request_uri_. Returns false if it is missing.
+  bool parsePushedAuthorizationResponse(const std::string& response_body);
 
   // Calls handleOAuthFailure and either calls continueDecoding() (async path) or sets state_
   // (sync path) depending on whether the request was already dispatched.
@@ -135,8 +167,8 @@ private:
   // state_ (sync path) depending on whether the request was already dispatched.
   void handleRefreshTokenFailure(bool is_request_dispatched);
 
-  Http::RequestMessagePtr createPostRequest() {
-    auto request = Http::Utility::prepareHeaders(uri_);
+  Http::RequestMessagePtr createPostRequest(const HttpUri& uri) {
+    auto request = Http::Utility::prepareHeaders(uri);
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     request->headers().setReferenceContentType(
         Http::Headers::get().ContentTypeValues.FormUrlEncoded);

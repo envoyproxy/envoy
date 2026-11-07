@@ -175,6 +175,12 @@ public:
               (const std::string&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 
+  MOCK_METHOD(void, asyncPushAuthorizationRequest,
+              (const FormParams&, const std::string&, const std::string&,
+               Envoy::Extensions::HttpFilters::Oauth2::AuthType));
+
+  MOCK_METHOD(const std::string&, pushedRequestUri, (), (const, override));
+
   MOCK_METHOD(OAuthState, getState, (), (const, override));
 };
 
@@ -7587,6 +7593,57 @@ TEST_F(OAuth2Test, ChunkedTokenCookiesRoundTripThroughValidator) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Utility::parseCookieValue(request_headers, "BearerToken"), access_token);
   EXPECT_EQ(config->stats().oauth_token_cookie_reassembled_.value(), 2);
+}
+
+TEST_F(OAuth2Test, RedirectWithUsePushesAuthorizationRequestInsteadOfRedirecting) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_use_par(true);
+  auto* par_endpoint = p.mutable_par_endpoint();
+  par_endpoint->set_cluster("auth.example.com");
+  par_endpoint->set_uri("auth.example.com/_par");
+  par_endpoint->mutable_timeout()->set_seconds(1);
+
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  init(makeFilterConfig(p, secret_reader).value());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  OAuth2Client::FormParams sent_params;
+  EXPECT_CALL(*oauth_client_, asyncPushAuthorizationRequest(_, TEST_CLIENT_ID, _, _))
+      .WillOnce([&sent_params](const OAuth2Client::FormParams& params, const std::string&,
+                               const std::string&, AuthType) { sent_params = params; });
+  // The browser is not redirected; the redirect happens after the PAR response.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  std::map<std::string, std::string> sent(sent_params.begin(), sent_params.end());
+  EXPECT_NE(sent.find("state"), sent.end());
+  EXPECT_NE(sent.find("code_challenge"), sent.end());
+  EXPECT_EQ("https://traffic.example.com/_oauth", sent.at("redirect_uri"));
+  EXPECT_EQ(sent.find("client_id"), sent.end());
 }
 
 } // namespace Oauth2
