@@ -2411,6 +2411,32 @@ WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
                                                                                         nullptr, 0,
                                                                                         0))
 
+WEAK_STUB(AiFilterGetFilterStateBytes,
+          envoy_dynamic_module_callback_ai_filter_get_filter_state_bytes(nullptr, {nullptr, 0},
+                                                                         nullptr))
+WEAK_STUB(AiFilterGetRequestHeaderValue,
+          envoy_dynamic_module_callback_ai_filter_get_request_header_value(nullptr, {nullptr, 0},
+                                                                           nullptr, 0, nullptr))
+WEAK_STUB(AiFilterGetRequestJson,
+          envoy_dynamic_module_callback_ai_filter_get_request_json(nullptr, {nullptr, 0}, nullptr))
+WEAK_STUB(AiFilterGetRequestProtocol,
+          envoy_dynamic_module_callback_ai_filter_get_request_protocol(nullptr, nullptr))
+WEAK_STUB(AiFilterRemoveRequestHeader,
+          envoy_dynamic_module_callback_ai_filter_remove_request_header(nullptr, {nullptr, 0}))
+WEAK_STUB(AiFilterRemoveRequestJson,
+          envoy_dynamic_module_callback_ai_filter_remove_request_json(nullptr, {nullptr, 0}))
+WEAK_STUB(AiFilterSendLocalReply,
+          envoy_dynamic_module_callback_ai_filter_send_local_reply(nullptr, 200, {nullptr, 0}))
+WEAK_STUB(AiFilterSetFilterStateBytes,
+          envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
+WEAK_STUB(AiFilterSetRequestHeader,
+          envoy_dynamic_module_callback_ai_filter_set_request_header(nullptr, {nullptr, 0},
+                                                                     {nullptr, 0}))
+WEAK_STUB(AiFilterSetRequestJson,
+          envoy_dynamic_module_callback_ai_filter_set_request_json(nullptr, {nullptr, 0},
+                                                                   {nullptr, 0}))
+
 WEAK_STUB(EarlyHeaderMutationAddHeader,
           envoy_dynamic_module_callback_early_header_mutation_add_header(nullptr, {nullptr, 0},
                                                                          {nullptr, 0}))
