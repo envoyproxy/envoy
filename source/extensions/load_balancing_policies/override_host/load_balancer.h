@@ -70,10 +70,12 @@ public:
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
   const std::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
+  const std::vector<std::string>& internalListenerNames() const { return internal_listener_names_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
                        std::optional<Config::MetadataKey>&& selected_host_key,
+                       std::vector<std::string>&& internal_listener_names,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -90,6 +92,7 @@ private:
 
   const std::vector<OverrideSource> override_host_sources_;
   const std::optional<Config::MetadataKey> selected_host_key_;
+  const std::vector<std::string> internal_listener_names_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -148,6 +151,9 @@ private:
   private:
     HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
+    // Looks up the endpoint as an internal address of each configured internal listener.
+    HostConstSharedPtr findInternalHost(const Upstream::HostLookupMap& hosts,
+                                        absl::string_view endpoint);
 
     HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
 

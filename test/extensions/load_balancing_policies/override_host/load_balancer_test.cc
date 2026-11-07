@@ -7,6 +7,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/network/address_impl.h"
 #include "source/common/upstream/load_balancer_factory_base.h"
 #include "source/extensions/load_balancing_policies/override_host/config.h"
 #include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
@@ -38,6 +39,7 @@ using ::envoy::config::core::v3::Locality;
 using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 using ::Envoy::Upstream::HostConstSharedPtr;
 using ::Envoy::Upstream::HostMap;
+using ::Envoy::Upstream::HostSharedPtr;
 using ::Envoy::Upstream::MockHostSet;
 using ::test::load_balancing_policies::override_host::Config;
 using ::testing::NiceMock;
@@ -193,6 +195,17 @@ protected:
     }
     thread_local_priority_set_.cross_priority_host_map_ =
         std::make_shared<Envoy::Upstream::FlatHostLookupMap>(host_map);
+  }
+
+  // Host reached through an internal listener, e.g. envoy://connect_originate/1.2.3.4:80.
+  HostSharedPtr makeInternalHost(const std::string& listener_name, const std::string& endpoint_id) {
+    return std::shared_ptr<Envoy::Upstream::HostImpl>(*Envoy::Upstream::HostImpl::create(
+        cluster_info_, "",
+        std::make_shared<Envoy::Network::Address::EnvoyInternalInstance>(listener_name,
+                                                                         endpoint_id),
+        nullptr, nullptr, 1, std::make_shared<Locality>(),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+        envoy::config::core::v3::HEALTHY));
   }
 
   Locality makeLocality(absl::string_view region, absl::string_view zone) {
@@ -1041,6 +1054,111 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedHostKeyWithNullRequestStreamInfo) {
   ASSERT_NE(host, nullptr);
   EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
 }
+
+TEST_F(OverrideHostLoadBalancerTest, InternalListenerNameMatchesInternalAddress) {
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {makeInternalHost("connect_originate", "1.2.3.4:80"),
+                      makeInternalHost("connect_originate", "5.6.7.8:80")};
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
+  makeCrossPriorityHostMap();
+
+  OverrideHost config =
+      makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served");
+  config.add_internal_listener_names("connect_originate");
+  createLoadBalancer(config);
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "5.6.7.8:80" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "envoy://connect_originate/5.6.7.8:80");
+
+  // The selected host is reported the way the picker named it.
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata_, "envoy.lb", "x-gateway-destination-endpoint-served");
+  EXPECT_EQ(metadata_value.string_value(), "5.6.7.8:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, InternalAddressIsNotMatchedWithoutListenerNames) {
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {makeInternalHost("connect_originate", "1.2.3.4:80"),
+                      makeInternalHost("connect_originate", "5.6.7.8:80")};
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfig());
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "5.6.7.8:80" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  // Not matched, so the fallback LB returns the first host.
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "envoy://connect_originate/1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, PlainAddressIsMatchedBeforeInternalListenerNames) {
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info_, "tcp://1.2.3.4:80", 1, 0,
+                                                    Host::HealthStatus::HEALTHY),
+                      makeInternalHost("connect_originate", "1.2.3.4:80")};
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
+  makeCrossPriorityHostMap();
+
+  OverrideHost config = makeDefaultConfig();
+  config.add_internal_listener_names("connect_originate");
+  createLoadBalancer(config);
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, InternalListenerNamesAreTriedInOrder) {
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {makeInternalHost("connect_originate", "1.2.3.4:80"),
+                      makeInternalHost("inner_connect_originate", "5.6.7.8:80")};
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
+  makeCrossPriorityHostMap();
+
+  OverrideHost config = makeDefaultConfig();
+  config.add_internal_listener_names("connect_originate");
+  config.add_internal_listener_names("inner_connect_originate");
+  createLoadBalancer(config);
+
+  // Not behind the first listener, found behind the second.
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "5.6.7.8:80" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "envoy://inner_connect_originate/5.6.7.8:80");
+}
+
 } // namespace
 } // namespace OverrideHost
 } // namespace LoadBalancingPolicies
