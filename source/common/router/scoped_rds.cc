@@ -27,8 +27,10 @@
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/prefix_utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
@@ -49,33 +51,28 @@ ConfigProviderPtr create(
          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
              RouteSpecifierCase::kScopedRoutes);
   switch (config.scoped_routes().config_specifier_case()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ConfigSpecifierCase::kScopedRouteConfigurationsList: {
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        ScopedRouteConfigurationsList& scoped_route_list =
-            config.scoped_routes().scoped_route_configurations_list();
+  case ScopedRoutes::ConfigSpecifierCase::kScopedRouteConfigurationsList:
     return scoped_routes_config_provider_manager.createStaticConfigProvider(
         RepeatedPtrUtil::convertToConstMessagePtrContainer<
             envoy::config::route::v3::ScopedRouteConfiguration,
-            ProtobufTypes::ConstMessagePtrVector>(scoped_route_list.scoped_route_configurations()),
+            ProtobufTypes::ConstMessagePtrVector>(config.scoped_routes()
+                                                      .scoped_route_configurations_list()
+                                                      .scoped_route_configurations()),
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
                                                 init_manager));
-  }
-  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ConfigSpecifierCase::kScopedRds:
+  case ScopedRoutes::ConfigSpecifierCase::kScopedRds:
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
                                                 init_manager));
-  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
-    PANIC("not implemented");
+  case ScopedRoutes::ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET: // LCOV_EXCL_LINE
+    PANIC("not implemented");                                       // LCOV_EXCL_LINE
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
+  PANIC_DUE_TO_CORRUPT_ENUM; // LCOV_EXCL_LINE
+} // LCOV_EXCL_LINE
 
 ScopeKeyBuilderPtr createScopeKeyBuilder(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -501,8 +498,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   const bool any_applied = status_or_applied.value();
   const auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
   if (!status.ok()) {
-    return status;
-  }
+    return status; // LCOV_EXCL_LINE
+  } // LCOV_EXCL_LINE
   if (any_applied || !to_be_removed_rds_providers.empty()) {
     setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
   }
@@ -552,7 +549,8 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg) {
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
   // All the scope names to be removed or updated.
-  absl::flat_hash_set<std::string> updated_or_removed_scopes;
+  absl::flat_hash_set<absl::string_view> updated_or_removed_scopes;
+  updated_or_removed_scopes.reserve(removed_resources.size() + resources.size());
   for (const std::string& removed_resource : removed_resources) {
     updated_or_removed_scopes.insert(removed_resource);
   }
@@ -563,38 +561,51 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     updated_or_removed_scopes.insert(scoped_route.name());
   }
 
-  absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash = scope_name_by_hash_;
-  absl::erase_if(scope_name_by_hash, [&updated_or_removed_scopes](const auto& key_name) {
-    auto const& [key, name] = key_name;
-    UNREFERENCED_PARAMETER(key);
-    return updated_or_removed_scopes.contains(name);
-  });
-  absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
-      scoped_routes;
+  absl::flat_hash_set<absl::string_view> scoped_routes;
+  scoped_routes.reserve(resources.size());
+  absl::flat_hash_map<uint64_t, absl::string_view> new_scope_name_by_hash;
+  new_scope_name_by_hash.reserve(resources.size());
+  using Fragment = envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment;
   for (const auto& resource : resources) {
     // Throws (thus rejects all) on any error.
     const auto& scoped_route =
         Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
             resource.get().resource());
     const std::string& scope_name = scoped_route.name();
-    auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
-    if (!scope_config_inserted.second) {
+    if (!scoped_routes.insert(scope_name).second) {
       exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
       return clean_removed_resources;
     }
-    envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
-        scope_config_inserted.first->second;
-    const uint64_t key_fingerprint =
-        ScopedRouteInfo(std::move(scoped_route_config), nullptr).scopeKey().hash();
-    if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
+    ScopeKey scope_key;
+    for (const auto& fragment : scoped_route.key().fragments()) {
+      switch (fragment.type_case()) {
+      case Fragment::TypeCase::kStringKey:
+        scope_key.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
+        break;
+      case Fragment::TypeCase::TYPE_NOT_SET: // LCOV_EXCL_LINE
+        PANIC("not implemented");            // LCOV_EXCL_LINE
+      }
+    }
+    const uint64_t key_fingerprint = scope_key.hash();
+    // Check for key conflict within the incoming batch itself.
+    if (!new_scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
       exception_msg =
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                      scope_name_by_hash[key_fingerprint], scope_name);
+                      new_scope_name_by_hash[key_fingerprint], scope_name);
+      return clean_removed_resources;
+    }
+    // Check for key conflict against existing scopes that are not being updated or removed.
+    auto existing_iter = scope_name_by_hash_.find(key_fingerprint);
+    if (existing_iter != scope_name_by_hash_.end() &&
+        !updated_or_removed_scopes.contains(existing_iter->second)) {
+      exception_msg =
+          fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
+                      existing_iter->second, scope_name);
       return clean_removed_resources;
     }
   }
 
-  // only remove resources that is not going to be updated.
+  // Only remove resources that are not going to be updated.
   for (const std::string& removed_resource : removed_resources) {
     if (!scoped_routes.contains(removed_resource)) {
       *clean_removed_resources.Add() = removed_resource;
