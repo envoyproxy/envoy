@@ -10,6 +10,7 @@
 #include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #ifdef ENVOY_ENABLE_QUIC
 #include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
@@ -417,7 +418,8 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
                              Eq(0));
 }
 
-class Http2RawFrameOverloadIntegrationTest : public BaseOverloadIntegrationTest,
+class Http2RawFrameOverloadIntegrationTest : public Event::TestUsingSimulatedTime,
+                                             public BaseOverloadIntegrationTest,
                                              public Http2RawFrameIntegrationTest,
                                              public testing::Test {
 public:
@@ -446,7 +448,23 @@ protected:
   }
 };
 
-class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
+// Splits the protocol matrix by whether either side speaks HTTP/3. The scaled-timer tests drive
+// their timers by advancing time; that runs on simulated time except for HTTP/3, which stays on
+// real time because the QUIC alarms run off the same clock (no simulated-time fixture in the tree
+// runs HTTP/3, see multiplexed_integration_test.cc).
+std::vector<HttpProtocolTestParams> scaledTimerProtocolTestParams(bool http3) {
+  std::vector<HttpProtocolTestParams> params;
+  for (const auto& param : HttpProtocolIntegrationTest::getProtocolTestParams()) {
+    const bool uses_http3 = param.downstream_protocol == Http::CodecType::HTTP3 ||
+                            param.upstream_protocol == Http::CodecType::HTTP3;
+    if (uses_http3 == http3) {
+      params.push_back(param);
+    }
+  }
+  return params;
+}
+
+class OverloadScaledTimerIntegrationTestBase : public OverloadIntegrationTest {
 protected:
   void initializeOverloadManager(
       const envoy::config::overload::v3::ScaleTimersOverloadActionConfig& config) {
@@ -462,13 +480,32 @@ protected:
     std::ignore = overload_action.mutable_typed_config()->PackFrom(config);
     OverloadIntegrationTest::initializeOverloadManager(overload_action);
   }
+
+  void testCloseIdleHttpConnections();
+  void testMaxConnectionDuration();
+  void testHttp1SafeMaxConnectionDuration();
+  void testHttp3CloseIdleDuringHandshake();
+  void testHttp3CloseMaxDurationDuringHandshake();
+  void testCloseIdleHttpStream();
+  void testTlsHandshakeTimeout();
 };
 
+class OverloadScaledTimerIntegrationTest : public Event::TestUsingSimulatedTime,
+                                           public OverloadScaledTimerIntegrationTestBase {};
+
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadScaledTimerIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         testing::ValuesIn(scaledTimerProtocolTestParams(/*http3=*/false)),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
+class OverloadScaledTimerHttp3IntegrationTest : public OverloadScaledTimerIntegrationTestBase {};
+
+// Empty when QUIC is compiled out.
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(OverloadScaledTimerHttp3IntegrationTest);
+INSTANTIATE_TEST_SUITE_P(Protocols, OverloadScaledTimerHttp3IntegrationTest,
+                         testing::ValuesIn(scaledTimerProtocolTestParams(/*http3=*/true)),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+void OverloadScaledTimerIntegrationTestBase::testCloseIdleHttpConnections() {
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
@@ -532,6 +569,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    // The drain sequence closes the connection from its drain timer, and the close itself is
+    // delayed: wait for the teardown through a stat so time keeps advancing.
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
     if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
@@ -543,7 +583,15 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   codec_client_->close();
 }
 
-TEST_P(OverloadScaledTimerIntegrationTest, MaxConnectionDuration) {
+TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
+  testCloseIdleHttpConnections();
+}
+
+TEST_P(OverloadScaledTimerHttp3IntegrationTest, CloseIdleHttpConnections) {
+  testCloseIdleHttpConnections();
+}
+
+void OverloadScaledTimerIntegrationTestBase::testMaxConnectionDuration() {
   config_helper_.addConfigModifier(
       [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               cm) -> void {
@@ -604,13 +652,22 @@ TEST_P(OverloadScaledTimerIntegrationTest, MaxConnectionDuration) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    // The drain sequence closes the connection from its drain timer, and the close itself is
+    // delayed: wait for the teardown through a stat so time keeps advancing.
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
   codec_client_->close();
 }
 
-TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
+TEST_P(OverloadScaledTimerIntegrationTest, MaxConnectionDuration) { testMaxConnectionDuration(); }
+
+TEST_P(OverloadScaledTimerHttp3IntegrationTest, MaxConnectionDuration) {
+  testMaxConnectionDuration();
+}
+
+void OverloadScaledTimerIntegrationTestBase::testHttp1SafeMaxConnectionDuration() {
   config_helper_.addConfigModifier(
       [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               cm) -> void {
@@ -678,13 +735,24 @@ TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    // The drain sequence closes the connection from its drain timer, and the close itself is
+    // delayed: wait for the teardown through a stat so time keeps advancing.
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
   codec_client_->close();
 }
 
-TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHandshake) {
+TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
+  testHttp1SafeMaxConnectionDuration();
+}
+
+TEST_P(OverloadScaledTimerHttp3IntegrationTest, Http1SafeMaxConnectionDuration) {
+  testHttp1SafeMaxConnectionDuration();
+}
+
+void OverloadScaledTimerIntegrationTestBase::testHttp3CloseIdleDuringHandshake() {
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
     return;
   }
@@ -748,7 +816,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   EXPECT_FALSE(codec_client2->sawGoAway());
 }
 
-TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsDuringHandshake) {
+TEST_P(OverloadScaledTimerHttp3IntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHandshake) {
+  testHttp3CloseIdleDuringHandshake();
+}
+
+void OverloadScaledTimerIntegrationTestBase::testHttp3CloseMaxDurationDuringHandshake() {
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
     return;
   }
@@ -819,7 +891,12 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
   EXPECT_FALSE(codec_client2->sawGoAway());
 }
 
-TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
+TEST_P(OverloadScaledTimerHttp3IntegrationTest,
+       HTTP3CloseMaxDurationHttpConnectionsDuringHandshake) {
+  testHttp3CloseMaxDurationDuringHandshake();
+}
+
+void OverloadScaledTimerIntegrationTestBase::testCloseIdleHttpStream() {
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
       timer_scale_factors:
@@ -860,6 +937,10 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
   EXPECT_EQ(response->headers().getStatusValue(), "504");
   EXPECT_THAT(response->body(), HasSubstr("stream timeout"));
 }
+
+TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) { testCloseIdleHttpStream(); }
+
+TEST_P(OverloadScaledTimerHttp3IntegrationTest, CloseIdleHttpStream) { testCloseIdleHttpStream(); }
 
 TEST_F(Http2RawFrameOverloadIntegrationTest, FlushTimeoutWhenDownstreamBlocked) {
   initializeOverloadManager(
@@ -912,7 +993,7 @@ TEST_F(Http2RawFrameOverloadIntegrationTest, FlushTimeoutWhenDownstreamBlocked) 
   test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
 }
 
-TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
+void OverloadScaledTimerIntegrationTestBase::testTlsHandshakeTimeout() {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3 ||
       upstreamProtocol() == Http::CodecClient::Type::HTTP3) {
     // TODO(#26236): Fix this test for H3.
@@ -970,8 +1051,10 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   // Run the dispatcher until it exits due to a read/write.
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 
-  // At this point, the connection should be idle but the SSL handshake isn't done.
+  // At this point, the connection should be idle but the SSL handshake isn't done. Make sure the
+  // server has accepted it (and so armed the connect timer) before time advances.
   EXPECT_FALSE(connect_callbacks.connected());
+  test_server_->waitForGauge(listenerStatPrefix("downstream_cx_active"), Eq(1));
 
   // Set the load so the timer is reduced but not to the minimum value.
   updateResource(0.8);
@@ -991,7 +1074,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
                              Eq(100));
 
   // The bad client will continue attempting to read, eventually noticing the remote close and
-  // closing the connection.
+  // closing the connection. Wait for the server side of the close through a stat so time keeps
+  // advancing until the connect timer fires.
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_destroy"), Ge(1));
   while (!connect_callbacks.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -1001,9 +1086,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
-class MultipleReduceTimeoutsActionsIntegrationTest : public OverloadIntegrationTest {
+TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) { testTlsHandshakeTimeout(); }
+
+class MultipleReduceTimeoutsActionsIntegrationTestBase : public OverloadIntegrationTest {
 protected:
-  MultipleReduceTimeoutsActionsIntegrationTest() {
+  MultipleReduceTimeoutsActionsIntegrationTestBase() {
     second_factory_ = std::make_unique<FakeResourceMonitorFactory2>();
     inject_second_factory_ =
         std::make_unique<Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>>(
@@ -1069,6 +1156,8 @@ protected:
     updateSecondResource(0);
   }
 
+  void testTimerTypesScaleIndependently();
+
 private:
   class FakeResourceMonitorFactory2;
   class FakeResourceMonitor2 : public Server::ResourceMonitor {
@@ -1115,11 +1204,24 @@ private:
       inject_second_factory_;
 };
 
+class MultipleReduceTimeoutsActionsIntegrationTest
+    : public Event::TestUsingSimulatedTime,
+      public MultipleReduceTimeoutsActionsIntegrationTestBase {};
+
 INSTANTIATE_TEST_SUITE_P(Protocols, MultipleReduceTimeoutsActionsIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         testing::ValuesIn(scaledTimerProtocolTestParams(/*http3=*/false)),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependently) {
+class MultipleReduceTimeoutsActionsHttp3IntegrationTest
+    : public MultipleReduceTimeoutsActionsIntegrationTestBase {};
+
+// Empty when QUIC is compiled out.
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(MultipleReduceTimeoutsActionsHttp3IntegrationTest);
+INSTANTIATE_TEST_SUITE_P(Protocols, MultipleReduceTimeoutsActionsHttp3IntegrationTest,
+                         testing::ValuesIn(scaledTimerProtocolTestParams(/*http3=*/true)),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+void MultipleReduceTimeoutsActionsIntegrationTestBase::testTimerTypesScaleIndependently() {
   initializeOverloadManager();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1150,6 +1252,14 @@ TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependentl
   EXPECT_EQ(max_duration_count,
             test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value());
   codec_client_->close();
+}
+
+TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependently) {
+  testTimerTypesScaleIndependently();
+}
+
+TEST_P(MultipleReduceTimeoutsActionsHttp3IntegrationTest, TimerTypesScaleIndependently) {
+  testTimerTypesScaleIndependently();
 }
 
 class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
@@ -1983,8 +2093,13 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMiss) {
   // Verify that the global workers megamiss counter is incremented.
   test_server_->waitForCounter("workers.watchdog_mega_miss", Ge(1));
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  // The request is forwarded once the worker unblocks; answer it rather than letting the router
+  // time it out.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Verifies that when the runtime guard is disabled, worker threads fallback to the main thread
@@ -2021,8 +2136,11 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
   EXPECT_EQ(test_server_->counter("server.worker_0.watchdog_mega_miss")->value(), 0);
   EXPECT_EQ(test_server_->counter("workers.watchdog_mega_miss")->value(), 0);
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 class TcpProxyLoadShedPointIntegrationTest
