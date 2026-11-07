@@ -38,3 +38,13 @@ is the owning HTTP connection manager's.
 
   rq_content_length_too_large, Counter, Total requests rejected because their ``Content-Length`` exceeded the limit
   rq_body_too_large, Counter, Total requests rejected once the body bytes received exceeded the limit
+
+Dynamic Metadata
+----------------
+
+.. _config_http_filters_body_size_limit_dynamic_metadata:
+
+When a request is rejected because its body size exceeds the configured limit, the filter sets
+dynamic metadata under the ``envoy.filters.http.body_size_limit`` namespace before sending the
+``413`` local reply. The ``details`` field contains human-readable details of the form
+``length=<bytes>, limit=<bytes>`` describing the observed request length and the configured limit.
