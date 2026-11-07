@@ -92,7 +92,7 @@ public:
   bool isInitialized() const { return context_ != nullptr; }
 
   // BootstrapExtensionFactory implementation
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
 

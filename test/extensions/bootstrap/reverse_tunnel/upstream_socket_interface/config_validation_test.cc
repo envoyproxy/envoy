@@ -5,6 +5,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,13 +31,13 @@ TEST_F(ConfigValidationTest, ValidConfiguration) {
 
   ReverseTunnelAcceptor acceptor(context_);
 
-  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+  ASSERT_OK(acceptor.createBootstrapExtension(config_, context_));
 }
 
 TEST_F(ConfigValidationTest, EmptyStatPrefix) {
   ReverseTunnelAcceptor acceptor(context_);
 
-  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+  ASSERT_OK(acceptor.createBootstrapExtension(config_, context_));
 }
 
 TEST_F(ConfigValidationTest, AccessLogConfigurationIsAccepted) {
@@ -52,7 +53,8 @@ TEST_F(ConfigValidationTest, AccessLogConfigurationIsAccepted) {
 
   ReverseTunnelAcceptor acceptor(context_);
   auto extension = acceptor.createBootstrapExtension(config_, context_);
-  auto* reverse_tunnel_extension = dynamic_cast<ReverseTunnelAcceptorExtension*>(extension.get());
+  ASSERT_OK(extension);
+  auto* reverse_tunnel_extension = dynamic_cast<ReverseTunnelAcceptorExtension*>(extension->get());
   ASSERT_NE(reverse_tunnel_extension, nullptr);
   EXPECT_TRUE(reverse_tunnel_extension->hasAccessLogs());
 }

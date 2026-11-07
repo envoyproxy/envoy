@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
@@ -792,24 +793,24 @@ TEST_F(ConfigValidationTest, ValidConfiguration) {
   // Test that valid configuration gets accepted.
   ReverseTunnelInitiator initiator(context_);
 
-  // Should not throw when creating bootstrap extension.
-  EXPECT_NO_THROW(initiator.createBootstrapExtension(config_, context_));
+  // Should succeed when creating bootstrap extension.
+  ASSERT_OK(initiator.createBootstrapExtension(config_, context_));
 }
 
 TEST_F(ConfigValidationTest, EmptyConfiguration) {
   // Test that empty configuration still works.
   ReverseTunnelInitiator initiator(context_);
 
-  // Should not throw with empty config.
-  EXPECT_NO_THROW(initiator.createBootstrapExtension(config_, context_));
+  // Should succeed with empty config.
+  ASSERT_OK(initiator.createBootstrapExtension(config_, context_));
 }
 
 TEST_F(ConfigValidationTest, EmptyStatPrefix) {
   // Test that empty stat_prefix still works with default.
   ReverseTunnelInitiator initiator(context_);
 
-  // Should not throw and should use default prefix.
-  EXPECT_NO_THROW(initiator.createBootstrapExtension(config_, context_));
+  // Should succeed and should use default prefix.
+  ASSERT_OK(initiator.createBootstrapExtension(config_, context_));
 }
 
 // Access log tests.
