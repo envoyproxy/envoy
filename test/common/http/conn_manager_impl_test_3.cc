@@ -3636,8 +3636,7 @@ TEST_F(HttpConnectionManagerImplTest, ProactiveDrainIdleConnection) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*proactive_drain_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
