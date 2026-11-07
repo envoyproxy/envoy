@@ -1,19 +1,73 @@
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_config.h"
 
+#include <algorithm>
+#include <chrono>
 #include <functional>
 #include <string>
 
 #include "envoy/common/exception.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_server_connection.h"
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
+
+namespace {
+
+using DrainAwareHcm =
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager;
+
+constexpr uint64_t kDefaultDrainGoawayDelayMs = 5000;
+
+absl::StatusOr<DrainDelayConfig> buildDrainDelayConfig(const DrainAwareHcm& proto_config) {
+  const auto& hcm_config = proto_config.hcm_config();
+
+  const auto metadata_delay =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, metadata_delay, 0));
+  const auto shutdown_notice_delay =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, shutdown_notice_delay, 0));
+  const auto goaway_delay = std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(hcm_config, drain_timeout, kDefaultDrainGoawayDelayMs));
+
+  // A zero delay means the step is not requested. Reject configs where a requested step can never
+  // be sent or would be sent out of order. The final GOAWAY is always sent.
+  if (metadata_delay.count() && !hcm_config.http2_protocol_options().allow_metadata()) {
+    return absl::InvalidArgumentError("drain_aware_hcm: metadata_delay requires "
+                                      "hcm_config.http2_protocol_options.allow_metadata");
+  }
+  if (std::max(metadata_delay, shutdown_notice_delay).count() &&
+      !proto_config.enable_drain_with_goaway()) {
+    return absl::InvalidArgumentError("drain_aware_hcm: metadata_delay or shutdown_notice_delay "
+                                      "requires enable_drain_with_goaway");
+  }
+  if (metadata_delay.count() && metadata_delay >= goaway_delay) {
+    return absl::InvalidArgumentError(
+        "drain_aware_hcm: metadata_delay must be less than hcm_config.drain_timeout");
+  }
+  if (metadata_delay.count() && shutdown_notice_delay.count() &&
+      metadata_delay >= shutdown_notice_delay) {
+    return absl::InvalidArgumentError(
+        "drain_aware_hcm: metadata_delay must be less than shutdown_notice_delay");
+  }
+  if (shutdown_notice_delay.count() && shutdown_notice_delay >= goaway_delay) {
+    return absl::InvalidArgumentError(
+        "drain_aware_hcm: shutdown_notice_delay must be less than hcm_config.drain_timeout");
+  }
+
+  return DrainDelayConfig{shutdown_notice_delay, metadata_delay, goaway_delay};
+}
+
+} // namespace
 
 Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createBaseCodec(
     Network::Connection& connection, const Buffer::Instance& data,
@@ -81,7 +135,7 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
   // only fires on hot-restart / full server shutdown.
   return std::make_unique<DrainAwareServerConnection>(
       std::move(codec), connection, factory_context_.drainDecision(),
-      factory_context_.serverFactoryContext(), std::move(on_local_drain),
+      factory_context_.serverFactoryContext(), drain_delay_config_, std::move(on_local_drain),
       std::move(callbacks_wrapper));
 }
 
@@ -93,12 +147,15 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
   const auto& hcm_config = proto_config.hcm_config();
   auto singletons = HttpConnectionManager::Utility::createSingletons(context);
 
+  auto drain_delay_config = buildDrainDelayConfig(proto_config);
+  RETURN_IF_NOT_OK_REF(drain_delay_config.status());
+
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<DrainAwareHttpConnectionManagerConfig>(
       hcm_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, proto_config.enable_drain_with_goaway(),
-      creation_status);
+      drain_delay_config.value(), creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {

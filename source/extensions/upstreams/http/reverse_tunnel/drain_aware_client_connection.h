@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -11,6 +12,7 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_http2_client_connection.h"
@@ -26,9 +28,9 @@ namespace Http {
 namespace ReverseTunnel {
 
 /**
- * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY: the
- * event is forwarded to the reverse-tunnel socket manager for reporter notification, then passed
- * through to the pool's normal drain handling.
+ * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY or a
+ * drain METADATA frame: the event is forwarded to the reverse-tunnel socket manager for reporter
+ * notification, then passed through to the pool's normal handling.
  */
 class DrainAwareClientCallbacks : public Envoy::Http::ConnectionCallbacks,
                                   public Logger::Loggable<Logger::Id::client> {
@@ -40,10 +42,7 @@ public:
   void onGoAway(Envoy::Http::GoAwayErrorCode error_code) override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: observed peer GOAWAY (error_code={})",
               static_cast<int>(error_code));
-    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
-            getThreadLocalSocketManager()) {
-      socket_manager->onGoAway(fd_);
-    }
+    notifyReporter();
     inner_.onGoAway(error_code);
   }
   void onSettings(Envoy::Http::ReceivedSettings& settings) override { inner_.onSettings(settings); }
@@ -51,14 +50,41 @@ public:
     inner_.onMaxStreamsChanged(num_streams);
   }
 
+  void notifyReporter() {
+    if (notified_) {
+      return;
+    }
+
+    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+            getThreadLocalSocketManager()) {
+      socket_manager->onGoAway(fd_);
+      notified_ = true;
+    }
+  }
+
   // Drive onGoAway into the pool's active client so the pool drains THIS connection (no new
   // streams, in-flight finish, close when idle). Needed because our drain GOAWAY is emitted
   // out-of-band, so the pool would not otherwise stop multiplexing onto it.
   void drainOwnPoolConnection() { inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError); }
 
+  void onMetadata(Envoy::Http::MetadataMapPtr&& metadata_map_ptr) override {
+    ENVOY_LOG(debug, "reverse_tunnel upstream codec: received connection metadata ({} entries)",
+              metadata_map_ptr->size());
+    auto it = metadata_map_ptr->find(
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY);
+    if (it != metadata_map_ptr->end() && it->second == metadata_val) {
+      notifyReporter();
+      metadata_map_ptr->erase(it);
+    }
+
+    inner_.onMetadata(std::move(metadata_map_ptr));
+  }
+
 private:
   Envoy::Http::ConnectionCallbacks& inner_;
   int fd_;
+  bool notified_{false};
+  constexpr static absl::string_view metadata_val{"true"};
 };
 
 /**

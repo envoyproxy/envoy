@@ -4,6 +4,8 @@ package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
@@ -30,6 +32,19 @@ message DrainAwareHttpConnectionManager {
   // When true, a peer-initiated GOAWAY on a reverse tunnel makes the initiator drop the draining
   // tunnel and dial a replacement, so capacity is restored before the old tunnel closes while its
   // in-flight streams finish. Default false, so the behavior is opt-in and unconfigured listeners
-  // are unaffected.
+  // are unaffected. Required by ``metadata_delay`` and ``shutdown_notice_delay``.
   bool enable_drain_with_goaway = 2;
+
+  // Delay from the start of a reverse tunnel drain until a METADATA frame carrying
+  // ``envoy.reverse_tunnel.drain: true`` is sent. Requires ``enable_drain_with_goaway`` and
+  // ``hcm_config.http2_protocol_options.allow_metadata``. Must be less than
+  // ``hcm_config.drain_timeout`` and, if set, ``shutdown_notice_delay``; otherwise the config is
+  // rejected. Default: 0s (not sent).
+  google.protobuf.Duration metadata_delay = 3;
+
+  // Delay from the start of a reverse tunnel drain until the soft GOAWAY (shutdown notice) is
+  // sent, telling the peer to stop opening new streams on this tunnel. Requires
+  // ``enable_drain_with_goaway``. Must be less than ``hcm_config.drain_timeout``; otherwise the
+  // config is rejected. Default: 0s (not sent).
+  google.protobuf.Duration shutdown_notice_delay = 4;
 }
