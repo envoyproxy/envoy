@@ -22,15 +22,15 @@ public:
     static const Http::LowerCaseString test_disabled_header("test_disabled_breaking_change");
 
     if (!headers.get(test_enabled_header).empty()) {
-      OBSERVED_BREAKING_CHANGE(test_enabled_breaking_change,
-                               decoder_callbacks_->streamInfo().filterState());
+      OBSERVED_REQUEST_BREAKING_CHANGE(test_enabled_breaking_change,
+                                       decoder_callbacks_->streamInfo().filterState());
       if (BREAKING_CHANGE_ENABLED(test_enabled_breaking_change)) {
         headers.remove(test_enabled_header);
       }
     }
     if (!headers.get(test_disabled_header).empty()) {
-      OBSERVED_BREAKING_CHANGE(test_disabled_breaking_change,
-                               decoder_callbacks_->streamInfo().filterState());
+      OBSERVED_REQUEST_BREAKING_CHANGE(test_disabled_breaking_change,
+                                       decoder_callbacks_->streamInfo().filterState());
       if (BREAKING_CHANGE_ENABLED(test_disabled_breaking_change)) {
         headers.remove(test_disabled_header);
       }

@@ -48,6 +48,8 @@ Adding a breaking change flag introduces Envoy reloadable flag with the ``envoy.
 name and puts tracking state in the ``BreakingChangesTracker`` class. Breaking changes are enabled by setting
 the ``envoy.reloadable_features.<flag_name>`` flag in Envoy Runtime.
 
+Presently breaking changes at the request level are tracked.
+
 To introduce and track a breaking change:
 
 1. Add a new flag to :repo:`source/common/runtime/breaking_changes_flags.h`.
@@ -62,11 +64,11 @@ To introduce and track a breaking change:
    Use the ENABLED macro for flags that are enabled by default and DISABLED macro for flags that
    are disabled by default.
 
-2. At the point of breaking change introduction, add the ``OBSERVED_BREAKING_CHANGE`` macro:
+2. At the point of breaking change introduction, add the ``OBSERVED_REQUEST_BREAKING_CHANGE`` macro:
 
    .. code-block:: cpp
 
-     OBSERVED_BREAKING_CHANGE(my_breaking_change, stream_info.filterState());
+     OBSERVED_REQUEST_BREAKING_CHANGE(my_breaking_change, stream_info.filterState());
 
    This records the occurrence in the ``envoy.breaking_changes_tracker`` filter state object.
    The tracked breaking changes can then be logged in access logs using

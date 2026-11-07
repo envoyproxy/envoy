@@ -14,9 +14,11 @@
 
 ABSL_DECLARE_FLAG(bool, breaking_change_observability_enabled);
 
-#define OBSERVED_BREAKING_CHANGE(name, filter_state)                                               \
+#define OBSERVED_REQUEST_BREAKING_CHANGE(name, filter_state)                                       \
   if (::Envoy::Runtime::BreakingChangesTracker::IsEnabled()) {                                     \
-    ::Envoy::Runtime::BreakingChangesTracker::fromFilterState(filter_state).name = 1;              \
+    ::Envoy::Runtime::BreakingChangesTracker::fromFilterState(                                     \
+        filter_state, StreamInfo::FilterState::LifeSpan::Request)                                  \
+        .name = 1;                                                                                 \
   }
 
 #define FEATURE_TRACKER(name) uint64_t name : 1 {0};
@@ -39,7 +41,7 @@ constexpr absl::string_view BreakingChangesTrackerDataName = "envoy.breaking_cha
  *
  * Each breaking change defined in ALL_BREAKING_CHANGES is tracked as a single-bit flag. When
  * breaking change observability is enabled, occurrences are recorded via the
- * OBSERVED_BREAKING_CHANGE macro and can be serialized into access logs via
+ * OBSERVED_REQUEST_BREAKING_CHANGE macro and can be serialized into access logs via
  * %FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%.
  */
 class BreakingChangesTracker : public StreamInfo::FilterState::Object {
@@ -48,9 +50,9 @@ public:
 
   static bool IsEnabled() { return absl::GetFlag(FLAGS_breaking_change_observability_enabled); }
 
-  static BreakingChangesTracker& fromFilterState(
-      const StreamInfo::FilterStateSharedPtr& filter_state,
-      StreamInfo::FilterState::LifeSpan life_span = StreamInfo::FilterState::LifeSpan::FilterChain);
+  static BreakingChangesTracker&
+  fromFilterState(const StreamInfo::FilterStateSharedPtr& filter_state,
+                  StreamInfo::FilterState::LifeSpan life_span);
 
   std::optional<std::string> serializeAsString() const override;
 

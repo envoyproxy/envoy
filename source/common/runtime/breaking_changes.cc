@@ -3,13 +3,15 @@
 #include <optional>
 #include <string>
 
+#include "envoy/stream_info/filter_state.h"
+
 #include "source/common/runtime/breaking_changes_flags.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 // Global flag controlling whether observability for breaking changes is enabled.
-// When disabled (the default), OBSERVED_BREAKING_CHANGE is a no-op to avoid filter state
+// When disabled (the default), OBSERVED_REQUEST_BREAKING_CHANGE is a no-op to avoid filter state
 // allocation overhead. When enabled, encountered breaking changes are recorded in the
 // envoy.breaking_changes_tracker filter state object for access logging and monitoring.
 ABSL_FLAG(bool, breaking_change_observability_enabled, false,
