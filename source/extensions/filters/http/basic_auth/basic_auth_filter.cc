@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "openssl/mem.h"
 
@@ -91,7 +92,12 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   absl::string_view auth_value = auth_header[0]->value().getStringView();
 
-  if (!absl::StartsWith(auth_value, "Basic ")) {
+  // RFC 9110 section 11.1: the authentication scheme is case-insensitive.
+  const bool has_basic_scheme =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.basic_auth_case_insensitive_scheme")
+          ? absl::StartsWithIgnoreCase(auth_value, "Basic ")
+          : absl::StartsWith(auth_value, "Basic ");
+  if (!has_basic_scheme) {
     if (config_->allowMissing()) {
       return Http::FilterHeadersStatus::Continue;
     }

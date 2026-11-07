@@ -4,6 +4,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -57,6 +58,41 @@ TEST_F(FilterTest, BasicAuth) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_user2, true));
   EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
+}
+
+TEST_F(FilterTest, BasicAuthSchemeIsCaseInsensitive) {
+  for (absl::string_view scheme : {"basic", "BASIC", "bAsIc"}) {
+    // user1:test1
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"Authorization", absl::StrCat(scheme, " dXNlcjE6dGVzdDE=")}};
+    request_headers.setScheme("http");
+    request_headers.setHost("host");
+    request_headers.setPath("/");
+    ON_CALL(decoder_filter_callbacks_, requestHeaders())
+        .WillByDefault(testing::Return(Http::RequestHeaderMapOptRef(request_headers)));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ("user1", request_headers.get_("x-username"));
+  }
+}
+
+TEST_F(FilterTest, BasicAuthSchemeIsCaseSensitiveWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.basic_auth_case_insensitive_scheme", "false"}});
+
+  // user1:test1
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "basic dXNlcjE6dGVzdDE="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
+      .WillOnce(testing::Return(makeOptRef(request_headers)));
+
+  EXPECT_CALL(decoder_filter_callbacks_,
+              sendLocalReply(Http::Code::Unauthorized, _, _, _, "invalid_scheme_for_basic_auth"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
 }
 
 TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
