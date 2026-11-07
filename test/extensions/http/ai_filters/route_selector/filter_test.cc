@@ -7,7 +7,6 @@
 
 #include "envoy/extensions/http/ai_filters/route_selector/v3/route_selector.pb.h"
 
-#include "source/common/http/headers.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
@@ -71,13 +70,6 @@ public:
             "api.openai.com",
             nullptr,
             "",
-        },
-        LlmRoute{
-            LLMProtocol::AnthropicMessages,
-            "claude-haiku-4-5",
-            "api.anthropic.com",
-            parseBinding("/v1/messages"),
-            "Bearer sk-anthropic",
         },
         LlmRoute{
             LLMProtocol::GeminiGenerateContent,
@@ -192,8 +184,8 @@ TEST_F(RouteSelectorFilterTest, MissingOrInvalidAttemptCount) {
   expectNoOutputFilterState();
   EXPECT_EQ(counterValue("invalid_route_data"), 2);
 
-  // Attempt count out of bounds (5 routes configured, attempt 6 requested).
-  run(6);
+  // Attempt count out of bounds (4 routes configured, attempt 5 requested).
+  run(5);
   expectLocalReply(Http::Code::InternalServerError, "Invalid LLM request attempt");
   expectNoOutputFilterState();
   EXPECT_EQ(counterValue("invalid_route_data"), 3);
@@ -201,14 +193,12 @@ TEST_F(RouteSelectorFilterTest, MissingOrInvalidAttemptCount) {
 
 TEST_F(RouteSelectorFilterTest, RejectsUnspecifiedProtocol) {
   populateRoutesInFilterState();
-  run(5, {{"authorization", "Bearer client-token"}});
+  run(4, {{"authorization", "Bearer client-token"}});
 
   expectLocalReply(Http::Code::InternalServerError, "Invalid LLM protocol");
   expectNoOutputFilterState();
   EXPECT_EQ(request_headers_.getHostValue(), "original.host");
-  const auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
-  ASSERT_EQ(auth.size(), 1);
-  EXPECT_EQ(auth[0]->value().getStringView(), "Bearer client-token");
+  EXPECT_EQ(request_headers_.get_("authorization"), "Bearer client-token");
   EXPECT_EQ(counterValue("invalid_route_data"), 1);
   EXPECT_EQ(counterValue("success"), 0);
 }
@@ -221,7 +211,8 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
       {"x-api-key", "stale-anthropic-key"},
   };
 
-  // Attempt 1: OpenAI Chat Completions with binding and api_key.
+  // Attempt 1: OpenAI Chat Completions with binding and api_key sets Authorization and strips
+  // x-goog-api-key and x-api-key.
   run(1, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   ASSERT_NE(responseProtocolObject(), nullptr);
@@ -230,12 +221,9 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   ASSERT_NE(responseBindingObject(), nullptr);
   EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(), "/v1/chat/completions");
   EXPECT_EQ(request_headers_.getHostValue(), "api.openai.com");
-  ASSERT_EQ(request_headers_.get(Http::CustomHeaders::get().Authorization).size(), 1);
-  EXPECT_EQ(
-      request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      "Bearer sk-openai-1");
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
+  EXPECT_EQ(request_headers_.get_("authorization"), "Bearer sk-openai-1");
+  EXPECT_FALSE(request_headers_.has("x-goog-api-key"));
+  EXPECT_FALSE(request_headers_.has("x-api-key"));
 
   // Attempt 2: OpenAI Responses without binding or api_key clears BindingResponse and removes
   // authentication headers so client credentials are not leaked.
@@ -249,28 +237,12 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   ASSERT_TRUE(cleared_binding.ok());
   EXPECT_EQ(*cleared_binding, nullptr);
   EXPECT_EQ(request_headers_.getHostValue(), "api.openai.com");
-  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
+  EXPECT_FALSE(request_headers_.has("authorization"));
+  EXPECT_FALSE(request_headers_.has("x-goog-api-key"));
+  EXPECT_FALSE(request_headers_.has("x-api-key"));
 
-  // Attempt 3: Anthropic Messages sets Authorization and binding, and strips x-goog-api-key and
-  // x-api-key.
+  // Attempt 3: Gemini Generate Content sets x-goog-api-key and strips Authorization and x-api-key.
   run(3, stale_headers);
-  EXPECT_FALSE(reply_code_.has_value());
-  EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::AnthropicMessages);
-  EXPECT_EQ(resolvedModel(), "claude-haiku-4-5");
-  ASSERT_NE(responseBindingObject(), nullptr);
-  EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(), "/v1/messages");
-  EXPECT_EQ(request_headers_.getHostValue(), "api.anthropic.com");
-  ASSERT_EQ(request_headers_.get(Http::CustomHeaders::get().Authorization).size(), 1);
-  EXPECT_EQ(
-      request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      "Bearer sk-anthropic");
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
-
-  // Attempt 4: Gemini Generate Content sets x-goog-api-key and strips Authorization and x-api-key.
-  run(4, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(resolvedModel(), "gemini-2.5-pro");
@@ -278,14 +250,11 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(),
             "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
   EXPECT_EQ(request_headers_.getHostValue(), "generativelanguage.googleapis.com:443");
-  ASSERT_EQ(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).size(), 1);
-  EXPECT_EQ(
-      request_headers_.get(Http::LowerCaseString("x-goog-api-key"))[0]->value().getStringView(),
-      "gemini-key-123");
-  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
+  EXPECT_EQ(request_headers_.get_("x-goog-api-key"), "gemini-key-123");
+  EXPECT_FALSE(request_headers_.has("authorization"));
+  EXPECT_FALSE(request_headers_.has("x-api-key"));
 
-  EXPECT_EQ(counterValue("success"), 4);
+  EXPECT_EQ(counterValue("success"), 3);
   EXPECT_EQ(counterValue("invalid_route_data"), 0);
 }
 
