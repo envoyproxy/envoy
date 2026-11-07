@@ -2004,7 +2004,6 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "overload_integration_test",
-    size = "large",
     srcs = ["overload_integration_test.cc"],
     rbe_pool = "linux_x64_small",
     shard_count = 8,
@@ -2017,6 +2016,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration/filters:block_filter_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
