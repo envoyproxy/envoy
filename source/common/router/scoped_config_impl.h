@@ -17,6 +17,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/numeric/int128.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Router {

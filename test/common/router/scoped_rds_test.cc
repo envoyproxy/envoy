@@ -332,6 +332,38 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+
+  testing::StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(true));
+  message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& filtered_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(filtered_config_dump));
 }
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
@@ -2566,6 +2598,119 @@ key:
   // The callback should have been invoked with false (no RDS provider for inline scope).
   EXPECT_TRUE(callback_called);
   EXPECT_FALSE(callback_value);
+}
+
+// Verify capacity pre-reservation across initial empty-map loads, incremental net-new scope
+// additions, inline-to-RDS / RDS-to-inline transitions (where net_new_scopes == 0 while
+// net_new_rds_scopes > 0), and in-place RDS updates (where both counts are 0).
+TEST_F(ScopedRdsTest, PreReservesCapacityAcrossInitialAndInPlaceUpdates) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // 1. Initial load with one RDS scope and one inline scope into empty maps.
+  const auto scope1_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2_inline = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration:
+  name: inline_routes_2
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_initial = TestUtility::decodeResources({scope1_rds, scope2_inline});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"shared_routes"}, "111");
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(1UL, active_scopes_.value());
+
+  // 2. Incremental addition of a net-new RDS scope into non-empty maps.
+  const auto scope3_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope3
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF");
+  const auto decoded_incremental = TestUtility::decodeResources({scope3_rds});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_incremental.refvec_, {}, "2"));
+  EXPECT_EQ(3UL, all_scopes_.value());
+  EXPECT_EQ(2UL, active_scopes_.value());
+
+  // 3. Transition foo_scope1 from RDS to inline and foo_scope2 from inline to RDS in the same
+  // batch (net_new_scopes == 0, net_new_rds_scopes == 1).
+  const auto scope1_inline = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration:
+  name: inline_routes_1
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_transition = TestUtility::decodeResources({scope1_inline, scope2_rds});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_transition.refvec_, {}, "3"));
+  EXPECT_EQ(3UL, all_scopes_.value());
+  EXPECT_EQ(2UL, active_scopes_.value());
+
+  auto worker_route_config = [this](absl::string_view key) {
+    return getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", absl::StrCat("x-foo-key;", key)}}));
+  };
+  ASSERT_THAT(worker_route_config("x-foo-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-foo-key")->name(), "inline_routes_1");
+  ASSERT_THAT(worker_route_config("x-bar-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-bar-key")->name(), "shared_routes");
+
+  // 4. In-place RDS update of foo_scope2 and foo_scope3 (net_new_scopes == 0,
+  // net_new_rds_scopes == 0).
+  const auto scope2_rds_v2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: other_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto scope3_rds_v2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope3
+route_configuration_name: other_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF");
+  const auto decoded_inplace = TestUtility::decodeResources({scope2_rds_v2, scope3_rds_v2});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_inplace.refvec_, {}, "4"));
+  pushRdsConfig({"other_routes"}, "222");
+  ASSERT_THAT(worker_route_config("x-bar-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-bar-key")->name(), "other_routes");
+  ASSERT_THAT(worker_route_config("x-baz-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-baz-key")->name(), "other_routes");
 }
 
 } // namespace
