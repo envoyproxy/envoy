@@ -8,6 +8,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
@@ -185,6 +186,7 @@ private:
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;
+  ExtensibleRuntime::ProviderPtr extensible_runtime_;
   Random::RandomGeneratorImpl random_generator_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
