@@ -42,7 +42,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -461,7 +461,7 @@ message Bootstrap {
   // <arch_overview_runtime_breaking_changes_observability>`.
   //
   // Defaults to ``false``.
-  bool enable_breaking_changes_observability = 44;
+  bool enable_breaking_changes_observability = 45;
 }
 
 // Administration interface :ref:`operations documentation
