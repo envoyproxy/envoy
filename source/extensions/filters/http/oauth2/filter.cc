@@ -342,6 +342,9 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
       OAuth2Config_AuthType_PRIVATE_KEY_JWT:
     return AuthType::PrivateKeyJwt;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_CLIENT_ASSERTION:
+    return AuthType::ClientAssertion;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
   default:
     return AuthType::UrlEncodedBody;
@@ -1284,7 +1287,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
 absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
   if (config_->authType() != AuthType::PrivateKeyJwt) {
-    // The credential is returned by value, so the shared secret is copied exactly once here.
+    // The credential is returned by value, so it is copied exactly once here.
     return std::string(config_->clientSecret());
   }
 

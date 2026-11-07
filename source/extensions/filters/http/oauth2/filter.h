@@ -68,8 +68,8 @@ constexpr absl::string_view KeyIdSecretEntry = "key_id";
 class SecretReader {
 public:
   virtual ~SecretReader() = default;
-  // The OAuth client secret sent to the token endpoint by the auth types that use a shared
-  // secret. Only ever the single-value form of ``token_secret``.
+  // The shared secret or externally issued JWT sent to the token endpoint. Only ever the
+  // single-value form of ``token_secret``.
   virtual const std::string& clientSecret() const PURE;
   virtual const std::string& hmacSecret() const PURE;
   // The PEM-encoded key used to sign the JWT client assertion, taken from the ``private_key``
