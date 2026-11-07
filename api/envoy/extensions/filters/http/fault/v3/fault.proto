@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
 // [#extension: envoy.filters.http.fault]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message FaultAbort {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.FaultAbort";
@@ -58,6 +58,35 @@ message FaultAbort {
   // The response body to be returned when aborting the request.
   // If not specified, defaults to "fault filter abort".
   string response_body = 6;
+
+  // If true, requests matching the abort fault will not be aborted and the ``FI``
+  // response flag will not be set. Instead, the ``aborts_dry_run`` stat is
+  // incremented and a ``dry_run_abort`` struct containing the would-be status
+  // code (``{"http_status": <code>}`` or ``{"grpc_status": <code>}``) is merged
+  // into the fault filter's dynamic metadata namespace (e.g.
+  // ``envoy.filters.http.fault``). User-configured :ref:`filter_metadata
+  // <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.filter_metadata>`
+  // is not written for dry-run abort matches (if another fault such as
+  // :ref:`delay <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.delay>`
+  // is injected on the same request and writes ``filter_metadata``,
+  // ``dry_run_abort`` is merged alongside it). Defaults to ``false``.
+  //
+  // .. note::
+  //   * This setting intentionally applies only to abort fault injection. Any
+  //     :ref:`delay <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.delay>` or
+  //     :ref:`response_rate_limit
+  //     <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.response_rate_limit>`
+  //     configured on the same filter is still injected normally.
+  //   * Dry-run evaluation skips the :ref:`max_active_faults
+  //     <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.max_active_faults>`
+  //     check, so ``aborts_dry_run`` can be higher than what enforcement would
+  //     actually abort and ``faults_overflow`` is not incremented.
+  //   * When combined with :ref:`header_abort
+  //     <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>`,
+  //     aborts requested by the client through ``x-envoy-fault-abort-request`` or
+  //     ``x-envoy-fault-abort-grpc-request`` are counted and recorded in
+  //     ``dry_run_abort`` dynamic metadata but not applied.
+  bool dry_run = 7;
 }
 
 // [#next-free-field: 17]
@@ -156,6 +185,9 @@ message HTTPFault {
 
   // When an abort or delay fault is executed, the metadata struct provided here will be added to the
   // request's dynamic metadata under the namespace corresponding to the name of the fault filter.
+  // This metadata is not written for :ref:`dry_run
+  // <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.dry_run>` abort matches, which
+  // instead merge a ``dry_run_abort`` struct into the fault filter's dynamic metadata namespace.
   // This data can be logged as part of Access Logs using the :ref:`command operator
   // <config_access_log_command_operators>` %DYNAMIC_METADATA(NAMESPACE)%, where NAMESPACE is the name of
   // the fault filter.
