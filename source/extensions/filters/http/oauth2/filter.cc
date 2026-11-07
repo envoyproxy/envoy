@@ -890,9 +890,8 @@ FilterConfig::FilterConfig(
   }
 
   use_par_ = proto_config.use_par();
-  if (use_par_) {
-    // PAR is not wired into the redirect yet; reject instead of failing every login with a 503.
-    creation_status = absl::UnimplementedError("use_par is not implemented yet");
+  if (use_par_ && !proto_config.has_par_endpoint()) {
+    creation_status = absl::InvalidArgumentError("use_par requires par_endpoint to be set");
     return;
   }
   if (proto_config.has_par_endpoint() &&
@@ -1544,6 +1543,33 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string path_and_query_params = query_params.replaceQueryString(
       Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()));
   authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
+  if (config_->usePar()) {
+    // Send the authorization parameters to the PAR endpoint. The redirect is sent later from
+    // onPushAuthorizationRequestSuccess(), which uses the cookies stored here.
+    auto client_credential = getClientCredential();
+    if (!client_credential.ok()) {
+      sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                           client_credential.status().message()));
+      return;
+    }
+    OAuth2Client::FormParams par_params;
+    for (const auto& [key, values] : query_params.data()) {
+      for (const auto& value : values) {
+        if (key == "client_id") {
+          // The client adds client_id itself.
+          continue;
+        }
+        // redirect_uri was percent-encoded above for the browser URL; the client encodes form
+        // values, so send the raw value here.
+        par_params.emplace_back(key, key == queryParamsRedirectUri ? redirect_uri : value);
+      }
+    }
+    pending_par_response_headers_ = std::move(response_headers);
+    oauthClient().asyncPushAuthorizationRequest(par_params, config_->clientId(),
+                                                client_credential.value(), config_->authType());
+    return;
+  }
+
   const std::string new_url = authorization_endpoint_url.toString();
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
 

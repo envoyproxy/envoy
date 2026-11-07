@@ -540,6 +540,8 @@ private:
   // Declared after the configs on purpose: the client holds a reference to the token endpoint URI
   // owned by the FilterConfig, so it must be destroyed before default_config_ is released.
   std::shared_ptr<OAuth2Client> oauth_client_;
+  // Response headers (cookies) for the browser redirect, held while the PAR request is in flight.
+  Http::ResponseHeaderMapPtr pending_par_response_headers_;
   OAuth2ClientFactory oauth_client_factory_;
   ValidatorFactory validator_factory_;
   TimeSource& time_source_;
