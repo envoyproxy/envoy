@@ -1,0 +1,7 @@
+path: "/v1/messages"
+body: "{\"model\":\"claude-sonnet-4-5\",\"max_tokens\":512,\"stream\":true,\"system\":[{\"type\":\"text\",\"text\":\"Be concise.\"}],\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is 6*7?\"}]},{\"role\":\"assistant\",\"content\":\"It is 42.\"},{\"role\":\"user\",\"content\":\"Multiply that by 2.\"}],\"temperature\":0.2,\"top_p\":0.85,\"stop_sequences\":[\"DONE\"]}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: GEMINI_GENERATE_CONTENT
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

@@ -1,0 +1,7 @@
+path: "/v1beta/models/gemini-2.5-flash:generateContent"
+body: "{\"systemInstruction\":{\"parts\":[{\"text\":\"Answer in plain text.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Give one fact about Mars.\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"Mars is the fourth planet.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"And its moons?\"}]}],\"generationConfig\":{\"maxOutputTokens\":\"300\",\"temperature\":\"0.5\",\"topP\":\"0.9\",\"stopSequences\":[\"END_MARS\"]}}"
+fragmentation_seed: 1311768467463790321
+request_protocol: GEMINI_GENERATE_CONTENT
+response_protocol: ANTHROPIC_MESSAGES
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

@@ -1,0 +1,10 @@
+path: "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+body: "{\"system_instruction\":{\"parts\":[{\"text\":\"Answer accurately.\"}]},\"contents\":[{\"parts\":[{\"text\":\"Implicit user role question.\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"Model response.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"Follow-up question.\"}]}],\"generation_config\":{\"max_output_tokens\":\"128\",\"temperature\":\"0.1\",\"top_p\":\"0.8\",\"seed\":\"42\",\"stop_sequences\":[\"HALT\"]}}"
+fragmentation_seed: 1311768467463790321
+request_protocol: GEMINI_GENERATE_CONTENT
+response_protocol: OPENAI_CHAT_COMPLETIONS
+response_binding {
+  uri_pattern: "/v1/chat/completions"
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

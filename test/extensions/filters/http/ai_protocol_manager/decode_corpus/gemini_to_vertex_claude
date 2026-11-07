@@ -1,0 +1,27 @@
+path: "/v1beta/models/gemini-2.5-flash:generateContent"
+body: "{\"systemInstruction\":{\"parts\":[{\"text\":\"Translate canonical Gemini to Vertex Claude.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Hello from Gemini to Vertex Claude.\"}]}],\"generationConfig\":{\"maxOutputTokens\":256,\"temperature\":0.4}}"
+fragmentation_seed: 1311768467463790321
+request_protocol: GEMINI_GENERATE_CONTENT
+response_protocol: ANTHROPIC_MESSAGES
+response_binding {
+  uri_pattern: "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}"
+  header_mutations {
+    remove: "anthropic-version"
+  }
+  body_mutations {
+    remove: "model"
+  }
+  body_mutations {
+    append {
+      record {
+        key: "anthropic_version"
+        value {
+          string_value: "vertex-2023-10-16"
+        }
+      }
+      action: ADD_IF_ABSENT
+    }
+  }
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

@@ -1,0 +1,65 @@
+path: "/gateway/acme/models/claude-sonnet-4-5/stream"
+body: "{\"max_tokens\":200,\"gateway_version\":\"gw-v1\",\"system\":\"Route through custom gateway.\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello custom gateway!\"}]}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: OPENAI_CHAT_COMPLETIONS
+request_binding {
+  uri_pattern: "/gateway/{project}/models/{model}/{invoke|stream}"
+  body_mutations {
+    remove: "model"
+  }
+  body_mutations {
+    remove: "stream"
+  }
+  body_mutations {
+    append {
+      record {
+        key: "gateway_version"
+        value {
+          string_value: "gw-v1"
+        }
+      }
+      action: ADD_IF_ABSENT
+    }
+  }
+}
+response_binding {
+  uri_pattern: "/gateway/{project}/models/{model}:{chat|chat-stream}"
+  header_mutations {
+    append {
+      header {
+        key: "x-target-model"
+        value: "{model}"
+      }
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    }
+  }
+  header_mutations {
+    append {
+      header {
+        key: "x-tenant-project"
+        value: "{project}"
+      }
+      append_action: ADD_IF_ABSENT
+    }
+  }
+  body_mutations {
+    remove: "model"
+  }
+  body_mutations {
+    remove: "stream"
+  }
+  body_mutations {
+    append {
+      record {
+        key: "user"
+        value {
+          string_value: "{project}:{model}"
+        }
+      }
+      action: OVERWRITE_IF_EXISTS_OR_ADD
+    }
+  }
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048
