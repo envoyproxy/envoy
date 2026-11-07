@@ -525,6 +525,20 @@ TEST_F(AllowMissingFilterTest, NoAuthHeaderPassesThrough) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
+TEST_F(AllowMissingFilterTest, NoAuthHeaderRemovesClientSuppliedUsername) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-username", "admin"}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-username")).empty());
+}
 
 TEST_F(AllowMissingFilterTest, BearerTokenPassesThrough) {
   // A request with a Bearer token (intended for JWT filter) should pass through BasicAuth
@@ -536,6 +550,47 @@ TEST_F(AllowMissingFilterTest, BearerTokenPassesThrough) {
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+TEST_F(AllowMissingFilterTest, BearerTokenRemovesClientSuppliedUsername) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"Authorization", "Bearer some.jwt.token"},
+      {"x-username", "admin"}};
+
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-username")).empty());
+}
+TEST_F(AllowMissingFilterTest, SameAuthenticationAndForwardUsernameHeader) {
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+
+  auto config = std::make_shared<FilterConfig>(
+      std::move(users), "x-username", "x-username",
+      /*allow_missing=*/true,
+      /*emit_dynamic_metadata=*/false,
+      /*realm=*/"", "stats", *stats_.rootScope());
+
+  BasicAuthFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-username", "Basic dXNlcjE6dGVzdDE="}};
+
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter.decodeHeaders(request_headers, true));
+
+  EXPECT_EQ("user1", request_headers.get_("x-username"));
 }
 
 TEST_F(AllowMissingFilterTest, ValidBasicCredentialsAuthenticated) {
