@@ -44,7 +44,14 @@ envoy_extension_cc_test(
     srcs = [
         "internal_listener_integration_test.cc",
     ],
-    extension_names = ["envoy.bootstrap.internal_listener"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    extension_names = [
+        "envoy.bootstrap.internal_listener",
+        "envoy.transport_sockets.tls",
+        "envoy.upstreams.http.tcp",
+    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:api_version_lib",
@@ -55,6 +62,8 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/io_socket/user_space:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/upstreams/http/tcp:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
@@ -66,7 +75,9 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

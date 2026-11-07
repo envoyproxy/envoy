@@ -74,15 +74,12 @@ void IoHandleImpl::setAbortiveClose() {
 }
 
 void IoHandleImpl::onPeerDestroy() {
-  // The peer has called close(). If this handle has already sent EOF to the peer, then this
-  // completes the half-close; otherwise, subsequent read() calls should return ECONNRESET.
-  //
-  // Same guard as the abortive close path in setAbortiveClose(): both turn a peer-side
-  // disconnect into a reset on the read side, so they are enabled and disabled together.
+  // Record that the peer fully closed (close(), not shutdown(WR)) so half-close-enabled
+  // connections can deliver any remaining data + end_stream and then close normally without
+  // leaking or synthesizing ECONNRESET. Kept under the same runtime guard as setAbortiveClose().
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_send_rst_on_user_space_socket") &&
-      !sent_eof_) {
-    receive_data_reset_after_drain_ = true;
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+    peer_closed_ = true;
   }
   peer_handle_ = nullptr;
   sent_eof_ = true;
@@ -99,14 +96,14 @@ Api::IoCallUint64Result IoHandleImpl::close() {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
+      // Record peer destruction before waking Read/Closed events on the peer.
+      peer_handle_->onPeerDestroy();
       if (rst_requested_) {
         peer_handle_->setRst();
       } else {
         // Notify the peer that it will not receive more data. shutdown(WRITE).
         peer_handle_->setEof();
       }
-      // Notify the peer that we no longer accept data. shutdown(RD).
-      peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
     } else {
       ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
@@ -124,6 +121,8 @@ bool IoHandleImpl::isOpen() const { return !closed_; }
 
 bool IoHandleImpl::wasConnected() const { return false; }
 
+bool IoHandleImpl::wasPeerFullyClosed() const { return peer_closed_; }
+
 Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                             uint64_t num_slice) {
   if (!isOpen()) {
@@ -134,9 +133,6 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
-      if (receive_data_reset_after_drain_) {
-        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
-      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -174,9 +170,6 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
-      if (receive_data_reset_after_drain_) {
-        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
-      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -294,9 +287,6 @@ Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flag
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
-      if (receive_data_reset_after_drain_) {
-        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
-      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
