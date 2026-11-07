@@ -58,7 +58,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
-    size = "large",
     srcs = ["integration_test.cc"],
     extension_names = [
         "envoy.load_balancing_policies.client_side_weighted_round_robin",
@@ -73,6 +72,7 @@ envoy_extension_cc_test(
         "//source/extensions/load_balancing_policies/load_aware_locality:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
