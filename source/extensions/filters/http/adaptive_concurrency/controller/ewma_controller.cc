@@ -121,9 +121,10 @@ void EwmaController::updateWindow() {
   if (peak < estimated_limit_ / 2.0) {
     return;
   }
-  // Gradient2's default queue allowance and smoothing. Retain the fractional estimate so even a
-  // sub-unit increase can accumulate over successive busy windows.
-  const double target = estimated_limit_ * gradient + 4.0;
+  // Keep the queue allowance below the 50% reduction available at the minimum gradient,
+  // even at small limits. At estimates of 16 or more this is Gradient2's usual allowance.
+  const double headroom = std::min(4.0, estimated_limit_ * 0.25);
+  const double target = estimated_limit_ * gradient + headroom;
   estimated_limit_ = std::clamp(estimated_limit_ + 0.2 * (target - estimated_limit_),
                                 static_cast<double>(minimum_), static_cast<double>(maximum_));
   limit_.store(static_cast<uint32_t>(estimated_limit_), std::memory_order_relaxed);

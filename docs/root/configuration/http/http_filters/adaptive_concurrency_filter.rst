@@ -140,9 +140,11 @@ The limit update adapts the stabilizing mechanisms from
   RTT. Clamp this gradient to [0.5, 1.0].
 * If the highest in-flight count observed at a sampled completion is below half the estimated
   limit, leave the limit unchanged: there is not enough demand to size it.
-* Otherwise, the target is the current estimate times the gradient plus four requests of headroom.
-  Move 20% of the way towards that target and clamp to the configured concurrency bounds. Keep
-  the fractional estimate across windows; use its integer part for admission.
+* Otherwise, the target is the current estimate times the gradient plus headroom. Headroom is
+  25% of the current estimate, up to four requests. For example, at a limit of 4 and a gradient
+  of 0.5, the target is 3 rather than 6, so the controller can reduce a small limit under load.
+  Move 20% of the way towards the target and clamp to the configured concurrency bounds. Keep the
+  fractional estimate across windows; use its integer part for admission.
 
 Limitations
 -----------

@@ -73,9 +73,12 @@ TEST_F(EwmaControllerTest, BoundsAdmissionCancellationAndIdleWindows) {
   tick();
   EXPECT_EQ(1000, gauge("gradient"));
   EXPECT_EQ(3, controller_->concurrencyLimit());
-  // Fractional increases are retained across windows.
-  record(0us, 3);
-  tick();
+  // At this small limit a healthy, busy window grows the estimate by 5%. Fractional
+  // increases accumulate across windows until there is room to admit another request.
+  for (int i = 0; i < 5; ++i) {
+    record(0us, 3);
+    tick();
+  }
   EXPECT_EQ(4, controller_->concurrencyLimit());
 }
 
@@ -141,6 +144,30 @@ TEST_F(EwmaControllerTest, SmoothedAndBoundedLimitOnlyChangesUnderLoad) {
   }
   EXPECT_EQ(101, controller_->concurrencyLimit());
   EXPECT_EQ(101, gauge("concurrency_limit"));
+}
+
+TEST_F(EwmaControllerTest, SaturatedSmallLimitBacksOffAndRecovers) {
+  start("min_concurrency_limit: 1\ninitial_concurrency: 4\nmax_concurrency_limit: 4\n"
+        "warmup_windows: 1\nhalf_life: 3600s");
+  record(10ms, 4);
+  tick();
+  ASSERT_EQ(4, controller_->concurrencyLimit());
+
+  record(100ms, 4);
+  tick();
+  ASSERT_EQ(500, gauge("gradient"));
+  EXPECT_EQ(3, controller_->concurrencyLimit());
+  for (int i = 0; i < 32; ++i) {
+    record(100ms, controller_->concurrencyLimit());
+    tick();
+  }
+  EXPECT_EQ(1, controller_->concurrencyLimit());
+
+  for (int i = 0; i < 32; ++i) {
+    record(10ms, controller_->concurrencyLimit());
+    tick();
+  }
+  EXPECT_EQ(4, controller_->concurrencyLimit());
 }
 
 TEST_F(EwmaControllerTest, HalfUtilizationBoundaryAndSmoothedDecrease) {
