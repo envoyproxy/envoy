@@ -27,7 +27,6 @@ namespace OpenTelemetry {
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -59,7 +58,7 @@ public:
   absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& config,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
-    EXPECT_NE(dynamic_cast<const Protobuf::Empty*>(&config), nullptr);
+    EXPECT_NE(Envoy::Protobuf::DynamicCastMessage<Protobuf::Empty>(&config), nullptr);
     return std::make_unique<DummyTraceExporter>();
   }
 
@@ -831,7 +830,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_ =
       new NiceMock<Event::MockTimer>(&context_.server_factory_context_.thread_local_.dispatcher_);
   ON_CALL(context_.server_factory_context_.thread_local_.dispatcher_, createTimer_(_))
-      .WillByDefault(Invoke([this](Event::TimerCb) { return timer_; }));
+      .WillByDefault([this](Event::TimerCb) { return timer_; });
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
   // Set up driver
   setupValidDriver();
@@ -1134,6 +1133,91 @@ resource_spans:
         - key: "second_tag_name"
           value:
             string_value: "second_tag_value"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(
+      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies typed span attributes are exported as native OTLP values
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithTypedAttributes) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  int64_t generated_int = 1;
+  EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->setTypedTag("int_tag", "42", Tracing::TagValueType::Int);
+  span->setTypedTag("double_tag", "3.5", Tracing::TagValueType::Double);
+  span->setTypedTag("bool_tag", "true", Tracing::TagValueType::Bool);
+  span->setTypedTag("string_tag", "hello", Tracing::TagValueType::String);
+  // A value that does not parse to the requested type falls back to a string attribute.
+  span->setTypedTag("fallback_tag", "not-a-number", Tracing::TagValueType::Int);
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      flags: 257
+      attributes:
+        - key: "int_tag"
+          value:
+            int_value: 42
+        - key: "double_tag"
+          value:
+            double_value: 3.5
+        - key: "bool_tag"
+          value:
+            bool_value: true
+        - key: "string_tag"
+          value:
+            string_value: "hello"
+        - key: "fallback_tag"
+          value:
+            string_value: "not-a-number"
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
@@ -1895,6 +1979,38 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
   span->finishSpan();
 
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies that spans_export_failed is incremented when the exporter fails to send the request.
+TEST_F(OpenTelemetryDriverTest, FailedExportIncrementsSpansExportFailed) {
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ =
+      "my_o11y_backend";
+  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"my_o11y_backend"});
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+          httpAsyncClient())
+      .WillByDefault(ReturnRef(
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
+  setupValidDriverWithHttpExporter();
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+  // A null in-flight request makes the HTTP exporter report failure.
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _))
+      .WillOnce(Return(nullptr));
+
+  span->finishSpan();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_export_failed").value());
 }
 
 } // namespace OpenTelemetry

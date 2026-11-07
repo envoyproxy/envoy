@@ -1,5 +1,7 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "envoy/network/udp_packet_writer_factory_factory.h"
+
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 
@@ -23,11 +25,25 @@ const std::string& TunnelResponseTrailers::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.udp_proxy.propagate_response_trailers");
 }
 
+Envoy::Router::HeaderParserPtr
+buildTunnelingHeaderParser(const TunnelingConfig& config,
+                           Server::Configuration::FactoryContext& context) {
+  if (config.formatters().empty()) {
+    return THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
+                                 Envoy::Router::HeaderParserPtr);
+  }
+
+  auto command_parsers = THROW_OR_RETURN_VALUE(
+      Formatter::SubstitutionFormatStringUtils::parseFormatters(config.formatters(), context),
+      Formatter::CommandParserPtrVector);
+  return THROW_OR_RETURN_VALUE(
+      Envoy::Router::HeaderParser::configure(config.headers_to_add(), command_parsers),
+      Envoy::Router::HeaderParserPtr);
+}
+
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
-    : header_parser_(
-          THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
-                                Envoy::Router::HeaderParserPtr)),
+    : header_parser_(buildTunnelingHeaderParser(config, context)),
       target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
@@ -132,6 +148,16 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
         "is not running with the CAP_NET_ADMIN capability.");
   }
 
+  if (config.has_upstream_packet_writer_config()) {
+    if (config.has_tunneling_config()) {
+      throw EnvoyException("upstream_packet_writer_config cannot be used with tunneling_config.");
+    }
+    auto& factory = Config::Utility::getAndCheckFactory<Network::UdpPacketWriterFactoryFactory>(
+        config.upstream_packet_writer_config());
+    upstream_packet_writer_factory_ =
+        factory.createUdpPacketWriterFactory(config.upstream_packet_writer_config(), context);
+  }
+
   session_access_logs_.reserve(config.access_log_size());
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
     session_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
@@ -171,7 +197,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       filter_factories_.push_back(
           udp_session_filter_config_provider_manager_->createDynamicFilterConfigProvider(
               filter.config_discovery(), filter.name(), context.serverFactoryContext(), context,
-              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr));
+              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr, ""));
       continue;
     }
 

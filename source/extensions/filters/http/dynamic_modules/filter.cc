@@ -35,6 +35,7 @@ void DynamicModuleHttpFilter::maybeRegisterDownstreamWatermarkCallbacks() {
 }
 
 void DynamicModuleHttpFilter::onStreamComplete() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
@@ -109,6 +110,7 @@ void DynamicModuleHttpFilter::destroy(OptRef<Event::Dispatcher> dispatcher) {
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     // The module failed to create the filter, so fail the request closed instead of calling a null
     // filter. Network and listener filters guard the same way.
@@ -124,6 +126,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return FilterDataStatus::StopIterationNoBuffer;
   }
@@ -137,6 +140,7 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return FilterTrailersStatus::StopIteration;
   }
@@ -160,6 +164,7 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
+  HookScope hook_scope(*this);
   if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
     return FilterHeadersStatus::Continue;
   }
@@ -171,6 +176,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
 };
 
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
+  HookScope hook_scope(*this);
   if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
     return FilterDataStatus::Continue;
   }
@@ -184,6 +190,7 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&) {
+  HookScope hook_scope(*this);
   if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
     return FilterTrailersStatus::Continue;
   }
@@ -278,6 +285,7 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
     return;
   }
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
   headers_vector.reserve(response->headers().size());
   response->headers().iterate([&headers_vector](
@@ -312,7 +320,7 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
   filter.http_callouts_.erase(it);
 
   // Check if the filter is destroyed before the callout completed.
-  if (!filter.in_module_filter_) {
+  if (!filter.in_module_filter_ || filter.decoder_callbacks_ == nullptr) {
     return;
   }
 
@@ -329,13 +337,23 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
       result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
       break;
     }
-    filter.config_->on_http_filter_http_callout_done_(filter.thisAsVoidPtr(),
-                                                      filter.in_module_filter_, callout_id, result,
-                                                      nullptr, 0, nullptr, 0);
+    // This can run inside a cluster manager update, so report it from a posted callback.
+    filter.decoder_callbacks_->dispatcher().post(
+        [weak_filter = filter.weak_from_this(), callout_id, result]() {
+          DynamicModuleHttpFilterSharedPtr filter = weak_filter.lock();
+          if (filter == nullptr || filter->in_module_filter_ == nullptr) {
+            return;
+          }
+          DynamicModuleHttpFilter::HookScope hook_scope(*filter);
+          filter->config_->on_http_filter_http_callout_done_(filter->thisAsVoidPtr(),
+                                                             filter->in_module_filter_, callout_id,
+                                                             result, nullptr, 0, nullptr, 0);
+        });
   }
 }
 
 void DynamicModuleHttpFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   // By the time this event is invoked, the filter might be destroyed.
   if (in_module_filter_) {
     config_->on_http_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
@@ -358,12 +376,14 @@ void DynamicModuleHttpFilter::continueEncoding() {
 
 void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
   ASSERT(in_module_filter_ != nullptr);
+  HookScope hook_scope(*this);
   config_->on_http_filter_downstream_above_write_buffer_high_watermark_(thisAsVoidPtr(),
                                                                         in_module_filter_);
 }
 
 void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
   ASSERT(in_module_filter_ != nullptr);
+  HookScope hook_scope(*this);
   config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
                                                                        in_module_filter_);
 }
@@ -429,17 +449,48 @@ DynamicModuleHttpFilter::startHttpStream(uint64_t* stream_id_out, absl::string_v
 
 void DynamicModuleHttpFilter::resetHttpStream(uint64_t stream_id) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+  if (it == http_stream_callouts_.end()) {
     return;
   }
+  // Envoy reset the stream and has not reported it yet.
+  if (it->second->stream_ == nullptr) {
+    reportHttpStreamReset(stream_id);
+    return;
+  }
+  it->second->reset_by_module_ = true;
   it->second->stream_->reset();
+}
+
+void DynamicModuleHttpFilter::reportHttpStreamReset(uint64_t stream_id) {
+  auto it = http_stream_callouts_.find(stream_id);
+  if (it == http_stream_callouts_.end()) {
+    return;
+  }
+  // Get the async client callback out of the map first to ensure it's cleaned up when this function
+  // returns.
+  auto callback = std::move(it->second);
+  http_stream_callouts_.erase(it);
+
+  // Check if the filter is destroyed before we can invoke the callback.
+  if (in_module_filter_ == nullptr || decoder_callbacks_ == nullptr) {
+    return;
+  }
+
+  HookScope hook_scope(*this);
+  config_->on_http_filter_http_stream_reset_(
+      thisAsVoidPtr(), in_module_filter_, stream_id,
+      envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
 }
 
 bool DynamicModuleHttpFilter::sendStreamData(uint64_t stream_id, Buffer::Instance& data,
                                              bool end_stream) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+  if (it == http_stream_callouts_.end()) {
     return false;
+  }
+  // Envoy reset the stream and reports it later, so the data is dropped.
+  if (it->second->stream_ == nullptr) {
+    return true;
   }
   it->second->stream_->sendData(data, end_stream);
   return true;
@@ -448,8 +499,12 @@ bool DynamicModuleHttpFilter::sendStreamData(uint64_t stream_id, Buffer::Instanc
 bool DynamicModuleHttpFilter::sendStreamTrailers(uint64_t stream_id,
                                                  Http::RequestTrailerMapPtr trailers) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+  if (it == http_stream_callouts_.end()) {
     return false;
+  }
+  // Envoy reset the stream and reports it later, so the trailers are dropped.
+  if (it->second->stream_ == nullptr) {
+    return true;
   }
 
   // Store the trailers in the callback to keep them alive, since AsyncStream stores a pointer.
@@ -480,6 +535,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onHeaders(ResponseHeade
     return Http::HeaderMap::Iterate::Continue;
   });
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter.config_->on_http_filter_http_stream_headers_(
       filter.thisAsVoidPtr(), filter.in_module_filter_, callout_id, headers_vector.data(),
       headers_vector.size(), end_stream);
@@ -505,6 +561,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onData(Buffer::Instance
     for (const auto& slice : slices) {
       buffers.push_back({static_cast<char*>(slice.mem_), slice.len_});
     }
+    DynamicModuleHttpFilter::HookScope hook_scope(filter);
     filter.config_->on_http_filter_http_stream_data_(filter.thisAsVoidPtr(),
                                                      filter.in_module_filter_, callout_id,
                                                      buffers.data(), buffers.size(), end_stream);
@@ -534,6 +591,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onTrailers(
     return Http::HeaderMap::Iterate::Continue;
   });
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter_.config_->on_http_filter_http_stream_trailers_(
       filter.thisAsVoidPtr(), filter.in_module_filter_, callout_id, trailers_vector.data(),
       trailers_vector.size());
@@ -567,6 +625,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onComplete() {
     return;
   }
 
+  DynamicModuleHttpFilter::HookScope hook_scope(filter);
   filter.config_->on_http_filter_http_stream_complete_(filter.thisAsVoidPtr(),
                                                        filter.in_module_filter_, callout_id_);
 }
@@ -581,27 +640,35 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
   DynamicModuleHttpFilter& filter = filter_;
   const uint64_t callout_id = callout_id_;
 
-  // Get the async client callback out of the map first to ensure it's cleaned up when this function
-  // returns.
-  auto it = filter.http_stream_callouts_.find(callout_id);
-  if (it == filter.http_stream_callouts_.end()) {
+  if (!filter.http_stream_callouts_.contains(callout_id)) {
     return;
   }
-  auto callback = std::move(it->second);
-  filter.http_stream_callouts_.erase(it);
 
   // Any in map callback must have a non-null stream_, reset it.
   ASSERT(stream_ != nullptr);
   stream_ = nullptr;
 
-  // Check if the filter is destroyed before we can invoke the callback.
-  if (filter.in_module_filter_ == nullptr || filter.decoder_callbacks_ == nullptr) {
+  // The module hears about a reset that it requested before its call returns.
+  if (reset_by_module_) {
+    filter.reportHttpStreamReset(callout_id);
     return;
   }
 
-  filter.config_->on_http_filter_http_stream_reset_(
-      filter.thisAsVoidPtr(), filter.in_module_filter_, callout_id_,
-      envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
+  // Check if the filter is destroyed before we can invoke the callback.
+  if (filter.in_module_filter_ == nullptr || filter.decoder_callbacks_ == nullptr) {
+    filter.http_stream_callouts_.erase(callout_id);
+    return;
+  }
+
+  // This can run inside a cluster manager update, so report it from a posted callback. Until then
+  // the stream stays in the map, so that a reset by the module still reaches it inline.
+  filter.decoder_callbacks_->dispatcher().post(
+      [weak_filter = filter.weak_from_this(), callout_id]() {
+        DynamicModuleHttpFilterSharedPtr filter = weak_filter.lock();
+        if (filter != nullptr) {
+          filter->reportHttpStreamReset(callout_id);
+        }
+      });
 }
 
 Http::LocalErrorStatus
@@ -609,6 +676,7 @@ DynamicModuleHttpFilter::onLocalReply(const Http::StreamFilterBase::LocalReplyDa
   if (!in_module_filter_ || config_->on_http_filter_local_reply_ == nullptr) {
     return Http::LocalErrorStatus::Continue;
   }
+  HookScope hook_scope(*this);
   envoy_dynamic_module_type_envoy_buffer details_buffer{data.details_.data(), data.details_.size()};
   const envoy_dynamic_module_type_on_http_filter_local_reply_status status =
       config_->on_http_filter_local_reply_(thisAsVoidPtr(), in_module_filter_,
@@ -634,7 +702,9 @@ void DynamicModuleHttpFilter::storeSocketOptionBytes(
 bool DynamicModuleHttpFilter::tryGetSocketOptionInt(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, int64_t& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.level == level && opt.name == name && opt.state == state &&
         opt.direction == direction && opt.is_int) {
       value_out = opt.int_value;
@@ -647,7 +717,9 @@ bool DynamicModuleHttpFilter::tryGetSocketOptionInt(
 bool DynamicModuleHttpFilter::tryGetSocketOptionBytes(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, absl::string_view& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.level == level && opt.name == name && opt.state == state &&
         opt.direction == direction && !opt.is_int) {
       value_out = opt.byte_value;

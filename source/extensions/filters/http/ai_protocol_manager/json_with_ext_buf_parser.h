@@ -77,6 +77,9 @@ public:
   // document depends on the offloaded bytes outliving it.
   bool hasExternalRefs() const { return has_external_refs_; }
 
+  // Total raw byte length of strings that were replaced by ExternalRefs rather than kept inline.
+  std::uint64_t externalRefBytes() const { return external_ref_bytes_; }
+
   // Json::Wuffs::WuffsJsonCursor::Handler
   bool openStringCapture(absl::string_view key, int depth, size_t token_start) override;
   bool onStringChunk(absl::string_view key, int depth, absl::string_view chunk) override;
@@ -135,6 +138,7 @@ private:
   std::string pending_string_;
   size_t string_token_start_{0};
   bool string_offloaded_{false};
+  std::uint64_t external_ref_bytes_{0};
 };
 
 } // namespace AiProtocolManager

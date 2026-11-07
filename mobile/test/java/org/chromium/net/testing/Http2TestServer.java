@@ -5,6 +5,7 @@ import android.os.ConditionVariable;
 import android.util.Log;
 
 import java.io.File;
+import java.security.Security;
 import java.util.concurrent.CountDownLatch;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -26,6 +27,7 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslProvider;
 
 /**
  * Wrapper class to start a HTTP/2 test server.
@@ -155,7 +157,14 @@ public final class Http2TestServer {
       // exist. Just avoid a KeyManagerFactory as it's unnecessary for our testing.
       System.setProperty("io.netty.handler.ssl.openssl.useKeyManagerFactory", "false");
 
+      // Robolectric's android-all jar registers Conscrypt as a JSSE provider inside the test
+      // sandbox. Its SSLEngine predates the JDK 9 ALPN API and does not override
+      // setHandshakeApplicationProtocolSelector, so Netty's ALPN probe hits the base-class
+      // UnsupportedOperationException and disables ALPN for the whole VM. Pin the server to
+      // SunJSSE so we get a real ALPN-capable SSLEngine regardless of provider ordering.
       mSslCtx = SslContextBuilder.forServer(certFile, keyFile)
+                    .sslProvider(SslProvider.JDK)
+                    .sslContextProvider(Security.getProvider("SunJSSE"))
                     .applicationProtocolConfig(applicationProtocolConfig)
                     .build();
 

@@ -42,7 +42,6 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::AnyNumber;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -138,11 +137,11 @@ public:
     EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
         .WillRepeatedly(Return(true));
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-        .WillOnce(Invoke([](Network::Connection& connection,
-                            const Filter::NetworkFilterFactoriesList& filter_factories) {
+        .WillOnce([](Network::Connection& connection,
+                     const Filter::NetworkFilterFactoriesList& filter_factories) {
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
-        }));
+        });
     EXPECT_CALL(*read_filter, onNewConnection())
         // Stop iteration to avoid calling getRead/WriteBuffer().
         .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -238,27 +237,27 @@ public:
       EXPECT_CALL(test.listener_config_, filterChainManager())
           .WillOnce(ReturnRef(filter_chain_manager_));
       EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-          .WillOnce(Invoke(
+          .WillOnce(
               [&test](const Network::ConnectionSocket& socket, const StreamInfo::StreamInfo&) {
                 EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
                 EXPECT_EQ("test.example.com", socket.requestedServerName());
                 return &test.proof_source_->filterChain();
-              }));
+              });
       EXPECT_CALL(test.proof_source_->filterChain(), networkFilterFactories())
           .WillOnce(ReturnRef(filter_factory_));
       EXPECT_CALL(test.listener_config_, filterChainFactory()).Times(2u);
       EXPECT_CALL(test.listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
           .WillRepeatedly(Return(true));
       EXPECT_CALL(test.listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-          .WillOnce(Invoke([](Network::Connection& connection,
-                              const Filter::NetworkFilterFactoriesList& filter_factories) {
+          .WillOnce([](Network::Connection& connection,
+                       const Filter::NetworkFilterFactoriesList& filter_factories) {
             EXPECT_EQ(1u, filter_factories.size());
             Server::Configuration::FilterChainUtility::buildFilterChain(connection,
                                                                         filter_factories);
             dynamic_cast<EnvoyQuicServerSession&>(connection)
                 .set_max_inbound_header_list_size(64 * 1024);
             return true;
-          }));
+          });
       EXPECT_CALL(*read_filter_, onNewConnection())
           // Stop iteration to avoid calling getRead/WriteBuffer().
           .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -368,12 +367,12 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringNetworkFilterInstallation) 
   EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const Filter::NetworkFilterFactoriesList& filter_factories) {
+      .WillOnce([](Network::Connection& connection,
+                   const Filter::NetworkFilterFactoriesList& filter_factories) {
         EXPECT_EQ(1u, filter_factories.size());
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
-      }));
+      });
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -503,6 +502,83 @@ TEST_P(EnvoyQuicDispatcherTest, ProcessPacketReturnsTrueForDispatchedPacketOnExi
   envoy_quic_dispatcher_.Shutdown();
 }
 
+// A draining dispatcher (not accepting) forwards packets for unknown connections, but a
+// connection it closed itself is in its time-wait list and must stay with the time-wait manager,
+// which re-sends the stored CONNECTION_CLOSE. Forwarding it would make the hot restart child,
+// which never knew the connection, answer with a stateless reset.
+TEST_P(EnvoyQuicDispatcherTest, ProcessPacketHandlesTimeWaitConnectionLocallyWhenNotAccepting) {
+  EnvoyQuicClock clock(*dispatcher_);
+  PreparedFilterChainMocks mocks(*this);
+  quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(
+      listen_socket_->connectionInfoProvider().localAddress()->ip());
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> chlo_packets =
+      quic::test::GetFirstFlightOfPackets(quic_version_, quic_config_, connection_id_);
+  for (const auto& packet : chlo_packets) {
+    auto wrapped_packet = wrapPacket(*encryptPacket(*packet), clock);
+    EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *wrapped_packet));
+  }
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  ASSERT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
+
+  // Close the connection ourselves: its ID moves to the time-wait list with a CONNECTION_CLOSE.
+  quic::QuicSession* session = const_cast<quic::QuicSession*>(
+      quic::test::QuicDispatcherPeer::FindSession(&envoy_quic_dispatcher_, connection_id_));
+  ASSERT_NE(session, nullptr);
+  session->connection()->CloseConnection(
+      quic::QUIC_NO_ERROR, "closed by test",
+      quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quic::QuicTimeWaitListManager* time_wait_list_manager =
+      quic::test::QuicDispatcherPeer::GetTimeWaitListManager(&envoy_quic_dispatcher_);
+  ASSERT_TRUE(time_wait_list_manager->IsConnectionIdInTimeWait(connection_id_));
+
+  envoy_quic_dispatcher_.StopAcceptingNewConnections();
+  // A late packet for the closed connection is handled here (not reported as non-dispatched).
+  auto packet = wrapPacket(*testEncryptedPacket(quic_version_, connection_id_, "hello"), clock);
+  EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *packet));
+  // A packet for a connection this dispatcher never had is still forwarded.
+  const quic::QuicConnectionId unknown_id = quic::test::TestConnectionId(4242);
+  auto unknown_packet = wrapPacket(*testEncryptedPacket(quic_version_, unknown_id, "hello"), clock);
+  EXPECT_FALSE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *unknown_packet));
+  envoy_quic_dispatcher_.Shutdown();
+}
+
+// The time-wait carve-out is behind a runtime guard; without it every unknown connection ID is
+// forwarded, time-wait or not.
+TEST_P(EnvoyQuicDispatcherTest, ProcessPacketForwardsTimeWaitConnectionWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_hot_restart_time_wait_before_forward", "false"}});
+  EnvoyQuicClock clock(*dispatcher_);
+  PreparedFilterChainMocks mocks(*this);
+  quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(
+      listen_socket_->connectionInfoProvider().localAddress()->ip());
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> chlo_packets =
+      quic::test::GetFirstFlightOfPackets(quic_version_, quic_config_, connection_id_);
+  for (const auto& packet : chlo_packets) {
+    auto wrapped_packet = wrapPacket(*encryptPacket(*packet), clock);
+    EXPECT_TRUE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *wrapped_packet));
+  }
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  quic::QuicSession* session = const_cast<quic::QuicSession*>(
+      quic::test::QuicDispatcherPeer::FindSession(&envoy_quic_dispatcher_, connection_id_));
+  ASSERT_NE(session, nullptr);
+  session->connection()->CloseConnection(
+      quic::QUIC_NO_ERROR, "closed by test",
+      quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  envoy_quic_dispatcher_.StopAcceptingNewConnections();
+  auto packet = wrapPacket(*testEncryptedPacket(quic_version_, connection_id_, "hello"), clock);
+  EXPECT_FALSE(envoy_quic_dispatcher_.processPacket(self_addr, peer_addr, *packet));
+  envoy_quic_dispatcher_.Shutdown();
+}
+
 TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   Network::MockFilterChainManager filter_chain_manager;
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
@@ -533,12 +609,12 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const Filter::NetworkFilterFactoriesList& filter_factories) {
+      .WillOnce([](Network::Connection& connection,
+                   const Filter::NetworkFilterFactoriesList& filter_factories) {
         EXPECT_EQ(1u, filter_factories.size());
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
-      }));
+      });
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -567,7 +643,7 @@ TEST_P(EnvoyQuicDispatcherTest, DrainConnectionsWithGivenFilterChains) {
   const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
   Network::ConnectionDrainEvent observed;
   EXPECT_CALL(network_connection_callbacks, onDrain(_))
-      .WillOnce(Invoke([&observed](Network::ConnectionDrainEvent event) { observed = event; }));
+      .WillOnce([&observed](Network::ConnectionDrainEvent event) { observed = event; });
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(0);
   const std::list<const Network::FilterChain*> filter_chains{&proof_source_->filterChain()};
   envoy_quic_dispatcher_.drainConnectionsWithFilterChains(
@@ -594,7 +670,7 @@ TEST_P(EnvoyQuicDispatcherTest, DrainAllConnectionsNotifiesEverySession) {
   const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
   Network::ConnectionDrainEvent observed;
   EXPECT_CALL(network_connection_callbacks, onDrain(_))
-      .WillOnce(Invoke([&observed](Network::ConnectionDrainEvent event) { observed = event; }));
+      .WillOnce([&observed](Network::ConnectionDrainEvent event) { observed = event; });
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(0);
   envoy_quic_dispatcher_.drainAllConnections(
       Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Gradual});
@@ -620,9 +696,9 @@ TEST_P(EnvoyQuicDispatcherTest, DrainCallbackClosingSessionIsSafe) {
   setUpSessionWithConnectionCallbacks(network_connection_callbacks, read_filter);
 
   EXPECT_CALL(network_connection_callbacks, onDrain(_))
-      .WillOnce(Invoke([read_filter](Network::ConnectionDrainEvent) {
+      .WillOnce([read_filter](Network::ConnectionDrainEvent) {
         read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      }));
+      });
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   envoy_quic_dispatcher_.drainAllConnections(Network::ConnectionDrainEvent{});
 }
@@ -657,8 +733,10 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
 
   getIdleList()->set_max_sessions_to_terminate_in_one_round(1);
   getIdleList()->set_max_sessions_to_terminate_in_one_round_when_saturated(2);
-  // Set a large enough gap to verify it's ignored.
+  // Set a large enough gap to verify it's ignored when saturated (which uses 10s).
   getIdleList()->set_min_time_before_termination_allowed(absl::Hours(1));
+  time_system_.advanceTimeAndRun(std::chrono::seconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
   EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
   envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);

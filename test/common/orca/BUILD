@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/common/common:base64_lib",
         "//source/common/orca:orca_parser",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",

@@ -15,7 +15,6 @@ namespace StatSinks {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -78,35 +77,34 @@ TEST_F(OpenTelemetryHttpMetricsExporterTest, ExportMetricsWithCustomHeaders) {
                     Http::AsyncClient::RequestOptions()
                         .setTimeout(std::chrono::milliseconds(250))
                         .setDiscardResponseBody(true)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            // Verify OTLP HTTP spec compliance: POST method and protobuf content-type.
-            EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
-            EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
-                      message->headers().getContentTypeValue());
+        // Verify OTLP HTTP spec compliance: POST method and protobuf content-type.
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
+                  message->headers().getContentTypeValue());
 
-            EXPECT_EQ("/v1/metrics", message->headers().getPathValue());
-            EXPECT_EQ("some-o11y.com", message->headers().getHostValue());
+        EXPECT_EQ("/v1/metrics", message->headers().getPathValue());
+        EXPECT_EQ("some-o11y.com", message->headers().getHostValue());
 
-            // Verify User-Agent follows OTLP spec.
-            EXPECT_TRUE(absl::StartsWith(message->headers().getUserAgentValue(),
-                                         "OTel-OTLP-Exporter-Envoy/"));
+        // Verify User-Agent follows OTLP spec.
+        EXPECT_TRUE(
+            absl::StartsWith(message->headers().getUserAgentValue(), "OTel-OTLP-Exporter-Envoy/"));
 
-            // Custom headers provided in the configuration.
-            EXPECT_EQ("auth-token", message->headers()
-                                        .get(Http::LowerCaseString("authorization"))[0]
-                                        ->value()
-                                        .getStringView());
-            EXPECT_EQ("custom-value", message->headers()
-                                          .get(Http::LowerCaseString("x-custom-header"))[0]
-                                          ->value()
-                                          .getStringView());
+        // Custom headers provided in the configuration.
+        EXPECT_EQ("auth-token", message->headers()
+                                    .get(Http::LowerCaseString("authorization"))[0]
+                                    ->value()
+                                    .getStringView());
+        EXPECT_EQ("custom-value", message->headers()
+                                      .get(Http::LowerCaseString("x-custom-header"))[0]
+                                      ->value()
+                                      .getStringView());
 
-            return &request;
-          }));
+        return &request;
+      });
 
   http_metrics_exporter_->send(createTestMetricsRequest());
 
@@ -157,12 +155,11 @@ TEST_F(OpenTelemetryHttpMetricsExporterTest, ExportMetricsNonSuccessStatusCode) 
   Http::AsyncClient::Callbacks* callback;
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
+        return &request;
+      });
 
   http_metrics_exporter_->send(createTestMetricsRequest());
 
@@ -189,12 +186,11 @@ TEST_F(OpenTelemetryHttpMetricsExporterTest, ExportMetricsHttpFailure) {
   Http::AsyncClient::Callbacks* callback;
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
+        return &request;
+      });
 
   http_metrics_exporter_->send(createTestMetricsRequest());
 

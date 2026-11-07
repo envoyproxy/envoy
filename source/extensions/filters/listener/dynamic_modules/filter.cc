@@ -1,7 +1,5 @@
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 
-#include "source/extensions/dynamic_modules/worker_index.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -55,7 +53,7 @@ Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFil
   // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
   cached_dispatcher_.store(&cb.dispatcher(), std::memory_order_release);
 
-  worker_index_ = parseWorkerIndexFromDispatcherName(cb.dispatcher().name());
+  worker_index_ = cb.dispatcher().workerId().value_or(0);
   // Delay the in-module filter initialization until callbacks are set
   // to allow accessing worker thread index during filter creation.
   initializeInModuleFilter();
@@ -66,11 +64,13 @@ Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFil
     return Network::FilterStatus::StopIteration;
   }
 
+  HookScope hook_scope(*this);
   auto status = config_->on_listener_filter_on_accept_(thisAsVoidPtr(), in_module_filter_);
   return toEnvoyFilterStatus(status);
 }
 
 Network::FilterStatus DynamicModuleListenerFilter::onData(Network::ListenerFilterBuffer& buffer) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -86,6 +86,7 @@ Network::FilterStatus DynamicModuleListenerFilter::onData(Network::ListenerFilte
 }
 
 void DynamicModuleListenerFilter::onClose() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
@@ -101,6 +102,7 @@ size_t DynamicModuleListenerFilter::maxReadBytes() const {
 }
 
 void DynamicModuleListenerFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   // By the time this event is invoked, the filter might be destroyed.
   if (in_module_filter_ && config_->on_listener_filter_scheduled_) {
     config_->on_listener_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
@@ -171,6 +173,7 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onSuccess(
           envoy_dynamic_module_type_envoy_buffer{static_cast<const char*>(slice.mem_), slice.len_});
     }
 
+    DynamicModuleListenerFilter::HookScope hook_scope(*filter);
     filter->config_->on_listener_filter_http_callout_done_(
         filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id,
         envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
@@ -183,9 +186,8 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onSuccess(
 
 void DynamicModuleListenerFilter::HttpCalloutCallback::onFailure(
     const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
-  // Copy the filter shared_ptr and callout id to the local scope since
-  // on_listener_filter_http_callout_done_ might cause destruction of the filter. That eventually
-  // ends up deallocating this callback itself.
+  // Copy the filter shared_ptr and callout id to the local scope since removing the callout below
+  // frees this callback.
   DynamicModuleListenerFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
   // request_ is set only after the async client accepts the callout. Gating on it avoids a
@@ -207,9 +209,17 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onFailure(
       break;
     }
 
-    filter->config_->on_listener_filter_http_callout_done_(filter->thisAsVoidPtr(),
-                                                           filter->in_module_filter_, callout_id,
-                                                           result, nullptr, 0, nullptr, 0);
+    // This can run inside a cluster manager update, so report it from a posted callback.
+    filter->dispatcher()->post([weak_filter = filter_, callout_id, result]() {
+      DynamicModuleListenerFilterSharedPtr filter = weak_filter.lock();
+      if (filter == nullptr || filter->in_module_filter_ == nullptr) {
+        return;
+      }
+      DynamicModuleListenerFilter::HookScope hook_scope(*filter);
+      filter->config_->on_listener_filter_http_callout_done_(filter->thisAsVoidPtr(),
+                                                             filter->in_module_filter_, callout_id,
+                                                             result, nullptr, 0, nullptr, 0);
+    });
   }
 
   // Remove the callout from the map.

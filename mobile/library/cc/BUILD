@@ -16,7 +16,6 @@ envoy_cc_library(
     hdrs = [
         "engine_builder_types.h",
     ],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         "@abseil-cpp//absl/strings",
@@ -30,7 +29,6 @@ envoy_cc_library(
     srcs = [
         "network_change_monitor.h",
     ],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [],
 )
@@ -40,7 +38,6 @@ envoy_cc_library(
     hdrs = [
         "engine_builder_base.h",
     ],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
@@ -71,7 +68,6 @@ envoy_cc_library(
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":engine_builder_base_lib",
@@ -123,7 +119,6 @@ envoy_cc_library(
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":engine_builder_base_lib",
@@ -182,7 +177,6 @@ envoy_cc_library(
         "stream_prototype.h",
         "string_accessor.h",
     ],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":network_change_monitor_interface",
@@ -199,7 +193,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_engine_cc_lib",
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":engine_builder_lib",

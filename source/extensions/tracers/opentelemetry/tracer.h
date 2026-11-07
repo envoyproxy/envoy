@@ -26,7 +26,8 @@ namespace OpenTelemetry {
 #define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)                                                                           \
-  COUNTER(spans_dropped)
+  COUNTER(spans_dropped)                                                                           \
+  COUNTER(spans_export_failed)
 
 struct OpenTelemetryTracerStats {
   OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
@@ -92,6 +93,8 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
+  void setTypedTag(absl::string_view name, absl::string_view value,
+                   Tracing::TagValueType type) override;
   void reserveTags(size_t size) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;

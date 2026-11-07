@@ -55,10 +55,11 @@ jobs:
       contents: read
       packages: read
     steps:
+    - uses: envoyproxy/toolshed/actions/diskspace@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
     - name: Generate manifest configuration (dev)
       id: dev-config
-      if: ${{ inputs.dev && inputs.target-branch == 'main' }}
-      uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      if: inputs.dev && inputs.target-branch == 'main'
+      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         input-format: yaml
         filter: >-
@@ -119,14 +120,6 @@ jobs:
             additional-tags:
             - distroless-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
-            tag: google-vrp-dev
-            registry: docker.io/envoyproxy
-            architectures:
-            - amd64
-            artifact-pattern: envoy-google-vrp.{arch}.tar
-            additional-tags:
-            - google-vrp-dev-${{ github.sha }}
-          - name: ${{ inputs.dockerhub-repo }}
             tag: tools-dev
             registry: docker.io/envoyproxy
             architectures:
@@ -137,9 +130,11 @@ jobs:
             - tools-dev-${{ github.sha }}
 
     - name: Generate manifest configuration (release)
-      uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: release-config
-      if: ${{ ! inputs.dev || inputs.target-branch != 'main' }}
+      if: >-
+        ! inputs.dev
+        || inputs.target-branch != 'main'
       with:
         input-format: yaml
         filter: >-
@@ -209,14 +204,6 @@ jobs:
             additional-tags:
             - distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
-            tag: google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
-            registry: docker.io/envoyproxy
-            architectures:
-            - amd64
-            artifact-pattern: envoy-google-vrp.{arch}.tar
-            additional-tags:
-            - google-vrp-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
-          - name: ${{ inputs.dockerhub-repo }}
             tag: tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             registry: docker.io/envoyproxy
             architectures:
@@ -227,7 +214,7 @@ jobs:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
 
     - name: Collect and push OCI artifacts
-      uses: envoyproxy/toolshed/actions/oci/collector@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      uses: envoyproxy/toolshed/actions/oci/collector@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         artifacts-pattern: oci.*
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}

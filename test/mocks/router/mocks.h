@@ -167,6 +167,11 @@ public:
     return reset_headers_;
   }
   bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
+  RetryStatePtr createRetryState(Http::RequestHeaderMap& request_headers,
+                                 const Upstream::ClusterInfo& cluster,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override;
 
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
@@ -193,6 +198,8 @@ public:
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isCrossSchemeRedirectAllowed, (), (const));
   MOCK_METHOD(const std::vector<Http::LowerCaseString>&, responseHeadersToCopy, (), (const));
+
+  std::vector<Http::LowerCaseString> response_headers_to_copy_;
 };
 
 class MockInternalRedirectPredicate : public InternalRedirectPredicate {
@@ -248,6 +255,7 @@ public:
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
   MOCK_METHOD(DoRetryType, doRetryType, (), (const));
+  MOCK_METHOD(bool, isAutomaticallyConfiguredForHttp3, (), (const));
 
   DoRetryCallback callback_;
 };
@@ -661,7 +669,8 @@ public:
   // Router::RouteSpecifier
   MOCK_METHOD(OnRouteResult, onRoute,
               (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
+               OnRouteInputStatus input_status),
               (const));
 };
 

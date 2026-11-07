@@ -18,6 +18,7 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
+		"filter_new_panic":             &FilterNewPanicConfigFactory{},
 		"local_reply_response_headers": &LocalReplyResponseHeadersConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
 		"header_callbacks":             &HeaderCallbacksConfigFactory{},
@@ -29,6 +30,8 @@ func init() {
 		"span_across_callbacks":        &SpanAcrossCallbacksConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
+		"stream_timing":                &StreamTimingConfigFactory{},
+		"upstream_connection_attempts": &UpstreamConnectionAttemptsConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
 		"buffer_limit_filter":          &BufferLimitConfigFactory{},
 		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
@@ -42,6 +45,7 @@ func init() {
 		"log_level":                    &LogLevelConfigFactory{},
 		"runtime_values":               &RuntimeValuesConfigFactory{},
 		"generic_secret_callbacks":     &GenericSecretCallbacksConfigFactory{},
+		"filter_state_object_recreate": &FilterStateObjectRecreateConfigFactory{},
 	})
 }
 
@@ -172,6 +176,30 @@ func (p *PassthroughFilter) OnRequestHeaders(headers shared.HeaderMap,
 	p.handle.Log(shared.LogLevelError, "on_request_headers called")
 	p.handle.Log(shared.LogLevelCritical, "on_request_headers called")
 	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// FilterNewPanic
+// -----------------------------------------------------------------------------
+
+// FilterNewPanicConfigFactory exercises the Go SDK panic barrier. Its filter constructor panics, so
+// on_http_filter_new recovers the panic, returns a null filter, and Envoy fails the request closed
+// with a 500 instead of aborting the process.
+type FilterNewPanicConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *FilterNewPanicConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &FilterNewPanicFilterFactory{}, nil
+}
+
+type FilterNewPanicFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *FilterNewPanicFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	panic("filter constructor failed on purpose")
 }
 
 // -----------------------------------------------------------------------------
@@ -962,6 +990,124 @@ func (p *StatsCallbacksFilter) OnStreamComplete() {
 }
 
 // -----------------------------------------------------------------------------
+// StreamTiming
+// -----------------------------------------------------------------------------
+
+type StreamTimingConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *StreamTimingConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	timingObservedTotal, result := h.DefineCounter("stream_timing_observed_total")
+	assertEq(result, shared.MetricsSuccess, "timing counter definition")
+	return &StreamTimingFilterFactory{timingObservedTotal: timingObservedTotal}, nil
+}
+
+type StreamTimingFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &StreamTimingFilter{handle: h, timingObservedTotal: f.timingObservedTotal}
+}
+
+type StreamTimingFilter struct {
+	shared.EmptyHttpFilter
+	handle              shared.HttpFilterHandle
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilter) OnStreamComplete() {
+	timing := f.handle.GetTimingInfo()
+	assert(timing.StartTimeUnixNs > 0, "start time")
+	assert(timing.HasStartTime, "start time available")
+	assert(timing.DownstreamConnectionBeginNs != -1, "downstream connection accepted")
+	assert(timing.HasDownstreamConnectionBegin, "downstream connection marker available")
+	assert(timing.DownstreamHandshakeStartNs == -1, "no downstream TLS handshake start")
+	assert(!timing.HasDownstreamHandshakeStart, "no downstream TLS start marker")
+	assert(timing.DownstreamHandshakeCompleteNs == -1, "no downstream TLS handshake completion")
+	assert(!timing.HasDownstreamHandshakeComplete, "no downstream TLS completion marker")
+	assert(timing.LastDownstreamHeaderRxByteReceivedNs >= 0, "request headers received")
+	assert(timing.HasLastDownstreamHeaderRxByteReceived, "request headers marker available")
+	assert(timing.LastDownstreamRxByteReceivedNs >= timing.LastDownstreamHeaderRxByteReceivedNs,
+		"request received")
+	assert(timing.HasLastDownstreamRxByteReceived, "request received marker available")
+	assert(timing.UpstreamConnectStartNs >= 0, "upstream connect start")
+	assert(timing.HasUpstreamConnectStart, "upstream connect start marker available")
+	assert(timing.UpstreamConnectCompleteNs >= timing.UpstreamConnectStartNs, "upstream connect complete")
+	assert(timing.HasUpstreamConnectComplete, "upstream connect end marker available")
+	assert(timing.UpstreamHandshakeCompleteNs == -1, "no upstream TLS handshake")
+	assert(!timing.HasUpstreamHandshakeComplete, "no upstream TLS completion marker")
+	assert(timing.FirstUpstreamTxByteSentNs >= 0, "upstream request start")
+	assert(timing.HasFirstUpstreamTxByteSent, "upstream request start marker available")
+	assert(timing.LastUpstreamTxByteSentNs >= timing.FirstUpstreamTxByteSentNs, "upstream request complete")
+	assert(timing.HasLastUpstreamTxByteSent, "upstream request end marker available")
+	assert(timing.FirstUpstreamRxByteReceivedNs >= 0, "upstream response start")
+	assert(timing.HasFirstUpstreamRxByteReceived, "upstream response start marker available")
+	assert(timing.FirstUpstreamRxBodyByteReceivedNs >= timing.FirstUpstreamRxByteReceivedNs,
+		"upstream response body start")
+	assert(timing.HasFirstUpstreamRxBodyByteReceived, "upstream body start marker available")
+	assert(timing.LastUpstreamRxByteReceivedNs >= timing.FirstUpstreamRxBodyByteReceivedNs,
+		"upstream response complete")
+	assert(timing.HasLastUpstreamRxByteReceived, "upstream response end marker available")
+	assert(timing.FirstDownstreamTxByteSentNs >= 0, "downstream response start")
+	assert(timing.HasFirstDownstreamTxByteSent, "downstream response start marker available")
+	assert(timing.LastDownstreamTxByteSentNs >= timing.FirstDownstreamTxByteSentNs,
+		"downstream response complete")
+	assert(timing.HasLastDownstreamTxByteSent, "downstream response end marker available")
+	assert(timing.LastDownstreamAckReceivedNs == -1, "no TCP final ACK marker")
+	assert(!timing.HasLastDownstreamAckReceived, "no TCP final ACK marker available")
+	assert(timing.RequestCompleteDurationNs >= 0, "request complete duration")
+	assert(timing.HasRequestComplete, "request complete marker available")
+	assert(timing.DownstreamConnectionEndNs == -1, "connection remains open")
+	assert(!timing.HasDownstreamConnectionEnd, "connection close marker unavailable")
+	assertEq(f.handle.IncrementCounterValue(f.timingObservedTotal, 1), shared.MetricsSuccess,
+		"timing counter")
+}
+
+// -----------------------------------------------------------------------------
+// UpstreamConnectionAttempts
+// -----------------------------------------------------------------------------
+
+type UpstreamConnectionAttemptsConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *UpstreamConnectionAttemptsConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	observedTotal, result := h.DefineCounter("upstream_connection_attempts_observed_total")
+	assertEq(result, shared.MetricsSuccess, "upstream attempts counter definition")
+	return &UpstreamConnectionAttemptsFilterFactory{observedTotal: observedTotal}, nil
+}
+
+type UpstreamConnectionAttemptsFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &UpstreamConnectionAttemptsFilter{handle: h, observedTotal: f.observedTotal}
+}
+
+type UpstreamConnectionAttemptsFilter struct {
+	shared.EmptyHttpFilter
+	handle        shared.HttpFilterHandle
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilter) OnStreamComplete() {
+	remoteAddress, ok := f.handle.GetUpstreamRemoteAddress()
+	assert(ok && remoteAddress.Len > 0, "upstream remote address")
+	assertEq(len(f.handle.GetUpstreamHostsAttempted()), 1, "upstream hosts attempted")
+	assertEq(len(f.handle.GetUpstreamConnectionIDsAttempted()), 1,
+		"upstream connection IDs attempted")
+	assertEq(f.handle.IncrementCounterValue(f.observedTotal, 1), shared.MetricsSuccess,
+		"upstream attempts counter")
+}
+
+// -----------------------------------------------------------------------------
 // StreamingTerminal
 // -----------------------------------------------------------------------------
 
@@ -1737,4 +1883,64 @@ func (p *RuntimeValuesFilter) OnResponseHeaders(headers shared.HeaderMap,
 	headers.Set("x-runtime-missing-int", strconv.FormatUint(f.missingInt, 10))
 	headers.Set("x-runtime-missing-number", strconv.FormatFloat(f.missingNumber, 'g', -1, 64))
 	return shared.HeadersStatusContinue
+}
+
+// FilterStateObjectRecreateConfigFactory checks that a Request-lifespan object survives
+// recreate_stream and a FilterChain-lifespan one does not.
+type FilterStateObjectRecreateConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *FilterStateObjectRecreateConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &FilterStateObjectRecreateFilterFactory{}, nil
+}
+
+type FilterStateObjectRecreateFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *FilterStateObjectRecreateFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &FilterStateObjectRecreateFilter{handle: handle}
+}
+
+type FilterStateObjectRecreateFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+type liveExchange struct {
+	tokens chan uint64
+}
+
+const liveObjectKey = "envoy.test.live_object"
+
+func (p *FilterStateObjectRecreateFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	object, ok := p.handle.GetFilterStateObject(liveObjectKey)
+	if !ok {
+		exchange := &liveExchange{tokens: make(chan uint64, 1)}
+		exchange.tokens <- 0xABCD
+		if !p.handle.SetFilterStateObject(liveObjectKey, exchange, shared.FilterStateLifeSpanRequest) {
+			panic("failed to store live object")
+		}
+		if !p.handle.SetFilterStateObject(liveObjectKey+".filter_chain",
+			"filter chain marker", shared.FilterStateLifeSpanFilterChain) {
+			panic("failed to store filter chain marker")
+		}
+		if !p.handle.RecreateStream(nil) {
+			panic("failed to recreate stream")
+		}
+		return shared.HeadersStatusStop
+	}
+
+	exchange := object.(*liveExchange)
+	if _, ok := p.handle.GetFilterStateObject(liveObjectKey + ".filter_chain"); ok {
+		p.handle.SendLocalResponse(500, nil, []byte("filter chain object survived recreate"), "")
+		return shared.HeadersStatusStop
+	}
+	token := <-exchange.tokens
+	p.handle.SendLocalResponse(200,
+		[][2]string{{"x-live-object-value", fmt.Sprintf("%#x", token)}}, nil, "")
+	return shared.HeadersStatusStop
 }

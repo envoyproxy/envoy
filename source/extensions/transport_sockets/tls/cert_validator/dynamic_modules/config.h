@@ -114,7 +114,7 @@ public:
 
   std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override;
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
 
 private:
   DynamicModuleCertValidatorConfigSharedPtr config_;

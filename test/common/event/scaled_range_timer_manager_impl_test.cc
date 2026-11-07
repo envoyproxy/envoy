@@ -176,10 +176,10 @@ TEST_F(ScaledRangeTimerManagerTest, InCallbackDisableLastTimerInSameQueue) {
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
 
-  EXPECT_CALL(callback1, Call).WillOnce(Invoke([&]() {
+  EXPECT_CALL(callback1, Call).WillOnce([&]() {
     timer2->disableTimer();
     timer2.reset();
-  }));
+  });
 
   // Run the dispatcher to make sure nothing happens when it's not supposed to.
   simTime().advanceTimeAndRun(std::chrono::seconds(100), dispatcher_, Dispatcher::RunType::Block);
@@ -203,10 +203,10 @@ TEST_F(ScaledRangeTimerManagerTest, InCallbackDisableTimerInOtherQueue) {
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
 
-  EXPECT_CALL(callback1, Call).WillOnce(Invoke([&]() {
+  EXPECT_CALL(callback1, Call).WillOnce([&]() {
     timer2->disableTimer();
     timer2.reset();
-  }));
+  });
 
   // Run the dispatcher to make sure nothing happens when it's not supposed to.
   simTime().advanceTimeAndRun(std::chrono::seconds(100), dispatcher_, Dispatcher::RunType::Block);

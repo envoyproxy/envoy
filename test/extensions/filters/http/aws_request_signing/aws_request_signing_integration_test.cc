@@ -456,13 +456,13 @@ public:
 
   void expectResolve(Network::DnsLookupFamily, const std::string& expected_address) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
-        .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                                   Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        .WillRepeatedly([&](const std::string&, Network::DnsLookupFamily,
+                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
           return nullptr;
-        }));
+        });
   }
 
   void dnsSetup(std::string hostname) {
@@ -916,13 +916,13 @@ public:
 
   void expectResolve(Network::DnsLookupFamily, const std::string& expected_address) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
-        .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                                   Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        .WillRepeatedly([&](const std::string&, Network::DnsLookupFamily,
+                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
           return nullptr;
-        }));
+        });
   }
 
   void dnsSetup(std::string hostname) {

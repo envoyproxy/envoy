@@ -12,7 +12,6 @@ envoy_extension_cc_test(
     name = "network_configuration_retry_options_test",
     srcs = ["predicate_test.cc"],
     extension_names = ["envoy.retry.options.network_configuration"],
-    repository = "@envoy",
     deps = [
         "//library/common/extensions/retry/options/network_configuration:config",
         "//library/common/network:connectivity_manager_lib",

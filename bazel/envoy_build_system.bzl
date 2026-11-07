@@ -68,6 +68,15 @@ load(
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
+load(
+    ":execution_context_transition.bzl",
+    _execution_context_dual_test = "execution_context_dual_test",
+)
+
+_DBG_BUILD = Label("//bazel:dbg_build")
+_LINUX = Label("//bazel:linux")
+_WINDOWS_DBG_BUILD = Label("//bazel:windows_dbg_build")
+_WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
 def envoy_package(default_visibility = ["//visibility:public"]):
     native.package(default_visibility = default_visibility)
@@ -114,7 +123,7 @@ def envoy_cmake(
         cache_entries_debug = dict(cache_entries)
         cache_entries_debug.update(debug_cache_entries)
         final_cache_entries = select({
-            "@envoy//bazel:dbg_build": cache_entries_debug,
+            _DBG_BUILD: cache_entries_debug,
             "//conditions:default": cache_entries,
         })
     else:
@@ -132,7 +141,7 @@ def envoy_cmake(
             copy_command = copy_command + " && " + postfix_script
 
         pf = select({
-            "@envoy//bazel:windows_dbg_build": copy_command,
+            _WINDOWS_DBG_BUILD: copy_command,
             "//conditions:default": postfix_script,
         })
     else:
@@ -147,7 +156,7 @@ def envoy_cmake(
         install = False,
         # TODO(lizan): Make this always true
         generate_crosstool_file = select({
-            "@envoy//bazel:windows_x86_64": True,
+            _WINDOWS_X86_64: True,
             "//conditions:default": generate_crosstool_file,
         }),
         lib_source = lib_source,
@@ -160,7 +169,7 @@ def envoy_cmake(
 # and envoy_cc_win32_library respectively
 def envoy_cc_platform_dep(name):
     return select({
-        "@envoy//bazel:windows_x86_64": [name + "_win32"],
+        _WINDOWS_X86_64: [name + "_win32"],
         "//conditions:default": [name + "_posix"],
     })
 
@@ -169,8 +178,8 @@ def envoy_cc_platform_dep(name):
 # envoy_cc_posix_without_library and envoy_cc_win32_library respectively
 def envoy_cc_platform_specific_dep(name):
     return select({
-        "@envoy//bazel:windows_x86_64": [name + "_win32"],
-        "@envoy//bazel:linux": [name + "_linux"],
+        _WINDOWS_X86_64: [name + "_win32"],
+        _LINUX: [name + "_linux"],
         "//conditions:default": [name + "_posix"],
     })
 
@@ -273,6 +282,7 @@ envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
+execution_context_dual_test = _execution_context_dual_test
 
 # Envoy Mobile defines (from envoy_mobile_defines.bz)
 envoy_mobile_defines = _envoy_mobile_defines

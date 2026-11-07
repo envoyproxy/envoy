@@ -102,7 +102,10 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro BSSL_NAMESPACE_END \
   --uncomment-regex-range 'template\s*<typename\s*T,\s*typename\s*Enable\s*=\s*void>' 'struct\s*DeleterImpl\s*{};' \
   --uncomment-struct Deleter \
-  --uncomment-regex-range 'template\s*<typename\s*T,\s*typename\s*CleanupRet,\s*void\s*(\*init)(T\s*\*),' '};$' \
+  --uncomment-regex 'template\s*<typename\s*T>' 'struct\s*StackAllocatedTraits\s*{};' \
+  --uncomment-regex 'template\s*<typename\s*T,\s*typename\s*Traits\s*=\s*StackAllocatedTraits<T>\s*>' \
+  --uncomment-class StackAllocated \
+  --uncomment-macro BORINGSSL_MAKE_STACK_TRAITS \
   --uncomment-regex 'template\s*<typename' 'using\s*UniquePtr' \
   --uncomment-macro OPENSSL_DEPRECATED \
   --uncomment-typedef-redef X509_STORE_CTX \

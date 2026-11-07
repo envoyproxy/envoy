@@ -17,31 +17,13 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/server/synchronous_feedback_trigger.h"
+#include "source/server/trigger.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Server {
-
-/**
- * Trigger encapsulates translating resource pressure into the corresponding
- * OverloadActionState.
- */
-class Trigger {
-public:
-  virtual ~Trigger() = default;
-
-  // Updates the current value of the metric and returns whether the trigger has changed state.
-  virtual bool updateValue(double value) PURE;
-
-  // Evaluates the action state for the given metric value without modifying trigger state.
-  virtual OverloadActionState evaluate(double value) const = 0;
-
-  // Returns the action state for the trigger.
-  virtual OverloadActionState actionState() const PURE;
-};
-using TriggerPtr = std::unique_ptr<Trigger>;
 
 absl::StatusOr<TriggerPtr>
 createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_config);
@@ -68,6 +50,9 @@ private:
   Stats::Gauge& scale_percent_gauge_;
 };
 
+using SynchronousFeedbackResourceMonitorMap =
+    absl::flat_hash_map<std::string, SynchronousFeedbackResourceMonitorSharedPtr>;
+
 /**
  * Implement a LoadShedPoint which is a particular point in the connection /
  * request lifecycle where we can either abort or continue the given work.
@@ -76,7 +61,8 @@ class LoadShedPointImpl : public LoadShedPoint {
 public:
   static absl::StatusOr<std::unique_ptr<LoadShedPointImpl>>
   create(const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
-         Random::RandomGenerator& random_generator);
+         Random::RandomGenerator& random_generator,
+         const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources);
   LoadShedPointImpl(const LoadShedPointImpl&) = delete;
   LoadShedPointImpl& operator=(const LoadShedPointImpl&) = delete;
 
@@ -94,13 +80,16 @@ public:
 private:
   LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
                     Stats::Scope& stats_scope, Random::RandomGenerator& random_generator,
+                    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources,
                     absl::Status& creation_status);
 
   // Helper to handle updating the probability to shed load given the triggers.
   void updateProbabilityShedLoad();
 
-  absl::flat_hash_map<std::string, TriggerPtr> triggers_;
-  std::atomic<float> probability_shed_load_{0};
+  const std::string name_;
+  absl::flat_hash_map<std::string, TriggerPtr> periodic_triggers_;
+  std::atomic<float> periodic_shed_probability_{0};
+  std::vector<SynchronousFeedbackTrigger> synchronous_feedback_triggers_;
   Stats::Gauge& scale_percent_;
   Stats::Counter& shed_load_counter_;
   Random::RandomGenerator& random_generator_;
@@ -194,8 +183,8 @@ private:
   using FlushEpochId = uint64_t;
   class Resource : public ResourceUpdateCallbacks {
   public:
-    Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
-             Stats::Scope& stats_scope);
+    Resource(const std::string& name, ResourceMonitorSharedPtr monitor,
+             OverloadManagerImpl& manager, Stats::Scope& stats_scope);
 
     // ResourceMonitor::ResourceUpdateCallbacks
     void onSuccess(const ResourceUsage& usage) override;
@@ -205,7 +194,7 @@ private:
 
   private:
     const std::string name_;
-    ResourceMonitorPtr monitor_;
+    ResourceMonitorSharedPtr monitor_;
     OverloadManagerImpl& manager_;
     bool pending_update_{false};
     FlushEpochId flush_epoch_;

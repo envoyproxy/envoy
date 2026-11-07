@@ -76,13 +76,13 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     // error: skip it.
     return false;
   }
-  if (format_ == ApiProtocol::Unspecified) {
+  if (format_ == LLMProtocol::Unspecified) {
     format_ = AdapterRegistry::detect(json);
-    if (format_ == ApiProtocol::Unspecified) {
+    if (format_ == LLMProtocol::Unspecified) {
       return false; // Not discriminating; a later document may be.
     }
   }
-  const ApiProtocolAdapter& adapter = AdapterRegistry::get(format_);
+  const LLMProtocolAdapter& adapter = AdapterRegistry::get(format_);
   const ExtractionResult result = adapter.extractUsage(json);
   usage_.merge(result.usage);
   if (result.malformed) {
@@ -141,7 +141,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
       // The cap is enforced *before* copying: one oversized frame must not
       // become an over-cap side allocation.
       if (view.size() > allowance) {
-        enterDiscardMode(pendingEventSkippable(view));
+        enterDiscardMode(pendingEventSkippable(view.substr(0, allowance)));
       } else {
         retainBytes(view);
       }
@@ -155,7 +155,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
       ENVOY_LOG(debug, "ai_protocol_manager: SSE event exceeds max_event_size ({} > {}), skipped",
                 buffer_.length() + boundary.value(), max_event_size_);
       stats_.sse_event_too_large_.inc();
-      if (!pendingEventSkippable(view.substr(0, boundary.value()))) {
+      if (!pendingEventSkippable(view.substr(0, allowance))) {
         degraded_ = true;
       }
       buffer_.drain(buffer_.length());
@@ -214,12 +214,12 @@ void SseResponseHandler::enterDiscardMode(bool skippable) {
 }
 
 bool SseResponseHandler::pendingEventSkippable(absl::string_view tail) {
-  // The event's opening lines are within the retained prefix, or within
-  // `tail` when nothing is retained yet. linearize() runs only on this rare
-  // oversize transition and is bounded by max_event_size_; the caller drains
-  // the buffer right after.
+  // Only split events touch buffer_; linearize() runs only on this rare
+  // oversize transition and is bounded by max_event_size_, and the caller
+  // drains the buffer right after.
   absl::string_view region = tail;
   if (buffer_.length() > 0) {
+    retainBytes(tail);
     region = absl::string_view(static_cast<const char*>(buffer_.linearize(buffer_.length())),
                                buffer_.length());
   }
@@ -297,7 +297,7 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
   }
 }
 
-JsonResponseHandler::JsonResponseHandler(ApiProtocol format, uint32_t max_inspected_body_size,
+JsonResponseHandler::JsonResponseHandler(LLMProtocol format, uint32_t max_inspected_body_size,
                                          AiProtocolManagerStats& stats,
                                          const Buffer::BufferMemoryAccountSharedPtr& /*account*/)
     : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),

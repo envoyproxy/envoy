@@ -71,7 +71,7 @@ public:
 
   // True when a validation context is configured, independent of `requiresClientCertificate()`.
   bool clientCertificateValidationConfigured() const {
-    return config_->certificateValidationContext() != nullptr;
+    return config_->validationContextConfigured();
   }
 
 protected:

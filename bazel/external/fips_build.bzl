@@ -103,9 +103,9 @@ def _create_build_config(prefix, lib, arch, arch_alias, hermetic_sysroot):
 
     # We currently support only libc++ and libstdc++, so these variants are mutually exclusive
     if lib == "libc++":
-        conditions.append("@envoy//bazel:libc++_enabled")
+        conditions.append(str(Label("//bazel:libc++_enabled")))
     else:
-        conditions.append("@envoy//bazel:libstdc++_enabled")
+        conditions.append(str(Label("//bazel:libstdc++_enabled")))
 
     if hermetic_sysroot:
         conditions.append("@envoy_repo//:use_hermetic_sysroot")

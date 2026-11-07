@@ -123,6 +123,12 @@ typed_config:
 
   void initializeBasicFilter(const std::string& so_id, const std::string& domain = "*",
                              bool with_injected_metadata_validator = false) {
+    configureBasicFilter(so_id, domain, with_injected_metadata_validator);
+    initialize();
+  }
+
+  void configureBasicFilter(const std::string& so_id, const std::string& domain = "*",
+                            bool with_injected_metadata_validator = false) {
     const auto yaml_fmt = R"EOF(
 name: golang
 typed_config:
@@ -180,7 +186,6 @@ typed_config:
         });
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    initialize();
   }
 
   void initializeRouteConfig(const std::string& so_id) {
@@ -1290,6 +1295,50 @@ TEST_P(GolangIntegrationTest, AccessLog) {
   cleanup();
 }
 
+// A filter before the Go filter sends a local reply, so the Go filter never sees decodeHeaders.
+// OnLog must still get the request headers.
+TEST_P(GolangIntegrationTest, AccessLogAfterEarlierFilterLocalReply) {
+  configureBasicFilter(ACCESSLOG, "test.com");
+  config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+        function envoy_on_request(handle)
+          if handle:headers():get("x-reject") ~= nil then
+            handle:respond({[":status"] = "403"}, "rejected")
+          end
+        end
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl rejected_headers{
+      {":method", "GET"},         {":path", "/test"}, {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},   {"x-reject", "1"},
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(rejected_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  codec_client_->close();
+
+  // use the second request to get the logged data
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},         {":path", "/test"}, {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},
+  };
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("403", getHeader(upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
+
+  cleanup();
+}
+
 TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1396,6 +1445,13 @@ TEST_P(GolangIntegrationTest, DataBuffer_DecodeData) { testBasic("/test?databuff
 // buffer all data in decode data phase with async mode.
 TEST_P(GolangIntegrationTest, Async_DataBuffer_DecodeData) {
   testBasic("/test?async=1&databuffer=decode-data");
+}
+
+// Only DecodeData is async, and it sleeps so that the trailers arrive before it returns
+// StopAndBuffer. The trailers are then handled synchronously, and the buffered data must still be
+// forwarded before them.
+TEST_P(GolangIntegrationTest, AsyncData_DataBuffer_DecodeData_SyncTrailers) {
+  testBasic("/test?async_data=1&data_sleep=1&databuffer=decode-data");
 }
 
 // Go send local reply in decode header phase.
@@ -2081,6 +2137,18 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
   testUpstreamOverrideHost(
       "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
       false);
+}
+
+// Same as SetUpstreamOverrideHost_InvalidHost_Strict_NotFound, but called from a goroutine so the
+// override is applied through the dispatcher post. Without strict mode the request would fall back
+// to a valid host and return 200.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound_Async) {
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+
+  testUpstreamOverrideHost(
+      "503", "",
+      "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true&async=1", false);
 }
 
 // Set an unavailable host with strict mode and retry, and the host is in the cluster.

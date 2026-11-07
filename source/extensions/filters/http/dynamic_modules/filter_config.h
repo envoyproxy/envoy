@@ -221,7 +221,7 @@ private:
   // to only while ``secret_subscription_frozen_`` is false, and read-only afterwards, which is what
   // makes the reads from worker threads safe. Each entry keeps its own thread local copy of the
   // value so that a read is a thread local lookup rather than a lock.
-  std::vector<std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>> generic_secrets_;
+  std::vector<Secret::ThreadLocalGenericSecretProviderPtr> generic_secrets_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -268,8 +268,9 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id)
-        : config_(config), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id,
+                        Event::Dispatcher& dispatcher)
+        : config_(config), callout_id_(id), dispatcher_(dispatcher) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -284,6 +285,8 @@ private:
   private:
     DynamicModuleHttpFilterConfig& config_;
     const uint64_t callout_id_{};
+    // The dispatcher of the thread that runs the callout.
+    Event::Dispatcher& dispatcher_;
   };
 
   /**
@@ -292,8 +295,9 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id)
-        : callout_id_(callout_id), config_(config) {}
+    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id,
+                              Event::Dispatcher& dispatcher)
+        : callout_id_(callout_id), config_(config), dispatcher_(dispatcher) {}
     ~HttpStreamCalloutCallback() override = default;
 
     void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
@@ -307,9 +311,13 @@ private:
     Http::RequestTrailerMapPtr request_trailers_ = nullptr;
     const uint64_t callout_id_{};
     bool cleaned_up_ = false;
+    // Set when the module resets the stream.
+    bool reset_by_module_ = false;
 
   private:
     DynamicModuleHttpFilterConfig& config_;
+    // The dispatcher of the thread that runs the stream.
+    Event::Dispatcher& dispatcher_;
   };
 
   /**
@@ -317,6 +325,11 @@ private:
    * various event hooks.
    */
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  /**
+   * Removes the stream and reports its reset to the module.
+   */
+  void reportHttpStreamReset(uint64_t stream_id);
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
@@ -357,8 +370,10 @@ public:
   DynamicModuleHttpPerRouteFilterConfig(
       envoy_dynamic_module_type_http_filter_config_module_ptr config,
       OnHttpPerRouteConfigDestroyType destroy,
-      Extensions::DynamicModules::DynamicModulePtr dynamic_module)
-      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)) {}
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+      Event::Dispatcher& main_dispatcher)
+      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)),
+        main_dispatcher_(main_dispatcher) {}
   ~DynamicModuleHttpPerRouteFilterConfig() override;
 
   envoy_dynamic_module_type_http_filter_config_module_ptr config_;
@@ -366,6 +381,7 @@ public:
 private:
   OnHttpPerRouteConfigDestroyType destroy_;
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+  Event::Dispatcher& main_dispatcher_;
 };
 
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
@@ -375,7 +391,8 @@ using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
 newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module);
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                   Event::Dispatcher& main_dispatcher);
 
 /**
  * Creates a new DynamicModuleHttpFilterConfig for given configuration.

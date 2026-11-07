@@ -167,6 +167,23 @@ protected:
                                                                  connection_key, connection_id);
   }
 
+  // Register a tunnel key on the parent so terminal cleanup has something to drop.
+  void registerParentHostKey(const std::string& host, const std::string& cluster,
+                             const std::string& key) {
+    ReverseConnectionIOHandle::HostConnectionInfo info;
+    info.host_address = host;
+    info.cluster_name = cluster;
+    info.target_connection_count = 1;
+    info.connection_keys.insert(key);
+    io_handle_->host_to_conn_info_map_[host] = std::move(info);
+  }
+
+  bool parentHostHasKey(const std::string& host, const std::string& key) const {
+    auto it = io_handle_->host_to_conn_info_map_.find(host);
+    return it != io_handle_->host_to_conn_info_map_.end() &&
+           it->second.connection_keys.contains(key);
+  }
+
   // Test fixtures.
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> mock_socket_;
   NiceMock<Network::MockIoHandle>* mock_io_handle_; // Raw pointer, managed by socket
@@ -192,14 +209,16 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, Setup) {
 }
 
 // When the parent ReverseConnectionIOHandle is destroyed first, it detaches its still-live children
-// so a surviving tunnel's parent() returns nullptr instead of a dangling pointer.
+// so surviving drain/close notifications are no-ops instead of using a dangling parent pointer.
 TEST_F(DownstreamReverseConnectionIOHandleTest, ParentTeardownDetachesChild) {
   auto child = createHandle(io_handle_.get(), "detach_key");
-  EXPECT_EQ(child->parent(), io_handle_.get());
 
   // Destroying the parent runs cleanup(), which detaches its registered children.
   io_handle_.reset();
-  EXPECT_EQ(child->parent(), nullptr);
+
+  // Drain and close must not crash after detach (parent back-pointer is null).
+  child->markTunnelDrainingAndDialReplacement();
+  EXPECT_EQ(child->close().err_, nullptr);
 }
 
 // Test close() method and all edge cases.
@@ -221,6 +240,21 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, CloseMethod) {
     EXPECT_EQ(result2.err_, nullptr);
     EXPECT_ENVOY_BUG(handle->activateFileEvents(0), "Null file_event_");
   }
+}
+
+// A handle disposed without an explicit close(), as a listener filter timeout or rejection does,
+// still runs the terminal cleanup so the parent drops the tunnel key and redials.
+TEST_F(DownstreamReverseConnectionIOHandleTest, DestructorRunsTerminalCleanup) {
+  const std::string connection_key = "destructor_key";
+  registerParentHostKey("192.168.1.1", "test-cluster", connection_key);
+  ASSERT_TRUE(parentHostHasKey("192.168.1.1", connection_key));
+
+  // Destroy the handle without calling close().
+  {
+    auto handle = createHandle(io_handle_.get(), connection_key);
+  }
+
+  EXPECT_FALSE(parentHostHasKey("192.168.1.1", connection_key));
 }
 
 // Test getSocket() method.
@@ -394,6 +428,80 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
 
     close(fds[1]);
   }
+}
+
+// Bytes the responder coalesced with the handshake response are replayed before the socket on the
+// read() path, then the handle falls through to the socket in order.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ResidualBytesServedBeforeSocketRead) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<Network::IoSocketHandleImpl>(fds[0]);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+  auto* io_handle_ptr = mock_io_handle.release();
+  mock_socket->io_handle_.reset(io_handle_ptr);
+  auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
+
+  const std::string preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+  auto residual = std::make_unique<Buffer::OwnedImpl>();
+  residual->add(preface);
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/1,
+      std::move(residual));
+
+  // The first read returns the residual preface rather than touching the socket.
+  Buffer::OwnedImpl buffer;
+  auto result = handle->read(buffer, std::nullopt);
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, preface.size());
+  EXPECT_EQ(buffer.toString(), preface);
+
+  // The next read falls through to the socket.
+  const std::string socket_data = "application bytes";
+  ASSERT_EQ(write(fds[1], socket_data.data(), socket_data.size()),
+            static_cast<ssize_t>(socket_data.size()));
+  Buffer::OwnedImpl buffer2;
+  auto result2 = handle->read(buffer2, std::nullopt);
+  EXPECT_EQ(result2.err_, nullptr);
+  EXPECT_EQ(buffer2.toString(), socket_data);
+
+  close(fds[1]);
+}
+
+// The TLS read path (readv) also replays the residual before the socket, draining it across calls
+// when the caller slice is smaller than the residual.
+TEST_F(DownstreamReverseConnectionIOHandleTest, ResidualBytesServedBeforeSocketReadv) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<Network::IoSocketHandleImpl>(fds[0]);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+  auto* io_handle_ptr = mock_io_handle.release();
+  mock_socket->io_handle_.reset(io_handle_ptr);
+  auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
+
+  const std::string preface = "PRI * HTTP/2.0\r\n\r\n";
+  auto residual = std::make_unique<Buffer::OwnedImpl>();
+  residual->add(preface);
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(socket_ptr), io_handle_.get(), "test_key", /*connection_id=*/2,
+      std::move(residual));
+
+  // A small slice drains the residual across multiple calls, preserving order.
+  std::string assembled;
+  char scratch[8];
+  while (assembled.size() < preface.size()) {
+    Buffer::RawSlice slice{scratch, sizeof(scratch)};
+    auto result = handle->readv(sizeof(scratch), &slice, 1);
+    ASSERT_EQ(result.err_, nullptr);
+    ASSERT_GT(result.return_value_, 0);
+    assembled.append(scratch, result.return_value_);
+  }
+  EXPECT_EQ(assembled, preface);
+
+  close(fds[1]);
 }
 
 // Test read() method with partial data handling using real sockets.

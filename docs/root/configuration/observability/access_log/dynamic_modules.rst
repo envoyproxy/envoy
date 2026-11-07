@@ -19,11 +19,18 @@ The logger receives completed request information including:
 *   Response code and details.
 *   Response flags (indicating errors, timeouts, etc.).
 *   Timing information (request duration, upstream latency, etc.).
-*   Byte counts (request/response sizes).
+*   Byte counts (request/response sizes and upstream/downstream wire bytes).
 *   Upstream information (cluster, host, connection details).
 *   TLS information (versions, certificates).
 *   Tracing information (trace ID, span ID).
 *   Dynamic metadata and filter state.
+
+Downstream wire byte counts are available through the Rust SDK's ``LogContext::downstream_wire_bytes()``.
+They use the same stream counters as ``DOWNSTREAM_WIRE_BYTES_RECEIVED`` and ``DOWNSTREAM_WIRE_BYTES_SENT``
+and can be nonzero for locally generated responses that never reach an upstream. For HTTP streams,
+these counters include protocol overhead accounted for by the codec, rather than only body bytes.
+Both values are zero when the downstream bytes meter is unavailable. The existing
+``LogContext::bytes_info()`` wire byte fields continue to report upstream traffic.
 
 Example Configuration
 ---------------------
@@ -44,4 +51,3 @@ Example Configuration
           buffer_size: 100
 
 For more details on dynamic modules, see the :ref:`architecture overview <arch_overview_dynamic_modules>`.
-

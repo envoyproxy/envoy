@@ -132,11 +132,11 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     // Test decode() method.
     ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
-        .WillOnce(testing::Invoke([](RequestHeaderFramePtr request, std::optional<StartTime>) {
+        .WillOnce([](RequestHeaderFramePtr request, std::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaRequestFrame*>(request.get())
                         ->request_->request_header_.correlation_id_,
                     3);
-        }));
+        });
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -217,11 +217,10 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     dst_buffer.add(&size, sizeof(size)); // Encode data length.
     response->encode(dst_buffer);
 
-    EXPECT_CALL(callbacks, writeToConnection(_))
-        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer) {
-          EXPECT_EQ(buffer.toString(), dst_buffer.toString());
-          buffer.drain(buffer.length());
-        }));
+    EXPECT_CALL(callbacks, writeToConnection(_)).WillOnce([&](Buffer::Instance& buffer) {
+      EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+      buffer.drain(buffer.length());
+    });
     EXPECT_TRUE(server_codec.encode(response_frame, encoding_context).ok());
   }
 }
@@ -239,11 +238,11 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     // Test decode() method.
     ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
-        .WillOnce(testing::Invoke([](ResponseHeaderFramePtr response, std::optional<StartTime>) {
+        .WillOnce([](ResponseHeaderFramePtr response, std::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(response.get())
                         ->response_->metadata_.correlation_id_,
                     3);
-        }));
+        });
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -314,11 +313,10 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     dst_buffer.add(&size, sizeof(size)); // Encode data length.
     request->encode(dst_buffer);
 
-    EXPECT_CALL(callbacks, writeToConnection(_))
-        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer) {
-          EXPECT_EQ(buffer.toString(), dst_buffer.toString());
-          buffer.drain(buffer.length());
-        }));
+    EXPECT_CALL(callbacks, writeToConnection(_)).WillOnce([&](Buffer::Instance& buffer) {
+      EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+      buffer.drain(buffer.length());
+    });
 
     EXPECT_TRUE(client_codec.encode(request_frame, encoding_context).ok());
   }

@@ -21,6 +21,8 @@ void DispatcherExecutor::schedule(std::coroutine_handle<> handle) {
   dispatcher_.post([handle]() { handle.resume(); });
 }
 
+void DispatcherExecutor::post(absl::AnyInvocable<void()> cb) { dispatcher_.post(std::move(cb)); }
+
 Event::TimerPtr DispatcherExecutor::createTimer(std::function<void()> cb) {
   return dispatcher_.createTimer(std::move(cb));
 }

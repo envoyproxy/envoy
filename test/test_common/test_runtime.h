@@ -30,6 +30,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
+#include "absl/flags/reflection.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {

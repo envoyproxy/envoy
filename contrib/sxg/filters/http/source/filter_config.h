@@ -39,22 +39,23 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& certificate_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& private_key_provider,
-                  ThreadLocal::SlotAllocator& tls, Api::Api& api)
+                  ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                  Event::Dispatcher& main_dispatcher)
       : certificate_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(certificate_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+                                      std::move(certificate_provider), tls, api, main_dispatcher),
+                                  Secret::ThreadLocalGenericSecretProviderPtr)),
         private_key_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(private_key_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+                                      std::move(private_key_provider), tls, api, main_dispatcher),
+                                  Secret::ThreadLocalGenericSecretProviderPtr)) {}
   // SecretReader
   const std::string& certificate() const override { return certificate_->secret(); }
   const std::string& privateKey() const override { return private_key_->secret(); }
 
 private:
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> certificate_;
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> private_key_;
+  Secret::ThreadLocalGenericSecretProviderPtr certificate_;
+  Secret::ThreadLocalGenericSecretProviderPtr private_key_;
 };
 
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {

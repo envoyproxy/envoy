@@ -5,6 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/logger_delegates.h"
 #include "source/common/common/thread.h"
+#include "source/common/coroutine/backtrace.h"
 #include "source/common/event/libevent.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/exe/process_wide.h"
@@ -123,6 +124,9 @@ bool isDeathTestChild(int argc, char** argv) {
 int TestRunner::runTests(int argc, char** argv) {
   const bool is_death_test_child = isDeathTestChild(argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
+  // Record the thread initializing gtest (the first thread of the process) as the test thread,
+  // for platforms that cannot identify it directly.
+  Thread::TestThread::registerTestThread();
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
   ProcessWide process_wide(false);
@@ -182,6 +186,7 @@ int TestRunner::runTests(int argc, char** argv) {
   // The downside of this is that if there's a crash, the backtrace is lost, as
   // the backtracing mechanism uses logging, so force the backtraces to stderr.
   BackwardsTrace::setLogToStderr(true);
+  Coroutine::Backtrace::setLogToStderr(true);
 #endif
 
   TestEnvironment::initializeOptions(argc, argv);

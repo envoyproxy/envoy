@@ -8,6 +8,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
@@ -35,6 +36,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
+
+class PersistentHostSet;
 
 class DynamicModuleCluster;
 class DynamicModuleClusterScheduler;
@@ -77,11 +80,14 @@ public:
    * @param cluster_config the configuration bytes to pass to the module.
    * @param module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
+   * @param persistent_host_partitions_allowed whether the module may opt the cluster into
+   * persistent host partitions, which requires lb_policy CLUSTER_PROVIDED.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
-         Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope);
+         Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+         bool persistent_host_partitions_allowed);
 
   ~DynamicModuleClusterConfig();
 
@@ -108,6 +114,14 @@ public:
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
 
+  // Whether the cluster's host sets are PersistentHostSet. Set by the module during
+  // on_cluster_config_new or from ClusterConfig.
+  bool use_persistent_host_partitions_ = false;
+  // Whether the module may set use_persistent_host_partitions_, which requires CLUSTER_PROVIDED.
+  const bool persistent_host_partitions_allowed_;
+  // Set when the module asked for persistent host partitions and was refused.
+  bool persistent_host_partitions_refused_ = false;
+
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
   Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
@@ -125,7 +139,7 @@ public:
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
                              Envoy::Extensions::DynamicModules::DynamicModulePtr module,
-                             Stats::Scope& stats_scope);
+                             Stats::Scope& stats_scope, bool persistent_host_partitions_allowed);
 
   const std::string cluster_name_;
   const std::string cluster_config_;
@@ -160,6 +174,7 @@ using DynamicModuleClusterHandleSharedPtr = std::shared_ptr<DynamicModuleCluster
  * The module manages hosts via add/remove callbacks and provides its own load balancer.
  */
 class DynamicModuleCluster : public Upstream::ClusterImplBase,
+                             public Event::DispatcherThreadDeletable,
                              public std::enable_shared_from_this<DynamicModuleCluster> {
 public:
   ~DynamicModuleCluster() override;
@@ -168,6 +183,7 @@ public:
   Upstream::Cluster::InitializePhase initializePhase() const override {
     return Upstream::Cluster::InitializePhase::Primary;
   }
+  void initialize(std::function<absl::Status()> callback) override;
 
   // Methods called by the dynamic module via ABI callbacks.
   bool addHosts(
@@ -188,6 +204,7 @@ public:
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
+  void usePersistentHostMap();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
@@ -242,12 +259,36 @@ protected:
 
   // Upstream::ClusterImplBase.
   void startPreInit() override;
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
 private:
+  /**
+   * Creates the in-module cluster. The factory calls this once a shared_ptr owns the cluster so
+   * that schedulers and callouts created in on_cluster_new can reach it.
+   */
+  absl::Status initializeInModuleCluster();
+
   /**
    * Registers server lifecycle callbacks (server_initialized, drain, shutdown).
    */
   void registerLifecycleCallbacks();
+
+  /**
+   * Finishes the pre-init phase unless the cluster manager released this cluster.
+   */
+  void completePreInit();
+
+  // The PersistentHostSet at `priority`, created if missing. Only valid with persistent partitions.
+  PersistentHostSet& persistentHostSet(uint32_t priority);
+  // Whether the host sets are PersistentHostSet. The factory is fixed once a host set exists.
+  bool usesPersistentHostSets() const;
+  // Hands `snapshot`, returned by a PersistentHostSet change, to the priority set with its delta.
+  void updateHostsFromSnapshot(uint32_t priority, Upstream::HostSetSnapshotConstSharedPtr snapshot,
+                               const Upstream::HostVector& hosts_added,
+                               const Upstream::HostVector& hosts_removed);
+  // Re-partitions `host` in its persistent host set. Returns false, changing nothing, if the
+  // cluster has no persistent host sets or the set does not hold `host`.
+  bool applyPersistentHealthChange(const Upstream::HostSharedPtr& host);
 
   friend class DynamicModuleClusterFactory;
   friend class DynamicModuleClusterScheduler;
@@ -260,8 +301,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleCluster> cluster, uint64_t id)
-        : cluster_(std::move(cluster)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleCluster& cluster, uint64_t id)
+        : cluster_(cluster), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -274,7 +315,9 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    const std::shared_ptr<DynamicModuleCluster> cluster_;
+    // Not owning, so that a callout in flight does not keep a released cluster alive. The cluster
+    // cancels its callouts when it is destroyed.
+    DynamicModuleCluster& cluster_;
     const uint64_t callout_id_{};
   };
 
@@ -328,10 +371,19 @@ private:
 
   // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
   ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
+  // The worker events that on_cluster_new requested, posted once it returns.
+  std::vector<uint64_t> worker_event_ids_from_on_cluster_new_;
 
   // HTTP callout tracking.
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
   absl::flat_hash_map<uint64_t, std::unique_ptr<HttpCalloutCallback>> http_callouts_;
+
+  // Whether on_cluster_init has returned.
+  bool on_cluster_init_returned_ = false;
+  // Whether the module called pre_init_complete before on_cluster_init returned.
+  bool pre_init_complete_pending_ = false;
+  // Set once the cluster manager released this cluster.
+  bool released_ = false;
 };
 
 /**
@@ -481,6 +533,23 @@ private:
 };
 
 /**
+ * Bounds the lifetime of the filter state views returned by the cluster load balancer callbacks.
+ * The serialized values are cleared when the outermost host selection callback returns so a module
+ * can hold several views during a single callback. The backing storage lives in abi_impl.cc.
+ */
+class ClusterLbFilterStateScratchGuard {
+public:
+  ClusterLbFilterStateScratchGuard();
+  ~ClusterLbFilterStateScratchGuard();
+  ClusterLbFilterStateScratchGuard(const ClusterLbFilterStateScratchGuard&) = delete;
+  ClusterLbFilterStateScratchGuard& operator=(const ClusterLbFilterStateScratchGuard&) = delete;
+};
+
+// Returns the number of retained cluster load balancer filter state values on this thread. Test
+// only.
+size_t clusterLbFilterStateScratchSizeForTest();
+
+/**
  * Load balancer that delegates to the dynamic module.
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
@@ -546,6 +615,10 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Hosts whose health changed since the previous update this worker applied, or nullptr outside
+  // the callback or when unknown (a priority without persistent partitions, or a health refresh).
+  const Upstream::HostVector* healthChangedHosts();
+
   // Returns the priority set that this load balancer subscribes to for host membership updates.
   const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
 
@@ -584,6 +657,12 @@ private:
 
   // Membership update callback handle.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+  // Records the priorities each membership update touched, which fire before the member callback.
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
+  std::vector<uint32_t> updated_priorities_;
+  // Built on the first healthChangedHosts() call of a membership update callback.
+  std::optional<Upstream::HostVector> health_changed_hosts_;
+  bool health_changed_hosts_known_{false};
 
   friend class DynamicModuleClusterTestPeer;
 };

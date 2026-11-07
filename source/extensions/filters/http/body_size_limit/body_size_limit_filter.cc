@@ -11,10 +11,13 @@ namespace HttpFilters {
 namespace BodySizeLimitFilter {
 
 BodySizeLimitFilterConfig::BodySizeLimitFilterConfig(
-    const envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit& proto_config)
+    const envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit& proto_config,
+    Stats::Scope& scope, const std::string& stats_prefix)
     : max_request_bytes_(proto_config.has_max_request_bytes()
                              ? static_cast<uint64_t>(proto_config.max_request_bytes().value())
-                             : 0) {}
+                             : 0),
+      stats_{ALL_BODY_SIZE_LIMIT_STATS(
+          POOL_COUNTER_PREFIX(scope, stats_prefix + "body_size_limit."))} {}
 
 BodySizeLimitFilter::BodySizeLimitFilter(BodySizeLimitFilterConfigSharedPtr config)
     : config_(config) {}
@@ -35,6 +38,7 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
   uint64_t content_length = 0;
   if (!cl.empty() && absl::SimpleAtoi(cl, &content_length)) {
     if (content_length > config_->maxRequestBytes()) {
+      config_->stats().rq_content_length_too_large_.inc();
       sizeExceeded(content_length, "content length exceeds maximum", "content length too large");
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -50,6 +54,7 @@ Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, b
 
   bytes_received_ += data.length();
   if (bytes_received_ > config_->maxRequestBytes()) {
+    config_->stats().rq_body_too_large_.inc();
     sizeExceeded(bytes_received_, "request size exceeds maximum", "request too long");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -57,31 +62,15 @@ Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, b
   return Http::FilterDataStatus::Continue;
 }
 
-void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* logMessage,
-                                       const char* replyText) {
-  const auto& provider = decoder_callbacks_->streamInfo().downstreamAddressProvider();
-  const auto& client_addr = provider.remoteAddress(); // Network::Address::Instance
-  absl::string_view client_address;
-  if (client_addr) {
-    client_address = client_addr->asStringView();
-  }
+void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* log_message,
+                                       const char* reply_text) {
+  // A rejection is client-controlled, so it is logged per stream at debug rather than at error:
+  // the counters and the access log's response code details record it without letting a client
+  // drive the error log.
+  ENVOY_STREAM_LOG(debug, "{} ({} > {})", *decoder_callbacks_, log_message, length,
+                   config_->maxRequestBytes());
 
-  absl::string_view path("/");
-  auto headers = decoder_callbacks_->requestHeaders();
-  if (headers) {
-    path = headers->getPathValue();
-  }
-
-  auto upstream_info = decoder_callbacks_->streamInfo().upstreamInfo();
-  absl::string_view target_host;
-  if (upstream_info && upstream_info->upstreamHost() && upstream_info->upstreamHost()->address()) {
-    target_host = upstream_info->upstreamHost()->address()->asStringView();
-  }
-
-  ENVOY_LOG(error, "{} ({} > {}), client: {}, target: {}{}", logMessage, length,
-            config_->maxRequestBytes(), client_address, target_host, path);
-
-  decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, replyText, nullptr, std::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, reply_text, nullptr, std::nullopt,
                                      StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
 }
 

@@ -9,7 +9,7 @@ namespace Router {
 
 absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& configs,
-    Server::Configuration::ServerFactoryContext& context) {
+    RouteSpecifierFactoryContext& context) {
   RouteSpecifierList specifiers;
   specifiers.reserve(configs.size());
 
@@ -23,7 +23,7 @@ absl::StatusOr<RouteSpecifierList> createRouteSpecifiers(
     }
 
     auto typed_config = Envoy::Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), *factory);
+        proto_config, context.serverFactoryContext().messageValidationVisitor(), *factory);
     auto specifier_or_error = factory->createRouteSpecifier(*typed_config, context);
     RETURN_IF_NOT_OK_REF(specifier_or_error.status());
 
@@ -46,49 +46,54 @@ namespace {
 // supply one.
 OnRouteResult runSpecifiers(RouteSpecifierSpan specifiers, RouteConstSharedPtr route,
                             const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random) {
+                            const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                            OnRouteInputStatus input_status) {
   for (const auto& specifier : specifiers) {
-    auto result = specifier->onRoute(std::move(route), headers, stream_info, random);
-    if (result.status == OnRouteResultStatus::StopIteration) {
+    auto result = specifier->onRoute(std::move(route), headers, stream_info, random, input_status);
+    if (result.status != OnRouteStatus::Continue) {
       return result;
     }
     route = std::move(result.route);
   }
-  return {std::move(route), OnRouteResultStatus::Continue};
+  return {std::move(route), OnRouteStatus::Continue};
 }
 
 } // namespace
 
-RouteConstSharedPtr
-applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
-                     RouteSpecifierSpan vhost_specifiers, RouteSpecifierSpan route_specifiers,
-                     const Http::RequestHeaderMap& headers,
-                     const StreamInfo::StreamInfo& stream_info, uint64_t random) {
-  if (!config_specifiers.empty()) {
-    auto result = runSpecifiers(config_specifiers, std::move(route), headers, stream_info, random);
-    route = std::move(result.route);
-    if (result.status == OnRouteResultStatus::StopIteration) {
-      return route;
+OnRouteResult applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
+                                   RouteSpecifierSpan vhost_specifiers,
+                                   RouteSpecifierSpan route_specifiers,
+                                   const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                                   OnRouteInputStatus input_status) {
+  if (!route_specifiers.empty()) {
+    auto result = runSpecifiers(route_specifiers, std::move(route), headers, stream_info, random,
+                                input_status);
+    if (result.status != OnRouteStatus::Continue) {
+      return result;
     }
+    route = std::move(result.route);
   }
 
   if (!vhost_specifiers.empty()) {
-    auto result = runSpecifiers(vhost_specifiers, std::move(route), headers, stream_info, random);
-    route = std::move(result.route);
-    if (result.status == OnRouteResultStatus::StopIteration) {
-      return route;
+    auto result = runSpecifiers(vhost_specifiers, std::move(route), headers, stream_info, random,
+                                input_status);
+    if (result.status != OnRouteStatus::Continue) {
+      return result;
     }
+    route = std::move(result.route);
   }
 
-  if (!route_specifiers.empty()) {
-    auto result = runSpecifiers(route_specifiers, std::move(route), headers, stream_info, random);
-    route = std::move(result.route);
-    if (result.status == OnRouteResultStatus::StopIteration) {
-      return route;
+  if (!config_specifiers.empty()) {
+    auto result = runSpecifiers(config_specifiers, std::move(route), headers, stream_info, random,
+                                input_status);
+    if (result.status != OnRouteStatus::Continue) {
+      return result;
     }
+    route = std::move(result.route);
   }
 
-  return route;
+  return {std::move(route), OnRouteStatus::Continue};
 }
 
 } // namespace Router

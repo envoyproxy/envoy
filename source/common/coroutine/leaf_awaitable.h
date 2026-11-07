@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <coroutine>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -63,6 +64,7 @@ public:
   }
 
   bool await_suspend(std::coroutine_handle<> continuation) {
+    on_coroutine_suspend(promiseBase(continuation));
     continuation_ = continuation;
     if (context_->cancellation()->cancelled()) {
       // If already cancelled, do not suspend and do not call onStart().
@@ -91,6 +93,10 @@ public:
   // [[nodiscard]]: the result carries success/failure/cancellation, so a
   // `co_await leaf;` that drops it is almost always a bug.
   [[nodiscard]] T await_resume() {
+    if (continuation_) {
+      on_coroutine_resume(promiseBase(continuation_));
+    }
+
     // If result_ contains a value (e.g. from tryImmediate()), return that result rather than
     // abortedValue() even if cancellation occurred. This ensures any non-blocking side effects
     // (such as popped items or acquired capacity) remain visible to the caller so that they can
@@ -146,7 +152,8 @@ private:
     // Inline resume at the event-loop boundary. Must touch no members after
     // this: resuming may run the coroutine to completion and destroy this leaf.
     if (continuation_) {
-      continuation_.resume();
+      // complete() can be called from either another coroutine or from normal function.
+      resume_handle(continuation_);
     }
   }
 
@@ -186,6 +193,40 @@ private:
  * e.g. co_await sleep(500ms)
  * */
 inline TimerAwaitable sleep(std::chrono::milliseconds duration) { return TimerAwaitable(duration); }
+
+/**
+ * Suspends the awaiting coroutine and posts its resumption onto the coroutine's
+ * executor, yielding the current call stack back to the event loop.
+ */
+class YieldAwaitable : public LeafAwaitable<absl::Status> {
+public:
+  YieldAwaitable() = default;
+  ~YieldAwaitable() override { *self_ = nullptr; }
+
+protected:
+  void onStart() override {
+    context().executor().post([self = self_]() {
+      if (*self != nullptr) {
+        (*self)->complete(absl::OkStatus());
+      }
+    });
+  }
+
+  // `post()` cannot be recalled from the dispatcher queue; clearing `*self_` turns
+  // the queued callback into a no-op once the cancel path has resumed and destroyed
+  // this leaf.
+  void onCancel() override { *self_ = nullptr; }
+
+private:
+  std::shared_ptr<YieldAwaitable*> self_ = std::make_shared<YieldAwaitable*>(this);
+};
+
+/**
+ * Yields execution of the awaiting coroutine back to its executor's run loop.
+ *
+ * e.g. CO_RETURN_IF_ERROR(co_await yield());
+ */
+inline YieldAwaitable yield() { return YieldAwaitable(); }
 
 } // namespace Coroutine
 } // namespace Envoy

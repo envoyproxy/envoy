@@ -1,10 +1,13 @@
 #include "source/extensions/tracers/datadog/agent_http_client.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -21,19 +24,37 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+namespace {
+
+datadog::tracing::Error deadlineExpiredError(std::chrono::milliseconds timeout) {
+  std::string message = "request deadline expired already";
+  if (timeout.count() < 0) {
+    message += ' ';
+    message += std::to_string(-timeout.count());
+    message += " milliseconds ago";
+  }
+  return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
+                                 std::move(message)};
+}
+
+} // namespace
 
 AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
                                  const std::string& cluster, const std::string& reference_host,
                                  TracerStats& stats, TimeSource& time_source)
-    : collector_cluster_(cluster_manager, cluster), cluster_(cluster),
-      reference_host_(reference_host), stats_(stats), time_source_(time_source) {}
+    : cluster_manager_(cluster_manager), cluster_(cluster), reference_host_(reference_host),
+      stats_(stats), time_source_(time_source) {}
 
-AgentHTTPClient::~AgentHTTPClient() {
+AgentHTTPClient::~AgentHTTPClient() { shutdown(); }
+
+void AgentHTTPClient::shutdown() {
   for (const auto& [request_ptr, _] : handlers_) {
     RELEASE_ASSERT(request_ptr,
                    "null Http::AsyncClient::Request* in handler map of Datadog::AgentHTTPClient");
     request_ptr->cancel();
   }
+  handlers_.clear();
+  shut_down_ = true;
 }
 
 // datadog::tracing::HTTPClient
@@ -42,6 +63,27 @@ datadog::tracing::Expected<void>
 AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string body,
                       ResponseHandler on_response, ErrorHandler on_error,
                       std::chrono::steady_clock::time_point deadline) {
+  // Not counted in stats_: they belong to the Tracer, which can be destroyed before this client.
+  if (shut_down_) {
+    ENVOY_LOG(debug, "not submitting data to {}: the HTTP client is shut down", url.path);
+    return datadog::tracing::nullopt;
+  }
+
+  const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+      deadline - time_source_.monotonicTime());
+  if (timeout.count() <= 0) {
+    stats_.reports_dropped_.inc();
+    return deadlineExpiredError(timeout);
+  }
+
+  Upstream::ThreadLocalCluster* collector_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_);
+  if (collector_cluster == nullptr) {
+    ENVOY_LOG(debug, "collector cluster '{}' does not exist", cluster_);
+    stats_.reports_skipped_no_cluster_.inc();
+    return datadog::tracing::nullopt;
+  }
+
   auto message = std::make_unique<Http::RequestMessageImpl>();
   Http::RequestHeaderMap& headers = message->headers();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
@@ -51,34 +93,22 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   RequestHeaderWriter writer{message->headers()};
   set_headers(writer);
 
-  message->body().add(body);
-
-  const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-      deadline - time_source_.monotonicTime());
-  if (timeout.count() <= 0) {
-    std::string message = "request deadline expired already";
-    if (timeout.count() < 0) {
-      message += ' ';
-      message += std::to_string(-timeout.count());
-      message += " milliseconds ago";
-    }
-    stats_.reports_dropped_.inc();
-    return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
-                                   std::move(message)};
+  // The body holds every trace collected since the last flush, which can be several megabytes.
+  if (!body.empty()) {
+    auto* payload = new std::string(std::move(body));
+    message->body().addBufferFragment(*new Buffer::BufferFragmentImpl(
+        payload->data(), payload->size(),
+        [payload](const void*, size_t, const Buffer::BufferFragmentImpl* fragment) {
+          delete payload;
+          delete fragment;
+        }));
   }
 
   ENVOY_LOG(debug, "submitting data to {} with payload size {} and {} ms timeout", url.path,
-            body.size(), timeout.count());
+            message->body().length(), timeout.count());
 
-  if (!collector_cluster_.threadLocalCluster().has_value()) {
-    ENVOY_LOG(debug, "collector cluster '{}' does not exist", cluster_);
-    stats_.reports_skipped_no_cluster_.inc();
-    return datadog::tracing::nullopt;
-  }
-
-  Http::AsyncClient::Request* request =
-      collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
-          std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+  Http::AsyncClient::Request* request = collector_cluster->httpAsyncClient().send(
+      std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
   if (!request) {
     stats_.reports_failed_.inc();
     return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,

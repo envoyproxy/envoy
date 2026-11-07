@@ -1,9 +1,6 @@
-"""Module extensions for Envoy's non-module dependencies.
+"""Module extensions for Envoy build configuration, dependency metadata, and repositories."""
 
-This file defines module extensions to support Envoy's bzlmod migration while
-respecting existing WORKSPACE patches and custom BUILD files.
-"""
-
+load("@envoy_toolshed//compile:llvm_minimal.bzl", "llvm_toolchain_alias", "setup_llvm_minimal")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("//bazel/external/cargo/remote:crates.bzl", "crate_repositories")
 load(":envoy_build_config.bzl", "default_envoy_build_config")
@@ -97,30 +94,6 @@ def _envoy_repo_impl(module_ctx):
     """
     envoy_repo()
 
-def _envoy_toolchains_impl(module_ctx):
-    """Implementation of the envoy_toolchains module extension.
-
-    This extension registers toolchains needed for Envoy builds in bzlmod mode,
-    including the clang_platform alias used in various BUILD files.
-
-    In WORKSPACE mode, this is handled by calling envoy_toolchains() from WORKSPACE.
-    In bzlmod mode, we need to use this extension to make the same repositories available.
-
-    Args:
-        module_ctx: The module extension context
-    """
-
-    # Create the clang_platform repository using arch_alias
-    # Note: We can't call envoy_toolchains() directly here because it uses native.register_toolchains
-    # which is not allowed in module extensions. Instead, we only create the arch_alias repository.
-    arch_alias(
-        name = "clang_platform",
-        aliases = {
-            "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
-            "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
-        },
-    )
-
 envoy_repo_extension = module_extension(
     implementation = _envoy_repo_impl,
     doc = """
@@ -136,22 +109,6 @@ envoy_repo_extension = module_extension(
     """,
 )
 
-envoy_toolchains_extension = module_extension(
-    implementation = _envoy_toolchains_impl,
-    doc = """
-    Extension for Envoy toolchain setup in bzlmod mode.
-
-    This extension creates toolchain-related repositories needed for Envoy builds:
-    - clang_platform: Architecture-specific platform aliases for RBE builds
-
-    In WORKSPACE mode, these are created by calling envoy_toolchains() from WORKSPACE.
-    In bzlmod mode, this extension provides the same functionality.
-
-    Note: Toolchain registration itself is handled by MODULE.bazel using the LLVM
-    toolchain extension. This extension only creates auxiliary repositories.
-    """,
-)
-
 def _wasm_cargo_impl(module_ctx):
     direct_deps = crate_repositories()
     return module_ctx.extension_metadata(
@@ -161,3 +118,79 @@ def _wasm_cargo_impl(module_ctx):
     )
 
 wasm_cargo = module_extension(implementation = _wasm_cargo_impl)
+
+_LLVM_MIGRATION = """
+`envoy_llvm_extension` (@envoy//bazel:extensions.bzl) is deprecated and will be removed.
+Migrate your MODULE.bazel to the toolshed extension:
+
+    llvm_toolchain_alias_ext = use_extension(
+        "@envoy_toolshed//compile:extensions.bzl",
+        "llvm_toolchain_alias_extension",
+    )
+    # Optional, root module only, to use a host LLVM install:
+    # llvm_toolchain_alias_ext.host(path = "/usr/lib/llvm-22")
+    use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+
+See bazel/README.md and bazel/tests/codeql for a complete example.
+"""
+
+# TODO(phlax): Remove once downstream modules have migrated.
+def _envoy_llvm_impl(module_ctx):
+    # buildifier: disable=print
+    print("DEPRECATED: " + _LLVM_MIGRATION)
+    for module in module_ctx.modules:
+        if module.tags.host:
+            # A host tag here can no longer redirect Envoy's own @llvm_toolchain_llvm
+            # (that now comes from the toolshed extension), so fail rather than
+            # silently produce an unused repo.
+            fail(
+                "envoy_llvm_extension.host() is no longer supported (set by module %r)." % module.name +
+                _LLVM_MIGRATION,
+            )
+
+    # Deprecated no-tag path: mirror toolshed's llvm_toolchain_alias_extension so an
+    # existing `use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")` keeps resolving.
+    setup_llvm_minimal()
+    llvm_toolchain_alias(
+        name = "llvm_toolchain_llvm",
+        minimal_linux_x64 = "@llvm_minimal_linux_x64//:BUILD.bazel",
+        minimal_linux_arm64 = "@llvm_minimal_linux_arm64//:BUILD.bazel",
+        minimal_macos_arm64 = "@llvm_minimal_macos_arm64//:BUILD.bazel",
+    )
+
+_host_llvm = tag_class(
+    attrs = {
+        "llvm_version": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+envoy_llvm_extension = module_extension(
+    implementation = _envoy_llvm_impl,
+    tag_classes = {"host": _host_llvm},
+    doc = "Deprecated: use @envoy_toolshed//compile:extensions.bzl%llvm_toolchain_alias_extension.",
+)
+
+# TODO(phlax): Remove once envoy-examples (and any other registry modules) use
+# @envoy_toolshed//repository:extensions.bzl%arch_alias_extension directly.
+def _envoy_toolchains_impl(module_ctx):
+    # buildifier: disable=print
+    print(
+        "DEPRECATED: `envoy_toolchains_extension` is deprecated; use " +
+        "@envoy_toolshed//repository:extensions.bzl%arch_alias_extension with " +
+        "`.alias(name = \"clang_platform\", amd64 = \"@envoy//bazel/platforms/rbe:linux_x64\", " +
+        "aarch64 = \"@envoy//bazel/platforms/rbe:linux_arm64\")` and " +
+        "`use_repo(arch_alias_ext, \"clang_platform\")`.",
+    )
+    arch_alias(
+        name = "clang_platform",
+        aliases = {
+            "amd64": str(Label("//bazel/platforms/rbe:linux_x64")),
+            "aarch64": str(Label("//bazel/platforms/rbe:linux_arm64")),
+        },
+    )
+
+envoy_toolchains_extension = module_extension(
+    implementation = _envoy_toolchains_impl,
+    doc = "Deprecated: use @envoy_toolshed arch_alias_extension instead.",
+)

@@ -12,6 +12,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
+CompositePerRouteConfig::~CompositePerRouteConfig() {
+  if (match_tree_ == nullptr || main_dispatcher_.isThreadSafe()) {
+    return;
+  }
+  // A route configuration may be released on a worker thread when an RDS update replaces it, but
+  // the match tree must be destroyed on the main thread.
+  main_dispatcher_.post([match_tree = std::move(match_tree_)]() mutable { match_tree.reset(); });
+}
+
 namespace {
 // Helper that returns `filter->func(args...)` if the filter is not null, returning `rval`
 // otherwise.
@@ -156,7 +165,7 @@ void Filter::handleAction(const Matcher::Action& action) {
     }
 
     if (!wrapper.filters_to_inject_.empty()) {
-      stats_.filter_delegation_success_.inc();
+      stats_->filter_delegation_success_.inc();
       delegated_filter_ =
           std::make_shared<DelegatedFilterChain>(std::move(wrapper.filters_to_inject_));
       updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
@@ -175,7 +184,7 @@ void Filter::handleAction(const Matcher::Action& action) {
   composite_action.createFilters(wrapper);
 
   if (!wrapper.errors_.empty()) {
-    stats_.filter_delegation_error_.inc();
+    stats_->filter_delegation_error_.inc();
     ENVOY_LOG(debug, "failed to create delegated filter {}",
               accumulateToString<absl::Status>(
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
@@ -187,7 +196,7 @@ void Filter::handleAction(const Matcher::Action& action) {
   // Handle filter chain mode.
   if (is_filter_chain) {
     if (!wrapper.filters_to_inject_.empty()) {
-      stats_.filter_delegation_success_.inc();
+      stats_->filter_delegation_success_.inc();
       delegated_filter_ =
           std::make_shared<DelegatedFilterChain>(std::move(wrapper.filters_to_inject_));
       updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
@@ -202,7 +211,7 @@ void Filter::handleAction(const Matcher::Action& action) {
 
   // Handle single filter mode.
   if (wrapper.filter_to_inject_.has_value()) {
-    stats_.filter_delegation_success_.inc();
+    stats_->filter_delegation_success_.inc();
 
     auto createDelegatedFilterFn = Overloaded{
         [this, action_name](Http::StreamDecoderFilterSharedPtr filter) {

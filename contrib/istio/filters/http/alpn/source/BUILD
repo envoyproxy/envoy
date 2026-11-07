@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "alpn_filter",
     srcs = ["alpn_filter.cc"],
     hdrs = ["alpn_filter.h"],
-    repository = "@envoy",
     deps = [
         "//envoy/http:filter_interface",
         "//source/common/network:application_protocol_lib",
@@ -26,7 +25,6 @@ envoy_cc_contrib_extension(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":alpn_filter",
         "//envoy/registry",

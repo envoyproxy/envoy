@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
@@ -92,7 +93,8 @@ func envoy_dynamic_module_on_header_formatter_config_new(
 	hostConfigPtr C.envoy_dynamic_module_type_header_formatter_config_envoy_ptr,
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
-) C.envoy_dynamic_module_type_header_formatter_config_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_header_formatter_config_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_header_formatter_config_new", nil, &modulePtr)
 	nameString := envoyBufferToStringUnsafe(name)
 	configBuffer := envoyBufferToUnsafeEnvoyBuffer(config)
 
@@ -120,6 +122,7 @@ func envoy_dynamic_module_on_header_formatter_config_new(
 func envoy_dynamic_module_on_header_formatter_config_destroy(
 	configPtr C.envoy_dynamic_module_type_header_formatter_config_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_header_formatter_config_destroy")
 	wrapper := headerFormatterConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		return
@@ -132,7 +135,8 @@ func envoy_dynamic_module_on_header_formatter_config_destroy(
 func envoy_dynamic_module_on_header_formatter_new(
 	configPtr C.envoy_dynamic_module_type_header_formatter_config_module_ptr,
 	hostFormatterPtr C.envoy_dynamic_module_type_header_formatter_envoy_ptr,
-) C.envoy_dynamic_module_type_header_formatter_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_header_formatter_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_header_formatter_new", nil, &modulePtr)
 	wrapper := headerFormatterConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		// A null formatter makes Envoy fall back to the default header casing for this message.
@@ -156,6 +160,7 @@ func envoy_dynamic_module_on_header_formatter_new(
 func envoy_dynamic_module_on_header_formatter_destroy(
 	formatterPtr C.envoy_dynamic_module_type_header_formatter_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_header_formatter_destroy")
 	headerFormatterManager.remove(unsafe.Pointer(formatterPtr))
 }
 
@@ -166,6 +171,7 @@ func envoy_dynamic_module_on_header_formatter_process_key(
 	formatterPtr C.envoy_dynamic_module_type_header_formatter_module_ptr,
 	key C.envoy_dynamic_module_type_envoy_buffer,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_header_formatter_process_key")
 	wrapper := headerFormatterManager.unwrap(unsafe.Pointer(formatterPtr))
 	if wrapper == nil {
 		return
@@ -182,7 +188,8 @@ func envoy_dynamic_module_on_header_formatter_format(
 	formatterPtr C.envoy_dynamic_module_type_header_formatter_module_ptr,
 	key C.envoy_dynamic_module_type_envoy_buffer,
 	result *C.envoy_dynamic_module_type_module_buffer,
-) C.bool {
+) (success C.bool) {
+	defer recovery.Export("envoy_dynamic_module_on_header_formatter_format", C.bool(false), &success)
 	wrapper := headerFormatterManager.unwrap(unsafe.Pointer(formatterPtr))
 	if wrapper == nil {
 		return C.bool(false)

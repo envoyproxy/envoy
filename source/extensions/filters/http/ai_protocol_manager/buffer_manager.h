@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <utility>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
@@ -77,6 +78,31 @@ public:
   // Reports bytes that have since become durable, resuming the data source once the total falls
   // to low_watermark_.
   void releaseUnacked(uint64_t bytes);
+
+  // Move-only RAII token that charges `bytes` to `addUnacked()` on construction and releases them
+  // via `releaseUnacked()` on destruction.
+  class ScopedUnacked {
+  public:
+    ScopedUnacked(FilterChainBridge& bridge, uint64_t bytes) : bridge_(&bridge), bytes_(bytes) {
+      if (bytes_ > 0) {
+        bridge_->addUnacked(bytes_);
+      }
+    }
+    ScopedUnacked(ScopedUnacked&& other) noexcept
+        : bridge_(std::exchange(other.bridge_, nullptr)), bytes_(std::exchange(other.bytes_, 0)) {}
+    ScopedUnacked& operator=(ScopedUnacked&&) = delete;
+    ScopedUnacked(const ScopedUnacked&) = delete;
+    ScopedUnacked& operator=(const ScopedUnacked&) = delete;
+    ~ScopedUnacked() {
+      if (bridge_ != nullptr && bytes_ > 0) {
+        bridge_->releaseUnacked(bytes_);
+      }
+    }
+
+  private:
+    FilterChainBridge* bridge_{nullptr};
+    uint64_t bytes_{0};
+  };
 
   // True while the data source is paused.
   bool ingestPaused() const { return source_paused_; }
@@ -211,7 +237,8 @@ public:
 
   // Offloads `data` into the external buffer (batching small frames). The caller
   // holds the filter chain (returns StopIteration*) while the body is buffered.
-  void onData(Buffer::Instance& data);
+  // `end_stream` marks `data` as the last frame of the body.
+  void onData(Buffer::Instance& data, bool end_stream = false);
 
   // Signals that the full body has been offloaded, flushing any batched backlog to
   // the buffer so all of it becomes durable, and is ready to replay.
@@ -261,6 +288,9 @@ public:
 
   // ReplayResumeHandler
   void onReplayResumed() override;
+
+  // Flushes any sub-threshold queued backlog when the bridge pauses the ingest source.
+  void onIngestPaused() { maybeIssueWrite(); }
 
 private:
   // Issues a write of the queued backlog when one is warranted: no write is in
@@ -343,9 +373,11 @@ private:
   // we never inject/error reentrantly from within it).
   Event::SchedulableCallbackPtr replay_cb_;
 
-  // True once endStream() has been called; gates flushing the batched backlog (the
+  // True once the body has ended; gates flushing the batched backlog (the
   // tail is written even if it is below WriteFlushThreshold).
   bool end_stream_seen_{false};
+  // True once a write carrying end_stream has been issued.
+  bool end_stream_flushed_{false};
   // True once cancelReplay() has been called. Permanent: disables all subsequent replay attempts.
   bool replay_cancelled_{false};
   // True once replay() has been requested by the caller and not yet started.

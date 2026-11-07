@@ -23,9 +23,9 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Network {
@@ -116,23 +116,22 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillOnce([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(
             data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u);
         EXPECT_EQ(data.buffer_->toString(), first);
-      }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      })
+      .WillOnce([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(
             data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u);
         EXPECT_EQ(data.buffer_->toString(), second);
 
         dispatcher_->exit();
-      }));
+      });
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady(_))
-      .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-      }));
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillRepeatedly([&](const Socket& socket) {
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
+  });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -150,14 +149,14 @@ TEST_P(UdpListenerImplTest, SendEmptyDatagramUnconnected) {
   const std::string follow_up("follow-up");
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillOnce([&](const UdpRecvData& data) -> void {
         ASSERT_NE(nullptr, data.addresses_.local_);
         EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
         ASSERT_NE(nullptr, data.addresses_.peer_);
         EXPECT_EQ(client_.localAddress()->asString(), data.addresses_.peer_->asString());
         EXPECT_EQ(0, data.buffer_->length());
-      }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      })
+      .WillOnce([&](const UdpRecvData& data) -> void {
         ASSERT_NE(nullptr, data.addresses_.local_);
         EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
         ASSERT_NE(nullptr, data.addresses_.peer_);
@@ -165,7 +164,7 @@ TEST_P(UdpListenerImplTest, SendEmptyDatagramUnconnected) {
         EXPECT_EQ(follow_up, data.buffer_->toString());
         timeout_timer->disableTimer();
         dispatcher_->exit();
-      }));
+      });
 
   client_.write("", *send_to_addr_);
   client_.write(follow_up, *send_to_addr_);
@@ -191,14 +190,14 @@ TEST_P(UdpListenerImplTest, SendEmptyDatagramConnected) {
   const std::string follow_up("follow-up");
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillOnce([&](const UdpRecvData& data) -> void {
         ASSERT_NE(nullptr, data.addresses_.local_);
         EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
         ASSERT_NE(nullptr, data.addresses_.peer_);
         EXPECT_EQ(connected_client_address->asString(), data.addresses_.peer_->asString());
         EXPECT_EQ(0, data.buffer_->length());
-      }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      })
+      .WillOnce([&](const UdpRecvData& data) -> void {
         ASSERT_NE(nullptr, data.addresses_.local_);
         EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
         ASSERT_NE(nullptr, data.addresses_.peer_);
@@ -206,7 +205,7 @@ TEST_P(UdpListenerImplTest, SendEmptyDatagramConnected) {
         EXPECT_EQ(follow_up, data.buffer_->toString());
         timeout_timer->disableTimer();
         dispatcher_->exit();
-      }));
+      });
 
   Buffer::OwnedImpl empty_buffer;
   Api::IoCallUint64Result send_result =
@@ -239,13 +238,13 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
-  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce([&](const UdpRecvData& data) -> void {
     validateRecvCallbackParams(
         data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u);
     EXPECT_EQ(data.buffer_->toString(), second);
 
     dispatcher_->exit();
-  }));
+  });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(2, listener_->packetsDropped());
@@ -268,13 +267,12 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   EXPECT_CALL(listener_callbacks_, onReadReady()).Times(testing::AtLeast(3u));
   EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
       .WillRepeatedly(Return(num_packets_expected_per_loop));
-  EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, num_packets_per_read);
-        if (last_piece == data.buffer_->toString()) {
-          dispatcher_->exit();
-        }
-      }));
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillRepeatedly([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data, num_packets_per_read);
+    if (last_piece == data.buffer_->toString()) {
+      dispatcher_->exit();
+    }
+  });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   num_packets_received_by_listener_ = 0u;
@@ -285,11 +283,11 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
       .WillRepeatedly(Return(num_packets_expected_per_loop));
-  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce([&](const UdpRecvData& data) -> void {
     validateRecvCallbackParams(data, num_packets_per_read);
     EXPECT_EQ(payload2, data.buffer_->toString());
     dispatcher_->exit();
-  }));
+  });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   if (!recvbuf_large_enough_) {
@@ -309,13 +307,12 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   EXPECT_CALL(listener_callbacks_, onReadReady()).Times(testing::AtLeast(2u));
   EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
       .WillRepeatedly(Return(num_packets_expected_per_loop));
-  EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, num_packets_per_read);
-        if (really_last_piece == data.buffer_->toString()) {
-          dispatcher_->exit();
-        }
-      }));
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillRepeatedly([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data, num_packets_per_read);
+    if (really_last_piece == data.buffer_->toString()) {
+      dispatcher_->exit();
+    }
+  });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -341,7 +338,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillOnce([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(
             data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u);
 
@@ -351,8 +348,8 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
 
         server_received_data.push_back(data_str);
-      }))
-      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+      })
+      .WillRepeatedly([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(
             data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u);
 
@@ -360,9 +357,9 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
 
         server_received_data.push_back(data_str);
-      }));
+      });
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce([&](const Socket& socket) {
     EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
     ASSERT_NE(test_peer_address, nullptr);
 
@@ -394,7 +391,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
     server_received_data.clear();
     dispatcher_->exit();
-  }));
+  });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -431,19 +428,18 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(2)
       .WillOnce(Return())
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillOnce([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(
             data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u);
 
         EXPECT_EQ(data.buffer_->toString(), second);
 
         dispatcher_->exit();
-      }));
+      });
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady(_))
-      .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-      }));
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillRepeatedly([&](const Socket& socket) {
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
+  });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -457,8 +453,9 @@ public:
   }
   void setup() {
     io_handle_ = &useHotRestartSocket(registrar_);
-    // File event should be created listening to no events (i.e. disabled).
-    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0));
+    // File event should be created listening to no events (i.e. disabled). Keep its callback so a
+    // test can inject an event on the paused listener.
+    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0)).WillOnce(SaveArg<1>(&file_event_cb_));
     // Parent drained callback should be registered when the listener is created.
     // We capture the callback so we can simulate "drain complete".
     EXPECT_CALL(registrar_, registerParentDrainedCallback(_, _))
@@ -474,6 +471,7 @@ protected:
   MockParentDrainedCallbackRegistrar registrar_;
   MockIoHandle* io_handle_;
   absl::AnyInvocable<void()> parent_drained_callback_;
+  Event::FileReadyCb file_event_cb_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, HotRestartedUdpListenerImplTest,
@@ -537,6 +535,31 @@ TEST_P(HotRestartedUdpListenerImplTest, EndingParentDrainedWhileDisabledShouldNo
   testing::Mock::VerifyAndClearExpectations(io_handle_);
 }
 
+/**
+ * A read event injected on the paused listener (activateRead(), which the QUIC listener uses to
+ * process the handshakes it buffered from packets the parent forwarded) runs the read-ready
+ * callback but must not read the socket: the socket is the parent's to read until the parent is
+ * gone, and anything dequeued here would belong to the parent's connections.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, InjectedReadWhilePausedDoesNotReadTheSocket) {
+  setup();
+  ASSERT_TRUE(file_event_cb_ != nullptr);
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  // No read of any kind, and no re-arming of the read event.
+  EXPECT_CALL(*io_handle_, supportsMmsg()).Times(0);
+  EXPECT_CALL(*io_handle_, activateFileEvents(_)).Times(0);
+  EXPECT_TRUE(file_event_cb_(Event::FileReadyType::Read).ok());
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  testing::Mock::VerifyAndClearExpectations(&listener_callbacks_);
+
+  // Once the parent is gone the listener starts reading as usual.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_P(HotRestartedUdpListenerImplTest,
        ParentDrainedCallbackAfterListenerDestroyedShouldDoNothing) {
   setup();
@@ -564,16 +587,16 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
 
   EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce([&](const Socket& socket) {
     EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-  }));
+  });
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onReceiveError(_))
-      .WillOnce(Invoke([&](Api::IoError::IoErrorCode err) -> void {
+      .WillOnce([&](Api::IoError::IoErrorCode err) -> void {
         ASSERT_EQ(Api::IoError::IoErrorCode::NoSupport, err);
         dispatcher_->exit();
-      }));
+      });
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
@@ -696,7 +719,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
 
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
-      .WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
+      .WillOnce([&](os_fd_t, msghdr* msg, int) {
         // Set msg_name and msg_namelen
         if (client_.localAddress()->ip()->version() == Address::IpVersion::v4) {
           sockaddr_storage ss;
@@ -769,22 +792,22 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg)) = overflow;
 #endif
         return Api::SysCallSizeResult{static_cast<long>(stacked_message.length()), 0};
-      }))
+      })
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, EAGAIN}));
 
-  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&]() { dispatcher_->exit(); }));
+  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce([&]() { dispatcher_->exit(); });
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(4u)
-      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+      .WillRepeatedly([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, client_data.size());
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
-      }));
+      });
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce([&](const Socket& socket) {
     EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-  }));
+  });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -802,15 +825,15 @@ TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(0);
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillOnce([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, 1);
         EXPECT_EQ(data.buffer_->toString(), first);
-      }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      })
+      .WillOnce([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, 1);
         EXPECT_EQ(data.buffer_->toString(), second);
         dispatcher_->exit();
-      }));
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0, listener_->packetsDropped());
@@ -846,7 +869,7 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
   EXPECT_CALL(os_sys_calls, supportsUdpGro).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
 
-  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce([&](os_fd_t, msghdr* msg, int) {
     // Set msg_name and msg_namelen
     if (client_.localAddress()->ip()->version() == Address::IpVersion::v4) {
       sockaddr_storage ss;
@@ -918,22 +941,22 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
     *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg)) = overflow;
 #endif
     return Api::SysCallSizeResult{static_cast<long>(64 * 1024), 0};
-  }));
+  });
 
-  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&]() { dispatcher_->exit(); }));
+  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce([&]() { dispatcher_->exit(); });
   // Only 64 packets should be read, via one recvmsg call.
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(64u)
-      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+      .WillRepeatedly([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, client_data.size());
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
-      }));
+      });
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce([&](const Socket& socket) {
     EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-  }));
+  });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

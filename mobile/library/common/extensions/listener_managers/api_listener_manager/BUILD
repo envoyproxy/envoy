@@ -16,7 +16,6 @@ envoy_cc_extension(
     hdrs = [
         "api_listener_manager.h",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/event:provisional_dispatcher_lib",

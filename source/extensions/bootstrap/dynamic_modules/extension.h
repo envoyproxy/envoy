@@ -23,9 +23,9 @@ public:
   ~DynamicModuleBootstrapExtension() override;
 
   /**
-   * Initializes the in-module extension.
+   * Initializes the in-module extension. Returns false when the module returns a null extension.
    */
-  void initializeInModuleExtension();
+  bool initializeInModuleExtension();
 
   // Server::BootstrapExtension
   void onServerInitialized(Server::Instance&) override;
@@ -77,6 +77,9 @@ private:
 
   // Handle for the shutdown lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
+
+  // Handle for the shutdown lifecycle callback that notifies the configuration of shutdown.
+  Server::ServerLifecycleNotifier::HandlePtr config_shutdown_handle_;
 };
 
 } // namespace DynamicModules

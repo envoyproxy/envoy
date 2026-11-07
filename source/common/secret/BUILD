@@ -31,6 +31,7 @@ envoy_cc_library(
     srcs = ["secret_provider_impl.cc"],
     hdrs = ["secret_provider_impl.h"],
     deps = [
+        "//envoy/event:dispatcher_interface",
         "//envoy/secret:secret_provider_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/thread_local:thread_local_object",

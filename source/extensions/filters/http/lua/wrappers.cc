@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
@@ -378,12 +379,14 @@ absl::StatusOr<int> DynamicMetadataMapWrapper::luaSet(lua_State* state) {
   // so push a copy of the 3rd arg ("value") to the top.
   lua_pushvalue(state, 4);
 
+  // Load the value before touching the metadata map: loadValue() fails on a type it cannot
+  // convert, and a map reached first would keep an empty struct for a set that never happened.
+  // Writing the field in place avoids setDynamicMetadata()'s Struct merge, which copies once per
+  // field of the value.
   auto loaded = Filters::Common::Lua::MetadataMapHelper::loadValue(state);
   RETURN_IF_NOT_OK_REF(loaded.status());
-
-  Protobuf::Struct value;
-  (*value.mutable_fields())[std::string(*key)] = std::move(*loaded);
-  streamInfo().setDynamicMetadata(std::string(*filter_name), value);
+  Config::Metadata::mutableMetadataValue(streamInfo().dynamicMetadata(), *filter_name, *key) =
+      std::move(*loaded);
 
   // Pop the copy of the metadata value from the stack.
   lua_pop(state, 1);
@@ -557,14 +560,14 @@ absl::StatusOr<int> VirtualHostWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
-const Protobuf::Struct& RouteWrapper::getMetadata() const {
+const Protobuf::Struct& RouteWrapper::getMetadata(absl::string_view ns) const {
   const auto route = stream_info_.route();
   if (!route) {
     return Protobuf::Struct::default_instance();
   }
 
   const auto& metadata = route->metadata();
-  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+  auto filter_it = metadata.filter_metadata().find(ns.empty() ? filter_config_name_ : ns);
 
   if (filter_it != metadata.filter_metadata().end()) {
     return filter_it->second;
@@ -574,11 +577,15 @@ const Protobuf::Struct& RouteWrapper::getMetadata() const {
 }
 
 absl::StatusOr<int> RouteWrapper::luaMetadata(lua_State* state) {
-  if (metadata_wrapper_.get() != nullptr) {
-    metadata_wrapper_.pushStack();
+  const absl::StatusOr<std::optional<absl::string_view>> ns_arg =
+      Filters::Common::Lua::optStringOrError(state, 2, "metadata");
+  RETURN_IF_NOT_OK_REF(ns_arg.status());
+  const absl::string_view ns = ns_arg->value_or(absl::string_view());
+  if (auto it = metadata_wrappers_.find(ns); it != metadata_wrappers_.end()) {
+    it->second.pushStack();
   } else {
-    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
-                            true);
+    const auto wrapper = Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata(ns));
+    metadata_wrappers_[ns].reset(wrapper, true);
   }
   return 1;
 }
@@ -697,13 +704,15 @@ absl::StatusOr<int> StatsScopeWrapper::luaHistogram(lua_State* state) {
       unit = Stats::Histogram::Unit::Bytes;
     } else if (unit_str == "microseconds") {
       unit = Stats::Histogram::Unit::Microseconds;
+    } else if (unit_str == "nanoseconds") {
+      unit = Stats::Histogram::Unit::Nanoseconds;
     } else if (unit_str == "unspecified") {
       unit = Stats::Histogram::Unit::Unspecified;
     } else {
       return absl::InvalidArgumentError(
           absl::StrCat("invalid histogram unit '", unit_str,
-                       "', expected 'ms', 'milliseconds', 'microseconds', 'bytes', or "
-                       "'unspecified'"));
+                       "', expected 'ms', 'milliseconds', 'microseconds', 'nanoseconds', "
+                       "'bytes', or 'unspecified'"));
     }
   }
 

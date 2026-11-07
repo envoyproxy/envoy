@@ -31,6 +31,7 @@ envoy_cc_extension(
         ":reverse_connection_address_lib",
         "//envoy/network:resolver_interface",
         "//envoy/registry",
+        "//source/common/http:header_utility_lib",
     ],
 )
 
@@ -78,7 +79,9 @@ envoy_cc_library(
         ":reverse_tunnel_extension_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:io_error_interface",
+        "//envoy/common:base_includes",
         "//envoy/common:random_generator_interface",
+        "//envoy/event:timer_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",

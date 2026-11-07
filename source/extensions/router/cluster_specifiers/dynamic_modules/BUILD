@@ -58,6 +58,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

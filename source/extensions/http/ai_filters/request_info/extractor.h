@@ -15,8 +15,8 @@ namespace AiFilters {
 namespace RequestInfo {
 
 struct RequestAttributes {
-  HttpFilters::AiProtocolManager::ApiProtocol api_protocol{
-      HttpFilters::AiProtocolManager::ApiProtocol::Unspecified};
+  HttpFilters::AiProtocolManager::LLMProtocol llm_protocol{
+      HttpFilters::AiProtocolManager::LLMProtocol::Unspecified};
   std::string model;
   std::optional<bool> stream;
   std::optional<uint64_t> max_output_tokens;
@@ -29,7 +29,7 @@ struct RequestAttributes {
 // TODO(botengyao): read one normalized schema once a transcoder produces an IR; the per-API
 // readers then go away.
 // `path` is the request :path, where Gemini names the model and the streaming operation.
-RequestAttributes extractRequestAttributes(HttpFilters::AiProtocolManager::ApiProtocol protocol,
+RequestAttributes extractRequestAttributes(HttpFilters::AiProtocolManager::LLMProtocol protocol,
                                            const nlohmann::json& json, absl::string_view path);
 
 } // namespace RequestInfo

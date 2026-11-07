@@ -928,6 +928,44 @@ TEST_F(SseCodecBufferTest, EndStreamTerminationStatesPreserveWireEndingAndClient
   }
 }
 
+TEST_F(SseEventDecoderTest, ByteSizeReflectsInMemoryResidenceNotOffloadedStorage) {
+  const std::string big_text(4096, 'x');
+  const std::string frame =
+      absl::StrCat(": ", std::string(1024, 'c'), "\ndata: {\"text\":\"", big_text, "\"}\n\n");
+
+  // 1) In-memory BufferManager (max_in_memory_frame_bytes = 64 KiB, string threshold = 128 B):
+  //    payload_store_ and extras_store_ stay in memory, so byteSize() includes their lengths.
+  {
+    events_.clear();
+    SseEventDecoder::Config cfg;
+    cfg.max_in_memory_frame_bytes = 64 * 1024;
+    cfg.parser.inline_string_threshold_bytes = 128;
+    SseEventDecoder decoder = makeDecoder(cfg);
+    ASSERT_THAT(feed(decoder, frame), IsOk());
+    ASSERT_EQ(events_.size(), 1);
+    ASSERT_NE(events_[0]->payload_store(), nullptr);
+    ASSERT_NE(events_[0]->payload_store()->inMemoryBytes(), nullptr);
+    EXPECT_GT(events_[0]->byteSize(), 5000u);
+  }
+
+  // 2) Offloaded BufferManager (max_in_memory_frame_bytes = 256 B, string threshold = 128 B):
+  //    payload_store_, extras_store_, and the 4 KiB JSON string are offloaded, so byteSize()
+  //    reflects only the small in-memory overhead (< 512 bytes).
+  {
+    events_.clear();
+    SseEventDecoder::Config cfg;
+    cfg.max_in_memory_frame_bytes = 256;
+    cfg.parser.inline_string_threshold_bytes = 128;
+    SseEventDecoder decoder = makeDecoder(cfg);
+    ASSERT_THAT(feed(decoder, frame), IsOk());
+    ASSERT_EQ(events_.size(), 1);
+    ASSERT_NE(events_[0]->payload_store(), nullptr);
+    EXPECT_EQ(events_[0]->payload_store()->inMemoryBytes(), nullptr);
+    EXPECT_EQ(events_[0]->extras_store()->inMemoryBytes(), nullptr);
+    EXPECT_LT(events_[0]->byteSize(), 512u);
+  }
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters
