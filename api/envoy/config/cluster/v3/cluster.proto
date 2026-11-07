@@ -639,9 +639,17 @@ message Cluster {
     type.v3.Percent healthy_panic_threshold = 1;
 
     oneof locality_config_specifier {
-      ZoneAwareLbConfig zone_aware_lb_config = 2;
+      // This field has been deprecated in favor of the ``locality_lb_config`` field of the
+      // load balancing policy configured via
+      // :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+      ZoneAwareLbConfig zone_aware_lb_config = 2
+          [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-      LocalityWeightedLbConfig locality_weighted_lb_config = 3;
+      // This field has been deprecated in favor of the locality configuration of the
+      // load balancing policy configured via
+      // :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+      LocalityWeightedLbConfig locality_weighted_lb_config = 3
+          [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
     }
 
     // If set, all health check/weight/metadata updates that happen within this duration will be
@@ -671,7 +679,12 @@ message Cluster {
     bool close_connections_on_host_set_change = 6;
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
-    ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+    // This field has been deprecated in favor of the ``consistent_hashing_lb_config`` field of the
+    // :ref:`RingHash <envoy_v3_api_msg_extensions.load_balancing_policies.ring_hash.v3.RingHash>` or
+    // :ref:`Maglev <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>`
+    // load balancing policy configured via :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+    ConsistentHashingLbConfig consistent_hashing_lb_config = 7
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // This controls what hosts are considered valid when using
     // :ref:`host overrides <arch_overview_load_balancing_override_host>`, which is used by some
@@ -915,6 +928,12 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
+  //
+  // .. note::
+  //
+  //   This field only selects a load balancer with its default settings. To configure the load
+  //   balancer, use :ref:`load_balancing_policy
+  //   <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` instead.
   LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
 
   // Setting this is required for specifying members of
@@ -1186,7 +1205,14 @@ message Cluster {
   core.v3.BindConfig upstream_bind_config = 21;
 
   // Configuration for load balancing subsetting.
-  LbSubsetConfig lb_subset_config = 22;
+  //
+  // .. attention::
+  //
+  //   This field has been deprecated in favor of the
+  //   :ref:`subset load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.subset.v3.Subset>`
+  //   configured via :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+  LbSubsetConfig lb_subset_config = 22
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
@@ -1198,19 +1224,39 @@ message Cluster {
   // LbPolicy will generate an error at runtime.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
-    RingHashLbConfig ring_hash_lb_config = 23;
+    // This field has been deprecated in favor of the
+    // :ref:`Ring Hash load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.ring_hash.v3.RingHash>`
+    // configured via :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+    RingHashLbConfig ring_hash_lb_config = 23
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Optional configuration for the Maglev load balancing policy.
-    MaglevLbConfig maglev_lb_config = 52;
+    // This field has been deprecated in favor of the
+    // :ref:`Maglev load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>`
+    // configured via :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+    MaglevLbConfig maglev_lb_config = 52
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Optional configuration for the Original Destination load balancing policy.
-    OriginalDstLbConfig original_dst_lb_config = 34;
+    // This field has been deprecated in favor of
+    // :ref:`OriginalDstCluster <envoy_v3_api_msg_extensions.clusters.original_dst.v3.OriginalDstCluster>`
+    // configured via :ref:`cluster_type <envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`.
+    OriginalDstLbConfig original_dst_lb_config = 34
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Optional configuration for the LeastRequest load balancing policy.
-    LeastRequestLbConfig least_request_lb_config = 37;
+    // This field has been deprecated in favor of the
+    // :ref:`LeastRequest load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>`
+    // configured via :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+    LeastRequestLbConfig least_request_lb_config = 37
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Optional configuration for the RoundRobin load balancing policy.
-    RoundRobinLbConfig round_robin_lb_config = 56;
+    // This field has been deprecated in favor of the
+    // :ref:`RoundRobin load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.round_robin.v3.RoundRobin>`
+    // configured via :ref:`load_balancing_policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+    RoundRobinLbConfig round_robin_lb_config = 56
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Common configuration for all load balancer implementations.

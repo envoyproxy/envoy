@@ -1,6 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -23,7 +24,9 @@ public:
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
-      cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
+      envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config;
+      subset_config.add_subset_selectors()->add_keys(type_key_);
+      ConfigHelper::setSubsetLbPolicy(*cluster, subset_config);
       if (enable_transport_socket_match_) {
         const std::string match_yaml = absl::StrFormat(
             R"EOF(

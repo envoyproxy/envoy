@@ -59,8 +59,11 @@ picked. The load balancer follows these steps:
 
 Locality weighted load balancing is configured by setting
 :ref:`locality_weighted_lb_config
-<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.locality_weighted_lb_config>` in the
-cluster configuration and by providing weights via :ref:`load_balancing_weight
+<envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.locality_weighted_lb_config>`
+in the ``locality_lb_config`` of the cluster's :ref:`load balancing policy
+<envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` (e.g.
+:ref:`RoundRobin <envoy_v3_api_field_extensions.load_balancing_policies.round_robin.v3.RoundRobin.locality_lb_config>`)
+and by providing weights via :ref:`load_balancing_weight
 <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.load_balancing_weight>` and
 identifying the location of the upstream hosts via :ref:`locality
 <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>` in

@@ -147,7 +147,7 @@ TEST_P(MaglevIntegrationTest, NormalLoadBalancing) {
   runNormalLoadBalancing();
 }
 
-TEST_P(MaglevIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
+TEST_P(MaglevIntegrationTest, DEPRECATED_FEATURE_TEST(NormalLoadBalancingWithLegacyAPI)) {
   initializeConfig(true);
   runNormalLoadBalancing();
 }
