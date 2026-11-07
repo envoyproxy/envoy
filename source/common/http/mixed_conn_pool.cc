@@ -28,7 +28,9 @@ HttpConnPoolImplMixed::createCodecClient(Upstream::Host::CreateConnectionData& d
   auto protocol = protocol_ == Protocol::Http11 ? CodecType::HTTP1 : CodecType::HTTP2;
   CodecClientPtr codec{new CodecClientProd(protocol, std::move(data.connection_),
                                            data.host_description_, dispatcher_, random_generator_,
-                                           transportSocketOptions())};
+                                           data.transport_socket_options_
+                                               ? data.transport_socket_options_
+                                               : transportSocketOptions())};
   return codec;
 }
 
