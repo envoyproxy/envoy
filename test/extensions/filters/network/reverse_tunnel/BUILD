@@ -21,7 +21,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/extensions/filters/network/reverse_tunnel:config",
@@ -36,7 +35,6 @@ envoy_extension_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = "linux_x64_small",
     shard_count = 4,
     deps = [
         ":jwt_test_data_lib",
@@ -81,7 +79,6 @@ envoy_extension_cc_test(
         "envoy.resolvers.reverse_connection",
         "envoy.filters.network.echo",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":jwt_test_data_lib",
         "//source/extensions/bootstrap/internal_listener:config",

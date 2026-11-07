@@ -44,7 +44,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
@@ -177,7 +176,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "load_balancer_base_test",
     srcs = ["load_balancer_impl_base_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":load_balancer_base_test_lib",
     ],

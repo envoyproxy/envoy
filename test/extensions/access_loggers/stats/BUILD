@@ -56,7 +56,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/access_loggers/stats:config",
         "//source/extensions/filters/network/tcp_proxy:config",

@@ -19,7 +19,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.least_request"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/least_request:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -35,7 +34,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.least_request"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -59,7 +57,6 @@ envoy_extension_cc_fuzz_test(
     srcs = ["least_request_load_balancer_fuzz_test.cc"],
     corpus = "least_request_load_balancer_corpus",
     extension_names = ["envoy.load_balancing_policies.least_request"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -91,7 +88,6 @@ envoy_extension_cc_test(
     name = "least_request_lb_test",
     srcs = ["least_request_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.least_request"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/least_request:config",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
@@ -102,7 +98,6 @@ envoy_extension_cc_test(
     name = "least_request_lb_simulation_test",
     srcs = ["least_request_lb_simulation_test.cc"],
     extension_names = ["envoy.load_balancing_policies.least_request"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:load_balancer_context_base_lib",

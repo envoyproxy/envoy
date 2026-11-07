@@ -12,7 +12,6 @@ envoy_package()
 envoy_cc_test(
     name = "lua_test",
     srcs = ["lua_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/thread_local:thread_local_lib",
         "//source/extensions/filters/common/lua:lua_lib",
@@ -28,7 +27,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",
@@ -44,7 +42,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "protobuf_converter_test",
     srcs = ["protobuf_converter_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":lua_wrappers_lib",
         "//source/extensions/filters/common/lua:protobuf_converter_lib",

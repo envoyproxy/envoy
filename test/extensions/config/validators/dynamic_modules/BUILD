@@ -19,7 +19,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:config_validator_test",
     ],
     extension_names = ["envoy.config.validators.dynamic_modules"],
-    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/common/config:decoded_resource_lib",
@@ -46,7 +45,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:config_validator_test",
     ],
     extension_names = ["envoy.config.validators.dynamic_modules"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
@@ -36,7 +35,6 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",

@@ -84,7 +84,6 @@ envoy_extension_cc_dyn_module_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

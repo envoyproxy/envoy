@@ -35,7 +35,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
@@ -63,7 +62,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
@@ -97,7 +95,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -134,7 +131,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -157,7 +153,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
     shard_count = 4,
     tags = ["skip_on_windows"],
     deps = [

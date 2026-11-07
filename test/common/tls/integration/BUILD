@@ -91,7 +91,6 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

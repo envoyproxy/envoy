@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_config_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/gcp_authn:config",
@@ -32,7 +31,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["gcp_authn_filter_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":gcp_authn_mocks",
         "//source/extensions/filters/http/gcp_authn",
@@ -83,7 +81,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["gcp_authn_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
@@ -102,7 +99,6 @@ envoy_extension_cc_test(
     name = "token_cache_test",
     srcs = ["token_cache_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",

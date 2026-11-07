@@ -19,7 +19,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.round_robin"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -35,7 +34,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.round_robin"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -58,7 +56,6 @@ envoy_cc_fuzz_test(
     name = "round_robin_load_balancer_fuzz_test",
     srcs = ["round_robin_load_balancer_fuzz_test.cc"],
     corpus = "round_robin_load_balancer_corpus",
-    rbe_pool = "linux_x64_small",
     deps = [
         ":round_robin_load_balancer_fuzz_proto_cc_proto",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -89,7 +86,6 @@ envoy_extension_cc_test(
     name = "round_robin_lb_test",
     srcs = ["round_robin_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.round_robin"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/round_robin:round_robin_lb_lib",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",

@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "xray_tracer_impl_test.cc",
     ],
     extension_names = ["envoy.tracers.xray"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
         "//test/mocks:common_lib",
@@ -42,7 +41,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.xray"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/xray:config",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -58,7 +56,6 @@ envoy_extension_cc_fuzz_test(
     srcs = ["fuzz_test.cc"],
     corpus = "wildcard_matcher_corpus",
     extension_names = ["envoy.tracers.xray"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
     ],

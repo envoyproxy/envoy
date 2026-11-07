@@ -17,7 +17,6 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.generic_proxy.codecs.http1"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",

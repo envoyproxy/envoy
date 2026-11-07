@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "config_discovery_impl_test",
     srcs = ["config_discovery_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/filter:config_discovery_lib",

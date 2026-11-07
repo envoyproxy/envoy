@@ -31,7 +31,6 @@ envoy_extension_cc_test(
     name = "udp_proxy_filter_test",
     srcs = ["udp_proxy_filter_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//envoy/network:udp_packet_writer_factory_factory_interface",
@@ -72,7 +71,6 @@ envoy_extension_cc_test(
     name = "hash_policy_impl_test",
     srcs = ["hash_policy_impl_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:hash_lib",
         "//source/common/network:address_lib",
@@ -85,7 +83,6 @@ envoy_extension_cc_test(
     name = "router_impl_test",
     srcs = ["router_impl_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -102,7 +99,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["udp_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
@@ -130,7 +126,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["udp_session_extension_discovery_integration_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",

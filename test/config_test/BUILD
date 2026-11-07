@@ -55,7 +55,6 @@ envoy_cc_dyn_module_test(
         "CONFIGS_TAR_PATH": "$(location :configs)",
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "linux_x64_large",
     deps = [":test_runner_lib"],
 )
 

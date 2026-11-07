@@ -43,7 +43,6 @@ envoy_extension_cc_test(
         "compressor_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/compression/brotli/compressor:config",
         "//source/extensions/compression/brotli/decompressor:config",
@@ -71,7 +70,6 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":mock_config_cc_proto",
         "//source/extensions/compression/common/compressor:compressor_factory_base_lib",
@@ -132,7 +130,6 @@ envoy_extension_cc_test(
         "compressor_integration_tests.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":compressor_integration_tests_lib",
         "//source/common/http:header_map_lib",

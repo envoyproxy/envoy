@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     extension_names = ["envoy.formatter.metadata"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",
@@ -35,7 +34,6 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     extension_names = ["envoy.formatter.metadata"],
-    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],

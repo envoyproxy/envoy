@@ -28,7 +28,6 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:filter",
@@ -50,7 +49,6 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:extractor_impl",
@@ -72,7 +70,6 @@ envoy_extension_cc_test(
     ],
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",

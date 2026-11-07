@@ -20,7 +20,6 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":private_key_provider_proto_cc_proto",
         "//source/common/secret:sds_api_lib",
@@ -49,7 +48,6 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
@@ -79,7 +77,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "secret_provider_impl_test",
     srcs = ["secret_provider_impl_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/secret:secret_provider_impl_lib",
         "//test/mocks/thread_local:thread_local_mocks",

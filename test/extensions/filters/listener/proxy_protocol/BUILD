@@ -18,7 +18,6 @@ envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
         "//source/common/buffer:buffer_lib",
@@ -60,7 +59,6 @@ envoy_extension_cc_fuzz_test(
     srcs = ["proxy_protocol_fuzz_test.cc"],
     corpus = "proxy_protocol_corpus",
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":proxy_protocol_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
@@ -79,7 +77,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["proxy_proto_integration_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":proxy_proto_integration_test_lib",
         "//source/common/buffer:buffer_lib",

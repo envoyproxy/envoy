@@ -32,7 +32,6 @@ envoy_extension_cc_test(
     name = "dns_filter_test",
     srcs = ["dns_filter_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
@@ -49,7 +48,6 @@ envoy_extension_cc_test(
     name = "dns_filter_access_log_test",
     srcs = ["dns_filter_access_log_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/access_loggers/file:config",
@@ -72,7 +70,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["dns_filter_integration_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":dns_filter_test_lib",
         "//source/common/runtime:runtime_features_lib",
@@ -92,7 +89,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["dns_filter_access_log_integration_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/access_loggers/file:config",
@@ -108,7 +104,6 @@ envoy_extension_cc_test(
     name = "dns_filter_utils_test",
     srcs = ["dns_filter_utils_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:config",
@@ -123,7 +118,6 @@ envoy_extension_cc_fuzz_test(
     srcs = ["dns_filter_fuzz_test.cc"],
     corpus = "dns_filter_corpus",
     extension_names = ["envoy.filters.udp.dns_filter"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/fuzz:utility_lib",

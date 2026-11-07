@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
     extension_names = ["envoy.filters.network.local_ratelimit"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/network/local_ratelimit:local_ratelimit_lib",
@@ -34,7 +33,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.network.local_ratelimit"],
-    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -62,7 +60,6 @@ envoy_extension_cc_fuzz_test(
     srcs = ["local_ratelimit_fuzz_test.cc"],
     corpus = "local_ratelimit_corpus",
     extension_names = ["envoy.filters.network.local_ratelimit"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":local_ratelimit_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

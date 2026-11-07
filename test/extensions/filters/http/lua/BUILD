@@ -49,7 +49,6 @@ envoy_extension_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:upstream_subject_alt_names_lib",
@@ -95,7 +94,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:factory_context_mocks",

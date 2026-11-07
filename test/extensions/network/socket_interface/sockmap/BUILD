@@ -57,7 +57,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["sockmap_integration_test.cc"],
     extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:socket_interface_lib",

@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "connection_limit_test",
     srcs = ["connection_limit_test.cc"],
     extension_names = ["envoy.filters.network.connection_limit"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/connection_limit:connection_limit_lib",
         "//test/mocks/event:event_mocks",
@@ -31,7 +30,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["connection_limit_integration_test.cc"],
     extension_names = ["envoy.filters.network.connection_limit"],
-    rbe_pool = "linux_x64_medium",
     deps = [
         "//source/common/config:well_known_names",
         "//source/common/runtime:runtime_features_lib",

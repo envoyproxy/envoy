@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "statsd_test",
     srcs = ["statsd_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -33,7 +32,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "udp_statsd_test",
     srcs = ["udp_statsd_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

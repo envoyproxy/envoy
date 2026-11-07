@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/skywalking:config",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -30,7 +29,6 @@ envoy_extension_cc_test(
     name = "trace_segment_reporter_test",
     srcs = ["trace_segment_reporter_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":skywalking_test_helper",
         "//source/extensions/tracers/skywalking:trace_segment_reporter_lib",
@@ -51,7 +49,6 @@ envoy_cc_library(
 envoy_extension_cc_test(
     name = "skywalking_test_helper",
     extension_names = ["envoy.tracers.skywalking"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":skywalking_test_helper_lib",
         "//source/common/common:base64_lib",
@@ -65,7 +62,6 @@ envoy_extension_cc_test(
     name = "tracer_test",
     srcs = ["tracer_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":skywalking_test_helper",
         "//source/extensions/tracers/skywalking:skywalking_tracer_lib",
@@ -83,7 +79,6 @@ envoy_extension_cc_test(
     name = "skywalking_tracer_impl_test",
     srcs = ["skywalking_tracer_impl_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":skywalking_test_helper",
         "//source/extensions/tracers/skywalking:skywalking_tracer_lib",

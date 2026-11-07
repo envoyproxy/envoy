@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "fault_config_test",
     srcs = ["fault_config_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//test/test_common:utility_lib",

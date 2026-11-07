@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "llm_protocol_detection_test",
     srcs = ["llm_protocol_detection_test.cc"],
     extension_names = ["envoy.http.ai_filters.schema_validation"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/http/ai_filters/schema_validation:llm_protocol_detection_lib",
         "//test/test_common:utility_lib",
@@ -27,7 +26,6 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.http.ai_filters.schema_validation"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -49,7 +47,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.schema_validation"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -71,7 +68,6 @@ envoy_extension_cc_test(
         "envoy.http.ai_filters.schema_validation",
         "envoy.filters.http.ai_protocol_manager",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/set_filter_state:config",

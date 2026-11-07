@@ -31,7 +31,6 @@ envoy_extension_cc_test(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     extension_names = ["envoy.tracers.datadog"],
-    rbe_pool = "linux_x64_small",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -66,7 +65,6 @@ envoy_extension_cc_test(
         "envoy.filters.http.lua",
         "envoy.tracers.datadog",
     ],
-    rbe_pool = "6gig",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

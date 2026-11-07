@@ -53,7 +53,6 @@ envoy_extension_cc_test(
         "envoy.resolvers.reverse_connection",
         "envoy.transport_sockets.tls",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",

@@ -70,7 +70,6 @@ envoy_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
-    rbe_pool = "linux_x64_small",
     # All Envoy extensions must be linked to the test in order for the fuzzer to pick
     # these up via the NamedHttpFilterConfigFactory.
     deps = [

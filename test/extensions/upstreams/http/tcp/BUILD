@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     extension_names = ["envoy.upstreams.http.tcp"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",

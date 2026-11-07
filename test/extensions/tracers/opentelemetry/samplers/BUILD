@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "sampler_test",
     srcs = ["sampler_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",

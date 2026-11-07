@@ -17,7 +17,6 @@ filegroup(
 envoy_cc_test(
     name = "runtime_protos_test",
     srcs = ["runtime_protos_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -31,7 +30,6 @@ envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]),
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -69,7 +67,6 @@ envoy_cc_test(
         "--envoy_reloadable_features_test_feature_true=false",
     ],
     coverage = False,
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_lib",
     ],
@@ -83,7 +80,6 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_false",
     ],
     coverage = False,
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_lib",
     ],

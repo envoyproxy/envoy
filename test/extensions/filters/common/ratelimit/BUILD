@@ -13,7 +13,6 @@ envoy_package()
 envoy_cc_test(
     name = "ratelimit_impl_test",
     srcs = ["ratelimit_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.udp_packet_writer.gso"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/test_common:utility_lib",

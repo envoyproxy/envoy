@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
@@ -40,7 +39,6 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/access_loggers/grpc:grpc_access_log_utils",
         "//test/mocks/local_info:local_info_mocks",
@@ -59,7 +57,6 @@ envoy_extension_cc_test(
     name = "http_grpc_access_log_impl_test",
     srcs = ["http_grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:serializer_lib",
         "//source/common/router:string_accessor_lib",
@@ -79,7 +76,6 @@ envoy_extension_cc_test(
     name = "http_config_test",
     srcs = ["http_config_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
         "//test/mocks/server:factory_context_mocks",
@@ -93,7 +89,6 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_medium",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -113,7 +108,6 @@ envoy_extension_cc_test(
     name = "tcp_config_test",
     srcs = ["tcp_config_test.cc"],
     extension_names = ["envoy.access_loggers.tcp_grpc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/access_loggers/grpc:tcp_config",
         "//test/mocks/server:factory_context_mocks",
@@ -133,7 +127,6 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.access_loggers.tcp_grpc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

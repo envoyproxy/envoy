@@ -31,7 +31,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_virtual_cluster",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",
@@ -68,7 +67,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:route_specifier_shadow",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:thread_local_store_lib",

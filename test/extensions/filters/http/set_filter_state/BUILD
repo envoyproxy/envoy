@@ -17,7 +17,6 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.set_filter_state"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",
@@ -36,7 +35,6 @@ envoy_extension_cc_test(
         "upstream_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.set_filter_state"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
         "//source/extensions/filters/http/header_mutation:config",

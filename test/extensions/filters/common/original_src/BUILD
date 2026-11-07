@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "original_src_socket_option_test",
     srcs = ["original_src_socket_option_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

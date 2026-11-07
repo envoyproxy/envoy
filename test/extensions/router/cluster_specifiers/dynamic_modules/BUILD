@@ -23,7 +23,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_specifier_integration_test",
     ],
     extension_names = ["envoy.router.cluster_specifier_plugin.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/retry/host/previous_hosts:config",
@@ -48,7 +47,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_specifier_integration_test",
     ],
     extension_names = ["envoy.router.cluster_specifier_plugin.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/formatter/metadata:config",
         "//source/extensions/load_balancing_policies/subset:config",

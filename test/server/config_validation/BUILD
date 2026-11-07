@@ -9,7 +9,6 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -42,7 +41,6 @@ envoy_cc_test(
         "//test/config_test:configs_test_setup.sh",
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:logger",
         "//source/extensions/access_loggers/stream:config",
@@ -72,7 +70,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_test",
     srcs = ["dispatcher_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
@@ -135,7 +132,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xds_verifier_test",
     srcs = ["xds_verifier_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_verifier_lib",
         "//test/config:utility_lib",
@@ -167,7 +163,6 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
-    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",
