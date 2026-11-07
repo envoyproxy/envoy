@@ -823,6 +823,51 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
   closeStreamAndDrainClient();
 }
 
+// Attaching one early data stream can synchronously cancel another pending early data stream,
+// for example when the first stream's pool failure ends a downstream request whose mirror request
+// is queued right behind it. onUpstreamReadyForEarlyData() must not touch the cancelled stream.
+TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataAttachCancelsNextPendingStream) {
+  clients_support_early_data_ = true;
+  concurrent_streams_ = 3u;
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
+
+  AttachContext second_context;
+  AttachContext third_context;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
+  Cancellable* second = pool_.newStreamImpl(second_context, /*can_send_early_data=*/true);
+  ASSERT_NE(nullptr, second);
+  EXPECT_NE(nullptr, pool_.newStreamImpl(third_context, /*can_send_early_data=*/true));
+  CHECK_STATE(0 /*active*/, 3 /*pending*/, concurrent_streams_ /*connecting capacity*/);
+
+  ActiveClient& client_ref = *clients_.back();
+  client_ref.onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_EQ(ActiveClient::State::ReadyForEarlyData, client_ref.state());
+
+  // Attaching the first stream cancels, and so destroys, the second one before the loop reaches
+  // it. The loop must skip it and go on to the third stream.
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(context_)))
+      .WillOnce([&](ActiveClient& client, AttachContext&) {
+        TestActiveClient::incrementActiveStreams(client);
+        second->cancel(ConnectionPool::CancelPolicy::Default);
+      });
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(second_context))).Times(0);
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(third_context)))
+      .WillOnce([](ActiveClient& client, AttachContext&) {
+        TestActiveClient::incrementActiveStreams(client);
+      });
+  pool_.onUpstreamReadyForEarlyData(client_ref);
+
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, concurrent_streams_ - 2 /*connecting capacity*/);
+  EXPECT_EQ(2, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_cancelled_.value());
+
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
+  // Clean up.
+  closeStreamAndDrainClient();
+}
+
 TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimit) {
   clients_support_early_data_ = true;
   concurrent_streams_ = 2u;

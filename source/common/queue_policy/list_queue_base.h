@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iterator>
 #include <list>
 
 #include "source/common/common/assert.h"
@@ -37,6 +38,11 @@ public:
   void remove(ItemType& item) override {
     auto entry = item_index_.find(&item);
     ASSERT(entry != item_index_.end());
+    // Keep any in-progress forEach() traversal pointing at live list nodes.
+    for (Traversal* traversal = active_traversals_; traversal != nullptr;
+         traversal = traversal->parent_) {
+      traversal->onErase(entry->second);
+    }
     items_.erase(entry->second);
     item_index_.erase(entry);
   }
@@ -46,29 +52,16 @@ public:
       return;
     }
 
-    size_t remaining = items_.size();
-    ItemType* next_fifo = items_.front();
-    ItemType* next_lifo = items_.back();
-    while (remaining > 0) {
+    // The items not yet visited always form one contiguous run of items_: a traversal only takes
+    // items from either end of the run, and add() appends after it, so items added by the callback
+    // are not visited. remove() moves the end of the run past a node that it erases, so the
+    // callback may remove any item, including items that have not been visited yet. Nothing here
+    // touches an item after its callback returns.
+    Traversal traversal(items_, active_traversals_);
+    while (!traversal.done_) {
+      // Re-evaluated on every step because callback removal can change the dequeue order.
       const bool use_lifo = shouldDequeueFromBack();
-      ItemType* item = use_lifo ? next_lifo : next_fifo;
-      auto entry = item_index_.find(item);
-      ASSERT(entry != item_index_.end());
-
-      --remaining;
-      if (remaining > 0) {
-        auto next = entry->second;
-        if (use_lifo) {
-          ASSERT(next != items_.begin());
-          --next;
-          next_lifo = *next;
-        } else {
-          ++next;
-          ASSERT(next != items_.end());
-          next_fifo = *next;
-        }
-      }
-
+      ItemType* item = traversal.take(use_lifo);
       if (!cb(*item)) {
         return;
       }
@@ -76,18 +69,66 @@ public:
   }
 
 protected:
-  // Re-evaluated during traversal because callback removal can change the dequeue order.
   virtual bool shouldDequeueFromBack() const PURE;
 
 private:
+  using ItemList = std::list<ItemType*>;
+
+  // The unvisited run [front_, back_] of an in-progress forEach(). Traversals nest if a callback
+  // calls forEach() again, so each one links to the traversal that was active before it.
+  struct Traversal {
+    Traversal(ItemList& items, Traversal*& head)
+        : front_(items.begin()), back_(std::prev(items.end())), head_(head), parent_(head) {
+      head_ = this;
+    }
+    ~Traversal() {
+      ASSERT(head_ == this);
+      head_ = parent_;
+    }
+
+    // Takes the next unvisited item from the back of the run if lifo, otherwise from the front.
+    ItemType* take(bool lifo) {
+      ASSERT(!done_);
+      ItemType* item = *(lifo ? back_ : front_);
+      if (front_ == back_) {
+        done_ = true;
+      } else if (lifo) {
+        --back_;
+      } else {
+        ++front_;
+      }
+      return item;
+    }
+
+    // Called before the node at it is erased from the list.
+    void onErase(typename ItemList::iterator it) {
+      if (done_) {
+        return;
+      }
+      if (it == front_ && it == back_) {
+        done_ = true;
+      } else if (it == front_) {
+        ++front_;
+      } else if (it == back_) {
+        --back_;
+      }
+    }
+
+    typename ItemList::iterator front_;
+    typename ItemList::iterator back_;
+    bool done_{false};
+    Traversal*& head_;
+    Traversal* const parent_;
+  };
+
   ItemType* nextItem() const {
     ASSERT(!items_.empty());
     return shouldDequeueFromBack() ? items_.back() : items_.front();
   }
 
-  using ItemList = std::list<ItemType*>;
   ItemList items_;
   absl::flat_hash_map<ItemType*, typename ItemList::iterator> item_index_;
+  Traversal* active_traversals_{nullptr};
 };
 
 } // namespace QueuePolicy
