@@ -45,6 +45,10 @@ private:
   Upstream::ClusterManager& cm_;
 };
 
+// TODO(wdauchy): the self-deletion relies on the async client calling
+// onBeforeFinalizeUpstreamSpan() exactly once per request, so a change in that behavior could leak
+// this object. Let the async client own the callbacks (e.g. via RequestOptions), or support
+// multiple destructor callbacks on Request, then remove the self-deletion.
 /**
  * Async client callbacks of one mirror request of a policy with stats. They record how the mirror
  * ended. The async client always calls onBeforeFinalizeUpstreamSpan() once when the request ends,
