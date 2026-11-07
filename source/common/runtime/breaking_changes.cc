@@ -8,6 +8,7 @@
 #include "source/common/runtime/breaking_changes_flags.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
 // Global flag controlling whether observability for breaking changes is enabled.

@@ -15,11 +15,13 @@
 ABSL_DECLARE_FLAG(bool, breaking_change_observability_enabled);
 
 #define OBSERVED_REQUEST_BREAKING_CHANGE(name, filter_state)                                       \
-  if (::Envoy::Runtime::BreakingChangesTracker::IsEnabled()) {                                     \
-    ::Envoy::Runtime::BreakingChangesTracker::fromFilterState(                                     \
-        filter_state, StreamInfo::FilterState::LifeSpan::Request)                                  \
-        .name = 1;                                                                                 \
-  }
+  do {                                                                                             \
+    if (::Envoy::Runtime::BreakingChangesTracker::IsEnabled()) {                                   \
+      ::Envoy::Runtime::BreakingChangesTracker::fromFilterState(                                   \
+          filter_state, StreamInfo::FilterState::LifeSpan::Request)                                \
+          .name = 1;                                                                               \
+    }                                                                                              \
+  } while (false)
 
 #define FEATURE_TRACKER(name) uint64_t name : 1 {0};
 
