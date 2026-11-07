@@ -1,9 +1,11 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/rds/config_traits.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_update_receiver.h"
@@ -33,6 +35,12 @@ public:
 
 private:
   ProtobufMessage::ValidationVisitor& validator_;
+};
+
+struct UpdateOnDemandCallback {
+  const std::string alias_;
+  Event::Dispatcher& thread_local_dispatcher_;
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
 };
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
@@ -72,6 +80,9 @@ public:
     return base_.configInfo();
   }
   void updateOnDemand(const std::string& alias) override {
+    if (warmingBlocksUnmatchedRequests()) {
+      return;
+    }
     if (vhds_subscription_ != nullptr) {
       // try_emplace keeps the answered state of an id that is requested again.
       requested_vhds_resource_ids_.try_emplace(alias, false);
@@ -96,8 +107,21 @@ public:
     const auto it = requested_vhds_resource_ids_.find(resource_id);
     return it != requested_vhds_resource_ids_.end() ? it->second : false;
   }
+  void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
+  void onVhdsConfigPublished() override;
+  bool warmingBlocksUnmatchedRequests() const override {
+    return warming_blocks_unmatched_requests_;
+  }
+  bool awaitingInitialVhdsUpdate() const override { return awaiting_initial_vhds_update_; }
+  void onVhdsFailure() override;
 
 private:
+  static void notifyCallback(const ConfigImpl& config, const std::string& alias,
+                             Event::Dispatcher& thread_local_dispatcher,
+                             std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
+
   const Protobuf::Any& latestRouteConfigurationAny() const {
     return base_.warming_state_.route_config_any_.has_value()
                ? *base_.warming_state_.route_config_any_
@@ -131,6 +155,12 @@ private:
   // The resource IDs explicitly requested on demand from the current subscription, and whether
   // the server has answered each of them in a published update.
   absl::flat_hash_map<std::string, bool> requested_vhds_resource_ids_;
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  // A flag used to determine if this instance of RouteConfigUpdateReceiverImpl hasn't been
+  // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+  bool warming_blocks_unmatched_requests_{false};
+  bool awaiting_initial_vhds_update_{false};
 };
 
 } // namespace Router

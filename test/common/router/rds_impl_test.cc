@@ -213,6 +213,47 @@ routes:
                        version, vhost_name);
   }
 
+  static std::string
+  warmingBlocksUnmatchedRequestsVhdsRdsConfigJson(absl::string_view version,
+                                                  absl::string_view vhost_name = "foo") {
+    return fmt::format(R"EOF(
+{{
+  "version_info": "{0}",
+  "resources": [
+    {{
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {{
+          "name": "{1}",
+          "domains": ["{1}"],
+          "routes": [{{"match": {{"prefix": "/{1}"}}, "route": {{"cluster": "foo"}}}}]
+        }}
+      ],
+      "vhds": {{
+        "config_source": {{
+          "resource_api_version": "V3",
+          "api_config_source": {{
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": [
+              {{
+                "envoy_grpc": {{
+                  "cluster_name": "xds_cluster"
+                }}
+              }}
+            ]
+          }}
+        }},
+        "warming_blocks_unmatched_requests": {{}}
+      }}
+    }}
+  ]
+}}
+)EOF",
+                       version, vhost_name);
+  }
+
   NiceMock<Server::MockInstance> server_;
   RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr rds_;
@@ -1674,6 +1715,97 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabledPublishWithoutAliasesLeave
   const auto decoded_nothing_added =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "2"));
+}
+
+TEST_F(RdsVhdsOnDemandTest,
+       WarmingBlocksUnmatchedRequestsQueuesRequestsWithoutOnDemandWireRequest) {
+  setup();
+  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      warmingBlocksUnmatchedRequestsVhdsRdsConfigJson("1"));
+  const auto decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(
+      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Request for 'bar.com' arrives while initial wildcard VHDS is in flight.
+  // It is queued, and NO requestOnDemandUpdate is sent to the server.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Now the wildcard VHDS update arrives, containing 'bar.com'.
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Subsequent request for 'bar.com' is answered locally with true, no server request.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(true));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Subsequent request for 'unknown.com' is answered locally with false, no server request!
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(false));
+  rds_->requestVirtualHostsUpdate("unknown.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+}
+
+TEST_F(RdsVhdsOnDemandTest,
+       WarmingBlocksUnmatchedRequestsEmptyInitialUpdateWakesHeldRequestsAsFalse) {
+  setup();
+  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      warmingBlocksUnmatchedRequestsVhdsRdsConfigJson("1"));
+  const auto decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(
+      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Request for 'bar.com' arrives while initial wildcard VHDS is in flight.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Empty initial VHDS update arrives.
+  EXPECT_CALL(mock_callback_, Call(false));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate({}, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+}
+
+TEST_F(RdsVhdsOnDemandTest, WarmingBlocksUnmatchedRequestsFailureWakesHeldRequestsAsFalse) {
+  setup();
+  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      warmingBlocksUnmatchedRequestsVhdsRdsConfigJson("1"));
+  const auto decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(
+      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Request for 'bar.com' arrives while initial wildcard VHDS is in flight.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Initial VHDS update fails.
+  EXPECT_CALL(mock_callback_, Call(false));
+  vhds_callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                       nullptr);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
 }
 
 } // namespace

@@ -5843,5 +5843,144 @@ TEST_F(HttpConnectionManagerImplTest, RouteResolutionStatsDisabledByDefault) {
   EXPECT_FALSE(fake_stats_.findHistogramByString("downstream_rq_route_resolutions").has_value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, InitialVhdsWaitReadDisablesAndResumesStream) {
+  setup();
+  setupFilterChain(1, 0);
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillOnce(Return(true))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(Router::VirtualHostRoute{}))
+      .WillRepeatedly(Return(
+          Router::VirtualHostRoute{route_config_provider_.route_config_->route_->virtual_host_,
+                                   route_config_provider_.route_config_->route_}));
+
+  Http::RouteConfigUpdatedCallbackSharedPtr captured_vhds_cb;
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("dynamic.lyft.com", _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Event::Dispatcher&,
+                     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+            captured_vhds_cb = route_config_updated_cb.lock();
+          }));
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false)).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "dynamic.lyft.com"}, {":method", "POST"}, {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(captured_vhds_cb, nullptr);
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(false));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  (*captured_vhds_cb)(true);
+  captured_vhds_cb.reset();
+
+  doRemoteClose();
+}
+
+TEST_F(HttpConnectionManagerImplTest, TimeoutWhileWaitingForInitialVhdsCancelsCallback) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup();
+  ON_CALL(*codec_, protocol()).WillByDefault(Return(Protocol::Http2));
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  ON_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillRepeatedly(Return(Router::VirtualHostRoute{}));
+
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> weak_vhds_cb;
+  Http::RouteConfigUpdatedCallbackSharedPtr strong_vhds_cb;
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("dynamic.lyft.com", _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Event::Dispatcher&,
+                     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+            weak_vhds_cb = route_config_updated_cb;
+            strong_vhds_cb = route_config_updated_cb.lock();
+          }));
+
+  Event::MockTimer* idle_timer = nullptr;
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    idle_timer = setUpTimer();
+    EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _)).Times(2);
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "dynamic.lyft.com"}, {":method", "GET"}, {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(strong_vhds_cb, nullptr);
+
+  // On HTTP/2, the local 504 reply leaves the stream in the zombie state until the codec flushes.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("504", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  idle_timer->invokeCallback();
+
+  // Once the timeout finishes the stream, ActiveStream drops its vhds_update_callback_ handle, and
+  // even an already-in-flight callback invocation is a no-op.
+  (*strong_vhds_cb)(true);
+  strong_vhds_cb.reset();
+  EXPECT_TRUE(weak_vhds_cb.expired());
+
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
+TEST_F(HttpConnectionManagerImplTest, SrdsDoesNotHoldRequestForInitialVhdsUpdate) {
+  setup(SetupOpts().setUseSrds(true));
+  setupFilterChain(1, 0);
+
+  ON_CALL(*route_config_, usesVhds()).WillByDefault(Return(true));
+  ON_CALL(*route_config_, awaitingInitialVhdsUpdate()).WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_, route(_, _, _, _)).WillRepeatedly(Return(Router::VirtualHostRoute{}));
+
+  EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
+              computeScopeKey(_))
+      .Times(2);
+  EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
+                  scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
+              getRouteConfig(_))
+      .Times(2)
+      .WillRepeatedly(Return(route_config_));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "unmatched.host"}, {":method", "GET"}, {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 } // namespace Http
 } // namespace Envoy
