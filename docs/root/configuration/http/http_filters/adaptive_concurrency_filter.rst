@@ -82,11 +82,18 @@ Notice that *B*, the buffer value added to the minRTT, allows for normal varianc
 latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
 before decreasing the gradient value.
 
-The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+The buffer is the larger of a percentage of the baseline and the optional absolute
+``min_latency_delta`` in the :ref:`minRTT calculation parameters
+<envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`:
 
 .. math::
 
-    B = minRTT * buffer_{pct}
+    B = \max(minRTT * buffer_{pct}, min\_latency\_delta)
+
+The buffers are not added together. For example, a 4ms baseline with a 100% relative buffer and a
+20ms absolute buffer allows a 24ms buffered baseline, not 28ms. This can tolerate ordinary
+network or scheduling noise on low-latency services without requiring an extremely large relative
+buffer. Unset or zero preserves the percentage-only behavior.
 
 The gradient value is then used to update the concurrency limit via:
 
@@ -104,6 +111,40 @@ at an unnecessary small value if the sampleRTT and minRTT are close to each othe
 
 Because the headroom value is so necessary to the proper function for the gradient controller, the
 headroom value is unconfigurable and pinned to the square-root of the concurrency limit.
+
+EWMA Controller
+~~~~~~~~~~~~~~~
+The :ref:`EWMA controller
+<envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.EwmaControllerConfig>` is a
+separate, opt-in alternative to the gradient controller. It learns a baseline from completed
+requests without temporarily reducing concurrency to measure minRTT. This avoids rejecting
+healthy traffic during a probe or replacing the baseline with the result of a single unlucky probe.
+A sustained latency increase can still become part of the baseline.
+
+The controller summarizes each nonempty sample window with a percentile (p50 by default). For
+example, one 5s request among 99 requests taking 2ms does not move the median away from 2ms.
+The same percentile is used for the short-term sample and the long-term baseline. The baseline
+starts as the mean of the first ``warmup_windows`` window percentiles (default 10). Subsequent
+nonempty windows move it towards the sample with weight :math:`1 - 2^{-\Delta t / H}`, where
+:math:`H` is the configured half-life (default 300s) and :math:`\Delta t` is the duration of that
+window. Empty windows and cancelled requests contribute no samples.
+
+The limit update adapts the stabilizing mechanisms from
+`Netflix Gradient2Limit
+<https://github.com/Netflix/concurrency-limits/blob/main/concurrency-limits-core/src/main/java/com/netflix/concurrency/limits/limit/Gradient2Limit.java>`_:
+
+* After warmup, when the baseline exceeds twice the sample, reduce it by an additional 5% per
+  nonempty window so that a prolonged slowdown does not leave the baseline inflated for several
+  half-lives after recovery.
+* Add the larger of the relative and absolute buffers to the baseline and divide by the sample
+  RTT. Clamp this gradient to [0.5, 1.0].
+* If the highest in-flight count observed at a sampled completion is below half the estimated
+  limit, leave the limit unchanged: there is not enough demand to size it.
+* Otherwise, the target is the current estimate times the gradient plus headroom. Headroom is
+  25% of the current estimate, up to four requests. For example, at a limit of 4 and a gradient
+  of 0.5, the target is 3 rather than 6, so the controller can reduce a small limit under load.
+  Move 20% of the way towards the target and clamp to the configured concurrency bounds. Keep the
+  fractional estimate across windows; use its integer part for admission.
 
 Limitations
 -----------
@@ -155,6 +196,23 @@ The above configuration can be understood as follows:
 * Pin concurrency to 50 while calculating minRTT, collect 50 request samples, and use the p90 to
   summarize them.
 * The filter is enabled by default.
+
+To use the EWMA controller instead, replace the ``gradient_controller_config`` block with:
+
+.. code-block:: yaml
+
+  ewma_controller_config:
+    half_life: 300s
+    concurrency_update_interval: 3s
+    min_concurrency_limit: 4
+    initial_concurrency: 200
+    max_concurrency_limit: 200
+    buffer: {value: 50}
+    min_latency_delta: 0.020s
+
+An empty ``ewma_controller_config: {}`` also selects this controller with all defaults. Existing
+gradient configurations do not opt in. The gradient controller's probe settings and runtime keys
+do not apply to the EWMA controller.
 
 .. note::
 
@@ -230,3 +288,17 @@ The gradient controller uses the namespace
   burst_queue_size, Gauge, The current headroom value in the concurrency limit calculation.
   min_rtt_msecs, Gauge, The current measured minRTT value.
   sample_rtt_msecs, Gauge, The current measured sampleRTT aggregate.
+
+EWMA Controller Statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The EWMA controller uses the namespace *http.<stat_prefix>.adaptive_concurrency.ewma_controller*.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: auto
+
+  rq_blocked, Counter, Total requests rejected by this controller.
+  concurrency_limit, Gauge, The current integer admission limit.
+  gradient, Gauge, The latest buffered baseline to sample ratio bounded between 0.5 and 1.0 and multiplied by 1000.
+  baseline_rtt_msecs, Gauge, The learned long-term RTT baseline in milliseconds.
+  sample_rtt_msecs, Gauge, The configured percentile of the latest nonempty window in milliseconds.
