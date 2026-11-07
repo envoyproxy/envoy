@@ -230,6 +230,7 @@ public:
   Stats::Scope& getRootScope() override;
   void countDeprecatedFeatureUse() const override;
   absl::Status onWorkerThreadsRegistered() override;
+  void freezeRestartFeatures() { restart_features_frozen_ = true; }
 
 private:
   friend RtdsSubscription;
@@ -260,6 +261,7 @@ private:
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   absl::node_hash_map<std::string, bool> runtime_feature_defaults_;
+  bool restart_features_frozen_{false};
   Upstream::ClusterManager* cm_{};
   Stats::Store& store_;
 

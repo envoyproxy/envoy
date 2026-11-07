@@ -46,7 +46,12 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 }
 
 void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
-                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults) {
+                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults,
+                            bool restart_features_frozen) {
+  const auto frozen = [restart_features_frozen](absl::string_view name) {
+    return restart_features_frozen && absl::StartsWith(name, "envoy.restart_features.");
+  };
+
   for (const auto& it : flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       runtime_feature_defaults.try_emplace(it.first, Runtime::runtimeFeatureEnabled(it.first));
@@ -55,14 +60,20 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
 
   for (const auto& it : runtime_feature_defaults) {
     const auto flag = flag_map.find(it.first);
-    if (flag == flag_map.end() || !flag->second.bool_value_.has_value()) {
+    if ((flag == flag_map.end() || !flag->second.bool_value_.has_value()) && !frozen(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second);
     }
   }
 
   for (const auto& it : flag_map) {
-    if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
+    if (!it.second.bool_value_.has_value() || !isRuntimeFeature(it.first)) {
+      continue;
+    }
+    if (!frozen(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
+    } else if (it.second.bool_value_.value() != Runtime::runtimeFeatureEnabled(it.first)) {
+      ENVOY_LOG_MISC(error, "ignoring {}={}: restart features only change with a restart", it.first,
+                     it.second.bool_value_.value());
     }
   }
 #ifdef ENVOY_ENABLE_QUIC
@@ -668,7 +679,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_);
+  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_, restart_features_frozen_);
 
   {
     absl::MutexLock lock(snapshot_mutex_);
@@ -697,6 +708,14 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
 absl::Status LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
     return absl::InvalidArgumentError("No admin layer specified");
+  }
+  if (restart_features_frozen_) {
+    for (const auto& [key, value] : values) {
+      if (absl::StartsWith(key, "envoy.restart_features.")) {
+        return absl::FailedPreconditionError(
+            fmt::format("{} is a restart feature, it only changes with a restart", key));
+      }
+    }
   }
   RETURN_IF_NOT_OK(admin_layer_->mergeValues(values));
   return loadNewSnapshot();

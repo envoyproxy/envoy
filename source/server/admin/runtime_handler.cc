@@ -90,7 +90,14 @@ Http::Code RuntimeHandler::handlerRuntimeModify(Http::ResponseHeaderMap&,
   for (const auto& it : params.data()) {
     overrides.insert({it.first, it.second[0]});
   }
-  TRY_ASSERT_MAIN_THREAD { THROW_IF_NOT_OK(server_.runtime().mergeValues(overrides)); }
+  TRY_ASSERT_MAIN_THREAD {
+    const absl::Status status = server_.runtime().mergeValues(overrides);
+    if (absl::IsFailedPrecondition(status)) {
+      response.add(status.message());
+      return Http::Code::BadRequest;
+    }
+    THROW_IF_NOT_OK_REF(status);
+  }
   END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(error, "{}", e.what());

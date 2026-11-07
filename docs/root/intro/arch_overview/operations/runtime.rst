@@ -22,3 +22,13 @@ redeploy it with a new set of static runtime flags.
 See Runtime :ref:`configuration <config_runtime>` as well as the
 `contributing guide <https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md#runtime-guarding>`_
 for more information.
+
+.. _arch_overview_runtime_restart_features:
+
+Restart features
+----------------
+
+Runtime guards named ``envoy.restart_features.*`` can only be changed by a restart. Set them in
+static layers or in the files of disk layers present at startup. They are ignored in RTDS layers and
+in later changes of disk layers, which is logged as an error, and :ref:`/runtime_modify
+<operations_admin_interface_runtime_modify>` rejects them with ``400 Bad Request``.
