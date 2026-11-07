@@ -31,6 +31,7 @@
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -126,6 +127,15 @@ public:
   // Return true if the cluster must be ready-for-use before ADS (Aggregated Discovery Service) can
   // be initialized; will only occur if ADS is configured to use the cluster via EnvoyGrpc.
   virtual bool requiredForAds() const PURE;
+
+  // Return the compressed resource name for this cluster when resource name compression is
+  // enabled, or nullopt otherwise.
+  virtual OptRef<const Config::XdsResourceName> xdsResourceName() const PURE;
+
+  // Return optional fallback storage keeping xdsResourceName() alive when ClusterInfo does not own
+  // an XdsResourceNameStorage (for example, standalone MockCluster instances in unit tests).
+  virtual std::shared_ptr<const Config::XdsResourceNameStorage>
+  fallbackResourceNameStorage() const PURE;
 };
 
 /**
@@ -254,7 +264,10 @@ public:
 
   bool initialized() override { return initialized_; }
 
-  std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
+  std::size_t warmingClusterCount() const {
+    return compress_resource_names_ ? compressed_warming_clusters_.size()
+                                    : warming_clusters_.size();
+  }
 
   // Upstream::ClusterManager
   absl::StatusOr<bool> addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
@@ -271,16 +284,33 @@ public:
 
   ClusterInfoMaps clusters() const override {
     ClusterInfoMaps clusters_maps;
-    for (const auto& cluster : active_clusters_) {
-      clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
-      if (cluster.second->cluster_->info()->addedViaApi()) {
-        ++clusters_maps.added_via_api_clusters_num_;
+    if (compress_resource_names_) {
+      for (const auto& [unused_key, cluster_data] : compressed_active_clusters_) {
+        const auto& info = cluster_data->cluster_->info();
+        clusters_maps.active_clusters_.emplace(info->name(), *cluster_data->cluster_);
+        if (info->addedViaApi()) {
+          ++clusters_maps.added_via_api_clusters_num_;
+        }
       }
-    }
-    for (const auto& cluster : warming_clusters_) {
-      clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
-      if (cluster.second->cluster_->info()->addedViaApi()) {
-        ++clusters_maps.added_via_api_clusters_num_;
+      for (const auto& [unused_key, cluster_data] : compressed_warming_clusters_) {
+        const auto& info = cluster_data->cluster_->info();
+        clusters_maps.warming_clusters_.emplace(info->name(), *cluster_data->cluster_);
+        if (info->addedViaApi()) {
+          ++clusters_maps.added_via_api_clusters_num_;
+        }
+      }
+    } else {
+      for (const auto& cluster : active_clusters_) {
+        clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+        if (cluster.second->cluster_->info()->addedViaApi()) {
+          ++clusters_maps.added_via_api_clusters_num_;
+        }
+      }
+      for (const auto& cluster : warming_clusters_) {
+        clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+        if (cluster.second->cluster_->info()->addedViaApi()) {
+          ++clusters_maps.added_via_api_clusters_num_;
+        }
       }
     }
     // The number of clusters that were added via API must be at most the number
@@ -292,42 +322,33 @@ public:
 
   void forEachActiveCluster(std::function<void(const Cluster&)> cb) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
+    if (compress_resource_names_) {
+      for (const auto& [unused_name, cluster_data] : compressed_active_clusters_) {
+        cb(*cluster_data->cluster_);
+      }
+      return;
+    }
     for (const auto& [unused_name, cluster_data] : active_clusters_) {
       cb(*cluster_data->cluster_);
     }
   }
 
-  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
-      return *it->second->cluster_;
-    }
-    return std::nullopt;
-  }
+  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override;
 
-  OptRef<const Cluster> getActiveOrWarmingCluster(absl::string_view cluster_name) const override {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
-      return *it->second->cluster_;
-    }
-    if (const auto& it = warming_clusters_.find(cluster_name); it != warming_clusters_.end()) {
-      return *it->second->cluster_;
-    }
-    return std::nullopt;
-  }
+  OptRef<const Cluster> getActiveOrWarmingCluster(absl::string_view cluster_name) const override;
 
-  bool hasCluster(absl::string_view cluster_name) const override {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
-  }
+  bool hasCluster(absl::string_view cluster_name) const override;
 
   bool hasActiveClusters() const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-    return !active_clusters_.empty();
+    return compress_resource_names_ ? !compressed_active_clusters_.empty()
+                                    : !active_clusters_.empty();
   }
 
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
+  ThreadLocalCluster*
+  getThreadLocalClusterByResourceName(const Config::XdsResourceName& cluster) override;
 
   bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
   void shutdown() override {
@@ -344,6 +365,8 @@ public:
     load_stats_reporter_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
+    compressed_active_clusters_.clear();
+    compressed_warming_clusters_.clear();
     updateClusterCounts();
   }
 
@@ -471,20 +494,24 @@ protected:
    * CIO to deferred instantiating clusters on workers until they are used.
    */
   struct ClusterInitializationObject {
-    ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
-                                ClusterInfoConstSharedPtr cluster_info,
-                                LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostSetFactory host_set_factory, HostLookupMapConstSharedPtr map,
-                                UnitFloat drop_overload, absl::string_view drop_category);
+    ClusterInitializationObject(
+        const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+        HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category,
+        std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage =
+            nullptr);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
         LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
-        HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
+        HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category,
+        std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage =
+            nullptr);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
+    const std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
     const HostSetFactory host_set_factory_;
@@ -497,6 +524,8 @@ protected:
       std::shared_ptr<const ClusterInitializationObject>;
   using ClusterInitializationMap =
       absl::flat_hash_map<std::string, ClusterInitializationObjectConstSharedPtr>;
+  using CompressedClusterInitializationMap =
+      absl::flat_hash_map<Config::XdsResourceName, ClusterInitializationObjectConstSharedPtr>;
 
   /**
    * An implementation of an on-demand CDS handle. It forwards the discovery request to the cluster
@@ -622,8 +651,15 @@ private:
     public:
       // `host_set_factory` is the main-thread cluster's, so worker host sets have its type.
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory, HostSetFactory host_set_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory, HostSetFactory host_set_factory,
+                   std::shared_ptr<const Config::XdsResourceNameStorage>
+                       fallback_resource_name_storage = nullptr);
       ~ClusterEntry() override;
+
+      const std::shared_ptr<const Config::XdsResourceNameStorage>&
+      fallbackResourceNameStorage() const {
+        return fallback_resource_name_storage_;
+      }
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -727,8 +763,9 @@ private:
       UnitFloat drop_overload_{0};
       std::string drop_category_;
 
-      // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
-      // may keep a reference to the cluster_info_.
+      // Don't change the order of fallback_resource_name_storage_/cluster_info_ and
+      // lb_factory_/lb_ as lb_factory_/lb_ may keep a reference to the cluster_info_.
+      std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage_;
       ClusterInfoConstSharedPtr cluster_info_;
 
       // Factory to create active LB.
@@ -761,6 +798,8 @@ private:
       LoadBalancerFactorySharedPtr load_balancer_factory_;
       ClusterInfoConstSharedPtr info_;
       HostSetFactory host_set_factory_{};
+      std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage_;
+      Config::XdsResourceName xds_resource_name_;
     };
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
@@ -780,7 +819,16 @@ private:
     void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     void removeHosts(const std::string& name, const HostVector& hosts_removed);
+    void removeHosts(const Config::XdsResourceName& resource_name, absl::string_view name,
+                     const HostVector& hosts_removed);
     void updateClusterMembership(const std::string& name, uint32_t priority,
+                                 PrioritySet::UpdateHostsParams update_hosts_params,
+                                 LocalityWeightsConstSharedPtr locality_weights,
+                                 const HostVector& hosts_added, const HostVector& hosts_removed,
+                                 bool weighted_priority_health, uint64_t overprovisioning_factor,
+                                 HostLookupMapConstSharedPtr cross_priority_host_map);
+    void updateClusterMembership(const Config::XdsResourceName& resource_name,
+                                 const std::string& name, uint32_t priority,
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
@@ -802,6 +850,7 @@ private:
      * is no cluster deferred cluster with that name.
      */
     ClusterEntry* initializeClusterInlineIfExists(absl::string_view cluster);
+    ClusterEntry* initializeClusterInlineIfExists(const Config::XdsResourceName& cluster);
 
     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> getNetworkObserverRegistry() {
       return makeOptRefFromPtr(network_observer_registry_.get());
@@ -817,11 +866,15 @@ private:
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
+    const bool compress_resource_names_;
     // Known clusters will exclusively exist in either `thread_local_clusters_`
-    // or `thread_local_deferred_clusters_`.
+    // or `thread_local_deferred_clusters_` (or their compressed counterparts when resource name
+    // compression is enabled).
     absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+    absl::flat_hash_map<Config::XdsResourceName, ClusterEntryPtr> compressed_thread_local_clusters_;
     // Maps from a given cluster name to the CIO for that cluster.
     ClusterInitializationMap thread_local_deferred_clusters_;
+    CompressedClusterInitializationMap compressed_thread_local_deferred_clusters_;
 
     ClusterConnectivityState cluster_manager_state_;
 
@@ -848,11 +901,24 @@ private:
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
-                TimeSource& time_source, const bool avoid_cds_removal = false)
+                TimeSource& time_source, bool compress_resource_names,
+                Config::XdsSymbolTable& symbol_table, const bool avoid_cds_removal = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
+          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads),
+          has_xds_resource_name_(compress_resource_names) {
+      if (compress_resource_names) {
+        if (const auto info_resource_name = cluster_->info()->xdsResourceName();
+            info_resource_name.has_value()) {
+          xds_resource_name_ = *info_resource_name;
+        } else {
+          fallback_resource_name_storage_ = std::make_shared<const Config::XdsResourceNameStorage>(
+              symbol_table.encode(cluster_->info()->name()));
+          xds_resource_name_ = fallback_resource_name_storage_->resourceName();
+        }
+      }
+    }
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -871,13 +937,25 @@ private:
       added_or_updated_ = true;
     }
     bool requiredForAds() const override { return required_for_ads_; }
+    OptRef<const Config::XdsResourceName> xdsResourceName() const override {
+      if (has_xds_resource_name_) {
+        return xds_resource_name_;
+      }
+      return std::nullopt;
+    }
+    std::shared_ptr<const Config::XdsResourceNameStorage>
+    fallbackResourceNameStorage() const override {
+      return fallback_resource_name_storage_;
+    }
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
+    std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage_;
     // Don't change the order of cluster_ and thread_aware_lb_ as the thread_aware_lb_ may
     // keep a reference to the cluster_.
     ClusterSharedPtr cluster_;
+    Config::XdsResourceName xds_resource_name_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
@@ -891,6 +969,7 @@ private:
     const bool avoid_cds_removal_ : 1;
     bool added_or_updated_ : 1 = false;
     const bool required_for_ads_ : 1;
+    const bool has_xds_resource_name_ : 1;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -903,6 +982,7 @@ private:
   using ClusterDataPtr = std::unique_ptr<ClusterData>;
   // This map is ordered so that config dumping is consistent.
   using ClusterMap = absl::btree_map<std::string, ClusterDataPtr>;
+  using CompressedClusterMap = absl::btree_map<Config::XdsResourceName, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
@@ -960,15 +1040,17 @@ private:
   static OdCdsDiscoveryStats generateOdCdsDiscoveryStats(Stats::Scope& scope);
 
   /**
-   * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
-   * nullptr if cluster_map did not contain the same cluster or an error if
-   * cluster load fails.
+   * @return a pair of {inserted ClusterData*, previous ClusterDataPtr in the target map or nullptr}
+   * or an error if cluster load fails.
    */
-  absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                             const uint64_t cluster_hash,
-                                             const std::string& version_info, bool added_via_api,
-                                             bool required_for_ads, ClusterMap& cluster_map,
-                                             bool avoid_cds_removal = false);
+  absl::StatusOr<std::pair<ClusterData*, ClusterDataPtr>>
+  loadCluster(const envoy::config::cluster::v3::Cluster& cluster, const uint64_t cluster_hash,
+              const std::string& version_info, bool added_via_api, bool required_for_ads,
+              bool into_warming_map, bool avoid_cds_removal = false);
+  CompressedClusterMap::iterator findCompressedCluster(CompressedClusterMap& map,
+                                                       absl::string_view cluster_name);
+  CompressedClusterMap::const_iterator findCompressedCluster(const CompressedClusterMap& map,
+                                                             absl::string_view cluster_name) const;
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
@@ -976,6 +1058,8 @@ private:
   // waitForWarmOnInit() flag.
   void updateCdsPause(const ClusterData& cluster_data);
   void clusterWarmingToActive(const std::string& cluster_name);
+  void clusterWarmingToActive(const Config::XdsResourceName& resource_name,
+                              absl::string_view cluster_name);
   static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
                               const ClusterConnectivityState& cluster_manager_state,
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
@@ -988,7 +1072,10 @@ private:
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
 protected:
+  bool compressResourceNames() const { return compress_resource_names_; }
+
   ClusterInitializationMap cluster_initialization_map_;
+  CompressedClusterInitializationMap compressed_cluster_initialization_map_;
   // OdCDS subscriptions keyed by config source hash. Subscriptions persist for the lifetime
   // of ClusterManagerImpl to avoid complexity around cleanup. A future optimization could
   // add proper lifetime management to close unnecessary connections.
@@ -1004,7 +1091,9 @@ private:
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
       LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
-      HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
+      HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category,
+      std::shared_ptr<const Config::XdsResourceNameStorage> fallback_resource_name_storage,
+      OptRef<const Config::XdsResourceName> resource_name);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
@@ -1012,12 +1101,13 @@ private:
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
+  const bool deferred_cluster_creation_;
+  const bool compress_resource_names_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
   Config::XdsManager& xds_manager_;
   Random::RandomGenerator& random_;
-  const bool deferred_cluster_creation_;
   std::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
@@ -1068,9 +1158,11 @@ private:
   // This might make MSAN unhappy because it thinks that we are accessing uninitialized
   // memory when those methods access fields of the cluster manager class.
   ClusterMap warming_clusters_;
+  CompressedClusterMap compressed_warming_clusters_;
 
 protected:
   ClusterMap active_clusters_;
+  CompressedClusterMap compressed_active_clusters_;
 };
 
 } // namespace Upstream

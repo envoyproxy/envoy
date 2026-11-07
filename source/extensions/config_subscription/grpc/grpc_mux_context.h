@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/backoff_strategy.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -14,6 +15,8 @@
 
 namespace Envoy {
 namespace Config {
+
+class XdsSymbolTable;
 
 // Context (data) needed for creating any GrpcMux object.
 struct GrpcMuxContext {
@@ -34,6 +37,7 @@ struct GrpcMuxContext {
   // A factory method that allows a GrpcMux lazily create a Load-Stats-Reporter
   // if needed.
   std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  OptRef<XdsSymbolTable> xds_symbol_table_;
 };
 
 } // namespace Config

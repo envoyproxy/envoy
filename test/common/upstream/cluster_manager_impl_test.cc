@@ -8,6 +8,7 @@
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/router/context_impl.h"
@@ -2015,6 +2016,9 @@ public:
 
   MOCK_METHOD(Cluster&, cluster, ());
   MOCK_METHOD(LoadBalancerFactorySharedPtr, loadBalancerFactory, ());
+  MOCK_METHOD(OptRef<const Config::XdsResourceName>, xdsResourceName, (), (const, override));
+  MOCK_METHOD(std::shared_ptr<const Config::XdsResourceNameStorage>, fallbackResourceNameStorage,
+              (), (const, override));
   bool addedOrUpdated() override { return added_or_updated_; }
   void setAddedOrUpdated() override {
     ASSERT(!added_or_updated_);
@@ -2781,6 +2785,441 @@ TEST_F(ClusterManagerImplTest, ClusterIgnoreRemoval) {
   // This should remove the cluster as remove_ignored is set to true
   EXPECT_TRUE(cluster_manager_->removeCluster("added_via_api", true));
   EXPECT_EQ(1, cluster_manager_->clusters().active_clusters_.size());
+}
+
+class CompressedResourceNamesClusterManagerTest : public ClusterManagerImplTest,
+                                                  public testing::WithParamInterface<bool> {
+protected:
+  CompressedResourceNamesClusterManagerTest() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"}});
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(CompressResourceNames, CompressedResourceNamesClusterManagerTest,
+                         testing::Bool());
+
+TEST_P(CompressedResourceNamesClusterManagerTest,
+       ThreadLocalClusterLookupAndNoSymbolTablePollution) {
+  const std::string bootstrap_yaml = R"EOF(
+  cluster_manager:
+    local_cluster_name: local_cluster
+  static_resources:
+    clusters:
+    - name: local_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: local_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: static_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  const std::string dynamic_cluster_name = "outbound|8080||service_a.ns.svc.cluster.local";
+  const std::string dynamic_yaml = R"EOF(
+    name: outbound|8080||service_a.ns.svc.cluster.local
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: outbound|8080||service_a.ns.svc.cluster.local
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11003
+  )EOF";
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(dynamic_yaml), "v1"));
+
+  EXPECT_TRUE(cluster_manager_->hasActiveClusters());
+  EXPECT_TRUE(cluster_manager_->hasCluster("local_cluster"));
+  EXPECT_TRUE(cluster_manager_->hasCluster(dynamic_cluster_name));
+  EXPECT_TRUE(cluster_manager_->getActiveCluster(dynamic_cluster_name).has_value());
+  EXPECT_TRUE(cluster_manager_->getActiveOrWarmingCluster(dynamic_cluster_name).has_value());
+  EXPECT_OK(cluster_manager_->checkActiveStaticCluster("static_cluster"));
+  EXPECT_EQ(absl::StrCat("gRPC client cluster '", dynamic_cluster_name, "' is not static"),
+            cluster_manager_->checkActiveStaticCluster(dynamic_cluster_name).message());
+
+  const auto maps = cluster_manager_->clusters();
+  EXPECT_EQ(3, maps.active_clusters_.size());
+  EXPECT_EQ(1, maps.added_via_api_clusters_num_);
+
+  size_t visited = 0;
+  cluster_manager_->forEachActiveCluster([&visited](const Cluster&) { ++visited; });
+  EXPECT_EQ(3, visited);
+
+  ThreadLocalCluster* by_str = cluster_manager_->getThreadLocalCluster(dynamic_cluster_name);
+  ASSERT_NE(nullptr, by_str);
+  EXPECT_EQ(dynamic_cluster_name, by_str->info()->name());
+
+  auto& symbol_table = factory_.server_context_.xdsManager().xdsSymbolTable();
+  const Config::XdsResourceNameStorage fallback_encoded = symbol_table.encode(dynamic_cluster_name);
+  const Config::XdsResourceName lookup_key =
+      GetParam() ? *by_str->info()->xdsResourceName() : fallback_encoded.resourceName();
+  EXPECT_EQ(by_str, cluster_manager_->getThreadLocalClusterByResourceName(lookup_key));
+
+  const Config::XdsResourceNameStorage unknown_encoded =
+      symbol_table.encode("registered_but_absent_cluster");
+  EXPECT_EQ(nullptr,
+            cluster_manager_->getThreadLocalClusterByResourceName(unknown_encoded.resourceName()));
+
+  // Verify untrusted misses with unseen tokens never insert into or pollute the symbol table.
+  const size_t symbols_before = symbol_table.numSymbols();
+  const std::string untrusted_unknown = "untrusted_header.token_alpha.token_beta";
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster(untrusted_unknown));
+  EXPECT_FALSE(cluster_manager_->getActiveCluster(untrusted_unknown).has_value());
+  EXPECT_FALSE(cluster_manager_->getActiveOrWarmingCluster(untrusted_unknown).has_value());
+  EXPECT_FALSE(cluster_manager_->hasCluster(untrusted_unknown));
+  EXPECT_FALSE(cluster_manager_->removeCluster(untrusted_unknown));
+  cluster_manager_->drainConnections(untrusted_unknown, nullptr);
+  EXPECT_EQ(absl::StrCat("Unknown gRPC client cluster '", untrusted_unknown, "'"),
+            cluster_manager_->checkActiveStaticCluster(untrusted_unknown).message());
+  EXPECT_EQ(symbols_before, symbol_table.numSymbols());
+
+  // Also verify misses where every token already exists in the symbol table (tryEncode succeeds,
+  // map lookup misses).
+  const std::string known_tokens_absent_cluster = "outbound|8080||local_cluster";
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster(known_tokens_absent_cluster));
+  EXPECT_FALSE(cluster_manager_->getActiveCluster(known_tokens_absent_cluster).has_value());
+  EXPECT_FALSE(
+      cluster_manager_->getActiveOrWarmingCluster(known_tokens_absent_cluster).has_value());
+  EXPECT_FALSE(cluster_manager_->hasCluster(known_tokens_absent_cluster));
+  EXPECT_FALSE(cluster_manager_->removeCluster(known_tokens_absent_cluster));
+  cluster_manager_->drainConnections(known_tokens_absent_cluster, nullptr);
+  EXPECT_EQ(absl::StrCat("Unknown gRPC client cluster '", known_tokens_absent_cluster, "'"),
+            cluster_manager_->checkActiveStaticCluster(known_tokens_absent_cluster).message());
+  EXPECT_EQ(symbols_before, symbol_table.numSymbols());
+}
+
+TEST_P(CompressedResourceNamesClusterManagerTest,
+       DynamicClusterLifecycleWarmingUpdateDrainAndRemove) {
+  create(defaultConfig());
+
+  auto& symbol_table = factory_.server_context_.xdsManager().xdsSymbolTable();
+  const size_t baseline_active_symbols = symbol_table.numActiveSymbols();
+
+  // Add a STRICT_DNS cluster whose DNS resolution is held pending so it stays warming.
+  Network::DnsResolver::ResolveCb dns_cb_1;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*factory_.dns_resolver_, resolve("warming1.example.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        dns_cb_1 = cb;
+        return &active_dns_query;
+      }));
+  const std::string warming_v1_yaml = R"EOF(
+    name: dynamic.lifecycle.cluster_one
+    connect_timeout: 0.250s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: dynamic.lifecycle.cluster_one
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: warming1.example.com
+                port_value: 11001
+  )EOF";
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_v1_yaml), "v1"));
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+  EXPECT_FALSE(cluster_manager_->getActiveCluster("dynamic.lifecycle.cluster_one").has_value());
+  EXPECT_TRUE(
+      cluster_manager_->getActiveOrWarmingCluster("dynamic.lifecycle.cluster_one").has_value());
+  EXPECT_EQ(1, cluster_manager_->clusters().warming_clusters_.size());
+
+  // Repeating the identical warming update is blocked.
+  EXPECT_FALSE(
+      *cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_v1_yaml), "v1"));
+
+  // Add a second warming cluster and remove it while still warming.
+  Network::DnsResolver::ResolveCb dns_cb_removed;
+  EXPECT_CALL(*factory_.dns_resolver_, resolve("warming_removed.example.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        dns_cb_removed = cb;
+        return &active_dns_query;
+      }));
+  const std::string warming_removed_yaml = R"EOF(
+    name: dynamic.lifecycle.removed_warming
+    connect_timeout: 0.250s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: dynamic.lifecycle.removed_warming
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: warming_removed.example.com
+                port_value: 11002
+  )EOF";
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_removed_yaml), "v1"));
+  EXPECT_EQ(2, cluster_manager_->warmingClusterCount());
+  EXPECT_CALL(active_dns_query, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_TRUE(cluster_manager_->removeCluster("dynamic.lifecycle.removed_warming"));
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+
+  // Complete DNS resolution for cluster_one -> transitions from warming to active.
+  dns_cb_1(Network::DnsResolver::ResolutionStatus::Completed, "",
+           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
+  ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("dynamic.lifecycle.cluster_one"));
+  // Repeating the identical active update is blocked.
+  EXPECT_FALSE(
+      *cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_v1_yaml), "v1"));
+
+  // Update cluster_one in place (v2) with a single endpoint so hosts are replaced without dangling
+  // map keys, then shrink hosts via DNS update to exercise postThreadLocalRemoveHosts.
+  Network::DnsResolver::ResolveCb dns_cb_2;
+  EXPECT_CALL(*factory_.dns_resolver_, resolve("warming1.example.com", _, _))
+      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        dns_cb_2 = cb;
+        return &active_dns_query;
+      }));
+  const std::string warming_v2_yaml = R"EOF(
+    name: dynamic.lifecycle.cluster_one
+    connect_timeout: 0.500s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: dynamic.lifecycle.cluster_one
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: warming1.example.com
+                port_value: 11001
+  )EOF";
+  // Cancel the refresh query on v1 when v2 replaces it.
+  EXPECT_CALL(active_dns_query, cancel(_)).Times(testing::AnyNumber());
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_v2_yaml), "v2"));
+  dns_cb_2(Network::DnsResolver::ResolutionStatus::Completed, "",
+           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("dynamic.lifecycle.cluster_one"));
+
+  // Drain connections on the active cluster (by name and across all clusters).
+  cluster_manager_->drainConnections("dynamic.lifecycle.cluster_one",
+                                     [](const Host&) { return true; });
+  cluster_manager_->drainConnections([](const Host&) { return true; },
+                                     ConnectionPool::DrainBehavior::DrainExistingConnections);
+
+  // Exercise MockCluster fallback storage + postThreadLocalRemoveHosts when ClusterInfo does not
+  // own an XdsResourceNameStorage.
+  auto mock_cluster = std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  mock_cluster->info_->name_ = "dynamic.mock.fallback_cluster";
+  ON_CALL(*mock_cluster->info_, addedViaApi()).WillByDefault(Return(true));
+  ON_CALL(*mock_cluster, initializePhase())
+      .WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
+  const std::string mock_cluster_yaml = R"EOF(
+    name: dynamic.mock.fallback_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+  )EOF";
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(mock_cluster_yaml), "v1"));
+  mock_cluster->initialize_callback_();
+  ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("dynamic.mock.fallback_cluster"));
+  HostSharedPtr mock_host = makeTestHost(mock_cluster->info_, "tcp://127.0.0.1:80");
+  mock_cluster->priority_set_.getMockHostSet(0)->hosts_ = {mock_host};
+  mock_cluster->priority_set_.getMockHostSet(0)->runCallbacks({mock_host}, {});
+  mock_cluster->priority_set_.getMockHostSet(0)->hosts_.clear();
+  mock_cluster->priority_set_.getMockHostSet(0)->runCallbacks({}, {mock_host});
+  mock_host.reset();
+  EXPECT_TRUE(cluster_manager_->removeCluster("dynamic.mock.fallback_cluster"));
+  mock_cluster.reset();
+
+  // Remove cluster_one and verify worker state and symbol table reference counts return to
+  // baseline.
+  EXPECT_TRUE(cluster_manager_->removeCluster("dynamic.lifecycle.cluster_one"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("dynamic.lifecycle.cluster_one"));
+  EXPECT_FALSE(cluster_manager_->hasCluster("dynamic.lifecycle.cluster_one"));
+  factory_.server_context_.dispatcher_.to_delete_.clear();
+  EXPECT_EQ(baseline_active_symbols, symbol_table.numActiveSymbols());
+
+  cluster_manager_->shutdown();
+  EXPECT_FALSE(cluster_manager_->hasActiveClusters());
+}
+
+TEST_P(CompressedResourceNamesClusterManagerTest, ConfigDumpDeterministicAlphabeticalOrder) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  // Define static clusters in reverse alphabetical order so compressed symbol IDs sort opposite to
+  // ASCII alphabetical order.
+  const std::string bootstrap_yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: static_z
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+    - name: static_m
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+    - name: static_a
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  // Add dynamic active clusters in reverse alphabetical order.
+  for (absl::string_view name : {"dyn_z", "dyn_m", "dyn_a"}) {
+    const std::string yaml = fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+    )EOF",
+                                         name);
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml), "v1"));
+  }
+
+  // Add dynamic warming clusters in reverse alphabetical order.
+  Network::MockActiveDnsQuery active_dns_query;
+  std::vector<Network::DnsResolver::ResolveCb> pending_dns_cbs;
+  EXPECT_CALL(*factory_.dns_resolver_, resolve(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                                 Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        pending_dns_cbs.push_back(cb);
+        return &active_dns_query;
+      }));
+  for (absl::string_view name : {"warm_z", "warm_a"}) {
+    const std::string yaml = fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: example.com
+                  port_value: 80
+    )EOF",
+                                         name, name);
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml), "v1"));
+  }
+
+  auto message_ptr =
+      factory_.server_context_.admin_.config_tracker_.config_tracker_callbacks_["clusters"](
+          Matchers::UniversalStringMatcher());
+  const auto& dump =
+      Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ClustersConfigDump>(*message_ptr);
+
+  ASSERT_EQ(3, dump.static_clusters_size());
+  envoy::config::cluster::v3::Cluster unpacked;
+  ASSERT_TRUE(dump.static_clusters(0).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("static_a", unpacked.name());
+  ASSERT_TRUE(dump.static_clusters(1).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("static_m", unpacked.name());
+  ASSERT_TRUE(dump.static_clusters(2).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("static_z", unpacked.name());
+
+  ASSERT_EQ(3, dump.dynamic_active_clusters_size());
+  ASSERT_TRUE(dump.dynamic_active_clusters(0).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("dyn_a", unpacked.name());
+  ASSERT_TRUE(dump.dynamic_active_clusters(1).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("dyn_m", unpacked.name());
+  ASSERT_TRUE(dump.dynamic_active_clusters(2).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("dyn_z", unpacked.name());
+
+  ASSERT_EQ(2, dump.dynamic_warming_clusters_size());
+  ASSERT_TRUE(dump.dynamic_warming_clusters(0).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("warm_a", unpacked.name());
+  ASSERT_TRUE(dump.dynamic_warming_clusters(1).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("warm_z", unpacked.name());
+
+  // Also verify name_matcher filtering on both active and warming clusters.
+  NiceMock<Matchers::MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match(_)).WillRepeatedly(Invoke([](absl::string_view name) {
+    return name == "dyn_m" || name == "warm_a";
+  }));
+  auto filtered_ptr =
+      factory_.server_context_.admin_.config_tracker_.config_tracker_callbacks_["clusters"](
+          mock_matcher);
+  const auto& filtered_dump =
+      Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ClustersConfigDump>(*filtered_ptr);
+  EXPECT_EQ(0, filtered_dump.static_clusters_size());
+  ASSERT_EQ(1, filtered_dump.dynamic_active_clusters_size());
+  ASSERT_TRUE(filtered_dump.dynamic_active_clusters(0).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("dyn_m", unpacked.name());
+  ASSERT_EQ(1, filtered_dump.dynamic_warming_clusters_size());
+  ASSERT_TRUE(filtered_dump.dynamic_warming_clusters(0).cluster().UnpackTo(&unpacked));
+  EXPECT_EQ("warm_a", unpacked.name());
+
+  EXPECT_CALL(active_dns_query, cancel(_)).Times(testing::AnyNumber());
+  cluster_manager_->shutdown();
+  cluster_manager_.reset();
+}
+
+TEST_P(CompressedResourceNamesClusterManagerTest, DuplicateStaticClusterError) {
+  const std::string duplicate_yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: dup_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+    - name: dup_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(duplicate_yaml)), EnvoyException,
+                            "cluster manager: duplicate cluster 'dup_cluster'");
+}
+
+TEST_P(CompressedResourceNamesClusterManagerTest, MissingLocalClusterError) {
+  const std::string missing_local_yaml = R"EOF(
+  cluster_manager:
+    local_cluster_name: nonexistent_local
+  static_resources:
+    clusters:
+    - name: some_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(missing_local_yaml)), EnvoyException,
+                            "local cluster 'nonexistent_local' must be defined");
 }
 
 #ifdef WIN32

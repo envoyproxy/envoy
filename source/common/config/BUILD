@@ -363,10 +363,27 @@ envoy_cc_library(
         ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
+        ":xds_symbol_table_lib",
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:thread_lib",
         "//source/common/upstream:load_stats_reporter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "xds_symbol_table_lib",
+    srcs = ["xds_symbol_table.cc"],
+    hdrs = ["xds_symbol_table.h"],
+    deps = [
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )

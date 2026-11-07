@@ -3,6 +3,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/xds_manager_impl.h"
+#include "source/common/config/xds_symbol_table.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -34,15 +36,15 @@ using testing::ReturnRef;
 class MockGrpcMuxFactory : public MuxFactory {
 public:
   MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
-    ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
+    ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(
             [](std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
                Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                -> std::shared_ptr<Config::GrpcMux> {
+               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+               OptRef<Config::XdsSymbolTable>) -> std::shared_ptr<Config::GrpcMux> {
               return std::make_shared<NiceMock<MockGrpcMux>>();
             });
   }
@@ -56,7 +58,8 @@ public:
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>));
+               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+               OptRef<Config::XdsSymbolTable>));
   const std::string name_;
 };
 
@@ -193,20 +196,25 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
   // Replace the created GrpcMux mock.
   std::shared_ptr<NiceMock<MockGrpcMux>> ads_mux_shared(std::make_shared<NiceMock<MockGrpcMux>>());
   NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared);
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce([&ads_mux_shared](
-                    std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                    std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
-                    Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-                    const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                    std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                    OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                    -> std::shared_ptr<Config::GrpcMux> {
-        EXPECT_NE(primary_async_client, nullptr);
-        EXPECT_EQ(failover_async_client, nullptr);
-        return ads_mux_shared;
-      });
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(
+          [this, &ads_mux_shared](
+              std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client, Event::Dispatcher&,
+              Random::RandomGenerator&, Stats::Scope&,
+              const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+              std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+              OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+              std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+              OptRef<Config::XdsSymbolTable> xds_symbol_table) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_EQ(failover_async_client, nullptr);
+            EXPECT_TRUE(xds_symbol_table.has_value());
+            if (xds_symbol_table.has_value()) {
+              EXPECT_EQ(&xds_symbol_table.ref(), &xds_manager_impl_.xdsSymbolTable());
+            }
+            return ads_mux_shared;
+          });
 
   // Start with 2 static clusters, and set the first to be the ADS cluster.
   initialize(R"EOF(
@@ -283,7 +291,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_shared(
       std::make_shared<NiceMock<Config::MockGrpcMux>>());
   NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared);
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce([&ads_mux_shared](
                     std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
                     std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
@@ -291,8 +299,8 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
                     const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                     std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                     OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                    -> std::shared_ptr<Config::GrpcMux> {
+                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+                    OptRef<Config::XdsSymbolTable>) -> std::shared_ptr<Config::GrpcMux> {
         EXPECT_NE(primary_async_client, nullptr);
         EXPECT_NE(failover_async_client, nullptr);
         return ads_mux_shared;
@@ -893,7 +901,7 @@ public:
     }
 
     if (enable_authority_a) {
-      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
                         std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                         Random::RandomGenerator&, Stats::Scope&,
@@ -901,14 +909,19 @@ public:
                         const LocalInfo::LocalInfo&,
                         std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                         OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+                        OptRef<Config::XdsSymbolTable> xds_symbol_table)
                         -> std::shared_ptr<Config::GrpcMux> {
             EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_TRUE(xds_symbol_table.has_value());
+            if (xds_symbol_table.has_value()) {
+              EXPECT_EQ(&xds_symbol_table.ref(), &xds_manager_impl_.xdsSymbolTable());
+            }
             return authority_A_mux_;
           });
     }
     if (enable_authority_b) {
-      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
                         std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                         Random::RandomGenerator&, Stats::Scope&,
@@ -916,14 +929,19 @@ public:
                         const LocalInfo::LocalInfo&,
                         std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                         OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+                        OptRef<Config::XdsSymbolTable> xds_symbol_table)
                         -> std::shared_ptr<Config::GrpcMux> {
             EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_TRUE(xds_symbol_table.has_value());
+            if (xds_symbol_table.has_value()) {
+              EXPECT_EQ(&xds_symbol_table.ref(), &xds_manager_impl_.xdsSymbolTable());
+            }
             return authority_B_mux_;
           });
     }
     if (enable_default_authority) {
-      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
                         std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                         Random::RandomGenerator&, Stats::Scope&,
@@ -931,9 +949,14 @@ public:
                         const LocalInfo::LocalInfo&,
                         std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                         OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+                        OptRef<Config::XdsSymbolTable> xds_symbol_table)
                         -> std::shared_ptr<Config::GrpcMux> {
             EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_TRUE(xds_symbol_table.has_value());
+            if (xds_symbol_table.has_value()) {
+              EXPECT_EQ(&xds_symbol_table.ref(), &xds_manager_impl_.xdsSymbolTable());
+            }
             return default_mux_;
           });
     }
@@ -1255,18 +1278,23 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
   // Replace the created GrpcMux mock with a delta-xDS one.
   NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                    std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
-                    Random::RandomGenerator&, Stats::Scope&,
-                    const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                    std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                    OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                    -> std::shared_ptr<Config::GrpcMux> {
-        EXPECT_NE(primary_async_client, nullptr);
-        return authority_A_mux_;
-      });
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(
+          [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>,
+              std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>,
+              OptRef<Config::XdsSymbolTable> xds_symbol_table) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            EXPECT_TRUE(xds_symbol_table.has_value());
+            if (xds_symbol_table.has_value()) {
+              EXPECT_EQ(&xds_symbol_table.ref(), &xds_manager_impl_.xdsSymbolTable());
+            }
+            return authority_A_mux_;
+          });
 
   // Have a single config_source with two authorities in it.
   initialize(R"EOF(
@@ -2174,6 +2202,10 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
         EXPECT_EQ(data.config_.config_source_specifier_case(),
                   envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds);
         EXPECT_EQ(data.type_url_, type_url);
+        EXPECT_TRUE(data.xds_symbol_table_.has_value());
+        if (data.xds_symbol_table_.has_value()) {
+          EXPECT_EQ(&data.xds_symbol_table_.ref(), &xds_manager_impl_.xdsSymbolTable());
+        }
         // Check other relevant fields if necessary, e.g., scope, callbacks, resource_decoder,
         // options
         return std::unique_ptr<MockSubscription>(mock_subscription);
@@ -2569,6 +2601,49 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
     EXPECT_TRUE(authority_a_resumed);
     EXPECT_TRUE(default_authority_resumed);
   }
+}
+
+// Validates that XdsManagerImpl owns a single server-wide XdsSymbolTable across its lifecycle,
+// and that MockXdsManager provides a working default XdsSymbolTable.
+TEST_P(XdsManagerImplTest, XdsSymbolTableLifecycleAndMockDefault) {
+  XdsSymbolTable& symbol_table = xds_manager_impl_.xdsSymbolTable();
+  const uint64_t initial_active = symbol_table.numActiveSymbols();
+
+  initialize();
+  EXPECT_EQ(&symbol_table, &xds_manager_impl_.xdsSymbolTable());
+
+  constexpr absl::string_view ResourceA =
+      "xdstp://authority_a/envoy.config.cluster.v3.Cluster/service_a";
+  constexpr absl::string_view ResourceB =
+      "xdstp://authority_a/envoy.config.cluster.v3.Cluster/service_b";
+  {
+    XdsResourceNameStorage storage_a = symbol_table.encode(ResourceA);
+    XdsResourceNameStorage storage_b = symbol_table.encode(ResourceB);
+    EXPECT_EQ(symbol_table.toString(storage_a.resourceName()), ResourceA);
+    EXPECT_EQ(symbol_table.toString(storage_b.resourceName()), ResourceB);
+    EXPECT_NE(storage_a.resourceName(), storage_b.resourceName());
+    EXPECT_GT(symbol_table.numActiveSymbols(), initial_active);
+  }
+  EXPECT_EQ(symbol_table.numActiveSymbols(), initial_active);
+
+  xds_manager_impl_.shutdown();
+  EXPECT_EQ(&symbol_table, &xds_manager_impl_.xdsSymbolTable());
+
+  // Validate MockXdsManager default symbol table wiring via ServerFactoryContext.
+  XdsSymbolTable& mock_symbol_table = server_context_.xdsManager().xdsSymbolTable();
+  EXPECT_NE(&symbol_table, &mock_symbol_table);
+  XdsResourceNameStorage mock_storage = mock_symbol_table.encode(ResourceA);
+  EXPECT_EQ(mock_symbol_table.toString(mock_storage.resourceName()), ResourceA);
+}
+
+// Validates the reloadable runtime guard for xDS resource name compression.
+TEST_P(XdsManagerImplTest, CompressXdsResourceNamesRuntimeGuard) {
+  EXPECT_TRUE(
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names"));
+
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.compress_xds_resource_names", "false"}});
+  EXPECT_FALSE(
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names"));
 }
 
 } // namespace

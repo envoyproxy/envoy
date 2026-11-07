@@ -14,6 +14,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/thread.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -139,6 +140,7 @@ public:
   MOCK_METHOD(std::optional<uint16_t>, maxResponseHeadersKb, (), (const));
   MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
+  MOCK_METHOD(OptRef<const Config::XdsResourceName>, xdsResourceName, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
@@ -183,7 +185,14 @@ public:
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
 
+  void setXdsResourceName(Config::XdsSymbolTable& symbol_table) {
+    xds_resource_name_storage_.emplace(symbol_table.encode(name_));
+    xds_resource_name_ = xds_resource_name_storage_->resourceName();
+  }
+
   std::string name_{"fake_cluster"};
+  std::optional<Config::XdsResourceNameStorage> xds_resource_name_storage_;
+  Config::XdsResourceName xds_resource_name_;
   std::string observability_name_{"observability_name"};
   std::optional<std::string> eds_service_name_;
   class MockHttpProtocolOptionsConfig : public HttpProtocolOptionsConfig {

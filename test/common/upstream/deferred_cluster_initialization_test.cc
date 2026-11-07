@@ -6,6 +6,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/config/xds_symbol_table.h"
 #include "source/extensions/clusters/eds/eds.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 
@@ -13,8 +14,10 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -838,6 +841,290 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(
       hostsInHostsVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts(), {1000, 4000}));
+}
+
+class CompressedDeferredClusterInitializationTest : public DeferredClusterInitializationTest {};
+
+INSTANTIATE_TEST_SUITE_P(CompressResourceNames, CompressedDeferredClusterInitializationTest,
+                         testing::Bool());
+
+TEST_P(CompressedDeferredClusterInitializationTest,
+       InlineInitViaGetThreadLocalClusterByResourceName) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"}});
+
+  const std::string bootstrap_yaml = R"EOF(
+    static_resources:
+    )EOF";
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(bootstrap_yaml, bootstrap);
+  bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(true);
+  create(bootstrap);
+
+  const std::string cluster_v1_yaml = R"EOF(
+    name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  const std::string cluster_v2_yaml = R"EOF(
+    name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11002
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11003
+  )EOF";
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_v1_yaml), "v1"));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_v2_yaml), "v2"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  auto& symbol_table = factory_.server_context_.xdsManager().xdsSymbolTable();
+  const Config::XdsResourceNameStorage unknown_name = symbol_table.encode("unknown_cluster");
+  EXPECT_EQ(nullptr,
+            cluster_manager_->getThreadLocalClusterByResourceName(unknown_name.resourceName()));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  const Config::XdsResourceNameStorage encoded_cluster_1 = symbol_table.encode("cluster_1");
+  const OptRef<const Cluster> active_cluster = cluster_manager_->getActiveCluster("cluster_1");
+  ASSERT_TRUE(active_cluster.has_value());
+  const Config::XdsResourceName lookup_key =
+      GetParam() ? *active_cluster->info()->xdsResourceName() : encoded_cluster_1.resourceName();
+
+  ThreadLocalCluster* tl_cluster = nullptr;
+  EXPECT_LOG_CONTAINS("debug", "initializing TLS cluster cluster_1 inline", {
+    tl_cluster = cluster_manager_->getThreadLocalClusterByResourceName(lookup_key);
+  });
+  ASSERT_NE(nullptr, tl_cluster);
+  EXPECT_EQ("cluster_1", tl_cluster->info()->name());
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+  EXPECT_TRUE(hostsInHostsVector(tl_cluster->prioritySet().hostSetsPerPriority()[0]->hosts(),
+                                 {11002, 11003}));
+
+  // Subsequent lookup hits the already-inflated thread-local cluster entry.
+  EXPECT_EQ(tl_cluster, cluster_manager_->getThreadLocalClusterByResourceName(lookup_key));
+}
+
+TEST_P(CompressedDeferredClusterInitializationTest, InlineInitWithBatchAwareUpdateDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"},
+       {"envoy.reloadable_features.enable_batch_aware_update", "false"}});
+
+  const std::string bootstrap_yaml = R"EOF(
+    static_resources:
+      clusters:
+      - name: bootstrap_static
+        connect_timeout: 0.250s
+        type: STATIC
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: bootstrap_static
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+    )EOF";
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(bootstrap_yaml, bootstrap);
+  bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(true);
+  create(bootstrap);
+
+  ThreadLocalCluster* tl_cluster = cluster_manager_->getThreadLocalCluster("bootstrap_static");
+  ASSERT_NE(nullptr, tl_cluster);
+  EXPECT_TRUE(
+      hostsInHostsVector(tl_cluster->prioritySet().hostSetsPerPriority()[0]->hosts(), {11001}));
+
+  // Also update the active inflated cluster with enable_batch_aware_update=false.
+  const std::string updated_yaml = R"EOF(
+    name: cluster_non_batch
+    connect_timeout: 0.250s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_non_batch
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.bar.com
+                port_value: 11002
+  )EOF";
+  EXPECT_CALL(*factory_.dns_resolver_, resolve("foo.bar.com", _, _))
+      .WillOnce(Invoke([](const std::string&, Network::DnsLookupFamily,
+                          Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+           TestUtility::makeDnsResponse({"127.0.0.1"}));
+        return nullptr;
+      }));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(updated_yaml), "v1"));
+  ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_non_batch"));
+}
+
+TEST_P(CompressedDeferredClusterInitializationTest, DeferredClusterUpdateCallbacksAndRemoval) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"}});
+
+  const std::string bootstrap_yaml = R"EOF(
+    static_resources:
+    )EOF";
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(bootstrap_yaml, bootstrap);
+  bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(true);
+  create(bootstrap);
+
+  NiceMock<MockClusterUpdateCallbacks> cb1;
+  NiceMock<MockClusterUpdateCallbacks> cb2;
+  auto handle1 = cluster_manager_->addThreadLocalClusterUpdateCallbacks(cb1);
+  auto handle2 = cluster_manager_->addThreadLocalClusterUpdateCallbacks(cb2);
+
+  // First cluster: both callbacks invoke command(), exercising inline inflation on the first
+  // callback and the already-inflated fast path on the second callback.
+  ThreadLocalCluster* cb1_cluster = nullptr;
+  ThreadLocalCluster* cb2_cluster = nullptr;
+  EXPECT_CALL(cb1, onClusterAddOrUpdate(absl::string_view("cluster_inflated"), _))
+      .WillOnce(Invoke([&](absl::string_view, ThreadLocalClusterCommand& command) {
+        cb1_cluster = &command();
+      }));
+  EXPECT_CALL(cb2, onClusterAddOrUpdate(absl::string_view("cluster_inflated"), _))
+      .WillOnce(Invoke([&](absl::string_view, ThreadLocalClusterCommand& command) {
+        cb2_cluster = &command();
+      }));
+
+  const std::string inflated_yaml = R"EOF(
+    name: cluster_inflated
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_inflated
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(inflated_yaml), "v1"));
+  ASSERT_NE(nullptr, cb1_cluster);
+  EXPECT_EQ(cb1_cluster, cb2_cluster);
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+
+  // Second cluster: remains deferred when removeCluster() is called.
+  EXPECT_CALL(cb1, onClusterAddOrUpdate(absl::string_view("cluster_deferred"), _));
+  EXPECT_CALL(cb2, onClusterAddOrUpdate(absl::string_view("cluster_deferred"), _));
+  const std::string deferred_yaml = R"EOF(
+    name: cluster_deferred
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_deferred
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11002
+  )EOF";
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(deferred_yaml), "v1"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+
+  EXPECT_CALL(cb1, onClusterRemoval(absl::string_view("cluster_deferred")));
+  EXPECT_CALL(cb2, onClusterRemoval(absl::string_view("cluster_deferred")));
+  EXPECT_TRUE(cluster_manager_->removeCluster("cluster_deferred"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_deferred"));
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+}
+
+TEST_P(CompressedDeferredClusterInitializationTest, DeferredClusterUpdatedToNonDeferredType) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"}});
+
+  const std::string bootstrap_yaml = R"EOF(
+    static_resources:
+    )EOF";
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(bootstrap_yaml, bootstrap);
+  bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(true);
+  create(bootstrap);
+
+  const std::string static_yaml = R"EOF(
+    name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(static_yaml), "v1"));
+  EXPECT_EQ(1, cluster_manager_->clusterInitializationMap().size());
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
+
+  EXPECT_CALL(*factory_.dns_resolver_, resolve("foo.bar.com", _, _))
+      .WillOnce(Invoke([](const std::string&, Network::DnsLookupFamily,
+                          Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+           TestUtility::makeDnsResponse({"127.0.0.1"}));
+        return nullptr;
+      }));
+  const std::string strict_dns_yaml = R"EOF(
+    name: cluster_1
+    connect_timeout: 0.250s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.bar.com
+                port_value: 11002
+  )EOF";
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(strict_dns_yaml), "v2"));
+  EXPECT_TRUE(cluster_manager_->clusterInitializationMap().empty());
+  EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
+  ASSERT_NE(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 }
 
 } // namespace

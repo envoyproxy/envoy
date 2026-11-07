@@ -5,6 +5,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
 
@@ -54,9 +55,11 @@ Protobuf::RepeatedPtrField<std::string> populateRepeatedString(std::vector<std::
   return add_to;
 }
 
-class DeltaSubscriptionStateTestBase : public testing::Test {
+class DeltaSubscriptionStateTestBase : public testing::TestWithParam<bool> {
 protected:
   DeltaSubscriptionStateTestBase(const std::string& type_url) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"}});
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
     state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(
         type_url, callbacks_, dispatcher_, XdsConfigTrackerOptRef());
@@ -148,6 +151,7 @@ protected:
 
   bool subscriptionUpdatePending() { return state_->subscriptionUpdatePending(); }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -161,8 +165,11 @@ public:
   DeltaSubscriptionStateTestBlank() : DeltaSubscriptionStateTestBase(TypeUrl) {}
 };
 
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTestBlank, DeltaSubscriptionStateTestBlank,
+                         testing::Bool());
+
 // Checks if subscriptionUpdatePending returns correct value depending on scenario.
-TEST_F(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
+TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
   // We should send a request, because nothing has been sent out yet. Note that this means
   // subscribing to the wildcard resource.
   EXPECT_TRUE(subscriptionUpdatePending());
@@ -199,7 +206,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
   EXPECT_FALSE(subscriptionUpdatePending());
 }
 
-TEST_F(DeltaSubscriptionStateTestBlank, DynamicContextChange) {
+TEST_P(DeltaSubscriptionStateTestBlank, DynamicContextChange) {
   // Initial request
   EXPECT_TRUE(subscriptionUpdatePending());
   getNextRequestAckless();
@@ -219,7 +226,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, DynamicContextChange) {
 //
 // Dropping from the cache can be seen through the initial_resource_versions field in the initial
 // request.
-TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequestedToDropped) {
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequestedToDropped) {
   updateSubscriptionInterest({"foo", "bar"}, {});
   auto req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
@@ -249,7 +256,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequest
 
 // Check if we keep foo resource in cache even if we lost interest in it. It could be a part of the
 // wildcard subscription.
-TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromRequestedToAmbiguous) {
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromRequestedToAmbiguous) {
   // subscribe to foo and make sure we have it.
   updateSubscriptionInterest({WildcardStr, "foo", "bar"}, {});
   auto req = getNextRequestAckless();
@@ -284,7 +291,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
 // Check that foo and bar do not appear in initial versions after we lost interest. Foo won't
 // appear, because we got a reply from server confirming dropping the resource. Bar won't appear
 // because we never got a reply from server with a version of it.
-TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromRequestedToDropped) {
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromRequestedToDropped) {
   // subscribe to foo and bar and make sure we have it.
   updateSubscriptionInterest({WildcardStr, "foo", "bar", "baz"}, {});
   auto req = getNextRequestAckless();
@@ -320,7 +327,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
 
 // Check that we move the resource from wildcard subscription to requested without losing version
 // information about it.
-TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildcardToRequested) {
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildcardToRequested) {
   updateSubscriptionInterest({}, {});
   auto req = getNextRequestAckless();
   EXPECT_TRUE(req->resource_names_subscribe().empty());
@@ -339,7 +346,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildca
 
 // Check that we move the ambiguous resource to requested without losing version information about
 // it.
-TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbiguousToRequested) {
+TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbiguousToRequested) {
   updateSubscriptionInterest({WildcardStr, "foo"}, {});
   auto req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
@@ -359,7 +366,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbigu
 }
 
 // Check if we correctly decide to send a legacy wildcard initial request.
-TEST_F(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
+TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   updateSubscriptionInterest({}, {});
   auto req = getNextRequestAckless();
   EXPECT_TRUE(req->resource_names_subscribe().empty());
@@ -393,7 +400,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
 
 // Validate that the resources versions are updated and sent upon reconnection.
 // Regression test of: https://github.com/envoyproxy/envoy/issues/20699
-TEST_F(DeltaSubscriptionStateTestBlank, ReconnectResourcesVersions) {
+TEST_P(DeltaSubscriptionStateTestBlank, ReconnectResourcesVersions) {
   // Subscribe to foo and bar.
   updateSubscriptionInterest({WildcardStr, "foo", "bar"}, {});
   auto req = getNextRequestAckless();
@@ -417,7 +424,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ReconnectResourcesVersions) {
 
 // Validates that if the reconnection notes that it should not send initial resource version,
 // then that field isn't populated.
-TEST_F(DeltaSubscriptionStateTestBlank, ReconnectAvoidResourcesVersions) {
+TEST_P(DeltaSubscriptionStateTestBlank, ReconnectAvoidResourcesVersions) {
   // Subscribe to foo and bar.
   updateSubscriptionInterest({WildcardStr, "foo", "bar"}, {});
   auto req = getNextRequestAckless();
@@ -439,7 +446,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, ReconnectAvoidResourcesVersions) {
 }
 
 // Check that ambiguous resources may also receive a heartbeat message.
-TEST_F(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
+TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
@@ -496,7 +503,7 @@ TEST_F(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
 }
 
 // Checks that we ignore resources that we haven't asked for.
-TEST_F(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
+TEST_P(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
   updateSubscriptionInterest({"foo", "bar"}, {});
   auto req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
@@ -535,14 +542,19 @@ public:
   DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestWithResources(TypeUrl) {}
 };
 
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTest, DeltaSubscriptionStateTest, testing::Bool());
+
 // Delta subscription state of a wildcard subscription request.
 class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestWithResources {
 public:
   WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestWithResources(TypeUrl, {}) {}
 };
 
+INSTANTIATE_TEST_SUITE_P(WildcardDeltaSubscriptionStateTest, WildcardDeltaSubscriptionStateTest,
+                         testing::Bool());
+
 // Basic gaining/losing interest in resources should lead to subscription updates.
-TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
+TEST_P(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
     updateSubscriptionInterest({"name4"}, {"name1"});
     auto cur_request = getNextRequestAckless();
@@ -558,7 +570,7 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
 }
 
 // Resources has no subscriptions should not be tracked.
-TEST_F(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
+TEST_P(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
   { // Add "name4", "name5", "name6" and remove "name1", "name2", "name3".
     updateSubscriptionInterest({"name4", "name5", "name6"}, {"name1", "name2", "name3"});
     auto cur_request = getNextRequestAckless();
@@ -609,7 +621,7 @@ TEST_F(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
 // again. So, we *should* send a request "re-"subscribing. This means that the server needs to
 // interpret the resource_names_subscribe field as "send these resources even if you think Envoy
 // already has them".
-TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
+TEST_P(DeltaSubscriptionStateTest, RemoveThenAdd) {
   updateSubscriptionInterest({}, {"name3"});
   updateSubscriptionInterest({"name3"}, {});
   auto cur_request = getNextRequestAckless();
@@ -625,7 +637,7 @@ TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
 // This test is just here to illustrate that this behavior exists, not to enforce that it
 // should be like this. What *is* important: the server must happily and cleanly ignore
 // "unsubscribe from [resource name I have never before referred to]" requests.
-TEST_F(DeltaSubscriptionStateTest, AddThenRemove) {
+TEST_P(DeltaSubscriptionStateTest, AddThenRemove) {
   updateSubscriptionInterest({"name4"}, {});
   updateSubscriptionInterest({}, {"name4"});
   auto cur_request = getNextRequestAckless();
@@ -634,7 +646,7 @@ TEST_F(DeltaSubscriptionStateTest, AddThenRemove) {
 }
 
 // add/remove/add == add.
-TEST_F(DeltaSubscriptionStateTest, AddRemoveAdd) {
+TEST_P(DeltaSubscriptionStateTest, AddRemoveAdd) {
   updateSubscriptionInterest({"name4"}, {});
   updateSubscriptionInterest({}, {"name4"});
   updateSubscriptionInterest({"name4"}, {});
@@ -644,7 +656,7 @@ TEST_F(DeltaSubscriptionStateTest, AddRemoveAdd) {
 }
 
 // remove/add/remove == remove.
-TEST_F(DeltaSubscriptionStateTest, RemoveAddRemove) {
+TEST_P(DeltaSubscriptionStateTest, RemoveAddRemove) {
   updateSubscriptionInterest({}, {"name3"});
   updateSubscriptionInterest({"name3"}, {});
   updateSubscriptionInterest({}, {"name3"});
@@ -655,7 +667,7 @@ TEST_F(DeltaSubscriptionStateTest, RemoveAddRemove) {
 
 // Starts with 1,2,3. 4 is added/removed/added. In those same updates, 1,2,3 are
 // removed/added/removed. End result should be 4 added and 1,2,3 removed.
-TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
+TEST_P(DeltaSubscriptionStateTest, BothAddAndRemove) {
   updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
   updateSubscriptionInterest({"name1", "name2", "name3"}, {"name4"});
   updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
@@ -665,7 +677,7 @@ TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
               UnorderedElementsAre("name1", "name2", "name3"));
 }
 
-TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
+TEST_P(DeltaSubscriptionStateTest, CumulativeUpdates) {
   updateSubscriptionInterest({"name4"}, {});
   updateSubscriptionInterest({"name5"}, {});
   auto cur_request = getNextRequestAckless();
@@ -675,7 +687,7 @@ TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
 
 // Verifies that a sequence of good and bad responses from the server all get the appropriate
 // ACKs/NACKs from Envoy.
-TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
+TEST_P(DeltaSubscriptionStateTest, AckGenerated) {
   // The xDS server's first response includes items for name1 and 2, but not 3.
   {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
@@ -736,7 +748,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
 // 1) resources we have a version of are present in the map,
 // 2) resources we are interested in but don't have are not present, and
 // 3) resources we have lost interest in are not present.
-TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
+TEST_P(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
   {
     // The xDS server's first update includes items for name1 and 2, but not 3.
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
@@ -797,7 +809,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
 // in between the last request of the last stream and the first request of the new stream, Envoy
 // lost interest in a resource. The unsubscription implicitly takes effect by simply saying
 // nothing about the resource in the newly reconnected stream.
-TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
+TEST_P(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer());
@@ -819,7 +831,7 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
 
 // Check that switching into wildcard subscription after initial
 // request switches us into the explicit wildcard mode.
-TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
+TEST_P(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   // We call deliverDiscoveryResponse twice in this test.
@@ -863,7 +875,7 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
 // for the Envoy's state (hence the need for initial_resource_versions), and the
 // resource_names_subscribe and resource_names_unsubscribe must be empty if we haven't gained any
 // new explicit interest in a resource. In such case, the client should send an empty request.
-TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectImplicit) {
+TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectImplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer());
@@ -883,7 +895,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
 // resource_names_unsubscribe must be empty (as is expected of every wildcard first message). The
 // resource_names_subscribe should contain all the resources we are explicitly interested in and a
 // special resource denoting a wildcard subscription.
-TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectExplicit) {
+TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectExplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer());
@@ -904,7 +916,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
 // subscription and then reconnection. The second request should look
 // like a non-wildcard request, so mention all the known resources in
 // the initial request.
-TEST_F(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscription) {
+TEST_P(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscription) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer());
@@ -929,7 +941,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscriptio
 // subscription and then reconnection. The second request should look
 // like a non-wildcard request, so mention all the known resources in
 // the initial request.
-TEST_F(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscription) {
+TEST_P(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscription) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer());
@@ -958,7 +970,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscriptio
 // Check that resource changes from being interested in implicitly to explicitly when we update the
 // subscription interest. Such resources will show up in the initial wildcard requests
 // too. Receiving the update on such resource will not change their interest mode.
-TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
+TEST_P(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2_a =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer()).Times(2);
@@ -999,7 +1011,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
 // Check that resource changes from being interested in implicitly to explicitly when we update the
 // subscription interest. Such resources will show up in the initial wildcard requests
 // too. Receiving the update on such resource will not change their interest mode.
-TEST_F(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStreamReset) {
+TEST_P(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStreamReset) {
   // verify that we will send the legacy wildcard subscription request
   // after stream reset
   updateSubscriptionInterest({"resource"}, {});
@@ -1033,7 +1045,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStream
 }
 
 // All resources from the server should be tracked.
-TEST_F(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWildcardXDS) {
+TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWildcardXDS) {
   { // Add "name4", "name5", "name6"
     updateSubscriptionInterest({"name4", "name5", "name6"}, {});
     auto cur_request = getNextRequestAckless();
@@ -1078,7 +1090,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWil
 }
 
 // initial_resource_versions should not be present on messages after the first in a stream.
-TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
+TEST_P(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
   // First, verify that the first message of a new stream sends initial versions.
   {
     // The xDS server's first update gives us all three resources.
@@ -1110,7 +1122,7 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
   }
 }
 
-TEST_F(DeltaSubscriptionStateTest, CheckUpdatePending) {
+TEST_P(DeltaSubscriptionStateTest, CheckUpdatePending) {
   // Note that the test fixture ctor causes the first request to be "sent", so we start in the
   // middle of a stream, with our initially interested resources having been requested already.
   EXPECT_FALSE(subscriptionUpdatePending());
@@ -1127,7 +1139,7 @@ TEST_F(DeltaSubscriptionStateTest, CheckUpdatePending) {
 // The next three tests test that duplicate resource names (whether additions or removals) cause
 // DeltaSubscriptionState to reject the update without even trying to hand it to the consuming
 // API's onConfigUpdate().
-TEST_F(DeltaSubscriptionStateTest, DuplicatedAdd) {
+TEST_P(DeltaSubscriptionStateTest, DuplicatedAdd) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> additions =
       populateRepeatedResource({{"name1", "version1A"}, {"name1", "sdfsdfsdfds"}});
   UpdateAck ack = deliverDiscoveryResponse(additions, {}, "debugversion1", std::nullopt, false);
@@ -1135,7 +1147,7 @@ TEST_F(DeltaSubscriptionStateTest, DuplicatedAdd) {
             ack.error_detail_.message());
 }
 
-TEST_F(DeltaSubscriptionStateTest, DuplicatedRemove) {
+TEST_P(DeltaSubscriptionStateTest, DuplicatedRemove) {
   Protobuf::RepeatedPtrField<std::string> removals;
   *removals.Add() = "name1";
   *removals.Add() = "name1";
@@ -1144,7 +1156,7 @@ TEST_F(DeltaSubscriptionStateTest, DuplicatedRemove) {
             ack.error_detail_.message());
 }
 
-TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
+TEST_P(DeltaSubscriptionStateTest, AddedAndRemoved) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> additions =
       populateRepeatedResource({{"name1", "version1A"}});
   Protobuf::RepeatedPtrField<std::string> removals;
@@ -1155,7 +1167,7 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
             ack.error_detail_.message());
 }
 
-TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
+TEST_P(DeltaSubscriptionStateTest, ResourceTTL) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
@@ -1222,7 +1234,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
 
 // Validates that when both heartbeat and non-heartbeat resources are sent, only
 // the non-heartbeat resources are processed.
-TEST_F(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessed) {
+TEST_P(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessed) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
@@ -1303,7 +1315,7 @@ TEST_F(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessed) {
   }
 }
 
-TEST_F(DeltaSubscriptionStateTest, TypeUrlMismatch) {
+TEST_P(DeltaSubscriptionStateTest, TypeUrlMismatch) {
   envoy::service::discovery::v3::DeltaDiscoveryResponse message;
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> additions;
@@ -1331,7 +1343,7 @@ TEST_F(DeltaSubscriptionStateTest, TypeUrlMismatch) {
 
 // Verifies that an update that is NACKed doesn't update the tracked
 // versions of the registered resources.
-TEST_F(DeltaSubscriptionStateTest, NoVersionUpdateOnNack) {
+TEST_P(DeltaSubscriptionStateTest, NoVersionUpdateOnNack) {
   // The xDS server's first response includes items for name1 and 2, but not 3.
   {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
@@ -1367,11 +1379,12 @@ public:
       : DeltaSubscriptionStateTestWithResources("envoy.config.route.v3.VirtualHost") {}
 };
 
-TEST_F(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
+INSTANTIATE_TEST_SUITE_P(VhdsDeltaSubscriptionStateTest, VhdsDeltaSubscriptionStateTest,
+                         testing::Bool());
+
+TEST_P(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
-
-  TestScopedRuntime scoped_runtime;
 
   auto create_resource_with_ttl = [](bool include_resource) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
@@ -1397,6 +1410,158 @@ TEST_F(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
   // Heartbeat update should not be propagated to the subscription callback.
   EXPECT_CALL(*ttl_timer_, enabled());
   deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
+}
+
+// Verifies shared `XdsSymbolTable` deduplication across delta subscription states, protection
+// against symbol pollution on unsolicited resources/heartbeats/removals, state transitions
+// (`requested` <-> `ambiguous` <-> `wildcard`), and full symbol reclamation.
+TEST_P(DeltaSubscriptionStateTestBlank, SharedSymbolTableLifecycleAndNoPollution) {
+  const bool compress_resource_names = GetParam();
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
+  auto symbol_table = XdsSymbolTable::create();
+  const size_t initial_active = symbol_table->numActiveSymbols();
+  const size_t initial_total = symbol_table->numSymbols();
+
+  NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_a;
+  NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_b;
+  NiceMock<Event::MockDispatcher> dispatcher_a;
+  NiceMock<Event::MockDispatcher> dispatcher_b;
+  auto* ttl_timer_a = new NiceMock<Event::MockTimer>(&dispatcher_a);
+  std::ignore = new NiceMock<Event::MockTimer>(&dispatcher_b);
+
+  XdsMux::DeltaSubscriptionStateFactory factory_a(dispatcher_a, makeOptRef(*symbol_table));
+  XdsMux::DeltaSubscriptionStateFactory factory_b(dispatcher_b, makeOptRef(*symbol_table));
+  auto state_a = factory_a.makeSubscriptionState(
+      TypeUrl, callbacks_a, nullptr, XdsConfigTrackerOptRef(), XdsResourcesDelegateOptRef(), "");
+  auto state_b = factory_b.makeSubscriptionState(
+      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment", callbacks_b, nullptr,
+      XdsConfigTrackerOptRef(), XdsResourcesDelegateOptRef(), "");
+
+  const std::string res_a =
+      "xdstp://shared_authority/envoy.config.cluster.v3.Cluster/shared_ns/svc_1";
+  const std::string res_b =
+      "xdstp://shared_authority/envoy.config.endpoint.v3.ClusterLoadAssignment/shared_ns/svc_1";
+  const std::string res_wild =
+      "xdstp://shared_authority/envoy.config.cluster.v3.Cluster/shared_ns/wild_1";
+
+  state_a->updateSubscriptionInterest({res_a}, {});
+  const size_t symbols_after_a = symbol_table->numSymbols();
+  state_b->updateSubscriptionInterest({res_b}, {});
+
+  if (compress_resource_names) {
+    EXPECT_GT(symbol_table->numActiveSymbols(), initial_active);
+    // `res_b` shares `shared_authority`, `envoy`, `config`, `v3`, `shared_ns`, `svc`, and `1`
+    // with `res_a`; only `endpoint` and `ClusterLoadAssignment` are new symbols!
+    EXPECT_EQ(symbol_table->numSymbols() - symbols_after_a, 2);
+  } else {
+    EXPECT_EQ(symbol_table->numActiveSymbols(), initial_active);
+    EXPECT_EQ(symbol_table->numSymbols(), initial_total);
+  }
+
+  auto req_a = state_a->getNextRequestAckless();
+  EXPECT_THAT(req_a->resource_names_subscribe(), UnorderedElementsAre(res_a));
+
+  // Non-wildcard mode: unsolicited resource, unsolicited heartbeat (both unseen tokens and known
+  // tokens), and unsolicited removal must NOT pollute `symbol_table`.
+  const size_t symbols_before_unsolicited = symbol_table->numSymbols();
+  const size_t active_before_unsolicited = symbol_table->numActiveSymbols();
+  {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse msg;
+    msg.set_type_url(TypeUrl);
+    msg.set_nonce("n1");
+    auto* r_good = msg.add_resources();
+    r_good->set_name(res_a);
+    r_good->set_version("v1");
+    r_good->mutable_resource()->set_type_url(TypeUrl);
+    auto* r_unsolicited = msg.add_resources();
+    r_unsolicited->set_name("xdstp://unsolicited_auth/unsolicited_pkg/unsolicited_res");
+    r_unsolicited->set_version("v_unsolicited");
+    r_unsolicited->mutable_resource()->set_type_url(TypeUrl);
+    // Unresolved alias messages (no `resource` field, non-empty `aliases`) pass through
+    // `isHeartbeatResponse` for both unseen tokens and known-token names without mutating
+    // `symbol_table`.
+    auto* r_unseen_alias = msg.add_resources();
+    r_unseen_alias->set_name("xdstp://unseen_alias_auth/unseen_alias_res");
+    r_unseen_alias->set_version("v_alias");
+    r_unseen_alias->add_aliases("alias_unseen");
+    auto* r_known_tokens_alias = msg.add_resources();
+    r_known_tokens_alias->set_name(
+        "xdstp://shared_authority/envoy.config.cluster.v3.Cluster/shared_ns/1");
+    r_known_tokens_alias->set_version("v_alias_known");
+    r_known_tokens_alias->add_aliases("alias_known");
+    msg.add_removed_resources("xdstp://unsolicited_removed_auth/unsolicited_removed_res");
+    msg.add_removed_resources(res_b);
+    state_a->handleResponse(msg);
+  }
+  EXPECT_EQ(symbol_table->numSymbols(), symbols_before_unsolicited);
+  EXPECT_EQ(symbol_table->numActiveSymbols(), active_before_unsolicited);
+
+  // Switch `state_a` into explicit wildcard mode, transition `res_a` (`requested -> ambiguous ->
+  // wildcard`), test ambiguous & wildcard heartbeats and TTL expiry, and verify reconnect
+  // `initial_resource_versions`.
+  state_a->updateSubscriptionInterest({WildcardStr}, {res_a});
+  std::ignore = state_a->getNextRequestAckless();
+  {
+    // Heartbeat while `res_a` is in `ambiguous` state is recognized as a heartbeat.
+    envoy::service::discovery::v3::DeltaDiscoveryResponse amb_hb_msg;
+    amb_hb_msg.set_type_url(TypeUrl);
+    amb_hb_msg.set_nonce("n_amb_hb");
+    auto* amb_hb = amb_hb_msg.add_resources();
+    amb_hb->set_name(res_a);
+    amb_hb->set_version("v1");
+    state_a->handleResponse(amb_hb_msg);
+  }
+  {
+    // Server sends `res_a` (resolving `ambiguous -> wildcard`) and `res_wild` with a 1s TTL.
+    envoy::service::discovery::v3::DeltaDiscoveryResponse msg;
+    msg.set_type_url(TypeUrl);
+    msg.set_nonce("n2");
+    auto* r_resolved = msg.add_resources();
+    r_resolved->set_name(res_a);
+    r_resolved->set_version("v2");
+    r_resolved->mutable_resource()->set_type_url(TypeUrl);
+    auto* r_wild = msg.add_resources();
+    r_wild->set_name(res_wild);
+    r_wild->set_version("vw1");
+    r_wild->mutable_resource()->set_type_url(TypeUrl);
+    r_wild->mutable_ttl()->set_seconds(1);
+    state_a->handleResponse(msg);
+  }
+  {
+    // Heartbeat for wildcard resource `res_wild` refreshes TTL without propagating update.
+    envoy::service::discovery::v3::DeltaDiscoveryResponse hb_msg;
+    hb_msg.set_type_url(TypeUrl);
+    hb_msg.set_nonce("n3");
+    auto* hb = hb_msg.add_resources();
+    hb->set_name(res_wild);
+    hb->set_version("vw1");
+    hb->mutable_ttl()->set_seconds(1);
+    EXPECT_CALL(callbacks_a, onConfigUpdate(_, _, _))
+        .WillOnce([](const auto& added, const auto&, const auto&) { EXPECT_TRUE(added.empty()); });
+    state_a->handleResponse(hb_msg);
+  }
+
+  state_a->markStreamFresh(true);
+  req_a = state_a->getNextRequestAckless();
+  EXPECT_THAT(req_a->initial_resource_versions(),
+              UnorderedElementsAre(Pair(res_a, "v2"), Pair(res_wild, "vw1")));
+
+  // Expire TTL on `res_wild` (`wildcard -> dropped`).
+  time_system.setSystemTime(std::chrono::seconds(2));
+  EXPECT_CALL(callbacks_a, onConfigUpdate(_, _, _))
+      .WillOnce([&res_wild](const auto& added, const auto& removed, const auto&) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_THAT(removed, UnorderedElementsAre(res_wild));
+      });
+  ttl_timer_a->invokeCallback();
+
+  // Unsubscribe from wildcard on `state_a` and `res_b` on `state_b`; all active symbols must be
+  // reclaimed!
+  state_a->updateSubscriptionInterest({}, {WildcardStr, "xdstp://unseen_unsub/res"});
+  state_b->updateSubscriptionInterest({}, {res_b});
+  EXPECT_EQ(symbol_table->numActiveSymbols(), initial_active);
 }
 
 } // namespace

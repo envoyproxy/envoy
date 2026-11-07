@@ -694,8 +694,8 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef xds_resources_delegate,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      override {
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<XdsSymbolTable> xds_symbol_table = {}) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -716,7 +716,8 @@ public:
         /*target_xds_authority_=*/Config::Utility::getGrpcControlPlane(ads_config).value_or(""),
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
-        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
+        /*xds_symbol_table_=*/xds_symbol_table};
     return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
   }
 };

@@ -1,5 +1,8 @@
 #include "source/server/admin/config_dump_handler.h"
 
+#include <algorithm>
+#include <vector>
+
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 
@@ -285,7 +288,17 @@ ProtobufTypes::MessagePtr
 ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
-  server_.clusterManager().forEachActiveCluster([&](const Upstream::Cluster& cluster) {
+  std::vector<const Upstream::Cluster*> active_clusters;
+  server_.clusterManager().forEachActiveCluster(
+      [&active_clusters](const Upstream::Cluster& cluster) {
+        active_clusters.push_back(&cluster);
+      });
+  std::sort(active_clusters.begin(), active_clusters.end(),
+            [](const Upstream::Cluster* lhs, const Upstream::Cluster* rhs) {
+              return lhs->info()->name() < rhs->info()->name();
+            });
+  for (const Upstream::Cluster* cluster_ptr : active_clusters) {
+    const Upstream::Cluster& cluster = *cluster_ptr;
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
@@ -295,7 +308,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
       cluster_load_assignment.set_cluster_name(cluster_info->name());
     }
     if (!name_matcher.match(cluster_load_assignment.cluster_name())) {
-      return;
+      continue;
     }
     auto& policy = *cluster_load_assignment.mutable_policy();
 
@@ -347,7 +360,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
       auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
       std::ignore = static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     }
-  });
+  }
   return endpoint_config_dump;
 }
 
