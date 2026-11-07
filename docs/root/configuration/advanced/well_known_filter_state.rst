@@ -49,6 +49,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   * ``ip``: IP address value as a string;
   * ``port``: port value as a number.
 
+``envoy.filters.listener.original_dst.local_port``
+  :ref:`Original destination listener filter <config_listener_filters_original_dst>` destination port
+  override for sockets with an IP address. Accepts a port number string as a constructor.
+
 ``envoy.upstream.dynamic_host``
   :ref:`Dynamic forward proxy <envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>` upstream
   host override on a per-connection basis. Accepts a host string as a constructor.

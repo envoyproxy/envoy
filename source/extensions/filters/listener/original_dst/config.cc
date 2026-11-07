@@ -6,7 +6,10 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/filter_state_dst_address.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,6 +76,21 @@ public:
 };
 
 REGISTER_FACTORY(OriginalDstRemoteFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
+
+class OriginalDstLocalPortFilterStateFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return FilterNames::get().LocalPortFilterStateKey; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    uint32_t port = 0;
+    if (absl::SimpleAtoi(data, &port) && port > 0 && port <= 65535) {
+      return std::make_unique<StreamInfo::UInt32AccessorImpl>(port);
+    }
+    return nullptr;
+  }
+};
+
+REGISTER_FACTORY(OriginalDstLocalPortFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace OriginalDst
 } // namespace ListenerFilters
