@@ -1,0 +1,11 @@
+// The beginning of test_large.proto, which the gen_test_large_proto rule in BUILD completes with
+// enough fields to make its serialized descriptor larger than 64 KiB.
+
+syntax = "proto2";
+
+package testdata.dynamic_descriptors;
+
+message LargeMessage {
+  // Bytes that need escaping: a trigraph, NULs, an octal escape followed by a digit, non-ASCII
+  // text and quotes.
+  optional string special = 1 [default = "??/ a\000b\0012 h\303\251llo \" \' \\"];

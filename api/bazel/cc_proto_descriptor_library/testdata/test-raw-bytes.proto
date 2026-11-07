@@ -1,0 +1,20 @@
+// Exercises embedding a serialized FileDescriptorProto that contains bytes which need care in a
+// C++ string literal. The defaults below are copied into the descriptor verbatim.
+
+syntax = "proto2";
+
+package testdata.dynamic_descriptors;
+
+message RawBytesMessage {
+  // Every C++ trigraph; "??/" would turn into a backslash if left unescaped.
+  optional string trigraphs = 1 [default = "??= ??/ ??' ??( ??) ??! ??< ??> ??-"];
+
+  // NUL bytes, and an octal escape followed by a digit.
+  optional string nul_bytes = 2 [default = "a\000b\0012"];
+
+  // Non-ASCII text, which is serialized as bytes >= 0x80.
+  optional string non_ascii = 3 [default = "h\303\251llo \342\230\203"];
+
+  // Characters that C++ requires to be escaped in literals.
+  optional string quotes = 4 [default = "\" \' \\"];
+}
