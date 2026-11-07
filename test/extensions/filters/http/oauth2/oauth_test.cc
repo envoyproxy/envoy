@@ -421,6 +421,63 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenBasicAuthEncodesRefreshToken) 
   EXPECT_EQ(1, callbacks_.size());
 }
 
+// When scopes are passed, the refresh request body carries a `scope` parameter after the
+// credentials. Spaces (the RFC 6749 scope delimiter) and other reserved characters in scope
+// values (such as Entra ID application ID URIs) must be form-encoded.
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenWithScopes) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("grant_type=refresh_token&refresh_token=a&client_id=b&client_secret=c"
+                  "&scope=openid%20offline_access%20https%3A%2F%2Fapp%2Faccess_as_user",
+                  message->bodyAsString());
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("a", "b", "c", AuthType::UrlEncodedBody,
+                                   "openid offline_access https://app/access_as_user");
+  EXPECT_EQ(1, callbacks_.size());
+}
+
+// The `scope` parameter is also appended on the BASIC_AUTH path, where the body carries no
+// credentials.
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenBasicAuthWithScopes) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("grant_type=refresh_token&refresh_token=a&scope=openid%20profile",
+                  message->bodyAsString());
+        EXPECT_FALSE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("a", "b", "c", AuthType::BasicAuth, "openid profile");
+  EXPECT_EQ(1, callbacks_.size());
+}
+
+// Without scopes (the default), the refresh request body has no `scope` parameter.
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenWithoutScopes) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("grant_type=refresh_token&refresh_token=a&client_id=b&client_secret=c",
+                  message->bodyAsString());
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("a", "b", "c");
+  EXPECT_EQ(1, callbacks_.size());
+}
+
 TEST_F(OAuth2ClientTest, RequestAccessTokenTlsClientAuthNoClientSecret) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))

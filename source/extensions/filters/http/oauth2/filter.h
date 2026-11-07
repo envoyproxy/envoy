@@ -267,6 +267,7 @@ public:
                                                  : !secret_reader_->clientSecret().empty();
   }
   FilterStats& stats() const { return stats_; }
+  const std::string& authScopes() const { return auth_scopes_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const std::string& cookieDomain() const { return cookie_domain_; }
@@ -274,6 +275,7 @@ public:
   const std::string& cookieDomainAttribute() const { return cookie_domain_attribute_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
+  bool sendScopesOnRefresh() const { return send_scopes_on_refresh_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
@@ -351,7 +353,8 @@ private:
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   mutable FilterStats stats_;
-  const std::string encoded_auth_scopes_;
+  // Space-separated scopes as sent on the authorization request (`user` when none configured).
+  const std::string auth_scopes_;
   const std::string encoded_resource_query_params_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
@@ -371,6 +374,7 @@ private:
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
+  const bool send_scopes_on_refresh_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;

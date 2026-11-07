@@ -173,7 +173,7 @@ public:
 
   MOCK_METHOD(void, asyncRefreshAccessToken,
               (const std::string&, const std::string&, const std::string&,
-               Envoy::Extensions::HttpFilters::Oauth2::AuthType));
+               Envoy::Extensions::HttpFilters::Oauth2::AuthType, const std::string&));
 
   MOCK_METHOD(OAuthState, getState, (), (const, override));
 };
@@ -424,6 +424,36 @@ public:
     auto* pass_through_matcher = p.add_pass_through_matcher();
     pass_through_matcher->set_name(":method");
     pass_through_matcher->mutable_string_match()->set_exact("OPTIONS");
+
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return makeFilterConfig(p, secret_reader).value();
+  }
+
+  // Builds a minimal valid config with refresh enabled and `send_scopes_on_refresh` set, carrying
+  // the given `auth_scopes` (none when the list is empty, to exercise the default scope).
+  FilterConfigSharedPtr getConfigWithScopesOnRefresh(const std::vector<std::string>& auth_scopes) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_stat_prefix("my_prefix");
+    p.mutable_use_refresh_token()->set_value(true);
+    p.set_send_scopes_on_refresh(true);
+    for (const auto& scope : auth_scopes) {
+      p.add_auth_scopes(scope);
+    }
 
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
@@ -2543,7 +2573,7 @@ TEST_F(OAuth2Test, RefreshTokenWithPrivateKeyJwt) {
 
   // The assertion (third param) is built dynamically, so use _ matcher.
   EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID, _,
-                                                      AuthType::PrivateKeyJwt));
+                                                      AuthType::PrivateKeyJwt, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -5151,7 +5181,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(third_request_headers, false));
@@ -5187,7 +5217,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -5239,7 +5269,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -5310,7 +5340,7 @@ TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -5350,7 +5380,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -5421,7 +5451,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) 
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -5495,7 +5525,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   // refresh token is available.
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::BasicAuth));
+                                      "asdf_client_secret_fdsa", AuthType::BasicAuth, ""));
 
   // Filter should stop iteration because the tokens are expired.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -5547,6 +5577,61 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
 
   // OAuth flow cookies should be removed before forwarding the request
   EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
+}
+
+// With `send_scopes_on_refresh`, the refresh request carries the configured `auth_scopes` joined
+// by a space, exactly as they were sent on the authorization request.
+TEST_F(OAuth2Test, RefreshAccessTokenSendsConfiguredScopes) {
+  init(getConfigWithScopesOnRefresh({"openid", "offline_access", "api://app/access_as_user"}));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+  };
+
+  std::string legit_refresh_token{"some-refresh-token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody,
+                                      "openid offline_access api://app/access_as_user"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+// With `send_scopes_on_refresh` and no `auth_scopes`, the refresh request carries the same default
+// scope the authorization request uses.
+TEST_F(OAuth2Test, RefreshAccessTokenSendsDefaultScope) {
+  init(getConfigWithScopesOnRefresh({}));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+  };
+
+  std::string legit_refresh_token{"some-refresh-token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, "user"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 // Test all cookies with STRICT SameSite
@@ -6148,7 +6233,7 @@ TEST_F(OAuth2Test, RouteSpecificConfigOverridesGlobalConfig) {
   EXPECT_CALL(*validator_, setParams(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _)).Times(0);
-  EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(_, _, _, _)).Times(0);
+  EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(_, _, _, _, _)).Times(0);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(scope_.counterFromString("test.oauth_passthrough").value(), 1);
@@ -6167,7 +6252,7 @@ TEST_F(OAuth2Test, EmptyRouteSpecificConfigOverridesGlobalConfig) {
   ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig()).WillByDefault(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _)).Times(0);
-  EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(_, _, _, _)).Times(0);
+  EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
@@ -6565,7 +6650,7 @@ TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
   // Mock asyncRefreshAccessToken to succeed (async work starts)
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken("legit_refresh_token", TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
 
   // Filter should stop and wait for async response
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -6627,7 +6712,7 @@ TEST_F(OAuth2Test, AllowFailedWithRefreshTokenSyncFailure) {
   // asyncRefreshAccessToken fails synchronously; getState() returns FailureContinue
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken("legit_refresh_token", TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
   EXPECT_CALL(*oauth_client_, getState())
       .WillOnce(Return(OAuth2Client::OAuthState::FailureContinue));
 
@@ -6952,7 +7037,7 @@ TEST_F(OAuth2Test, AllowFailedWithRefreshTokenSyncFailureStop) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken("legit_refresh_token", TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody, ""));
   // Sync failure: a 401 or redirect was already sent inside asyncRefreshAccessToken.
   EXPECT_CALL(*oauth_client_, getState()).WillOnce(Return(OAuth2Client::OAuthState::FailureStop));
 
