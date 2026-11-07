@@ -19,6 +19,7 @@ envoy_cc_library(
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/config:typed_config_interface",
+        "//envoy/http:header_map_interface",
         "//envoy/network:address_interface",
         "//envoy/protobuf:message_validator_interface",
         "//envoy/server:factory_context_interface",

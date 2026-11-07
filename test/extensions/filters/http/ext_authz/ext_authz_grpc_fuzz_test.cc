@@ -35,25 +35,25 @@ public:
   ReusableGrpcClientFactory()
       : internal_grpc_mock_client_(std::make_shared<NiceMock<Grpc::MockAsyncClient>>()) {
     ON_CALL(*internal_grpc_mock_client_, sendRaw(_, _, _, _, _, _))
-        .WillByDefault(
-            Invoke([&](absl::string_view, absl::string_view, Buffer::InstancePtr&& serialized_req,
-                       Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                       const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
-              envoy::service::auth::v3::CheckRequest check_request;
-              EXPECT_TRUE(check_request.ParseFromString(serialized_req->toString()))
-                  << "Could not parse serialized check request";
+        .WillByDefault([&](absl::string_view, absl::string_view,
+                           Buffer::InstancePtr&& serialized_req, Grpc::RawAsyncRequestCallbacks&,
+                           Tracing::Span&,
+                           const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+          envoy::service::auth::v3::CheckRequest check_request;
+          EXPECT_TRUE(check_request.ParseFromString(serialized_req->toString()))
+              << "Could not parse serialized check request";
 
-              ENVOY_LOG_MISC(trace, "Check Request attributes:\n{}",
-                             check_request.attributes().DebugString());
+          ENVOY_LOG_MISC(trace, "Check Request attributes:\n{}",
+                         check_request.attributes().DebugString());
 
-              if (failure_reason_) {
-                grpc_client_->onFailure(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown,
-                                        *failure_reason_, mock_span_);
-              } else {
-                grpc_client_->onSuccess(std::move(response_), mock_span_);
-              }
-              return &grpc_async_request_;
-            }));
+          if (failure_reason_) {
+            grpc_client_->onFailure(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown,
+                                    *failure_reason_, mock_span_);
+          } else {
+            grpc_client_->onSuccess(std::move(response_), mock_span_);
+          }
+          return &grpc_async_request_;
+        });
   }
 
   std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl>

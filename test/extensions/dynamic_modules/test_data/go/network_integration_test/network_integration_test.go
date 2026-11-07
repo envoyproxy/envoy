@@ -12,6 +12,7 @@ func init() {
 		"connection_state": &connectionStateConfigFactory{},
 		"half_close":       &halfCloseConfigFactory{},
 		"buffer_limits":    &bufferLimitsConfigFactory{},
+		"dynamic_metadata": &dynamicMetadataConfigFactory{},
 	})
 }
 
@@ -171,6 +172,51 @@ func (f *bufferLimitsFilter) OnNewConnection() shared.NetworkFilterStatus {
 	f.handle.SetBufferLimits(32768)
 	if f.handle.GetBufferLimit() != 32768 {
 		panic("expected updated buffer limit")
+	}
+	return shared.NetworkFilterStatusContinue
+}
+
+type dynamicMetadataConfigFactory struct {
+	shared.EmptyNetworkFilterConfigFactory
+}
+
+func (f *dynamicMetadataConfigFactory) Create(shared.NetworkFilterConfigHandle, []byte) (shared.NetworkFilterFactory, error) {
+	return &dynamicMetadataFactory{}, nil
+}
+
+type dynamicMetadataFactory struct {
+	shared.EmptyNetworkFilterFactory
+}
+
+func (f *dynamicMetadataFactory) Create(handle shared.NetworkFilterHandle) shared.NetworkFilter {
+	return &dynamicMetadataFilter{handle: handle}
+}
+
+type dynamicMetadataFilter struct {
+	handle shared.NetworkFilterHandle
+	shared.EmptyNetworkFilter
+}
+
+func (f *dynamicMetadataFilter) OnNewConnection() shared.NetworkFilterStatus {
+	// A serialized google.protobuf.Struct with "k" set to "v".
+	if !f.handle.SetMetadataStruct("dynamic_modules.struct",
+		[]byte{0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76}) {
+		panic("expected the struct to be merged")
+	}
+	if value, ok := f.handle.GetMetadataString("dynamic_modules.struct", "k"); !ok || value.ToUnsafeString() != "v" {
+		panic("expected struct metadata")
+	}
+
+	// A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+	if !f.handle.SetTypedMetadata("dynamic_modules.typed",
+		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02}) {
+		panic("expected the typed metadata to be set")
+	}
+
+	// A struct that does not parse and an Any without a type URL are rejected.
+	if f.handle.SetMetadataStruct("dynamic_modules.struct", []byte{0x0f}) ||
+		f.handle.SetTypedMetadata("dynamic_modules.typed", nil) {
+		panic("expected the invalid buffers to be rejected")
 	}
 	return shared.NetworkFilterStatusContinue
 }

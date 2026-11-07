@@ -761,14 +761,14 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
       std::make_shared<NiceMock<Upstream::MockUpstreamLocalAddressSelector>>(mock_address);
 
   ON_CALL(*mock_selector, getUpstreamLocalAddressImpl(_, _))
-      .WillByDefault(Invoke([mock_address](const Network::Address::InstanceConstSharedPtr&,
-                                           OptRef<const Network::TransportSocketOptions>)
-                                -> Upstream::UpstreamLocalAddress {
+      .WillByDefault([mock_address](const Network::Address::InstanceConstSharedPtr&,
+                                    OptRef<const Network::TransportSocketOptions>)
+                         -> Upstream::UpstreamLocalAddress {
         Upstream::UpstreamLocalAddress local_address;
         local_address.address_ = mock_address;
         local_address.socket_options_ = nullptr;
         return local_address;
-      }));
+      });
 
   EXPECT_CALL(*cluster->info_, getUpstreamLocalAddressSelector())
       .WillRepeatedly(Return(mock_selector));

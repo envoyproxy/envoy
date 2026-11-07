@@ -52,7 +52,8 @@ envoy_dynamic_module_on_route_specifier_config_new(
 void envoy_dynamic_module_on_route_specifier_config_destroy(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr) {}
 
-envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route_specifier_on_route(
+envoy_dynamic_module_type_route_specifier_on_route_status
+envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr) {
   // Selecting a declared route override isolates the route entry override accessors from the other
@@ -61,7 +62,14 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
     const envoy_dynamic_module_type_module_buffer override_id = {"applied", 7};
     envoy_dynamic_module_callback_route_specifier_set_route_override(context_envoy_ptr,
                                                                      override_id);
-    return envoy_dynamic_module_type_route_specifier_decision_Override;
+    // Metadata the module records itself wins over what the override carries, which the metadata
+    // layering test reads back from the produced route.
+    const envoy_dynamic_module_type_module_buffer ns = {"envoy.test.override", 19};
+    const envoy_dynamic_module_type_module_buffer key = {"group", 5};
+    const envoy_dynamic_module_type_module_buffer value = {"module", 6};
+    envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(context_envoy_ptr, ns,
+                                                                            key, value);
+    return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
   }
   // Recording only a route name produces a route wrapper whose name replaces that of the route.
   if (config_module_ptr == &route_name_mode) {
@@ -70,7 +78,7 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
     envoy_dynamic_module_callback_route_specifier_set_route_name(context_envoy_ptr, name);
     const envoy_dynamic_module_type_module_buffer empty = {"", 0};
     envoy_dynamic_module_callback_route_specifier_set_route_name(context_envoy_ptr, empty);
-    return envoy_dynamic_module_type_route_specifier_decision_Override;
+    return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
   }
   // The metadata-free modes skip metadata so a test can reach the wrapper metadata fallbacks.
   if (config_module_ptr != &entry_no_meta_mode && config_module_ptr != &filter_only_mode) {
@@ -81,18 +89,18 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
                                                                             key, value);
   }
   if (config_module_ptr == &route_only_mode) {
-    return envoy_dynamic_module_type_route_specifier_decision_Override;
+    return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
   }
   if (config_module_ptr == &filter_only_mode) {
     const envoy_dynamic_module_type_module_buffer filter = {"envoy.test.disabled", 19};
     envoy_dynamic_module_callback_route_specifier_set_filter_disabled(context_envoy_ptr, filter,
                                                                       true);
-    return envoy_dynamic_module_type_route_specifier_decision_Override;
+    return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
   }
   const envoy_dynamic_module_type_module_buffer cluster = {"canary", 6};
   envoy_dynamic_module_callback_route_specifier_set_cluster_name(context_envoy_ptr, cluster);
   if (config_module_ptr == &entry_no_meta_mode) {
-    return envoy_dynamic_module_type_route_specifier_decision_Override;
+    return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
   }
   const envoy_dynamic_module_type_module_buffer route_name = {"module_route_entry", 18};
   envoy_dynamic_module_callback_route_specifier_set_route_name(context_envoy_ptr, route_name);
@@ -127,5 +135,5 @@ envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route
   envoy_dynamic_module_callback_route_specifier_add_response_header(
       context_envoy_ptr, response_key, value,
       envoy_dynamic_module_type_route_specifier_header_append_action_AddIfAbsent);
-  return envoy_dynamic_module_type_route_specifier_decision_Override;
+  return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
 }

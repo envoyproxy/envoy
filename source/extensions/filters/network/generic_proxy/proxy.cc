@@ -605,8 +605,7 @@ bool ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
 
 void ActiveStream::deferredDelete() {
   if (inserted()) {
-    parent_.callbacks_->connection().dispatcher().deferredDelete(
-        removeFromList(parent_.active_streams_));
+    parent_.callbacks_->connection().dispatcher().deferredDelete(removeFromList());
   }
 }
 
@@ -746,7 +745,7 @@ void Filter::unregisterFrameHandler(uint64_t stream_id) { frame_handlers_.erase(
 void Filter::newDownstreamRequest(StreamRequestPtr request, std::optional<StartTime> start_time) {
   auto stream = std::make_unique<ActiveStream>(*this, std::move(request), start_time);
   auto raw_stream = stream.get();
-  LinkedList::moveIntoList(std::move(stream), active_streams_);
+  active_streams_.push(std::move(stream));
 
   // Initialize filter chain.
   if (!raw_stream->initializeFilterChain(*config_)) {
@@ -760,7 +759,7 @@ void Filter::newDownstreamRequest(StreamRequestPtr request, std::optional<StartT
 
 void Filter::resetDownstreamAllStreams(DownstreamStreamResetReason reason) {
   while (!active_streams_.empty()) {
-    auto* stream = active_streams_.front().get();
+    auto* stream = active_streams_.front();
     // Remove the stream from the active stream list by the filter self. Although the
     // resetStream() method will do the same thing. But doing it here could ensure the
     // stream is removed even if the resetStream() method is not working as expected.

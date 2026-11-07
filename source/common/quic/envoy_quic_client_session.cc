@@ -14,6 +14,8 @@
 #include "source/common/quic/scone_state.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/types/span.h"
+#include "quiche/quic/core/http/http_frames.h"
 #include "quiche/quic/core/quic_bandwidth.h"
 
 namespace Envoy {
@@ -260,8 +262,9 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
-bool EnvoyQuicClientSession::OnSettingsFrame(const quic::SettingsFrame& frame) {
-  if (!quic::QuicSpdyClientSession::OnSettingsFrame(frame)) {
+bool EnvoyQuicClientSession::OnSettingsFrame(const quic::SettingsFrame& frame,
+                                             absl::Span<const uint64_t> wire_order) {
+  if (!quic::QuicSpdyClientSession::OnSettingsFrame(frame, wire_order)) {
     // The base implementation may close the connection on invalid settings.
     return false;
   }

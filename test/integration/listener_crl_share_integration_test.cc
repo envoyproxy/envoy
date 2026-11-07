@@ -88,10 +88,16 @@ public:
   }
 
   // Creates a client transport socket factory that presents the given client certificate. The
-  // client does not verify the server, mirroring the CRL unit tests in ssl_socket_test.cc.
+  // client does not verify the server, mirroring the CRL unit tests in ssl_socket_test.cc. The
+  // client is limited to TLS 1.2 so that a rejected client certificate fails the handshake; with
+  // TLS 1.3, the client completes its handshake before the server validates the certificate.
   Network::UpstreamTransportSocketFactoryPtr makeClientSslFactory(const std::string& cert,
                                                                   const std::string& key) {
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    tls_context.mutable_common_tls_context()
+        ->mutable_tls_params()
+        ->set_tls_maximum_protocol_version(
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
     auto* client_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
     client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(cert));
     client_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(key));

@@ -53,7 +53,7 @@ void InternalListenerExtension::onServerInitialized(Server::Instance&) {
   InternalClientConnectionFactory::buffer_size_ = buffer_size_;
 }
 
-Server::BootstrapExtensionPtr InternalListenerFactory::createBootstrapExtension(
+Server::BootstrapExtensionCreationResult InternalListenerFactory::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::bootstrap::internal_listener::v3::InternalListener&>(

@@ -71,7 +71,7 @@ require_client_certificate: true
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, server_factory_context_.serverScope());
+        std::move(cfg), context_manager_, upstreamStatsScope());
   }
 
   void createUpstreams() override {

@@ -21,7 +21,7 @@ class SockmapSocketInterfaceExtension;
 class SockmapSocketInterface : public SocketInterfaceImpl {
 public:
   // Server::Configuration::BootstrapExtensionFactory
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

@@ -179,10 +179,6 @@ void ProxyFilter::onDestroy() {
 }
 
 bool ProxyFilter::isProxying() {
-  if (!(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"))) {
-    return false;
-  }
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
   return filter_state && filter_state->hasData<Network::Http11ProxyInfoFilterState>(
@@ -301,7 +297,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   latchTime(decoder_callbacks_, DNS_START);
   const bool is_proxying = isProxying();
-  if (headers.Host()->value().getStringView().empty()) {
+  if (headers.getHostValue().empty()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        ResponseStrings::get().EmptyHostHeader, nullptr,
                                        std::nullopt, RcDetails::get().EmptyHostHeader);
@@ -309,8 +305,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   // Get host value from the request headers.
-  const auto host_attributes =
-      Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+  const auto host_attributes = Http::Utility::parseAuthority(headers.getHostValue());
   // For IPv6 numeric addresses, use a copy with square brackets added around the host.
   // For any other address type just use the existing unmodified host string.
   std::string host_str;

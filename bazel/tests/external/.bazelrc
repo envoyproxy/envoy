@@ -10,7 +10,7 @@ startup --host_jvm_args=-Xmx3g
 #############################################################################
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/462e7c8781a6a94be81f7f3383a1c88b5347c58f
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/99aa31e2d4adaf1c58e12532ff14d29e81c62609
 
 common --noincompatible_disallow_empty_glob
 
@@ -32,6 +32,8 @@ build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 # TODO(phlax): Remove this once a proper fix for the deprecated enum lands
 build --copt=--system-header-prefix=envoy/config/route/v3/route_components.pb.h
 build --per_file_copt=external/envoy_api.*/route_components\.pb\.cc@-Wno-deprecated-declarations
+
+build --features=system_include_paths --host_features=system_include_paths
 
 try-import %workspace%/../../../ci.bazelrc
 try-import %workspace%/../../../user.bazelrc

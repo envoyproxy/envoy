@@ -136,10 +136,10 @@ struct ThreadStatus {
 class CallbackNotInvokedAfterDeletionTest : public ThreadLocalInstanceImplTest {
 protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
-    EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly(Invoke([&](Event::PostCb cb) {
+    EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly([&](Event::PostCb cb) {
       // Holds the posted callback.
       holder_.push_back(std::move(cb));
-    }));
+    });
 
     slot_->set([this](Event::Dispatcher&) {
       // Callbacks happen on the main thread but not the workers, so track the total.
@@ -411,9 +411,9 @@ TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaysActiveSlot) {
   std::list<Event::PostCb> holder;
 
   // registerThread should post the dispatcher setter and the active slot callback.
-  EXPECT_CALL(new_worker_dispatcher, post(_))
-      .Times(2)
-      .WillRepeatedly(Invoke([&holder](Event::PostCb cb) { holder.push_back(std::move(cb)); }));
+  EXPECT_CALL(new_worker_dispatcher, post(_)).Times(2).WillRepeatedly([&holder](Event::PostCb cb) {
+    holder.push_back(std::move(cb));
+  });
 
   tls_.registerThread(new_worker_dispatcher, false);
   EXPECT_EQ(2, holder.size());
@@ -443,9 +443,9 @@ TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaySlotDeletedBeforeRunning
   NiceMock<Event::MockDispatcher> new_worker_dispatcher{"new_worker_thread"};
   std::list<Event::PostCb> holder;
 
-  EXPECT_CALL(new_worker_dispatcher, post(_))
-      .Times(2)
-      .WillRepeatedly(Invoke([&holder](Event::PostCb cb) { holder.push_back(std::move(cb)); }));
+  EXPECT_CALL(new_worker_dispatcher, post(_)).Times(2).WillRepeatedly([&holder](Event::PostCb cb) {
+    holder.push_back(std::move(cb));
+  });
 
   tls_.registerThread(new_worker_dispatcher, false);
   EXPECT_EQ(2, holder.size());
@@ -497,9 +497,9 @@ TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaySlotReallocated) {
   std::list<Event::PostCb> holder;
 
   // registerThread should post dispatcher setter and slot2 callback only (not slot1).
-  EXPECT_CALL(new_worker_dispatcher, post(_))
-      .Times(2)
-      .WillRepeatedly(Invoke([&holder](Event::PostCb cb) { holder.push_back(std::move(cb)); }));
+  EXPECT_CALL(new_worker_dispatcher, post(_)).Times(2).WillRepeatedly([&holder](Event::PostCb cb) {
+    holder.push_back(std::move(cb));
+  });
 
   tls_.registerThread(new_worker_dispatcher, false);
   EXPECT_EQ(2, holder.size());
@@ -575,9 +575,9 @@ TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorkerBeforeRegisterThr
 
         EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(false));
         // Capture the removeSlot callback posted from worker to main dispatcher.
-        EXPECT_CALL(main_dispatcher, post(_)).WillOnce(Invoke([&remove_slot_cb](Event::PostCb cb) {
+        EXPECT_CALL(main_dispatcher, post(_)).WillOnce([&remove_slot_cb](Event::PostCb cb) {
           remove_slot_cb = std::move(cb);
-        }));
+        });
 
         slot.reset();
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -15,30 +16,32 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Whether the specifier chain should carry on after a specifier has run.
+ * What happens after a specifier has run: whether the chain carries on, and whether route
+ * matching accepts the route the chains were run for.
  */
-enum class OnRouteChainStatus : uint8_t {
+enum class OnRouteStatus : uint8_t {
   // Hand the result to the next specifier.
   Continue,
-  // The result is final. No further specifier runs, at this level or any later one.
+  // The result is final: no further specifier runs, at this level or any later one, and the
+  // returned route (nullptr included) is accepted.
   StopIteration,
+  // The result is final and the matched route is turned down: no further specifier runs, the
+  // returned route is discarded, and route matching carries on with the next route of the list
+  // being evaluated. Outside the evaluation of a route list, where there is no next route to try,
+  // this behaves like StopIteration.
+  StopIterationAndSkipRoute,
 };
 
 /**
- * Whether the route matching should continue or stop. This only makes sense when Envoy is
- * evaluating a list of routes. And this enum allow the route specifier to indicate whether the
- * current route should be accepted or if the matching should continue to the next route to find a
- * more suitable one.
- *
- * The last non-Unspecified from the chain of route specifiers determines the final route match
- * status. This give the possibility for a specifier to ignore specific route when necessary.
+ * The input status indicates whether there are more routes to evaluate in the route list for
+ * matching.
  */
-enum class OnRouteMatchStatus : uint8_t {
+enum class OnRouteInputStatus : uint8_t {
   Unspecified,
-  // Continue matching route
-  Continue,
-  // Accept matched route
-  Accept
+  // Has more routes to evaluate in the route list for matching.
+  HasMoreRoutes,
+  // No more routes to evaluate in the route list for matching.
+  NoMoreRoutes
 };
 
 /**
@@ -47,12 +50,9 @@ enum class OnRouteMatchStatus : uint8_t {
 struct OnRouteResult {
   // The route to use from here on. May be nullptr.
   RouteConstSharedPtr route;
-  // Whether the chain carries on. Defaults to Continue, so a specifier only has to say something
+  // What happens with the result. Defaults to Continue, so a specifier only has to say something
   // when it wants its result to be the final one.
-  OnRouteChainStatus chain_status{OnRouteChainStatus::Continue};
-  // The status of the route match. Defaults to Unspecified, so a specifier only has to say
-  // something when it wants to indicate a specific match status.
-  OnRouteMatchStatus match_status{OnRouteMatchStatus::Unspecified};
+  OnRouteStatus status{OnRouteStatus::Continue};
 };
 
 /**
@@ -62,7 +62,7 @@ struct OnRouteResult {
  *
  * Specifiers are executed in order, and the output of each is the input of the next. The route
  * that comes out of the last one is the route Envoy uses for the request, unless a specifier ends
- * the chain early by returning OnRouteChainStatus::StopIteration, which makes its own result the
+ * the chain early by returning OnRouteStatus::StopIteration, which makes its own result the
  * final one.
  *
  * Specifiers are configured at three levels, which are evaluated in this order, each level's list
@@ -79,9 +79,9 @@ struct OnRouteResult {
  * route.
  *
  * The chains run as part of route matching, every time a route of the virtual host matches the
- * request. If they turn that route down by ending up with OnRouteMatchStatus::Continue, route
- * matching carries on with the next route of the virtual host, which runs the chains again once
- * it matched. Any other match status accepts what the chains produced, a nullptr route included.
+ * request. If a specifier turns that route down with OnRouteStatus::StopIterationAndSkipRoute,
+ * route matching carries on with the next route of the virtual host, which runs the chains again
+ * once it matched. Any other outcome accepts what the chains produced, a nullptr route included.
  * The virtual host and route configuration chains run one more time, with no route, when no
  * virtual host or no route was found for the request. A specifier may therefore run more than
  * once for a single request.
@@ -113,19 +113,23 @@ public:
    * @param info the stream info of the downstream request.
    * @param random a stable random seed for the request, for specifiers that need to make a
    *        weighted choice.
+   * @param input_status whether there are more routes to evaluate in the route list after the
+   *        one being processed. The run that happens when no route or no virtual host matched
+   *        carries NoMoreRoutes, since there is nothing left to try. Unspecified when the caller
+   *        does not provide this information.
    * @return the route to hand to the next specifier in the chain, which may be @param route
    *         itself if the specifier does not want to change anything, or nullptr to drop it,
-   *         together with whether the chain should carry on. Returning
-   *         OnRouteChainStatus::StopIteration makes the returned route the final one: no later
+   *         together with the status of the result. Returning
+   *         OnRouteStatus::StopIteration makes the returned route the final one: no later
    *         specifier runs, at this level or any of the levels after it. If the route that comes
    *         out of the chain is nullptr the request is handled as if no route had matched.
-   *         Returning OnRouteMatchStatus::Continue asks route matching to skip the matched route
-   *         and try the next one, unless a later specifier returns OnRouteMatchStatus::Accept.
+   *         Returning OnRouteStatus::StopIterationAndSkipRoute also ends the chain, but
+   *         discards the returned route and asks route matching to skip the matched route and
+   *         try the next one of the list being evaluated.
    */
-  // TODO(wbpcode): add a flag to tell the specifier whether the route it is given is the last one
-  // of the list that is being evaluated or there are more routes to try after it.
   virtual OnRouteResult onRoute(RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-                                const StreamInfo::StreamInfo& info, uint64_t random) const PURE;
+                                const StreamInfo::StreamInfo& info, uint64_t random,
+                                OnRouteInputStatus input_status = {}) const PURE;
 };
 
 using RouteSpecifierSharedPtr = std::shared_ptr<const RouteSpecifier>;

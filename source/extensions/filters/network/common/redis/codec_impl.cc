@@ -750,7 +750,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       auto& s = pending_value_stack_.front().value_->asString();
       ASSERT((!s.empty() && s.back() == 'x') || (s.size() > 1 && s[s.size() - 2] == 'x'));
       s.push_back(buffer[0]);
-      if (s[s.size() - 3] == 'x') {
+      if (s.size() >= 3 && s[s.size() - 3] == 'x') {
         char c = static_cast<char>(std::stoul(&s[s.size() - 2], nullptr, 16));
         s.resize(s.size() - 3);
         s.push_back(c);

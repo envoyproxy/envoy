@@ -22,7 +22,6 @@ namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -433,7 +432,7 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitPostsAndRunsHook) {
       };
 
   // Run the posted callback inline to model the main thread dispatching the event.
-  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce(Invoke([](Event::PostCb cb) { cb(); }));
+  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
 
   DynamicModuleStatsSinkConfigScheduler scheduler(config->weak_from_this());
   scheduler.commit(42);
@@ -468,9 +467,9 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventAfterConfigDestroyed
   // Capture the posted callback instead of running it inline, simulating an event that arrives
   // after the config has been destroyed.
   Event::PostCb posted_cb;
-  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce(Invoke([&posted_cb](Event::PostCb cb) {
+  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([&posted_cb](Event::PostCb cb) {
     posted_cb = std::move(cb);
-  }));
+  });
 
   auto config = makeConfig();
   config->on_config_scheduled_ = [](envoy_dynamic_module_type_stat_sink_config_envoy_ptr,

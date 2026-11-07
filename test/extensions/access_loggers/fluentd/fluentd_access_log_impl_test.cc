@@ -105,10 +105,10 @@ TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByRemote) {
   EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     logger_->onEvent(Network::ConnectionEvent::RemoteClose);
     return true;
-  }));
+  });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
@@ -118,10 +118,10 @@ TEST_F(FluentdAccessLoggerImplTest, NoWriteOnLogIfDisconnectedByLocal) {
   EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     logger_->onEvent(Network::ConnectionEvent::LocalClose);
     return true;
-  }));
+  });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
@@ -131,16 +131,15 @@ TEST_F(FluentdAccessLoggerImplTest, LogSingleEntry) {
   EXPECT_CALL(*backoff_strategy_, reset());
   EXPECT_CALL(*retry_timer_, disableTimer());
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     logger_->onEvent(Network::ConnectionEvent::Connected);
     return true;
-  }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(1);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+  });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(1);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
@@ -158,16 +157,15 @@ TEST_F(FluentdAccessLoggerImplTest, LogTwoEntries) {
 
   // Expect second entry to cause all entries to flush.
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     logger_->onEvent(Network::ConnectionEvent::Connected);
     return true;
-  }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(2);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+  });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(2);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
@@ -190,26 +188,25 @@ TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connect())
-      .WillOnce(Invoke([this]() -> bool {
+      .WillOnce([this]() -> bool {
         EXPECT_CALL(*backoff_strategy_, reset()).Times(0);
         EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1), _));
         EXPECT_CALL(*retry_timer_, disableTimer()).Times(0);
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         EXPECT_CALL(*backoff_strategy_, reset());
         EXPECT_CALL(*retry_timer_, enableTimer(_, _)).Times(0);
         EXPECT_CALL(*retry_timer_, disableTimer());
         logger_->onEvent(Network::ConnectionEvent::Connected);
         return true;
-      }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(1);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+      });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(1);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
   retry_timer_->invokeCallback();
@@ -227,14 +224,14 @@ TEST_F(FluentdAccessLoggerImplTest, ReconnectFailure) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect())
-      .WillOnce(Invoke([this]() -> bool {
+      .WillOnce([this]() -> bool {
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }));
+      });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
   retry_timer_->invokeCallback();
@@ -252,18 +249,18 @@ TEST_F(FluentdAccessLoggerImplTest, TwoReconnects) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect())
-      .WillOnce(Invoke([this]() -> bool {
+      .WillOnce([this]() -> bool {
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         logger_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }));
+      });
 
   logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
   retry_timer_->invokeCallback();
@@ -347,9 +344,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateLoggerWhenClusterNotFound) {
 TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
   init();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
+  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce([&] {
     return Tcp::AsyncTcpClientPtr{async_client1_};
-  }));
+  });
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
   config.set_cluster(cluster_name_);
@@ -363,9 +360,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
 TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersSameHash) {
   init();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillRepeatedly(Invoke([&] {
+  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillRepeatedly([&] {
     return Tcp::AsyncTcpClientPtr{async_client1_};
-  }));
+  });
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config1;
   config1.set_cluster(cluster_name_);
@@ -394,8 +391,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
       .WillOnce(Return(&cluster_));
 
   EXPECT_CALL(cluster_, tcpAsyncClient(_, _))
-      .WillOnce(Invoke([&] { return Tcp::AsyncTcpClientPtr{async_client1_}; }))
-      .WillOnce(Invoke([&] { return Tcp::AsyncTcpClientPtr{async_client2_}; }));
+      .WillOnce([&] { return Tcp::AsyncTcpClientPtr{async_client1_}; })
+      .WillOnce([&] { return Tcp::AsyncTcpClientPtr{async_client2_}; });
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config1;
   config1.set_cluster(cluster_name_);
@@ -428,9 +425,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));
   EXPECT_CALL(*async_client1_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client1_, connect()).WillRepeatedly(Return(false));
-  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
+  EXPECT_CALL(cluster_, tcpAsyncClient(_, _)).WillOnce([&] {
     return Tcp::AsyncTcpClientPtr{async_client1_};
-  }));
+  });
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
   config.set_cluster(cluster_name_);
@@ -520,12 +517,12 @@ TEST_F(FluentdAccessLogTest, CreateAndLog) {
   EXPECT_CALL(stream_info, timeSource()).WillOnce(ReturnRef(time_system));
 
   EXPECT_CALL(*formatter, format(_, _)).WillOnce(Return(std::vector<uint8_t>{10, 20}));
-  EXPECT_CALL(*logger, log(_)).WillOnce(Invoke([](EntryPtr&& entry) {
+  EXPECT_CALL(*logger, log(_)).WillOnce([](EntryPtr&& entry) {
     EXPECT_EQ(200, entry->time_);
     ASSERT_EQ(2, entry->record_.size());
     EXPECT_EQ(uint8_t(10), entry->record_[0]);
     EXPECT_EQ(uint8_t(20), entry->record_[1]);
-  }));
+  });
 
   access_log.log({}, stream_info);
 }

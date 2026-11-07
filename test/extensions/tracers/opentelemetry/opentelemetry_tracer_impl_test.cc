@@ -27,7 +27,6 @@ namespace OpenTelemetry {
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -831,7 +830,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_ =
       new NiceMock<Event::MockTimer>(&context_.server_factory_context_.thread_local_.dispatcher_);
   ON_CALL(context_.server_factory_context_.thread_local_.dispatcher_, createTimer_(_))
-      .WillByDefault(Invoke([this](Event::TimerCb) { return timer_; }));
+      .WillByDefault([this](Event::TimerCb) { return timer_; });
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
   // Set up driver
   setupValidDriver();
@@ -1980,6 +1979,38 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
   span->finishSpan();
 
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies that spans_export_failed is incremented when the exporter fails to send the request.
+TEST_F(OpenTelemetryDriverTest, FailedExportIncrementsSpansExportFailed) {
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->name_ =
+      "my_o11y_backend";
+  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"my_o11y_backend"});
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+          httpAsyncClient())
+      .WillByDefault(ReturnRef(
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
+  setupValidDriverWithHttpExporter();
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+  // A null in-flight request makes the HTTP exporter report failure.
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _))
+      .WillOnce(Return(nullptr));
+
+  span->finishSpan();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_export_failed").value());
 }
 
 } // namespace OpenTelemetry

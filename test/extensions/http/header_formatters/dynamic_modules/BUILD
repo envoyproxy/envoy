@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -22,6 +25,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:header_formatter_no_op",
         "//test/extensions/dynamic_modules/test_data/c:header_formatter_preserve_case",
     ],
+    extension_names = ["envoy.http.stateful_header_formatters.dynamic_modules"],
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_formatters/dynamic_modules:config",
@@ -33,7 +37,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
     data = [
@@ -48,6 +52,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:header_formatter_no_op",
         "//test/extensions/dynamic_modules/test_data/c:header_formatter_preserve_case",
     ],
+    extension_names = ["envoy.http.stateful_header_formatters.dynamic_modules"],
     deps = [
         "//source/extensions/http/header_formatters/dynamic_modules:header_formatter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -57,7 +62,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
@@ -67,6 +72,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:header_formatter_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.http.stateful_header_formatters.dynamic_modules"],
     deps = [
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

@@ -116,3 +116,5 @@ message LocalReplyDuringHostSelectionConfig {
 }
 message BreakingChangeFilterConfig {
 }
+message StatsPrefixFilterConfig {
+}

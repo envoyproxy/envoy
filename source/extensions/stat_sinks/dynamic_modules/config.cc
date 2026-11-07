@@ -10,6 +10,8 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/stat_sinks/dynamic_modules/sink.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -36,8 +38,8 @@ absl::StatusOr<Stats::SinkPtr> DynamicModuleStatsSinkFactory::createStatsSink(
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
           server, proto_config.sink_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-      return absl::InvalidArgumentError("Failed to parse sink config: " +
-                                        std::string(config_or_error.status().message()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to parse sink config: ", config_or_error.status().message()));
     }
     sink_config_str = std::move(config_or_error.value());
   }

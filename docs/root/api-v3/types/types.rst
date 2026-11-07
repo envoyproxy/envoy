@@ -5,6 +5,7 @@ Types
   :glob:
   :maxdepth: 2
 
+  ../type/ai/v3/llm_binding.proto
   ../type/ai/v3/llm_protocol.proto
   ../type/matcher/v3/http_inputs.proto
   ../type/tracing/v3/custom_tag.proto
