@@ -2310,6 +2310,68 @@ TEST_P(TcpProxyIntegrationTest, ClusterBufferHighWatermarkTimeoutClosesUpstream)
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->close());
 }
+
+// Tests that the idle timeout still closes a downstream that stops reading after the upstream
+// connection has fully closed. The client sends a request and half-closes, the upstream answers
+// with a response and half-closes, so the upstream connection closes once both directions are
+// half-closed.
+// The tcp_proxy then FlushWrite-closes the downstream; since the client never reads the response,
+// only the idle timer can end the flush.
+TEST_P(TcpProxyIntegrationTest, IdleTimeoutClosesStuckDownstreamAfterUpstreamClose) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    // Small kernel send buffer so data for the non-reading client stays in Envoy's write buffer.
+    auto* downstream_sendbuf = listener->add_socket_options();
+    downstream_sendbuf->set_level(SOL_SOCKET);
+    downstream_sendbuf->set_name(SO_SNDBUF);
+    downstream_sendbuf->set_int_value(4096);
+    downstream_sendbuf->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    auto* config_blob =
+        listener->mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    tcp_proxy_config.mutable_idle_timeout()->set_seconds(2);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+
+  auto options = std::make_shared<Network::ConnectionSocket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 128));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"), options);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // The client sends its request and half-closes, then stops reading.
+  ASSERT_TRUE(tcp_client->write("request", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(7));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  tcp_client->readDisable(true);
+
+  // The response stays below the default buffer limit, so Envoy reads all of it plus the FIN
+  // and the upstream connection closes, while most of the response is stuck in Envoy's
+  // downstream write buffer behind the client's tiny receive window.
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(256 * 1024, 'a'), true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", testing::Eq(1));
+  EXPECT_EQ(0, test_server_->counter("tcp.tcpproxy_stats.idle_timeout")->value())
+      << "idle timeout fired before the upstream was closed; the test did not exercise the "
+         "post-upstream-close flush";
+
+  // The downstream flush can never finish, so the idle timer has to close the connection.
+  test_server_->waitForCounter("tcp.tcpproxy_stats.idle_timeout", testing::Eq(1),
+                               std::chrono::seconds(10));
+
+  tcp_client->readDisable(false);
+  tcp_client->waitForDisconnect(/*ignore_spurious_events=*/true);
+  tcp_client->close();
+}
 #endif
 
 // Test ON_DOWNSTREAM_DATA mode delays connection until data is received.
