@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_google_grpc",
 )
@@ -18,13 +19,33 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_async_handshaker_lib",
+        "//envoy/api:io_error_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/stats:stats_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/network:io_socket_error_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/singleton:manager_impl_lib",
+        "//source/extensions/transport_sockets/alts:alts_channel_pool",
         "//source/extensions/transport_sockets/alts:config",
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
 
@@ -64,12 +85,53 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "fake_async_handshaker_lib",
+    srcs = ["fake_async_handshaker.cc"],
+    hdrs = ["fake_async_handshaker.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/grpc:status",
+        "//envoy/http:async_client_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/tracing:trace_driver_interface",
+        "//source/common/buffer:buffer_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@grpc//src/proto/grpc/gcp:alts_handshaker_cc_grpc",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "alts_async_proxy_test",
+    srcs = ["alts_async_proxy_test.cc"],
+    extension_names = ["envoy.transport_sockets.alts"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":fake_async_handshaker_lib",
+        "//envoy/grpc:status",
+        "//source/extensions/transport_sockets/alts:alts_async_proxy",
+        "//source/extensions/transport_sockets/alts:alts_proxy",
+        "//test/test_common:status_utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@abseil-cpp//absl/types:span",
+        "@grpc//src/proto/grpc/gcp:alts_handshaker_cc_grpc",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "alts_tsi_handshaker_test",
     srcs = ["alts_tsi_handshaker_test.cc"],
     extension_names = ["envoy.transport_sockets.alts"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_async_handshaker_lib",
+        "//envoy/grpc:status",
         "//envoy/network:address_interface",
         "//source/extensions/transport_sockets/alts:alts_proxy",
         "//source/extensions/transport_sockets/alts:alts_tsi_handshaker",
@@ -102,6 +164,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_async_handshaker_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:address_interface",
         "//source/extensions/transport_sockets/alts:alts_proxy",
@@ -127,6 +190,7 @@ envoy_extension_cc_test(
     external_deps = ["grpc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_async_handshaker_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:address_interface",
         "//source/common/network:transport_socket_options_lib",
@@ -160,6 +224,7 @@ envoy_extension_cc_test(
     external_deps = ["grpc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/network:connection_interface",
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
@@ -171,8 +236,11 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration/filters:decode_dynamic_metadata_filter_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
         "@grpc//src/proto/grpc/gcp:alts_handshaker_cc_grpc",
     ],

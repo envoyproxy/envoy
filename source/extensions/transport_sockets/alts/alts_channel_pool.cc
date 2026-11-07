@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/alts/alts_channel_pool.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -10,6 +11,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
+#include "grpc/grpc.h"
 #include "grpcpp/channel.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
@@ -29,16 +31,23 @@ constexpr int ExperimentalKeepAliveTimeoutMs = 10 * 1000;
 // 10 minutes
 constexpr int ExperimentalKeepAliveTimeMs = 10 * 60 * 1000;
 
+std::vector<std::pair<std::string, int>> AltsChannelPool::channelArgs() {
+  std::vector<std::pair<std::string, int>> channel_args = {{GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, 1}};
+  const char* keep_alive = std::getenv(UseGrpcExperimentalAltsHandshakerKeepaliveParams);
+  if (keep_alive != nullptr && std::strcmp(keep_alive, "true") == 0) {
+    channel_args.emplace_back(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, ExperimentalKeepAliveTimeoutMs);
+    channel_args.emplace_back(GRPC_ARG_KEEPALIVE_TIME_MS, ExperimentalKeepAliveTimeMs);
+  }
+  return channel_args;
+}
+
 std::unique_ptr<AltsChannelPool>
 AltsChannelPool::create(absl::string_view handshaker_service_address) {
   std::vector<std::shared_ptr<grpc::Channel>> channel_pool;
   channel_pool.reserve(ChannelPoolSize);
   grpc::ChannelArguments channel_args;
-  channel_args.SetInt(GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, 1);
-  const char* keep_alive = std::getenv(UseGrpcExperimentalAltsHandshakerKeepaliveParams);
-  if (keep_alive != nullptr && std::strcmp(keep_alive, "true") == 0) {
-    channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, ExperimentalKeepAliveTimeoutMs);
-    channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, ExperimentalKeepAliveTimeMs);
+  for (const auto& [key, value] : channelArgs()) {
+    channel_args.SetInt(key, value);
   }
   for (std::size_t i = 0; i < ChannelPoolSize; ++i) {
     channel_pool.push_back(grpc::CreateCustomChannel(

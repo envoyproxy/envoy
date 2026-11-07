@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/string_view.h"
@@ -17,6 +19,10 @@ namespace Alts {
 class AltsChannelPool {
 public:
   static std::unique_ptr<AltsChannelPool> create(absl::string_view handshaker_service_address);
+
+  // Returns the arguments of every channel to the ALTS handshaker service. Also
+  // used for the channels of Envoy's async gRPC client to that service.
+  static std::vector<std::pair<std::string, int>> channelArgs();
 
   // Gets a channel to the ALTS handshaker service. The caller is responsible
   // for checking that the channel is non-null.

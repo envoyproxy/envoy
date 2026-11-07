@@ -1,13 +1,16 @@
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <thread>
 #include <utility>
 
+#include "envoy/grpc/status.h"
 #include "envoy/network/address.h"
 
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 #include "source/extensions/transport_sockets/alts/alts_tsi_handshaker.h"
 
+#include "test/extensions/transport_sockets/alts/fake_async_handshaker.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
@@ -166,16 +169,22 @@ public:
     alts_handshake_result_ = std::move(alts_handshake_result);
   }
 
+  // The number of results that onNextDoneImpl reported to this handshaker.
+  int onNextDoneCalls() const { return on_next_done_calls_; }
+  void recordOnNextDone() { ++on_next_done_calls_; }
+
 private:
   std::unique_ptr<AltsHandshakeResult> alts_handshake_result_;
   std::string bytes_to_send_;
   absl::Status status_ = absl::InternalError("Never populated.");
+  int on_next_done_calls_ = 0;
 };
 
 void onNextDoneImpl(absl::Status status, void* handshaker, const unsigned char* bytes_to_send,
                     size_t bytes_to_send_size,
                     std::unique_ptr<AltsHandshakeResult> handshake_result) {
   CapturingHandshaker* capturing_handshaker = static_cast<CapturingHandshaker*>(handshaker);
+  capturing_handshaker->recordOnNextDone();
   capturing_handshaker->setStatus(status);
   absl::string_view bytes(reinterpret_cast<const char*>(bytes_to_send), bytes_to_send_size);
   capturing_handshaker->setBytesToSend(bytes);
@@ -720,6 +729,163 @@ TEST_P(AltsTsiHandshakerTest, ComputeMaxFrameSize) {
   // Max frame size is within the allowed limits.
   result.set_max_frame_size(AltsMinFrameSize + 1);
   EXPECT_EQ(AltsTsiHandshaker::computeMaxFrameSize(result), AltsMinFrameSize + 1);
+}
+
+// Tests of handshakers that talk to the handshaker service asynchronously. The
+// fake handshaker service only responds when the test delivers the response.
+class AltsTsiHandshakerAsyncTest : public testing::Test {
+protected:
+  absl::Status next(AltsTsiHandshaker& handshaker, absl::string_view received_bytes) {
+    return handshaker.next(&capturing_handshaker_,
+                           reinterpret_cast<const unsigned char*>(received_bytes.data()),
+                           received_bytes.size(), onNextDoneImpl);
+  }
+
+  // The number of next() results reported so far.
+  int results() const { return capturing_handshaker_.onNextDoneCalls(); }
+
+  std::shared_ptr<FakeAsyncHandshakerClient> client_ =
+      std::make_shared<FakeAsyncHandshakerClient>();
+  CapturingHandshaker capturing_handshaker_;
+};
+
+TEST_F(AltsTsiHandshakerAsyncTest, ClientSideFullHandshake) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForClient(client_, "target.googleapis.com");
+
+  // Get the ClientInit. next() returns before the handshaker service responds.
+  EXPECT_OK(next(*handshaker, ""));
+  EXPECT_EQ(results(), 0);
+  ASSERT_EQ(client_->streams().size(), 1);
+  ASSERT_EQ(client_->lastStream().requests().size(), 1);
+  EXPECT_EQ(client_->lastStream().requests()[0].client_start().target_name(),
+            "target.googleapis.com");
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_EQ(results(), 1);
+  EXPECT_OK(capturing_handshaker_.getStatus());
+  EXPECT_EQ(capturing_handshaker_.getBytesToSend(), FakeHandshake::ClientInit);
+  EXPECT_THAT(capturing_handshaker_.getAltsHandshakeResult(), IsNull());
+
+  // Get the ClientFinished and the handshake result.
+  EXPECT_OK(next(*handshaker, FakeHandshake::ServerInitAndFinished));
+  EXPECT_EQ(results(), 1);
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_EQ(results(), 2);
+  EXPECT_OK(capturing_handshaker_.getStatus());
+  EXPECT_EQ(capturing_handshaker_.getBytesToSend(), FakeHandshake::ClientFinished);
+  auto result = capturing_handshaker_.getAltsHandshakeResult();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->frame_protector, NotNull());
+  EXPECT_EQ(result->peer_identity, FakeHandshake::PeerServiceAccount);
+  EXPECT_EQ(result->unused_bytes.size(), 0);
+
+  // The whole handshake used one stream.
+  EXPECT_EQ(client_->streams().size(), 1);
+  EXPECT_THAT(next(*handshaker, ""), StatusCodeIs(absl::StatusCode::kInternal));
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, ServerSideFullHandshakeKeepsUnusedBytes) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+
+  // Get the ServerInit and ServerFinished.
+  EXPECT_OK(next(*handshaker, FakeHandshake::ClientInit));
+  EXPECT_EQ(results(), 0);
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_EQ(results(), 1);
+  EXPECT_OK(capturing_handshaker_.getStatus());
+  EXPECT_EQ(capturing_handshaker_.getBytesToSend(), FakeHandshake::ServerInitAndFinished);
+
+  // The ClientFinished arrives together with application data.
+  std::string received_bytes = absl::StrCat(FakeHandshake::ClientFinished, ApplicationData);
+  EXPECT_OK(next(*handshaker, received_bytes));
+  // The caller may reuse its buffer as soon as next() returns.
+  std::fill(received_bytes.begin(), received_bytes.end(), 'x');
+  EXPECT_EQ(results(), 1);
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_EQ(results(), 2);
+  EXPECT_OK(capturing_handshaker_.getStatus());
+  EXPECT_EQ(capturing_handshaker_.getBytesToSend(), "");
+  auto result = capturing_handshaker_.getAltsHandshakeResult();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->frame_protector, NotNull());
+  EXPECT_EQ(result->peer_identity, FakeHandshake::PeerServiceAccount);
+  EXPECT_EQ(std::string(result->unused_bytes.begin(), result->unused_bytes.end()), ApplicationData);
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, NextWhileWaitingFails) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+  EXPECT_OK(next(*handshaker, FakeHandshake::ClientInit));
+  EXPECT_THAT(next(*handshaker, FakeHandshake::ClientFinished),
+              StatusCodeIs(absl::StatusCode::kFailedPrecondition));
+  EXPECT_EQ(client_->lastStream().requests().size(), 1);
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, CancelDropsResponse) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+  EXPECT_OK(next(*handshaker, FakeHandshake::ClientInit));
+  FakeAsyncHandshakerStream& stream = client_->lastStream();
+
+  handshaker->cancel();
+  EXPECT_TRUE(stream.closed());
+  EXPECT_TRUE(stream.waitingForRemoteClose());
+  EXPECT_FALSE(stream.deliverResponse());
+  EXPECT_EQ(results(), 0);
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, StreamFailureIsReported) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForClient(client_);
+  EXPECT_OK(next(*handshaker, ""));
+  EXPECT_TRUE(client_->lastStream().remoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                                "unavailable"));
+  EXPECT_EQ(results(), 1);
+  EXPECT_THAT(capturing_handshaker_.getStatus(), StatusCodeIs(absl::StatusCode::kUnavailable));
+  EXPECT_EQ(capturing_handshaker_.getBytesToSend(), "");
+  EXPECT_THAT(capturing_handshaker_.getAltsHandshakeResult(), IsNull());
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, StreamStartFailureIsReturned) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+  client_->failNextStart();
+  EXPECT_THAT(next(*handshaker, FakeHandshake::ClientInit),
+              StatusCodeIs(absl::StatusCode::kUnavailable));
+  EXPECT_EQ(results(), 0);
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, SendAfterStreamFailureIsReturned) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+  EXPECT_OK(next(*handshaker, FakeHandshake::ClientInit));
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_TRUE(client_->lastStream().remoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable,
+                                                "unavailable"));
+  EXPECT_THAT(next(*handshaker, FakeHandshake::ClientFinished),
+              StatusCodeIs(absl::StatusCode::kUnavailable));
+  EXPECT_EQ(results(), 1);
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, HandshakerServiceErrorIsReported) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+  // The fake handshaker service rejects an unexpected first message.
+  EXPECT_OK(next(*handshaker, "NOT_A_CLIENT_INIT"));
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_EQ(results(), 1);
+  EXPECT_THAT(capturing_handshaker_.getStatus(), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(capturing_handshaker_.getAltsHandshakeResult(), IsNull());
+}
+
+TEST_F(AltsTsiHandshakerAsyncTest, InvalidHandshakeResultIsReported) {
+  auto handshaker = AltsTsiHandshaker::createAsyncForServer(client_);
+  EXPECT_OK(next(*handshaker, FakeHandshake::ClientInit));
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+
+  HandshakerResp response;
+  *response.mutable_result() = FakeHandshake::handshakeResult();
+  response.mutable_result()->clear_peer_identity();
+  client_->lastStream().setNextResponse(response);
+  EXPECT_OK(next(*handshaker, FakeHandshake::ClientFinished));
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  EXPECT_EQ(results(), 2);
+  EXPECT_THAT(capturing_handshaker_.getStatus(),
+              StatusCodeIs(absl::StatusCode::kFailedPrecondition));
+  EXPECT_THAT(capturing_handshaker_.getAltsHandshakeResult(), IsNull());
 }
 
 } // namespace
