@@ -6,6 +6,7 @@
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/hex.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/common/tracing/tracing_validation.h"
 
 #include "msgpack.hpp"
 
@@ -14,14 +15,11 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
+using ::Envoy::Tracing::W3cTraceConstants;
+
 // Handle Span and Trace context extraction and validation
 // Adapted from OpenTelemetry tracer extension @alexanderellis @yanavlasov
 // See https://www.w3.org/TR/trace-context/#traceparent-header
-constexpr int kTraceparentHeaderSize = 55; // 2 + 1 + 32 + 1 + 16 + 1 + 2
-constexpr int kVersionHexSize = 2;
-constexpr int kTraceIdHexSize = 32;
-constexpr int kParentIdHexSize = 16;
-constexpr int kTraceFlagsHexSize = 2;
 
 bool isValidHex(const absl::string_view& input) {
   return std::all_of(input.begin(), input.end(),
@@ -50,7 +48,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   }
   auto header_value_string = propagation_header.value();
 
-  if (header_value_string.size() != kTraceparentHeaderSize) {
+  if (header_value_string.size() != W3cTraceConstants::kTraceparentHeaderSize) {
     return absl::InvalidArgumentError("Invalid traceparent header length");
   }
   // Try to split it into its component parts:
@@ -63,8 +61,10 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   absl::string_view trace_id = propagation_header_components[1];
   absl::string_view parent_id = propagation_header_components[2];
   absl::string_view trace_flags = propagation_header_components[3];
-  if (version.size() != kVersionHexSize || trace_id.size() != kTraceIdHexSize ||
-      parent_id.size() != kParentIdHexSize || trace_flags.size() != kTraceFlagsHexSize) {
+  if (version.size() != W3cTraceConstants::kVersionHexSize ||
+      trace_id.size() != W3cTraceConstants::kTraceIdHexSize ||
+      parent_id.size() != W3cTraceConstants::kParentIdHexSize ||
+      trace_flags.size() != W3cTraceConstants::kTraceFlagsHexSize) {
     return absl::InvalidArgumentError("Invalid traceparent field sizes");
   }
   if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(parent_id) ||
