@@ -180,7 +180,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
 
-    registerCertCompression(tls_config.crypto_config_->ssl_ctx());
+    registerClientCertDecompression(tls_config.crypto_config_->ssl_ctx());
 
     if (client_certificates_enabled_) {
       absl::Status status = configureQuicClientCertChain(

@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "source/common/tls/cert_compression.h"
+#include "source/common/tls/cert_decompression.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -9,10 +10,13 @@
 #include "absl/types/span.h"
 #include "gtest/gtest.h"
 #include "openssl/bn.h"
+#include "openssl/bytestring.h"
 #include "openssl/ec_key.h"
 #include "openssl/evp.h"
 #include "openssl/nid.h"
 #include "openssl/rsa.h"
+#include "openssl/ssl3.h"
+#include "openssl/tls1.h"
 #include "openssl/x509.h"
 
 namespace Envoy {
@@ -62,8 +66,8 @@ TEST(CertCompressionBrotliTest, RoundTrip) {
   // Decompress
   CRYPTO_BUFFER* out = nullptr;
   EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::decompressBrotli(nullptr, &out, kTestDataLen,
-                                              CBB_data(compressed.get()), compressed_len));
+            CertDecompression::decompressBrotli(nullptr, &out, kTestDataLen,
+                                                CBB_data(compressed.get()), compressed_len));
   ASSERT_NE(nullptr, out);
   bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
 
@@ -106,8 +110,8 @@ TEST(CertCompressionBrotliTest, DecompressBadData) {
         CRYPTO_BUFFER* out = nullptr;
         const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(CertCompression::FAILURE,
-                  CertCompression::decompressBrotli(nullptr, &out, 100, &bad_compressed_data,
-                                                    sizeof(bad_compressed_data)));
+                  CertDecompression::decompressBrotli(nullptr, &out, 100, &bad_compressed_data,
+                                                      sizeof(bad_compressed_data)));
       });
 }
 
@@ -124,9 +128,9 @@ TEST(CertCompressionBrotliTest, DecompressBadLength) {
       "error", "Brotli decompression length did not match peer provided uncompressed length", {
         CRYPTO_BUFFER* out = nullptr;
         EXPECT_EQ(CertCompression::FAILURE,
-                  CertCompression::decompressBrotli(nullptr, &out,
-                                                    kTestDataLen + 1 /* intentionally incorrect */,
-                                                    CBB_data(compressed.get()), compressed_len));
+                  CertDecompression::decompressBrotli(
+                      nullptr, &out, kTestDataLen + 1 /* intentionally incorrect */,
+                      CBB_data(compressed.get()), compressed_len));
       });
 }
 
@@ -147,8 +151,8 @@ TEST(CertCompressionZlibTest, RoundTrip) {
   // Decompress
   CRYPTO_BUFFER* out = nullptr;
   EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::decompressZlib(nullptr, &out, kTestDataLen, CBB_data(compressed.get()),
-                                            compressed_len));
+            CertDecompression::decompressZlib(nullptr, &out, kTestDataLen,
+                                              CBB_data(compressed.get()), compressed_len));
   ASSERT_NE(nullptr, out);
   bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
 
@@ -188,8 +192,8 @@ TEST(CertCompressionZlibTest, DecompressBadData) {
       "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
         EXPECT_EQ(CertCompression::FAILURE,
-                  CertCompression::decompressZlib(nullptr, &out, 100, bad_compressed_data,
-                                                  sizeof(bad_compressed_data)));
+                  CertDecompression::decompressZlib(nullptr, &out, 100, bad_compressed_data,
+                                                    sizeof(bad_compressed_data)));
       });
 }
 
@@ -209,7 +213,7 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
                       {
                         CRYPTO_BUFFER* out = nullptr;
                         EXPECT_EQ(CertCompression::FAILURE,
-                                  CertCompression::decompressZlib(
+                                  CertDecompression::decompressZlib(
                                       nullptr, &out, kTestDataLen + 1 /* intentionally incorrect */,
                                       CBB_data(compressed.get()), compressed_len));
                       });
@@ -237,9 +241,9 @@ TEST(CertCompressionBrotliTest, DistinctChainsDoNotCollide) {
   auto roundtrip = [](const std::string& compressed, size_t uncompressed_len) {
     CRYPTO_BUFFER* out = nullptr;
     EXPECT_EQ(CertCompression::SUCCESS,
-              CertCompression::decompressBrotli(nullptr, &out, uncompressed_len,
-                                                reinterpret_cast<const uint8_t*>(compressed.data()),
-                                                compressed.size()));
+              CertDecompression::decompressBrotli(
+                  nullptr, &out, uncompressed_len,
+                  reinterpret_cast<const uint8_t*>(compressed.data()), compressed.size()));
     bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
     return std::string(reinterpret_cast<const char*>(CRYPTO_BUFFER_data(out)),
                        CRYPTO_BUFFER_len(out));
@@ -305,19 +309,15 @@ bssl::UniquePtr<SSL_CTX> makeCompressionServerCtx(X509* cert, EVP_PKEY* key) {
   return ctx;
 }
 
-using DecompressFn = int (*)(SSL*, CRYPTO_BUFFER**, size_t, const uint8_t*, size_t);
-
-// A TLS 1.3 client context that advertises decompression for exactly one algorithm, so
-// the server is forced to use it. Verification is disabled; the test inspects the
-// presented certificate directly.
-bssl::UniquePtr<SSL_CTX> makeCompressionClientCtx(uint16_t alg, DecompressFn decompress) {
+// A TLS 1.3 client context that registers decompression (as Envoy's client contexts do) for
+// exactly one algorithm, so the server is forced to use it. Verification is disabled; the test
+// inspects the presented certificate directly.
+bssl::UniquePtr<SSL_CTX> makeCompressionClientCtx(void (*register_decompression)(SSL_CTX*)) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   RELEASE_ASSERT(SSL_CTX_set_min_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
   RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
   SSL_CTX_set_verify(ctx.get(), SSL_VERIFY_NONE, nullptr);
-  RELEASE_ASSERT(
-      SSL_CTX_add_cert_compression_alg(ctx.get(), alg, /*compress=*/nullptr, decompress) == 1,
-      "add_cert_compression_alg failed");
+  register_decompression(ctx.get());
   return ctx;
 }
 
@@ -377,12 +377,11 @@ TEST(CertCompressionMatrixTest, CorrectCertPerAlgorithmAcrossHandshakes) {
 
   struct AlgCase {
     std::string name;
-    uint16_t id;
-    DecompressFn decompress;
+    void (*register_decompression)(SSL_CTX*);
   };
   const std::vector<AlgCase> alg_cases = {
-      {"brotli", TLSEXT_cert_compression_brotli, CertCompression::decompressBrotli},
-      {"zlib", TLSEXT_cert_compression_zlib, CertCompression::decompressZlib},
+      {"brotli", CertDecompression::registerBrotli},
+      {"zlib", CertDecompression::registerZlib},
   };
 
   for (const auto& cert : cert_cases) {
@@ -390,7 +389,7 @@ TEST(CertCompressionMatrixTest, CorrectCertPerAlgorithmAcrossHandshakes) {
     bssl::UniquePtr<SSL_CTX> server_ctx = makeCompressionServerCtx(cert.cert.get(), cert.key.get());
 
     for (const auto& alg : alg_cases) {
-      bssl::UniquePtr<SSL_CTX> client_ctx = makeCompressionClientCtx(alg.id, alg.decompress);
+      bssl::UniquePtr<SSL_CTX> client_ctx = makeCompressionClientCtx(alg.register_decompression);
       for (int i = 0; i < 2; i++) {
         bssl::UniquePtr<X509> served =
             handshakeAndGetServerCert(client_ctx.get(), server_ctx.get());
@@ -401,6 +400,118 @@ TEST(CertCompressionMatrixTest, CorrectCertPerAlgorithmAcrossHandshakes) {
             << " iter=" << i;
       }
     }
+  }
+}
+
+struct CertWireStats {
+  std::vector<uint16_t> sent_compressed_algs;
+  std::vector<uint16_t> received_compressed_algs;
+  int sent_uncompressed_certs = 0;
+  int received_uncompressed_certs = 0;
+};
+
+void recordCertHandshakeMessages(int is_write, int /*version*/, int content_type, const void* buf,
+                                 size_t len, SSL* /*ssl*/, void* arg) {
+  if (content_type != SSL3_RT_HANDSHAKE) {
+    return;
+  }
+  CBS cbs;
+  CBS_init(&cbs, static_cast<const uint8_t*>(buf), len);
+  uint8_t msg_type = 0;
+  CBS body;
+  if (!CBS_get_u8(&cbs, &msg_type) || !CBS_get_u24_length_prefixed(&cbs, &body)) {
+    return;
+  }
+  auto* stats = static_cast<CertWireStats*>(arg);
+  if (msg_type == SSL3_MT_COMPRESSED_CERTIFICATE) {
+    uint16_t alg_id = 0;
+    if (CBS_get_u16(&body, &alg_id)) {
+      if (is_write) {
+        stats->sent_compressed_algs.push_back(alg_id);
+      } else {
+        stats->received_compressed_algs.push_back(alg_id);
+      }
+    }
+  } else if (msg_type == SSL3_MT_CERTIFICATE) {
+    if (is_write) {
+      stats->sent_uncompressed_certs++;
+    } else {
+      stats->received_uncompressed_certs++;
+    }
+  }
+}
+
+bool runInMemoryHandshake(SSL* client, SSL* server) {
+  SSL_set_connect_state(client);
+  SSL_set_accept_state(server);
+
+  BIO* client_bio = nullptr;
+  BIO* server_bio = nullptr;
+  RELEASE_ASSERT(BIO_new_bio_pair(&client_bio, 1 << 17, &server_bio, 1 << 17) == 1, "bio_pair");
+  SSL_set0_rbio(client, client_bio);
+  BIO_up_ref(client_bio);
+  SSL_set0_wbio(client, client_bio);
+  SSL_set0_rbio(server, server_bio);
+  BIO_up_ref(server_bio);
+  SSL_set0_wbio(server, server_bio);
+
+  for (int i = 0; i < 100; i++) {
+    SSL_do_handshake(client);
+    SSL_do_handshake(server);
+    if (SSL_is_init_finished(client) && SSL_is_init_finished(server)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(CertCompressionDecompressionOnlyTest, DoesNotRegisterCompressors) {
+  bssl::UniquePtr<EVP_PKEY> key = generateEcdsaKey();
+  bssl::UniquePtr<X509> cert = makeSelfSignedCert(key.get(), "decompress-only.example.com");
+
+  // Peer client offering both brotli and zlib certificate decompression.
+  bssl::UniquePtr<SSL_CTX> peer_client_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_EQ(1, SSL_CTX_set_min_proto_version(peer_client_ctx.get(), TLS1_3_VERSION));
+  ASSERT_EQ(1, SSL_CTX_set_max_proto_version(peer_client_ctx.get(), TLS1_3_VERSION));
+  SSL_CTX_set_verify(peer_client_ctx.get(), SSL_VERIFY_NONE, nullptr);
+  CertDecompression::registerBrotli(peer_client_ctx.get());
+  CertDecompression::registerZlib(peer_client_ctx.get());
+
+  // Control: full registration (registerBrotli + registerZlib) sends CompressedCertificate.
+  {
+    bssl::UniquePtr<SSL_CTX> full_server_ctx = makeCompressionServerCtx(cert.get(), key.get());
+    bssl::UniquePtr<SSL> client(SSL_new(peer_client_ctx.get()));
+    bssl::UniquePtr<SSL> server(SSL_new(full_server_ctx.get()));
+    CertWireStats server_stats;
+    SSL_set_msg_callback(server.get(), recordCertHandshakeMessages);
+    SSL_set_msg_callback_arg(server.get(), &server_stats);
+
+    ASSERT_TRUE(runInMemoryHandshake(client.get(), server.get()));
+    EXPECT_EQ(server_stats.sent_compressed_algs,
+              std::vector<uint16_t>{TLSEXT_cert_compression_brotli});
+    EXPECT_EQ(server_stats.sent_uncompressed_certs, 0);
+  }
+
+  // Decompression-only registration leaves compress == nullptr, so acting as a server sends an
+  // uncompressed Certificate message instead of CompressedCertificate.
+  {
+    bssl::UniquePtr<SSL_CTX> decomp_only_ctx(SSL_CTX_new(TLS_method()));
+    ASSERT_EQ(1, SSL_CTX_set_min_proto_version(decomp_only_ctx.get(), TLS1_3_VERSION));
+    ASSERT_EQ(1, SSL_CTX_set_max_proto_version(decomp_only_ctx.get(), TLS1_3_VERSION));
+    ASSERT_EQ(1, SSL_CTX_use_certificate(decomp_only_ctx.get(), cert.get()));
+    ASSERT_EQ(1, SSL_CTX_use_PrivateKey(decomp_only_ctx.get(), key.get()));
+    CertDecompression::registerBrotli(decomp_only_ctx.get());
+    CertDecompression::registerZlib(decomp_only_ctx.get());
+
+    bssl::UniquePtr<SSL> client(SSL_new(peer_client_ctx.get()));
+    bssl::UniquePtr<SSL> server(SSL_new(decomp_only_ctx.get()));
+    CertWireStats server_stats;
+    SSL_set_msg_callback(server.get(), recordCertHandshakeMessages);
+    SSL_set_msg_callback_arg(server.get(), &server_stats);
+
+    ASSERT_TRUE(runInMemoryHandshake(client.get(), server.get()));
+    EXPECT_TRUE(server_stats.sent_compressed_algs.empty());
+    EXPECT_EQ(server_stats.sent_uncompressed_certs, 1);
   }
 }
 #endif // ENVOY_SSL_OPENSSL
@@ -435,6 +546,19 @@ TEST_F(CertCompressionRegistrationTest, RegisterAllAlgorithms) {
   // Order matters: brotli > zlib (by priority)
   EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
   EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
+}
+
+TEST_F(CertCompressionRegistrationTest, RegisterBrotliDecompressionOnly) {
+  EXPECT_NO_THROW(CertDecompression::registerBrotli(ssl_ctx_.get()));
+}
+
+TEST_F(CertCompressionRegistrationTest, RegisterZlibDecompressionOnly) {
+  EXPECT_NO_THROW(CertDecompression::registerZlib(ssl_ctx_.get()));
+}
+
+TEST_F(CertCompressionRegistrationTest, RegisterAllDecompressionOnlyAlgorithms) {
+  EXPECT_NO_THROW(CertDecompression::registerBrotli(ssl_ctx_.get()));
+  EXPECT_NO_THROW(CertDecompression::registerZlib(ssl_ctx_.get()));
 }
 
 } // namespace Tls

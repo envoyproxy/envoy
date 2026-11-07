@@ -27,6 +27,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -45,6 +46,16 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+namespace {
+
+// Priority: brotli > zlib (brotli generally provides best compression for certs).
+void registerServerCertCompression(SSL_CTX* ssl_ctx) {
+  CertCompression::registerBrotli(ssl_ctx);
+  CertCompression::registerZlib(ssl_ctx);
+}
+
+} // namespace
 
 Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
   Ssl::CurveNIDVector cnsv{};
@@ -101,7 +112,7 @@ ServerContextImpl::ServerContextImpl(
     bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : ContextImpl(scope, config, tls_certificates, factory_context, additional_init,
-                  creation_status),
+                  creation_status, registerServerCertCompression),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (!creation_status.ok()) {

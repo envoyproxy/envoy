@@ -65,12 +65,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source_test.cc"]),
+    external_deps = ["ssl"],
     rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/quic:envoy_tls_server_handshaker",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:server_context_lib",
@@ -511,6 +513,7 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3(["cert_compression_test.cc"]),
     deps = envoy_select_enable_http3([
         "//source/common/tls:cert_compression_lib",
+        "//source/common/tls:cert_decompression_lib",
         "//test/test_common:logging_lib",
     ]),
 )

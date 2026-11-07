@@ -1,4 +1,5 @@
 #include "source/common/tls/cert_compression.h"
+#include "source/common/tls/cert_decompression.h"
 
 #include "test/test_common/logging.h"
 
@@ -8,6 +9,7 @@ namespace Envoy {
 namespace Quic {
 
 using TlsCertCompression = Extensions::TransportSockets::Tls::CertCompression;
+using TlsCertDecompression = Extensions::TransportSockets::Tls::CertDecompression;
 
 TEST(CertCompressionZlibTest, DecompressBadData) {
   constexpr uint8_t bad_compressed_data[2] = {1};
@@ -16,8 +18,8 @@ TEST(CertCompressionZlibTest, DecompressBadData) {
       "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
         EXPECT_EQ(TlsCertCompression::FAILURE,
-                  TlsCertCompression::decompressZlib(nullptr, &out, 100, bad_compressed_data,
-                                                     sizeof(bad_compressed_data)));
+                  TlsCertDecompression::decompressZlib(nullptr, &out, 100, bad_compressed_data,
+                                                       sizeof(bad_compressed_data)));
       });
 }
 
@@ -45,7 +47,7 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
                       {
                         CRYPTO_BUFFER* out = nullptr;
                         EXPECT_EQ(TlsCertCompression::FAILURE,
-                                  TlsCertCompression::decompressZlib(
+                                  TlsCertDecompression::decompressZlib(
                                       nullptr, &out,
                                       uncompressed_len + 1 /* intentionally incorrect */,
                                       CBB_data(compressed.get()), compressed_len));

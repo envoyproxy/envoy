@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_decompression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -44,6 +45,16 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+namespace {
+
+// Clients only need to decompress the server's certificate. Priority: brotli > zlib.
+void registerClientCertDecompression(SSL_CTX* ssl_ctx) {
+  CertDecompression::registerBrotli(ssl_ctx);
+  CertDecompression::registerZlib(ssl_ctx);
+}
+
+} // namespace
+
 absl::StatusOr<std::unique_ptr<ClientContextImpl>>
 ClientContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                           Server::Configuration::CommonFactoryContext& factory_context) {
@@ -60,7 +71,7 @@ ClientContextImpl::ClientContextImpl(
     bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
     absl::Status& creation_status)
     : ContextImpl(scope, config, tls_certificates, factory_context, nullptr /* additional_init */,
-                  creation_status),
+                  creation_status, registerClientCertDecompression),
       server_name_indication_(config.serverNameIndication()),
       auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
