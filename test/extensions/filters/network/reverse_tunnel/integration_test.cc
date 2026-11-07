@@ -1,3 +1,4 @@
+#include <optional>
 #include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -62,6 +63,15 @@ typed_config:
 
     // Call parent initialize to complete setup.
     BaseIntegrationTest::initialize();
+  }
+
+  // Number of samples currently recorded in the initiator setup-latency histogram.
+  uint64_t tunnelSetupTimeSampleCount() {
+    auto histogram = test_server_->histogram("reverse_tunnel_initiator.tunnel_setup_time");
+    if (histogram == nullptr) {
+      return 0;
+    }
+    return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
   }
 
 protected:
@@ -453,6 +463,11 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
   test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.e2e-cluster", Ge(1));
 
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
+
+  // Successful full-capacity setup must record a setup-latency sample.
+  test_server_->waitUntilHistogramHasSamples("reverse_tunnel_initiator.tunnel_setup_time",
+                                             std::chrono::milliseconds(5000));
+  EXPECT_EQ(tunnelSetupTimeSampleCount(), 1);
 
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
