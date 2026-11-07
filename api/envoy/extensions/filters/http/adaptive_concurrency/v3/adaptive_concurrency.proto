@@ -111,7 +111,7 @@ message EwmaControllerConfig {
   google.protobuf.Duration concurrency_update_interval = 1
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // Half-life of the baseline over nonempty windows after warmup. Defaults to 300s.
+  // Half-life of the baseline over nonempty windows after initialization. Defaults to 300s.
   google.protobuf.Duration half_life = 2 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // Number of nonempty window percentiles averaged to initialize the baseline. Defaults to 10.
