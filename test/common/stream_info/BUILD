@@ -118,3 +118,12 @@ envoy_cc_test(
         "//source/common/stream_info:bool_accessor_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "uuid_object_impl_test",
+    srcs = ["uuid_object_impl_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/stream_info:uuid_object_lib",
+    ],
+)
