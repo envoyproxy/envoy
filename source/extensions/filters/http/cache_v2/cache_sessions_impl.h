@@ -123,7 +123,9 @@ private:
     // If the passed-through response turns out to be cacheable (i.e. upstream has changed
     // cache headers), client should update state to Writing, or, if state is already changed,
     // client should abort the new upstream request and use the shared one.
-    NotCacheable
+    NotCacheable,
+    // Failed sessions remain failed for existing readers. New lookups use a new session.
+    Failed
   };
 
   EndStream endStreamAfterHeaders() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
@@ -214,7 +216,7 @@ private:
   bool canReadBodyRangeFromCacheEntry(BodySubscriber& subscriber);
   void onBodyChunkFromCache(AdjustedByteRange range, Buffer::InstancePtr buffer,
                             EndStream end_stream) ABSL_LOCKS_EXCLUDED(mu_);
-  void onCacheError() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void onCacheError(bool reset_lookups = true) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   void doCacheEntryInvalid() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   void doCacheMiss() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
@@ -258,6 +260,10 @@ private:
   bool inserting() const {
     absl::MutexLock lock(mu_);
     return state_ == State::Inserting;
+  }
+  bool failed() const {
+    absl::MutexLock lock(mu_);
+    return state_ == State::Failed;
   }
   void setExpiry(SystemTime expiry) { expires_at_ = expiry; }
   bool isExpiredAt(SystemTime t) const { return expires_at_ < t && !inserting(); }
