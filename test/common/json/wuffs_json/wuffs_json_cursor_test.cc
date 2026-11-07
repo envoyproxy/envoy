@@ -6,6 +6,7 @@
 #include "test/test_common/status_utility.h"
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -350,6 +351,78 @@ TEST(WuffsJsonCursorTest, SameKeyNameAtDifferentDepthsAllowed) {
 TEST(WuffsJsonCursorTest, SameKeyNameInSiblingObjectsAllowed) {
   CapturingHandler h;
   EXPECT_OK(parse(R"([{"a":1},{"a":2}])", h));
+}
+
+// Duplicate detection switches from a linear scan to a hash set past
+// SeenKeys::kLinearScanLimit keys. Results must be the same on both sides.
+
+namespace {
+
+// `{"k0":0,"k1":1,...}` with `count` keys, then `extra` (",..." or empty).
+std::string objectWithKeys(size_t count, absl::string_view extra = "") {
+  std::string out = "{";
+  for (size_t i = 0; i < count; ++i) {
+    absl::StrAppend(&out, i == 0 ? "" : ",", "\"k", i, "\":", i);
+  }
+  absl::StrAppend(&out, extra, "}");
+  return out;
+}
+
+constexpr size_t kLimit = WuffsJsonCursor::SeenKeys::kLinearScanLimit;
+
+} // namespace
+
+TEST(WuffsJsonCursorTest, ManyDistinctKeysAcrossPromotionAccepted) {
+  CapturingHandler h;
+  EXPECT_OK(parse(objectWithKeys(kLimit * 4), h));
+  EXPECT_EQ(h.fields.size(), kLimit * 4);
+}
+
+TEST(WuffsJsonCursorTest, DuplicateInLinearScanRegionRejected) {
+  CapturingHandler h;
+  // Duplicate well under the limit.
+  EXPECT_THAT(parse(objectWithKeys(kLimit / 2, ",\"k0\":9"), h), Not(IsOk()));
+}
+
+TEST(WuffsJsonCursorTest, DuplicateExactlyAtPromotionBoundaryRejected) {
+  CapturingHandler h;
+  // The insert that triggers promotion is itself a duplicate...
+  EXPECT_THAT(parse(objectWithKeys(kLimit, ",\"k0\":9"), h), Not(IsOk()));
+  CapturingHandler h2;
+  // ...and a duplicate of the last scanned key.
+  EXPECT_THAT(parse(objectWithKeys(kLimit, absl::StrCat(",\"k", kLimit - 1, "\":9")), h2),
+              Not(IsOk()));
+}
+
+TEST(WuffsJsonCursorTest, DuplicateOfScannedKeyAfterPromotionRejected) {
+  CapturingHandler h;
+  // Keys from the scan phase must survive the move to the hash set.
+  EXPECT_THAT(parse(objectWithKeys(kLimit * 2, ",\"k0\":9"), h), Not(IsOk()));
+}
+
+TEST(WuffsJsonCursorTest, DuplicateOfPostPromotionKeyRejected) {
+  CapturingHandler h;
+  EXPECT_THAT(parse(objectWithKeys(kLimit * 2, absl::StrCat(",\"k", kLimit + 3, "\":9")), h),
+              Not(IsOk()));
+}
+
+// The packed buffer must not confuse "ab","c" with "a","bc", or "a" with "ab".
+TEST(WuffsJsonCursorTest, PackedKeyBufferDoesNotConfuseBoundaries) {
+  CapturingHandler h;
+  EXPECT_OK(parse(R"({"ab":1,"c":2,"a":3,"bc":4,"abc":5,"":6})", h));
+  EXPECT_EQ(h.fields.size(), 6u);
+}
+
+// A narrow object after a wide sibling starts clean and still catches duplicates.
+TEST(WuffsJsonCursorTest, SeenKeysResetBetweenSiblingsAfterPromotion) {
+  CapturingHandler h;
+  const std::string wide = objectWithKeys(kLimit * 2);
+  EXPECT_OK(parse(absl::StrCat("[", wide, ",", wide, "]"), h));
+  CapturingHandler h2;
+  EXPECT_THAT(parse(absl::StrCat("[", wide, ",{\"x\":1,\"x\":2}]"), h2), Not(IsOk()));
+  CapturingHandler h3;
+  // The wide sibling's keys are not remembered.
+  EXPECT_OK(parse(absl::StrCat("[", wide, ",{\"k0\":1}]"), h3));
 }
 
 // Key-length enforcement tests
