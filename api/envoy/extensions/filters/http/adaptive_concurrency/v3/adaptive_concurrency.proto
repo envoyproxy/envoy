@@ -136,7 +136,6 @@ message EwmaControllerConfig {
   google.protobuf.Duration min_latency_delta = 9 [(validate.rules).duration = {gte {}}];
 }
 
-// [#next-free-field: 5]
 message AdaptiveConcurrency {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency";
