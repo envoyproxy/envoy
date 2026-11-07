@@ -778,6 +778,8 @@ protected:
   // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should persist
   // until either the upstream or downstream connection is terminated.
   std::unique_ptr<GenericUpstream> upstream_;
+  // HTTP upstreams account for bytes through their codec; raw TCP upstreams rely on this filter.
+  bool upstream_accounts_for_bytes_{false};
   // The connection pool used to set up |upstream_|.
   // This will be non-null from when an upstream connection is attempted until
   // it either succeeds or fails.
