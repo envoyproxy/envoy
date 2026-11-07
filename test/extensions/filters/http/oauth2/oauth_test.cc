@@ -442,6 +442,27 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenWithScopes) {
   EXPECT_EQ(1, callbacks_.size());
 }
 
+// A literal `%` in a scope value must itself be percent-encoded. Otherwise the token endpoint
+// form-decodes `%2F` to `/` and the refresh request asks for a different scope than the
+// authorization request did.
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenWithScopesEncodesPercent) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("grant_type=refresh_token&refresh_token=a&client_id=b&client_secret=c"
+                  "&scope=https%3A%2F%2Fapp%2Ffiles%252Fread",
+                  message->bodyAsString());
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("a", "b", "c", AuthType::UrlEncodedBody,
+                                   "https://app/files%2Fread");
+  EXPECT_EQ(1, callbacks_.size());
+}
+
 // The `scope` parameter is also appended on the BASIC_AUTH path, where the body carries no
 // credentials.
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenBasicAuthWithScopes) {

@@ -160,12 +160,11 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   }
 
   // RFC 6749 section 6 allows `scope` on a refresh request. Some providers (e.g. Microsoft Entra
-  // ID when the client is also the resource) reject the request without it. Scopes are space
-  // separated, so the space must be encoded too.
+  // ID when the client is also the resource) reject the request without it. Use the same full
+  // percent-encoding as the authorization request so that spaces (the scope delimiter) and literal
+  // `%` characters survive form-decoding at the token endpoint.
   if (!scopes.empty()) {
-    absl::StrAppend(&body, "&scope=",
-                    Http::Utility::PercentEncoding::encode(
-                        scopes, absl::StrCat(WwwFormUrlEncodedReservedCharacters, " ")));
+    absl::StrAppend(&body, "&scope=", Http::Utility::PercentEncoding::urlEncode(scopes));
   }
 
   request->body().add(body);
