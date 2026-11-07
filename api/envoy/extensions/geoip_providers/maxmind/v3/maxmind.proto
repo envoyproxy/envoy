@@ -28,7 +28,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`
 // [#extension: envoy.geoip_providers.maxmind]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message MaxMindConfig {
   // Full file path to the MaxMind city database, e.g., ``/etc/GeoLite2-City.mmdb``.
   // Database file is expected to have ``.mmdb`` extension.
@@ -59,4 +59,12 @@ message MaxMindConfig {
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
   common.v3.CommonGeoipProviderConfig common_provider_config = 4
       [(validate.rules).message = {required: true}];
+
+  // If ``true``, allows Envoy to start when a configured database file cannot be opened. Lookups
+  // that require an unavailable database return no geolocation data until the file appears and is
+  // loaded by the provider's file watcher. The provider logs a warning and increments the
+  // ``db_load_error`` counter for each unavailable database at startup.
+  //
+  // Defaults to ``false`` to preserve fail-closed startup behavior.
+  bool allow_missing_database = 7;
 }
