@@ -9,9 +9,16 @@
 
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
+
+#include "absl/algorithm/container.h"
+#include "absl/numeric/int128.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,11 +49,40 @@ uint64_t TraceIdRatioBasedSampler::traceIdToUint64(const std::string& trace_id) 
   return first_8_bytes;
 }
 
+namespace {
+constexpr uint64_t MaxThreshold = uint64_t{1} << 56;
+constexpr size_t TraceIdHexLength = 32;
+constexpr size_t RandomnessHexLength = 14;
+} // namespace
+
+uint64_t TraceIdRatioBasedSampler::traceIdRandomness(absl::string_view trace_id) {
+  uint64_t randomness = 0;
+  if (trace_id.size() != TraceIdHexLength || !absl::c_all_of(trace_id, absl::ascii_isxdigit) ||
+      !absl::SimpleHexAtoi(trace_id.substr(TraceIdHexLength - RandomnessHexLength), &randomness)) {
+    IS_ENVOY_BUG("trace id is not 32 hex characters");
+    return 0;
+  }
+  return randomness;
+}
+
+uint64_t
+TraceIdRatioBasedSampler::rejectionThreshold(const envoy::type::v3::FractionalPercent& percentage) {
+  const uint64_t denominator =
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percentage.denominator());
+  const uint64_t numerator = percentage.numerator();
+  if (numerator >= denominator) {
+    return 0;
+  }
+  const absl::uint128 sampled_values = (absl::uint128(numerator) << 56) / denominator;
+  return MaxThreshold - absl::Uint128Low64(sampled_values);
+}
+
 TraceIdRatioBasedSampler::TraceIdRatioBasedSampler(
     const envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig&
         config,
     Server::Configuration::TracerFactoryContext& /*context*/)
-    : sampling_percentage_(config.sampling_percentage()) {
+    : sampling_percentage_(config.sampling_percentage()),
+      rejection_threshold_(rejectionThreshold(config.sampling_percentage())) {
   const envoy::type::v3::FractionalPercent& sampling_percentage = config.sampling_percentage();
   description_ = "TraceIdRatioBasedSampler{" + std::to_string(sampling_percentage.numerator()) +
                  "/" +
@@ -70,8 +106,13 @@ SamplingResult TraceIdRatioBasedSampler::shouldSample(
     return result;
   }
 
-  if (ProtobufPercentHelper::evaluateFractionalPercent(sampling_percentage_,
-                                                       traceIdToUint64(trace_id))) {
+  const bool sampled =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.otel_ratio_sampler_use_trace_id_rightmost_bytes")
+          ? traceIdRandomness(trace_id) >= rejection_threshold_
+          : ProtobufPercentHelper::evaluateFractionalPercent(sampling_percentage_,
+                                                             traceIdToUint64(trace_id));
+  if (sampled) {
     result.decision = Decision::RecordAndSample;
     return result;
   }

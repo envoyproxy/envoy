@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based:config",
         "//source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based:trace_id_ratio_based_sampler_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
