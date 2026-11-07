@@ -1,0 +1,5 @@
+stats_config:
+  stats_tags:
+  - tag_name: custom_tag
+    fixed_value: custom_value
+static_resources:
