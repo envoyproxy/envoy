@@ -92,6 +92,16 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
         callbacks_.remove(&callbacks);
       });
 
+  ON_CALL(*this, addSidestreamWatermarkCallbacks(_))
+      .WillByDefault([this](DownstreamWatermarkCallbacks& callbacks) -> void {
+        sidestream_callbacks_.push_back(&callbacks);
+      });
+
+  ON_CALL(*this, removeSidestreamWatermarkCallbacks(_))
+      .WillByDefault([this](DownstreamWatermarkCallbacks& callbacks) -> void {
+        sidestream_callbacks_.remove(&callbacks);
+      });
+
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig())
       .WillByDefault(Return(makeOptRef<const Tracing::Config>(tracing_config_)));

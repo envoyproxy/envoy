@@ -874,6 +874,29 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
+   * This routine is called by StreamFilterSidestreamWatermarkCallbacks to subscribe a side-stream
+   * (e.g., an ext_proc gRPC stream) to watermark events on the downstream stream and downstream
+   * connection only, excluding encoder filter buffer watermarks.
+   *
+   * Unlike addDownstreamWatermarkCallbacks() (which fires on both downstream connection, stream
+   * watermarks and encoder filter buffer watermarks), side-streams must not be paused when an
+   * encoder filter buffer fills up, because the encoder filter may be waiting on the side-stream
+   * response to drain its buffer (which would cause a deadlock).
+   *
+   * Immediately after subscribing, the side-stream will get a high watermark callback for each
+   * outstanding backed up downstream stream or connection buffer.
+   */
+  virtual void addSidestreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) {}
+
+  /**
+   * This routine is called by StreamFilterSidestreamWatermarkCallbacks to stop subscribing a
+   * side-stream to watermark events on the downstream stream and downstream connection.
+   *
+   * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
+   */
+  virtual void removeSidestreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) {}
+
+  /**
    * This routine can be called by a filter to subscribe to watermark events on the upstream request
    * path, i.e. the aggregate back-pressure raised toward the request source via
    * onDecoderFilterAboveWriteBufferHighWatermark() (notably by the router's UpstreamRequest when
