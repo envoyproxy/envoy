@@ -748,6 +748,9 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
 // Validate that an update to a Cluster that doesn't receive updated ClusterLoadAssignment
 // uses the previous (cached) cluster load assignment.
 TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
+  // Replay would deliver the EDS resource before the fetch timeout; test the EDS cache instead.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_replay_cached_resources",
+                                    "false");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
@@ -817,6 +820,9 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
 
 TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
   // This test should be kept after the runtime guard is deprecated
+  // Replay would deliver the EDS resource before the fetch timeout; test the EDS cache instead.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_replay_cached_resources",
+                                    "false");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
@@ -868,6 +874,9 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
 // that don't receive updated ClusterLoadAssignment use the previous (cached) cluster
 // load assignment.
 TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
+  // Replay would deliver the EDS resource before the fetch timeout; test the EDS cache instead.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_replay_cached_resources",
+                                    "false");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster0 = buildCluster("cluster_0");

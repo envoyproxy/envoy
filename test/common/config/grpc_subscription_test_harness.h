@@ -52,6 +52,8 @@ public:
         should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
+    // WatchMap replay callback, one per subscribed type.
+    EXPECT_CALL(dispatcher_, createSchedulableCallback_(_)).Times(testing::AnyNumber());
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);

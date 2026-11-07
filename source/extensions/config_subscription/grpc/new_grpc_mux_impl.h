@@ -107,7 +107,7 @@ public:
                       CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
                       EdsResourcesCacheOptRef eds_resources_cache)
-        : watch_map_(type_url, config_validators, eds_resources_cache),
+        : watch_map_(type_url, config_validators, eds_resources_cache, dispatcher),
           sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(

@@ -47,6 +47,8 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+    // WatchMap replay callback, one per subscribed type.
+    EXPECT_CALL(dispatcher_, createSchedulableCallback_(_)).Times(testing::AnyNumber());
     auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
     GrpcMuxContext grpc_mux_context{

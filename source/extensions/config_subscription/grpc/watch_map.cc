@@ -3,10 +3,12 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -33,6 +35,7 @@ Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
 void WatchMap::forgetWatch(Watch* watch) {
   wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
   forgetAccept(watch);
+  pending_replays_.erase(watch);
   watches_.erase(watch);
 }
 
@@ -299,6 +302,16 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
     }
   }
 
+  // A name absent from a state-of-the-world response is not evicted: for explicitly named
+  // types (EDS, RDS, ...) the server may legitimately send a subset, and the watches that
+  // already hold the resource keep it too. The cache follows what those watches hold.
+  delta_ = false;
+  for (uint32_t resource_idx = 0; resource_idx < resources.size(); ++resource_idx) {
+    if (interesting_resources[resource_idx]) {
+      cacheResource(*resources[resource_idx], version_info);
+    }
+  }
+
   if (eds_resources_cache_.has_value()) {
     // Add/update the watched resources to/in the cache.
     // Only resources that have a watcher should be updated.
@@ -413,6 +426,14 @@ void WatchMap::onConfigUpdate(
     }
   }
 
+  delta_ = true;
+  for (const auto& resource : decoded_resources) {
+    cacheResource(*resource, resource->version());
+  }
+  for (const auto& name : removed_resources) {
+    cached_resources_.erase(name);
+  }
+
   if (eds_resources_cache_.has_value()) {
     // Add/update the watched resources to/in the cache.
     for (const auto& resource : decoded_resources) {
@@ -443,8 +464,10 @@ WatchMap::findAdditions(const absl::flat_hash_set<std::string>& newly_added_to_w
       newly_added_to_subscription.insert(name);
       watch_interest_[name] = {watch};
     } else {
-      // Add this watch to the already-existing set at watch_interest_[name]
+      // Add this watch to the already-existing set at watch_interest_[name]. The name is already
+      // subscribed, so the server will not send the resource again for this watch.
       entry->second.insert(watch);
+      queueReplay(watch, name);
     }
   }
   return newly_added_to_subscription;
@@ -463,10 +486,95 @@ WatchMap::findRemovals(const absl::flat_hash_set<std::string>& newly_removed_fro
     entry->second.erase(watch);
     if (entry->second.empty()) {
       watch_interest_.erase(entry);
+      cached_resources_.erase(name);
       newly_removed_from_subscription.insert(name);
     }
   }
+  // A watch that dropped a name before its replay ran must not receive it.
+  if (auto pending = pending_replays_.find(watch); pending != pending_replays_.end()) {
+    for (const auto& name : newly_removed_from_watch) {
+      pending->second.erase(name);
+    }
+    if (pending->second.empty()) {
+      pending_replays_.erase(pending);
+    }
+  }
   return newly_removed_from_subscription;
+}
+
+void WatchMap::cacheResource(const DecodedResource& resource, const std::string& version) {
+  // Only explicitly named interest is cached: a resource routed through a wildcard or glob
+  // watch has no per-name reference count, and a wildcard subscription is resent in full anyway.
+  if (!resource.hasResource() || !watch_interest_.contains(resource.name())) {
+    return;
+  }
+  Protobuf::Arena::UniquePtr<Protobuf::Message> copy =
+      Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, resource.resource().New());
+  copy->CopyFrom(resource.resource());
+  cached_resources_.insert_or_assign(resource.name(),
+                                     CachedResource{std::move(copy), resource.aliases(), version});
+}
+
+void WatchMap::queueReplay(Watch* watch, const std::string& name) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_replay_cached_resources") ||
+      !cached_resources_.contains(name)) {
+    return;
+  }
+  pending_replays_[watch].insert(name);
+  replay_cb_->scheduleCallbackNextIteration();
+}
+
+void WatchMap::replayCachedResources() {
+  // Take the queue first: a delivery may add or remove watches, and must not disturb this pass.
+  auto pending = std::move(pending_replays_);
+  pending_replays_.clear();
+  for (auto& [watch, names] : pending) {
+    // The watch may have been removed since the replay was queued.
+    if (!watches_.contains(watch)) {
+      continue;
+    }
+    std::vector<DecodedResourcePtr> decoded;
+    std::vector<DecodedResourceRef> refs;
+    std::string version;
+    for (const auto& name : names) {
+      auto cached = cached_resources_.find(name);
+      // The entry may be gone if the server removed the resource, or the watch may have changed
+      // its interest in the meantime.
+      if (cached == cached_resources_.end() || !watch->resource_names_.contains(name)) {
+        continue;
+      }
+      Protobuf::Arena::UniquePtr<Protobuf::Message> copy =
+          Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, cached->second.resource_->New());
+      copy->CopyFrom(*cached->second.resource_);
+      decoded.push_back(std::make_unique<DecodedResourceImpl>(
+          std::move(copy), name, cached->second.aliases_, cached->second.version_));
+      refs.emplace_back(*decoded.back());
+      version = cached->second.version_;
+    }
+    if (refs.empty()) {
+      continue;
+    }
+    ENVOY_LOG(debug, "Replaying {} cached {} resource(s) to a late watch", refs.size(), type_url_);
+    // The resource was accepted when it arrived, and there is no response to NACK, so a failure
+    // here is only logged. The watch keeps waiting for the server as it would without replay.
+    TRY_ASSERT_MAIN_THREAD {
+      absl::Status status;
+      if (delta_) {
+        status = watch->callbacks_.onConfigUpdate(refs, {}, version);
+      } else {
+        // The watch now holds resources, so a later state-of-the-world update that drops them
+        // must be delivered to it (see the delivery loop in onConfigUpdate()).
+        watch->state_of_the_world_empty_ = false;
+        status = watch->callbacks_.onConfigUpdate(refs, version);
+      }
+      if (!status.ok()) {
+        ENVOY_LOG(warn, "Replay of cached {} resources rejected: {}", type_url_, status.message());
+      }
+    }
+    END_TRY
+    CATCH(const EnvoyException& e,
+          { ENVOY_LOG(warn, "Replay of cached {} resources failed: {}", type_url_, e.what()); });
+  }
 }
 
 } // namespace Config

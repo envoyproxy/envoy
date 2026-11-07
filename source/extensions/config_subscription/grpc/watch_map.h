@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -7,6 +8,7 @@
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
@@ -76,12 +78,20 @@ struct Watch {
 // The WatchMap is responsible to update the cache with the resource contents, and it is
 // up to the specific xDS type subscription handler (i.e., EdsClusterImpl), to fetch
 // the resource from the cache.
+//
+// Independently of the EDS cache, the WatchMap keeps the last resource delivered for every
+// explicitly watched name while at least one watch is interested in it. When a watch later
+// joins a name that is already subscribed (so no new request is sent and a conformant server
+// will not resend an unchanged resource), the cached resource is replayed to that watch on
+// the next dispatcher iteration through its regular onConfigUpdate(). Wildcard and glob
+// interest is never cached. See RESOURCE_REPLAY_DESIGN.md.
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const std::string& type_url, CustomConfigValidators* config_validators,
-           EdsResourcesCacheOptRef eds_resources_cache)
+           EdsResourcesCacheOptRef eds_resources_cache, Event::Dispatcher& dispatcher)
       : type_url_(type_url), config_validators_(config_validators),
-        eds_resources_cache_(eds_resources_cache) {
+        eds_resources_cache_(eds_resources_cache),
+        replay_cb_(dispatcher.createSchedulableCallback([this] { replayCachedResources(); })) {
     // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
     ASSERT(!eds_resources_cache_.has_value() ||
            (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()));
@@ -151,7 +161,20 @@ public:
     config_validators_ = config_validators;
   }
 
+  // For tests: whether a resource is currently cached for the given name.
+  bool hasCachedResourceForTest(const std::string& name) const {
+    return cached_resources_.contains(name);
+  }
+
 private:
+  // The last resource delivered for an explicitly watched name. The resource is an owned copy:
+  // decoded resources are allocated on a per-batch arena and do not outlive the dispatch.
+  struct CachedResource {
+    Protobuf::Arena::UniquePtr<Protobuf::Message> resource_;
+    std::vector<std::string> aliases_;
+    std::string version_;
+  };
+
   void removeDeferredWatches();
 
   // Erases the watch from every routing structure (wildcard, glob, and named interest).
@@ -178,6 +201,13 @@ private:
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
 
+  // Stores a copy of the resource for later replay if its name is explicitly watched.
+  void cacheResource(const DecodedResource& resource, const std::string& version);
+  // Queues a replay of the cached resource for 'name', if any, to 'watch'.
+  void queueReplay(Watch* watch, const std::string& name);
+  // Delivers queued replays. Runs from the dispatcher, never from inside an update.
+  void replayCachedResources();
+
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 
   // Watches whose interest set is currently empty, which is interpreted as "everything".
@@ -201,9 +231,21 @@ private:
   // accept every resource named "P/...".
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> accept_prefix_watches_;
 
+  // Last delivered resource per explicitly watched name; an entry exists only while
+  // watch_interest_ has the name.
+  absl::flat_hash_map<std::string, CachedResource> cached_resources_;
+  // Watches that joined an already-subscribed, cached name and are waiting for the replay,
+  // with the names each one joined.
+  std::map<Watch*, absl::flat_hash_set<std::string>> pending_replays_;
+
+  // Whether the last delivery used the delta form of onConfigUpdate(). A replay uses the same
+  // form, so a watch sees exactly what the mux that owns this map would deliver.
+  bool delta_{false};
+
   const std::string type_url_;
   CustomConfigValidators* config_validators_;
   EdsResourcesCacheOptRef eds_resources_cache_;
+  Event::SchedulableCallbackPtr replay_cb_;
 };
 
 } // namespace Config
