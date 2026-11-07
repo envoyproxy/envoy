@@ -52,7 +52,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
   COUNTER(http_not_ok_resp_received)                                                               \
   COUNTER(immediate_responses_sent)                                                                \
-  COUNTER(server_half_closed)
+  COUNTER(server_half_closed)                                                                      \
+  COUNTER(logging_info_not_created)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -148,6 +149,7 @@ public:
   const ProcessingEffects&
   processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
+
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
   void setDestination(absl::string_view destination) { destination_ = destination; }
   const std::string& destination() const {
@@ -740,7 +742,9 @@ private:
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
-  ExtProcLoggingInfo* logging_info_;
+  // Owned by the FilterState entry keyed by the filter name. Null if that key was already in use
+  // (e.g. another filter with the same name); always check before dereferencing.
+  ExtProcLoggingInfo* logging_info_{nullptr};
   envoy::config::core::v3::GrpcService grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
 
