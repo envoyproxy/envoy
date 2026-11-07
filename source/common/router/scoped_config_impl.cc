@@ -71,7 +71,7 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
     }
     break;
   case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor::EXTRACT_TYPE_NOT_SET:
-    PANIC("not reached");
+    PANIC("not reached"); // LCOV_EXCL_LINE
   }
 
   return nullptr;
@@ -83,13 +83,14 @@ ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfigurat
       config_hash_(MessageUtil::hash(config_proto_)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
+  using Fragment = envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment;
   for (const auto& fragment : config_proto_.key().fragments()) {
     switch (fragment.type_case()) {
-    case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::kStringKey:
+    case Fragment::TypeCase::kStringKey:
       scope_key_.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
       break;
-    case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::TYPE_NOT_SET:
-      PANIC("not implemented");
+    case Fragment::TypeCase::TYPE_NOT_SET: // LCOV_EXCL_LINE
+      PANIC("not implemented");            // LCOV_EXCL_LINE
     }
   }
 }
@@ -103,8 +104,8 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
       fragment_builders_.emplace_back(std::make_unique<HeaderValueExtractorImpl>(
           ScopedRoutes::ScopeKeyBuilder::FragmentBuilder(fragment_builder)));
       break;
-    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::TYPE_NOT_SET:
-      PANIC("not implemented");
+    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::TYPE_NOT_SET: // LCOV_EXCL_LINE
+      PANIC("not implemented");                                        // LCOV_EXCL_LINE
     }
   }
 }
@@ -146,6 +147,15 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
       scoped_route_info_by_name_.erase(iter);
     }
   }
+}
+
+void ScopedConfigImpl::onConfigUpdate(
+    const std::vector<ScopedRouteInfoConstSharedPtr>& added_or_updated_scopes,
+    const std::vector<std::string>& removed_scope_names) {
+  // Process removals before additions in case a removed scope and a newly added scope
+  // share the same ScopeKey hash.
+  removeRoutingScopes(removed_scope_names);
+  addOrUpdateRoutingScopes(added_or_updated_scopes);
 }
 
 Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKeyPtr& scope_key) const {

@@ -186,15 +186,23 @@ private:
   // during updating, the exception message is collected via the exception messages vector.
   // Returns a failed status if the operation was unsuccessful. If successful,
   // returns a boolean indicating if any scopes were applied.
+  // When `deferred_updated_scopes` is non-null, updated scopes are appended to it instead of
+  // calling `applyConfigUpdate` directly. When `delayed_rds_providers` is non-null, replaced RDS
+  // provider helpers are appended to it so their subscriptions outlive the update batch.
   absl::StatusOr<bool>
   addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                    Init::Manager& init_manager, const std::string& version_info);
+                    Init::Manager& init_manager, const std::string& version_info,
+                    std::vector<ScopedRouteInfoConstSharedPtr>* deferred_updated_scopes = nullptr,
+                    std::list<RdsRouteConfigProviderHelperPtr>* delayed_rds_providers = nullptr);
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
+  // When `deferred_removed_scope_names` is non-null, removed scope names are appended to it
+  // instead of calling `applyConfigUpdate` directly.
   std::list<RdsRouteConfigProviderHelperPtr>
   removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
-               const std::string& version_info);
+               const std::string& version_info,
+               std::vector<std::string>* deferred_removed_scope_names = nullptr);
 
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }

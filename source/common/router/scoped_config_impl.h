@@ -17,6 +17,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/numeric/int128.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Router {
@@ -117,6 +118,10 @@ public:
   addOrUpdateRoutingScopes(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos);
 
   void removeRoutingScopes(const std::vector<std::string>& scope_names);
+
+  // Atomically applies a batch of scope removals and additions/updates in a single call.
+  void onConfigUpdate(const std::vector<ScopedRouteInfoConstSharedPtr>& added_or_updated_scopes,
+                      const std::vector<std::string>& removed_scope_names);
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const override;
