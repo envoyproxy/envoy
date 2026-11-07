@@ -140,17 +140,36 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnectionsIf(
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::freeOnePool() {
-  // Try to find a pool that isn't doing anything.
+  // Prefer a fully idle pool (no streams and no clients at all): tearing one
+  // down is quiet. Fall back to the historical criterion of a pool with no
+  // pending or active streams, which may still own connecting or idle
+  // keepalive clients; such victims are deferred below.
   auto pool_iter = active_pools_.begin();
   while (pool_iter != active_pools_.end()) {
-    if (!pool_iter->second->hasActiveConnections()) {
+    if (pool_iter->second->isIdle()) {
       break;
     }
     ++pool_iter;
   }
+  if (pool_iter == active_pools_.end()) {
+    pool_iter = active_pools_.begin();
+    while (pool_iter != active_pools_.end()) {
+      if (!pool_iter->second->hasActiveConnections()) {
+        break;
+      }
+      ++pool_iter;
+    }
+  }
 
   if (pool_iter != active_pools_.end()) {
     // We found one. Free it up, and let the caller know.
+    // The pool must be destroyed via deferred deletion, matching erasePool():
+    // hasActiveConnections() does not account for connecting or idle-keepalive
+    // clients, and destroying such a pool inline runs ActiveClient destructors
+    // that re-enter ConnPoolImplBase::checkForIdleAndNotify(). The still-registered
+    // idle callback then calls back into this map (httpConnPoolIsIdle -> erasePool)
+    // while this erase is mid-flight, double-destroying the same map slot.
+    thread_local_dispatcher_.deferredDelete(std::move(pool_iter->second));
     active_pools_.erase(pool_iter);
     host_->cluster().resourceManager(priority_).connectionPools().dec();
     return true;
