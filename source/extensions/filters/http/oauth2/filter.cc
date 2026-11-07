@@ -128,6 +128,12 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
   return scopes;
 }
 
+// The space-separated `scope` value sent to the authorization server, built from 'auth_scopes'
+// (or the default scope when none are configured).
+std::string authScopesString(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos) {
+  return absl::StrJoin(authScopesList(auth_scopes_protos), " ");
+}
+
 // Transforms the proto list into encoded resource params
 // Takes care of percentage encoding http and https is needed
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
@@ -376,8 +382,8 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
       Http::Utility::QueryParamsMulti::parseQueryString(proto_config.authorization_endpoint());
   query_params.overwrite("client_id", proto_config.credentials().client_id());
   query_params.overwrite("response_type", "code");
-  std::string scopes_list = absl::StrJoin(authScopesList(proto_config.auth_scopes()), " ");
-  query_params.overwrite("scope", Http::Utility::PercentEncoding::urlEncode(scopes_list));
+  query_params.overwrite("scope", Http::Utility::PercentEncoding::urlEncode(
+                                      authScopesString(proto_config.auth_scopes())));
   return query_params;
 }
 
@@ -794,6 +800,7 @@ FilterConfig::FilterConfig(
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
+      auth_scopes_(authScopesString(proto_config.auth_scopes())),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
@@ -821,6 +828,7 @@ FilterConfig::FilterConfig(
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
+      send_scopes_on_refresh_(proto_config.send_scopes_on_refresh()),
       disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
@@ -1200,7 +1208,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       }
       OAuth2Client& oauth_client = oauthClient();
       oauth_client.asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
-                                           client_credential.value(), config_->authType());
+                                           client_credential.value(), config_->authType(),
+                                           config_->sendScopesOnRefresh() ? config_->authScopes()
+                                                                          : EMPTY_STRING);
       const auto state = oauth_client.getState();
       if (state == OAuth2Client::OAuthState::FailureContinue) {
         return Http::FilterHeadersStatus::Continue;
