@@ -758,10 +758,10 @@ downstream_tls_context:
   EXPECT_TRUE(factory.clientCertificateValidationConfigured());
 }
 
-// The resumption default follows the resolved validation context, which is still pending when a
-// validation context is delivered over SDS. Such a filter chain therefore keeps the default
-// resumption and early data behavior, unlike one with an inline validation context.
-TEST_F(QuicServerTransportSocketFactoryConfigTest, SdsValidationContextKeepsResumptionDefault) {
+// A validation context delivered over SDS is configured before its secret is resolved. Resumption
+// and early data therefore default to off just as they do for an inline validation context.
+TEST_F(QuicServerTransportSocketFactoryConfigTest,
+       SdsValidationContextDisablesResumptionByDefault) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:
   common_tls_context:
@@ -775,8 +775,8 @@ downstream_tls_context:
       sds_config:
         ads: {}
 )EOF");
-  verifyQuicServerTransportSocketFactory(yaml, /*expect_early_data=*/true,
-                                         /*expect_resumption=*/true);
+  verifyQuicServerTransportSocketFactory(yaml, /*expect_early_data=*/false,
+                                         /*expect_resumption=*/false);
 }
 
 // A validation context which can neither verify nor deliberately skip verification is rejected
