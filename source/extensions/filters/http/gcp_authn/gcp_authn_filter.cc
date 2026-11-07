@@ -91,8 +91,8 @@ FilterConfig::FilterConfig(const FilterConfigProto& config,
   }
 }
 
-std::optional<std::string>
-GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
+std::optional<GcpAuthnFilter::ClientCertData>
+GcpAuthnFilter::getClientCertData(Upstream::ThreadLocalCluster* cluster) {
   if (cluster == nullptr) {
     return std::nullopt;
   }
@@ -123,8 +123,16 @@ GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) 
     return std::nullopt;
   }
 
+  auto cert_chain_or_error = fingerprinter_->getCertChainFromPem(cert_pem);
+  if (!cert_chain_or_error.ok()) {
+    ENVOY_LOG(warn, "Failed to extract certificate chain: {}",
+              cert_chain_or_error.status().message());
+    return std::nullopt;
+  }
+
   filter_config_->stats().client_cert_fingerprint_calculated_.inc();
-  return fingerprint_or_error.value();
+  return ClientCertData{std::move(fingerprint_or_error).value(),
+                        std::move(cert_chain_or_error).value()};
 }
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
@@ -159,6 +167,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   audience_ = audience_opt.value();
 
   std::string resolved_authorization;
+  std::optional<ClientCertData> client_cert_data;
   if (audience_.has_iam_access_token()) {
     if (filter_config_->accountFormatter() == nullptr ||
         filter_config_->authFormatter() == nullptr) {
@@ -188,20 +197,20 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // Save the value for the target project as the cache key, but not the authorization header.
     audience_.mutable_iam_access_token()->set_account(resolved_account);
   } else if (audience_.has_bound_jwt() || audience_.has_bound_access_token()) {
-    // Resolve fingerprint if bound token is requested. Note client_cert_fingerprint_ remains
-    // std::nullopt by default for unbound tokens.
-    client_cert_fingerprint_ = getClientCertFingerprint(cluster);
-    if (!client_cert_fingerprint_.has_value()) {
-      ENVOY_LOG(warn,
-                "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+    // Resolve client certificate data if bound token is requested. Note client_cert_fingerprint_
+    // remains std::nullopt by default for unbound tokens.
+    client_cert_data = getClientCertData(cluster);
+    if (!client_cert_data.has_value()) {
+      ENVOY_LOG(warn, "Failed to fetch bound token: client certificate is unavailable.");
       filter_config_->stats().bound_token_fingerprint_unavailable_.inc();
       state_ = State::Complete;
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
-          "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
-          std::nullopt, "bound_token_fingerprint_unavailable");
+          "Failed to fetch bound token: client certificate is unavailable.", nullptr, std::nullopt,
+          "bound_token_fingerprint_unavailable");
       return FilterHeadersStatus::StopAllIterationAndWatermark;
     }
+    client_cert_fingerprint_ = client_cert_data->fingerprint;
   }
 
   // Check cache first and reuse previously fetched token if possible. The hit and miss counters
@@ -223,9 +232,10 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   if (audience_.has_iam_access_token()) {
     client_->fetchIamAccessToken(audience_, resolved_authorization, *this);
   } else if (audience_.has_bound_access_token()) {
-    client_->fetchBoundAccessToken(audience_, client_cert_fingerprint_.value(), *this);
+    client_->fetchBoundAccessToken(audience_, client_cert_data->fingerprint, client_cert_data->pem,
+                                   *this);
   } else if (audience_.has_bound_jwt()) {
-    client_->fetchBoundJwt(audience_, client_cert_fingerprint_.value(), *this);
+    client_->fetchBoundJwt(audience_, client_cert_data->fingerprint, client_cert_data->pem, *this);
   } else if (audience_.has_access_token()) {
     client_->fetchUnboundAccessToken(audience_, *this);
   } else if (!audience_.url().empty()) {

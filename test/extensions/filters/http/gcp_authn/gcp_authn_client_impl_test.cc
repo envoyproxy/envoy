@@ -513,11 +513,17 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundJwt) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_jwt()->set_url("http://test_audience");
   const std::string fingerprint = "abc+def/ghi=";
-  client_->fetchBoundJwt(audience, fingerprint, request_callbacks_);
-  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  const std::string cert_pem = "dummy cert PEM";
+  client_->fetchBoundJwt(audience, fingerprint, cert_pem, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
-            "test_audience&bindCertificateFingerprint=abc%252Bdef%252Fghi%253D");
+            "test_audience");
+  EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
+            "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
+                                           R"({"certificate_chain":"dummy cert PEM"})"));
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 
@@ -540,11 +546,16 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessToken) {
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
   audience.mutable_bound_access_token();
   const std::string fingerprint = "abc+def/ghi=";
-  client_->fetchBoundAccessToken(audience, fingerprint, request_callbacks_);
-  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  const std::string cert_pem = "dummy cert PEM";
+  client_->fetchBoundAccessToken(audience, fingerprint, cert_pem, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
-            "/computeMetadata/v1/instance/service-accounts/default/"
-            "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D");
+            "/computeMetadata/v1/instance/service-accounts/default/token");
+  EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
+            "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
+                                           R"({"certificate_chain":"dummy cert PEM"})"));
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 
@@ -572,12 +583,17 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessTokenWithScopes) {
       "https://www.googleapis.com/auth/cloud-platform");
   audience.mutable_bound_access_token()->add_scopes("openid");
   const std::string fingerprint = "abc+def/ghi=";
-  client_->fetchBoundAccessToken(audience, fingerprint, request_callbacks_);
-  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  const std::string cert_pem = "dummy cert PEM";
+  client_->fetchBoundAccessToken(audience, fingerprint, cert_pem, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
-            "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D"
-            "&scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
+            "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
+  EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
+            "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
+                                           R"({"certificate_chain":"dummy cert PEM"})"));
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 
@@ -619,6 +635,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessIamAccessTokenDefaultScopes) {
             "Bearer my_gce_token");
   EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
             "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(
       message_->bodyAsString(),
       "{\"lifetime\":\"3600s\",\"scope\":[\"https://www.googleapis.com/auth/cloud-platform\"]}"));
@@ -652,6 +669,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessIamAccessTokenCustomScopes) {
   client_->fetchIamAccessToken(audience, "Bearer token", request_callbacks_);
 
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(
       message_->bodyAsString(),
       "{\"lifetime\":\"3600s\",\"scope\":[\"https://www.googleapis.com/auth/"

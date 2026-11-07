@@ -25,7 +25,6 @@ constexpr absl::string_view TokenUrlPath = "token";
 constexpr absl::string_view AudienceQueryKey = "audience";
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
-constexpr char BindCertificateFingerprintKey[] = "bindCertificateFingerprint";
 constexpr absl::string_view ScopesQueryKey = "scopes";
 
 std::string encodeAndJoinScopes(const Protobuf::RepeatedPtrField<std::string>& scopes) {
@@ -49,6 +48,20 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
            {Envoy::Http::LowerCaseString(MetadataFlavorKey), MetadataFlavor}});
 
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+}
+
+Http::RequestMessagePtr buildMdsPostRequest(absl::string_view url, const std::string& cert_pem) {
+  auto message = buildRequest(url);
+  message->headers().setMethod(Envoy::Http::Headers::get().MethodValues.Post);
+  message->headers().setContentType("application/json; charset=utf-8");
+
+  Protobuf::Struct request_body_struct;
+  (*request_body_struct.mutable_fields())["certificate_chain"].set_string_value(cert_pem);
+  std::string body;
+  std::ignore = Protobuf::util::MessageToJsonString(request_body_struct, &body);
+  message->headers().setContentLength(body.length());
+  message->body().add(body);
+  return message;
 }
 
 Http::RequestMessagePtr
@@ -79,6 +92,7 @@ buildIamPostRequest(const envoy::extensions::filters::http::gcp_authn::v3::Audie
   std::ignore = Protobuf::util::MessageToJsonString(request_body_struct, &body);
 
   auto message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  message->headers().setContentLength(body.length());
   message->body().add(body);
   return message;
 }
@@ -157,7 +171,7 @@ void GcpAuthnClientImpl::fetchUnboundJwt(
   query_params.add(AudienceQueryKey, audience.url());
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
-  makeTokenRequest(TokenType::Jwt, audience, final_url, std::nullopt, callbacks);
+  sendRequest(TokenType::Jwt, audience, std::nullopt, buildRequest(final_url), callbacks);
 }
 
 void GcpAuthnClientImpl::fetchUnboundAccessToken(
@@ -169,37 +183,33 @@ void GcpAuthnClientImpl::fetchUnboundAccessToken(
   }
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
-  makeTokenRequest(TokenType::AccessToken, audience, final_url, std::nullopt, callbacks);
+  sendRequest(TokenType::AccessToken, audience, std::nullopt, buildRequest(final_url), callbacks);
 }
 
 void GcpAuthnClientImpl::fetchBoundJwt(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
+    const std::string& fingerprint, const std::string& cert_pem,
+    GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
   query_params.add(AudienceQueryKey, audience.bound_jwt().url());
-  // N.B.: double-URL-encoding is REQUIRED by the GCP metadata server.
-  query_params.add(BindCertificateFingerprintKey,
-                   Http::Utility::PercentEncoding::urlEncode(
-                       Http::Utility::PercentEncoding::urlEncode(fingerprint)));
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, IdentityUrlPath, query_params.toString());
-  makeTokenRequest(TokenType::BoundJwt, audience, final_url, fingerprint, callbacks);
+  sendRequest(TokenType::BoundJwt, audience, fingerprint, buildMdsPostRequest(final_url, cert_pem),
+              callbacks);
 }
 
 void GcpAuthnClientImpl::fetchBoundAccessToken(
     const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) {
+    const std::string& fingerprint, const std::string& cert_pem,
+    GcpAuthnClient::Callbacks& callbacks) {
   Http::Utility::QueryParamsMulti query_params;
-  // N.B.: double-URL-encoding is REQUIRED by the GCP metadata server.
-  query_params.add(BindCertificateFingerprintKey,
-                   Http::Utility::PercentEncoding::urlEncode(
-                       Http::Utility::PercentEncoding::urlEncode(fingerprint)));
   if (!audience.bound_access_token().scopes().empty()) {
     query_params.add(ScopesQueryKey, encodeAndJoinScopes(audience.bound_access_token().scopes()));
   }
   const std::string final_url =
       absl::StrCat(DefaultServiceAccountPrefix, TokenUrlPath, query_params.toString());
-  makeTokenRequest(TokenType::BoundAccessToken, audience, final_url, fingerprint, callbacks);
+  sendRequest(TokenType::BoundAccessToken, audience, fingerprint,
+              buildMdsPostRequest(final_url, cert_pem), callbacks);
 }
 
 void GcpAuthnClientImpl::fetchIamAccessToken(
@@ -207,13 +217,6 @@ void GcpAuthnClientImpl::fetchIamAccessToken(
     const std::string& authorization, GcpAuthnClient::Callbacks& callbacks) {
   sendRequest(TokenType::IamAccessToken, audience, std::nullopt,
               buildIamPostRequest(audience, authorization), callbacks);
-}
-
-void GcpAuthnClientImpl::makeTokenRequest(
-    TokenType token_type, const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-    const std::string& final_url, const std::optional<std::string>& fingerprint,
-    GcpAuthnClient::Callbacks& callbacks) {
-  sendRequest(token_type, audience, fingerprint, buildRequest(final_url), callbacks);
 }
 
 void GcpAuthnClientImpl::sendRequest(
