@@ -58,6 +58,10 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
 
 } // namespace
 
+bool ActiveStreamFilterBase::observedEndStream() const {
+  return parent_.per_filter_observed_end_stream_ ? observed_end_stream_ : streamObservedEndStream();
+}
+
 void ActiveStreamFilterBase::commonContinue() {
   if (!canContinue()) {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
@@ -434,7 +438,9 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
+bool ActiveStreamDecoderFilter::streamObservedEndStream() const {
+  return parent_.decoderObservedEndStream();
+}
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -494,12 +500,15 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
   injectDecodedHeadersToFilterChain(false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+  // The end-of-stream marker originates (or is retracted) at this filter's position.
+  observed_end_stream_ = end_stream;
+  // With per-filter observed end stream, the stream-level flag is left untouched: it records
+  // what the downstream client actually sent and drives lifecycle decisions.
+  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
     parent_.state().observed_decode_end_stream_ = end_stream;
-    ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream updated: {}", parent_,
-                     end_stream);
   }
+  ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream: {}", parent_,
+                   end_stream);
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -629,6 +638,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
+    // |= as the marker latches: a later non-terminal delivery must not retract it.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
@@ -738,7 +749,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame types, return now.
-    if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
+    if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_, end_stream)) {
       return;
     }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
@@ -789,6 +800,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
+    // |= as the marker latches: when trailers are parked at this filter, its own buffered data
+    // is replayed to it with end_stream false, and that delivery must not retract the marker.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
@@ -896,6 +910,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
 
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    // Trailers carry the end-of-stream marker: it reaches this filter's position whether the
+    // trailers are delivered to it below or parked here because it has stopped.
+    (*entry)->observed_end_stream_ = true;
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -1353,6 +1370,8 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
+    // |= as the marker latches: a later non-terminal delivery must not retract it.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
@@ -1563,7 +1582,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame type, return now.
-    if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
+    if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_, end_stream)) {
       return;
     }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
@@ -1586,6 +1605,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
+    // |= as the marker latches: when trailers are parked at this filter, its own buffered data
+    // is replayed to it with end_stream false, and that delivery must not retract the marker.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace, "encodeData filter iteration aborted due to local reply: filter={}",
@@ -1636,6 +1658,9 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
       commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    // Trailers carry the end-of-stream marker: it reaches this filter's position whether the
+    // trailers are delivered to it below or parked here because it has stopped.
+    (*entry)->observed_end_stream_ = true;
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -1742,11 +1767,14 @@ bool FilterManager::processNewlyAddedMetadata() {
 }
 
 bool FilterManager::handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
-                                        bool& filter_streaming) {
+                                        bool& filter_streaming, bool end_stream) {
   if (filter.stoppedAll()) {
     ASSERT(!filter.canIterate());
     filter_streaming =
         filter.iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark;
+    // The data (and the end-of-stream marker, if it carries one) parks at this filter's position
+    // until iteration resumes here.
+    filter.observed_end_stream_ |= end_stream;
     filter.commonHandleBufferData(data);
     return true;
   }
@@ -1939,8 +1967,10 @@ void ActiveStreamDecoderFilter::removeUpstreamWatermarkCallbacks(
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
-  // there was no body from the HCM's point of view.
-  if (!observedEndStream()) {
+  // there was no body from the HCM's point of view. This deliberately checks the stream-level
+  // flag rather than this filter's positional marker: recreation requires the whole request to
+  // have been received, wherever it is currently buffered.
+  if (!parent_.decoderObservedEndStream()) {
     return false;
   }
 
@@ -1994,7 +2024,7 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
-bool ActiveStreamEncoderFilter::observedEndStream() {
+bool ActiveStreamEncoderFilter::streamObservedEndStream() const {
   return parent_.state_.observed_encode_end_stream_;
 }
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
@@ -2058,12 +2088,15 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
   injectEncodedHeadersToFilterChain(false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+  // The end-of-stream marker originates (or is retracted) at this filter's position.
+  observed_end_stream_ = end_stream;
+  // With per-filter observed end stream, the stream-level flag is left untouched: it records
+  // what the upstream actually sent and drives lifecycle decisions.
+  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
-    ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream updated: {}", parent_,
-                     end_stream);
   }
+  ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream: {}", parent_,
+                   end_stream);
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
