@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -86,7 +89,13 @@ private:
  */
 class MetadataMapWrapper : public BaseLuaObject<MetadataMapWrapper> {
 public:
-  MetadataMapWrapper(const Protobuf::Struct& metadata) : metadata_{metadata} {}
+  // Copies `metadata`.
+  MetadataMapWrapper(const Protobuf::Struct& metadata) : owned_{metadata}, metadata_{*owned_} {}
+
+  // Borrows `metadata`, which must stay alive until the wrapper is marked dead. Pass it with
+  // std::cref() to pick this over the copy.
+  MetadataMapWrapper(std::reference_wrapper<const Protobuf::Struct> metadata)
+      : metadata_{metadata.get()} {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"get", static_luaGet}, {"__pairs", static_luaPairs}};
@@ -112,7 +121,8 @@ private:
     iterator_.reset();
   }
 
-  const Protobuf::Struct metadata_;
+  const std::optional<Protobuf::Struct> owned_;
+  const Protobuf::Struct& metadata_;
   LuaDeathRef<MetadataMapIterator> iterator_;
 
   friend class MetadataMapIterator;

@@ -31,6 +31,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/strings/str_cat.h"
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 
@@ -329,6 +330,18 @@ function envoy_on_request(handle)
 end
 )EOF";
 
+// Read one key of the filter context in each handler, which is how a filter that takes its
+// settings from the context reads them.
+constexpr absl::string_view kFilterContextGet = R"EOF(
+function envoy_on_request(handle)
+  local v = handle:filterContext():get("host_header")
+end
+
+function envoy_on_response(handle)
+  local v = handle:filterContext():get("host_header")
+end
+)EOF";
+
 // The request every arm receives.
 using HeaderTable = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
@@ -351,6 +364,23 @@ const HeaderTable& requestHeaderTable() {
                          });
 }
 
+// A filter context shaped like a path-matching filter's: one scalar, a list of `paths` entries and
+// a small map.
+Protobuf::Struct filterContext(int paths) {
+  Protobuf::Struct context;
+  auto& fields = *context.mutable_fields();
+  fields["host_header"].set_string_value("x-bench-host");
+  Protobuf::ListValue* list = fields["paths"].mutable_list_value();
+  for (int i = 0; i < paths; ++i) {
+    list->add_values()->set_string_value(absl::StrCat("/bench/path/", i));
+  }
+  auto& headers = *fields["path_headers"].mutable_struct_value()->mutable_fields();
+  for (int i = 0; i < 4; ++i) {
+    headers[absl::StrCat("x-bench-out-", i)].set_string_value("v");
+  }
+  return context;
+}
+
 // --- harness ---------------------------------------------------------------------------------
 
 class Harness {
@@ -358,7 +388,8 @@ public:
   // Worker count the filter config is told about; it only feeds the lua.lua_vm_count gauge.
   static constexpr uint32_t kConcurrency = 1;
 
-  Harness(absl::string_view code, bool clear_route_cache = true) {
+  Harness(absl::string_view code, bool clear_route_cache = true,
+          const Protobuf::Struct& filter_context = Protobuf::Struct::default_instance()) {
     ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault([this]() -> StreamInfo::StreamInfo& {
       return *stream_info_;
@@ -375,6 +406,7 @@ public:
     envoy::extensions::filters::http::lua::v3::Lua proto_config;
     proto_config.mutable_default_source_code()->set_inline_string(std::string(code));
     proto_config.mutable_clear_route_cache()->set_value(clear_route_cache);
+    *proto_config.mutable_filter_context() = filter_context;
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
                                              *stats_store_.rootScope(), "bench.", kConcurrency,
@@ -458,8 +490,9 @@ private:
 
 // One request/response pair for a given script. The error count has to stay zero, because the
 // filter fails open: a script that raises on every request looks exactly like a very fast script.
-void runScript(benchmark::State& state, absl::string_view code, bool clear_route_cache) {
-  Harness harness(code, clear_route_cache);
+void runScript(benchmark::State& state, absl::string_view code, bool clear_route_cache,
+               const Protobuf::Struct& filter_context = Protobuf::Struct::default_instance()) {
+  Harness harness(code, clear_route_cache, filter_context);
   // Warm the VM and prove the script actually runs before anything is timed.
   harness.oneRequest();
   RELEASE_ASSERT(harness.executions() > 0, "script never ran");
@@ -517,6 +550,12 @@ LUA_SCRIPT_BENCHMARK(MetadataSet1Get1, kMetadataSet1Get1)
 LUA_SCRIPT_BENCHMARK(MetadataSet16Get1, kMetadataSet16Get1)
 LUA_SCRIPT_BENCHMARK(FilterStateSet1Get0, kFilterStateSet1Get0)
 LUA_SCRIPT_BENCHMARK(FilterStateSet1Get16, kFilterStateSet1Get16)
+
+// The argument is the length of the context's `paths` list, which the script never reads.
+void BM_FilterContextGet(benchmark::State& state) {
+  runScript(state, kFilterContextGet, true, filterContext(state.range(0)));
+}
+BENCHMARK(BM_FilterContextGet)->Arg(0)->Arg(16)->Arg(256);
 
 // gmock dispatch is not free, and it is inside every filter arm but not inside BM_Fixture: the
 // filter resolves its per-route config once per direction and asks for the stream info once per
