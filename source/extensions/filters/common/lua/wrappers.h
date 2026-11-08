@@ -93,7 +93,7 @@ public:
   MetadataMapWrapper(const Protobuf::Struct& metadata) : owned_{metadata}, metadata_{*owned_} {}
 
   // Borrows `metadata`, which must stay alive until the wrapper is marked dead. Pass it with
-  // std::cref() to pick this over the copy.
+  // `std::cref()` to pick this over the copy.
   MetadataMapWrapper(std::reference_wrapper<const Protobuf::Struct> metadata)
       : metadata_{metadata.get()} {}
 

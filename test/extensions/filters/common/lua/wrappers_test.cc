@@ -216,7 +216,7 @@ class LuaMetadataMapWrapperOwnershipTest : public LuaMetadataMapWrapperTest,
 
 INSTANTIATE_TEST_SUITE_P(CopyOrBorrow, LuaMetadataMapWrapperOwnershipTest, testing::Bool());
 
-// A wrapper built from a plain reference holds its own copy, and one built from std::cref() reads
+// A wrapper built from a plain reference holds its own copy, and one built from `std::cref()` reads
 // the caller's struct.
 TEST_P(LuaMetadataMapWrapperOwnershipTest, SeesChangesOnlyWhenBorrowed) {
   const bool borrow = GetParam();
