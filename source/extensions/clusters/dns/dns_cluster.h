@@ -7,6 +7,7 @@
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/common/logical_host.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -57,18 +58,18 @@ private:
     bool isSuccessfulResponse(const std::list<Network::DnsResponse>& response,
                               const Network::DnsResolver::ResolutionStatus& status);
 
-    struct ParsedHosts {
-      HostVector hosts;
-      std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+    struct ParsedDnsResponse {
+      // The first resolved address, or nullptr if the response is empty.
+      Network::Address::InstanceConstSharedPtr primary_address;
+      // All resolved addresses with the port, in response order.
+      std::vector<Network::Address::InstanceConstSharedPtr> address_list;
+      // Unique resolved addresses, keyed by Address::Instance::asString().
       absl::flat_hash_set<std::string> host_addresses;
+      std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
     };
-    absl::StatusOr<ParsedHosts>
-    createLogicalDnsHosts(const std::list<Network::DnsResponse>& response);
-    absl::StatusOr<ParsedHosts>
-    createStrictDnsHosts(const std::list<Network::DnsResponse>& response);
-    void updateLogicalDnsHosts(const std::list<Network::DnsResponse>& response,
-                               const ParsedHosts& new_hosts);
-    void updateStrictDnsHosts(const ParsedHosts& new_hosts);
+    ParsedDnsResponse parseDnsResponse(const std::list<Network::DnsResponse>& response);
+    absl::Status updateLogicalDnsHosts(const ParsedDnsResponse& parsed);
+    absl::Status updateStrictDnsHosts(const ParsedDnsResponse& parsed);
 
     DnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
@@ -94,6 +95,8 @@ private:
     // synchronization mechanisms.
     Network::Address::InstanceConstSharedPtr logic_dns_cached_address_;
     std::vector<Network::Address::InstanceConstSharedPtr> logic_dns_cached_address_list_;
+    // The current logical host, updated in place when skip_draining_on_resolution is enabled.
+    LogicalHostSharedPtr logical_host_;
   };
 
   using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
@@ -123,6 +126,7 @@ private:
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
   bool all_addresses_in_single_endpoint_;
+  const bool skip_draining_on_resolution_;
 };
 
 DECLARE_FACTORY(DnsClusterFactory);

@@ -93,6 +93,8 @@ areas:
     title: decompression
   dns:
     title: dns
+  dns_cluster:
+    title: dns_cluster
   dns_resolver:
     title: dns_resolver
   drain:

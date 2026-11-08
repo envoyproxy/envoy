@@ -186,9 +186,6 @@ protected:
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
 
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
-      EXPECT_CALL(membership_updated_, ready());
-    }
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
@@ -230,9 +227,6 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
-      EXPECT_CALL(membership_updated_, ready());
-    }
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
@@ -1127,10 +1121,6 @@ TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
   resolve_timer_->invokeCallback();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
-    EXPECT_CALL(membership_updated_, ready());
-  }
-
   dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.3"}, std::chrono::seconds(3000)));
@@ -1149,6 +1139,99 @@ TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
     actual_addresses.push_back(addr->asString());
   }
   EXPECT_THAT(actual_addresses, ::testing::UnorderedElementsAreArray(expected_addresses));
+}
+
+TEST_P(LogicalDnsImplementationsTest, AddressChangeUpdatesHostInPlaceByDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: cluster1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      dns_lookup_family: V4_ONLY
+      all_addresses_in_single_endpoint: true
+  lb_policy: ROUND_ROBIN
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_OK(factorySetupFromV3Yaml(config));
+
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _)).Times(AnyNumber());
+  // Only the first resolution publishes a membership update.
+  EXPECT_CALL(membership_updated_, ready());
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1"}));
+  const HostSharedPtr original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("127.0.0.1:443", original_host->address()->asString());
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  resolve_timer_->invokeCallback();
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+
+  ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(original_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ("127.0.0.2:443", original_host->address()->asString());
+  EXPECT_EQ(2UL, original_host->addressListOrNull()->size());
+}
+
+TEST_F(LogicalDnsClusterTest, AddressChangeReplacesHostWhenSkipDrainingDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", "true"}});
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: cluster1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      dns_lookup_family: V4_ONLY
+      all_addresses_in_single_endpoint: true
+      skip_draining_on_resolution: false
+  lb_policy: ROUND_ROBIN
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_OK(factorySetupFromV3Yaml(config));
+
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _)).Times(AnyNumber());
+  EXPECT_CALL(membership_updated_, ready()).Times(2);
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1"}));
+  const HostSharedPtr original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  resolve_timer_->invokeCallback();
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  const HostSharedPtr new_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_NE(original_host, new_host);
+  // The old host keeps its address so its connection pools drain against it.
+  EXPECT_EQ("127.0.0.1:443", original_host->address()->asString());
+  EXPECT_EQ("127.0.0.2:443", new_host->address()->asString());
 }
 
 } // namespace
