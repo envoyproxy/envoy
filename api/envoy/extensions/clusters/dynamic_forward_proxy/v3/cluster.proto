@@ -25,6 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 // [#extension: envoy.clusters.dynamic_forward_proxy]
+// [#next-free-field: 6]
 message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig";
