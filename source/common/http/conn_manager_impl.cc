@@ -2144,6 +2144,8 @@ std::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream:
 }
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
+  state_.waiting_for_vhds_ = false;
+  vhds_update_callback_.reset();
   // The BadRequest error code indicates there has been a messaging error.
   if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {

@@ -5945,6 +5945,71 @@ TEST_F(HttpConnectionManagerImplTest, TimeoutWhileWaitingForInitialVhdsCancelsCa
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
+TEST_F(HttpConnectionManagerImplTest,
+       TimeoutWhileWaitingForInitialVhdsWithPausedEncoderFilterCancelsCallback) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup();
+  setupFilterChain(1, 1);
+  ON_CALL(*codec_, protocol()).WillByDefault(Return(Protocol::Http2));
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  ON_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillRepeatedly(Return(Router::VirtualHostRoute{}));
+
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> weak_vhds_cb;
+  Http::RouteConfigUpdatedCallbackSharedPtr strong_vhds_cb;
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("dynamic.lyft.com", _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Event::Dispatcher&,
+                     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+            weak_vhds_cb = route_config_updated_cb;
+            strong_vhds_cb = route_config_updated_cb.lock();
+          }));
+
+  Event::MockTimer* idle_timer = nullptr;
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    idle_timer = setUpTimer();
+    EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _)).Times(2);
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "dynamic.lyft.com"}, {":method", "GET"}, {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(strong_vhds_cb, nullptr);
+
+  // Pause the 504 local reply in encoder_filters_[0] before doEndStream runs.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  idle_timer->invokeCallback();
+
+  // ActiveStream::onLocalReply has already canceled the VHDS wait before the encoder filter chain.
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, _)).Times(0);
+  (*strong_vhds_cb)(true);
+  strong_vhds_cb.reset();
+  EXPECT_TRUE(weak_vhds_cb.expired());
+
+  // Resume encoding to finish cleanup.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("504", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  encoder_filters_[0]->callbacks_->continueEncoding();
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
 TEST_F(HttpConnectionManagerImplTest, SrdsDoesNotHoldRequestForInitialVhdsUpdate) {
   setup(SetupOpts().setUseSrds(true));
   setupFilterChain(1, 0);

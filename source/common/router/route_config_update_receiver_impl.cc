@@ -196,14 +196,12 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   if (rds_virtual_hosts_ == nullptr) {
     rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
   }
-  const bool was_awaiting_initial = awaiting_initial_vhds_update_;
-  awaiting_initial_vhds_update_ = false;
 
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
   const bool vhosts_changed =
-      removed || updated || !added_resource_ids.empty() || was_awaiting_initial;
+      removed || updated || !added_resource_ids.empty() || awaiting_initial_vhds_update_;
   if (!vhosts_changed) {
     // Nothing to rebuild, so the currently published route configuration stays in place. An update
     // that is still warming up is deliberately left alone. This update still carried no resource
@@ -228,6 +226,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // No exception, the new route configuration is valid, can update the state. This has to happen
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().
+  awaiting_initial_vhds_update_ = false;
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
   // Only ids that were explicitly requested on demand enter the answered cache. The server may
   // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
@@ -248,7 +247,6 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 
 void RouteConfigUpdateReceiverImpl::onVhdsFailure() {
   if (awaiting_initial_vhds_update_) {
-    awaiting_initial_vhds_update_ = false;
     auto route_config_after_this_update =
         std::make_unique<envoy::config::route::v3::RouteConfiguration>();
     const Protobuf::Any& latest_route_config_any = latestRouteConfigurationAny();
@@ -266,6 +264,7 @@ void RouteConfigUpdateReceiverImpl::onVhdsFailure() {
                                    *route_config_after_this_update);
     std::string version_info = base_.configInfo().has_value() ? base_.configInfo()->version_ : "";
     base_.updateConfig(*route_config_after_this_update, std::nullopt, version_info);
+    awaiting_initial_vhds_update_ = false;
     base_.startWarming();
   }
 }
