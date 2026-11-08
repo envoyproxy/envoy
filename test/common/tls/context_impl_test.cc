@@ -2325,9 +2325,8 @@ common_tls_context:
 
   auto tls_certs = server_context_config->tlsCertificates();
   ASSERT_EQ(1, tls_certs.size());
-  const std::string expected_metric_name =
-      absl::StrCat("ssl.certificate.", tls_certs[0].get().certificateName(),
-                   ".expiration_unix_time_seconds");
+  const std::string expected_metric_name = absl::StrCat(
+      "ssl.certificate.", tls_certs[0].get().certificateName(), ".expiration_unix_time_seconds");
 
   Stats::SymbolTableImpl symbol_table;
   Stats::Allocator alloc(symbol_table);
@@ -2371,9 +2370,8 @@ common_tls_context:
 
   auto tls_certs = client_context_config->tlsCertificates();
   ASSERT_EQ(1, tls_certs.size());
-  const std::string expected_metric_name =
-      absl::StrCat("ssl.certificate.", tls_certs[0].get().certificateName(),
-                   ".expiration_unix_time_seconds");
+  const std::string expected_metric_name = absl::StrCat(
+      "ssl.certificate.", tls_certs[0].get().certificateName(), ".expiration_unix_time_seconds");
 
   Stats::SymbolTableImpl symbol_table;
   Stats::Allocator alloc(symbol_table);
