@@ -2,7 +2,7 @@
 
 #include "source/extensions/compression/gzip/compressor/config.h"
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
@@ -13,10 +13,9 @@ using testing::Ge;
 namespace Envoy {
 namespace {
 
-class DecompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+class DecompressorIntegrationTest : public UpstreamDownstreamIntegrationTest {
 public:
-  DecompressorIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+  DecompressorIntegrationTest() {
     Extensions::Compression::Gzip::Compressor::GzipCompressorLibraryFactory
         compressor_library_factory;
     envoy::extensions::compression::gzip::compressor::v3::Gzip factory_config;
@@ -31,10 +30,13 @@ public:
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-    config_helper_.prependFilter(config);
+    config_helper_.prependFilter(config, testing_downstream_filter_);
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
+  }
+
+  std::string statPrefix() const {
+    return testing_downstream_filter_ ? "http.config_test." : "cluster.cluster_0.";
   }
 
   const std::string default_config{R"EOF(
@@ -51,9 +53,10 @@ public:
   Envoy::Compression::Compressor::CompressorPtr response_compressor_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DecompressorIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, DecompressorIntegrationTest,
+                         testing::ValuesIn(UpstreamDownstreamIntegrationTest::getDefaultTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+                         UpstreamDownstreamIntegrationTest::testParamsToString);
 
 /**
  * Exercises gzip decompression bidirectionally with default configuration.
@@ -114,16 +117,16 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
                 .getStringView());
 
   // Verify stats
-  test_server_->waitForCounter("http.config_test.decompressor.testlib.gzip.request.decompressed",
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.request.decompressed",
                                Eq(1));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.not_decompressed", Eq(0));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
-      Eq(compressed_request_length));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.total_uncompressed_bytes",
-      Eq(uncompressed_request_length));
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.request.not_decompressed",
+                               Eq(0));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.request.total_compressed_bytes",
+                               Eq(compressed_request_length));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.request.total_uncompressed_bytes",
+                               Eq(uncompressed_request_length));
 
   // Enable response decompression by setting the Content-Encoding header to gzip.
   upstream_request_->encodeHeaders(
@@ -165,16 +168,16 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
                 .getStringView());
 
   // Verify stats
-  test_server_->waitForCounter("http.config_test.decompressor.testlib.gzip.response.decompressed",
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.response.decompressed",
                                Eq(1));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.response.not_decompressed", Eq(0));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.response.total_compressed_bytes",
-      Eq(compressed_response_length));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.response.total_uncompressed_bytes",
-      Eq(uncompressed_response_length));
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.response.not_decompressed",
+                               Eq(0));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.response.total_compressed_bytes",
+                               Eq(compressed_response_length));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.response.total_uncompressed_bytes",
+                               Eq(uncompressed_response_length));
 }
 
 /**
@@ -237,15 +240,15 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
                 .getStringView());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
-  test_server_->waitForCounter("http.config_test.decompressor.testlib.gzip.request.decompressed",
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.request.decompressed",
                                Eq(1));
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.request.not_decompressed",
+                               Eq(0));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.request.total_compressed_bytes",
+                               Eq(compressed_request_length));
   test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.not_decompressed", Eq(0));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
-      Eq(compressed_request_length));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", Eq(2));
+      statPrefix() + "decompressor.testlib.gzip.decompressor_library.zlib_data_error", Eq(2));
 
   // Enable response decompression by setting the Content-Encoding header to gzip.
   upstream_request_->encodeHeaders(
@@ -277,15 +280,15 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
                 .getStringView());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
-  test_server_->waitForCounter("http.config_test.decompressor.testlib.gzip.response.decompressed",
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.response.decompressed",
                                Eq(1));
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.response.not_decompressed",
+                               Eq(0));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.response.total_compressed_bytes",
+                               Eq(compressed_response_length));
   test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.response.not_decompressed", Eq(0));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.response.total_compressed_bytes",
-      Eq(compressed_response_length));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", Ge(3));
+      statPrefix() + "decompressor.testlib.gzip.decompressor_library.zlib_data_error", Ge(3));
 }
 
 // Buffer the request after it's been decompressed.
@@ -295,7 +298,8 @@ TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
     name: encoder-decoder-buffer-filter
     typed_config:
       "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
-  )EOF");
+  )EOF",
+                               testing_downstream_filter_);
 
   config_helper_.prependFilter(R"EOF(
   name: envoy.filters.http.decompressor
@@ -317,7 +321,8 @@ TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
         enabled:
           default_value: false
           runtime_key: response_decompressor_enabled
-  )EOF");
+  )EOF",
+                               testing_downstream_filter_);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -349,7 +354,7 @@ TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
 
   Stats::Store& stats = test_server_->server().stats();
   Stats::CounterSharedPtr counter = TestUtility::findCounter(
-      stats, "http.config_test.decompressor.gzip_default.gzip.request.decompressed");
+      stats, statPrefix() + "decompressor.gzip_default.gzip.request.decompressed");
   ASSERT_NE(nullptr, counter);
   EXPECT_EQ(1L, counter->value());
 }
@@ -418,17 +423,17 @@ TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
                 .getStringView());
 
   // Verify stats
-  test_server_->waitForCounter("http.config_test.decompressor.testlib.gzip.request.decompressed",
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.request.decompressed",
                                Eq(1));
+  test_server_->waitForCounter(statPrefix() + "decompressor.testlib.gzip.request.not_decompressed",
+                               Eq(0));
+  test_server_->waitForCounter(statPrefix() +
+                                   "decompressor.testlib.gzip.request.total_compressed_bytes",
+                               Eq(compressed_data_length));
   test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.not_decompressed", Eq(0));
+      statPrefix() + "decompressor.testlib.gzip.request.total_uncompressed_bytes", Eq(4096));
   test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
-      Eq(compressed_data_length));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.request.total_uncompressed_bytes", Eq(4096));
-  test_server_->waitForCounter(
-      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", Ge(1));
+      statPrefix() + "decompressor.testlib.gzip.decompressor_library.zlib_data_error", Ge(1));
 }
 
 // Construct a zstd RLE bomb frame (RFC 8878 sec 3.1.1.2.2).
@@ -519,7 +524,7 @@ TEST_P(DecompressorIntegrationTest, LimitZstdDecompression) {
                           << "Decompressed: " << upstream_request_->bodyLength() << " bytes.";
 
   test_server_->waitForCounter(
-      "http.config_test.decompressor.bomb.zstd.decompressor_library.zstd_generic_error", Ge(1));
+      statPrefix() + "decompressor.bomb.zstd.decompressor_library.zstd_generic_error", Ge(1));
 
   // Complete the stream cleanly.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
