@@ -147,14 +147,21 @@ public:
                                       absl::string_view filter_name,
                                       absl::string_view serialized_any);
 
+  // Whether filter state would store key at life_span, logging at debug when it would not.
+  // FilterState refuses, with an ENVOY_BUG, a key already stored at a different life span.
+  static bool canSetFilterState(const StreamInfo::FilterStateSharedPtr& filter_state,
+                                absl::string_view key, StreamInfo::FilterState::LifeSpan life_span);
+
   // Set a string value in filter state. When life_span or stream_sharing is set, it is passed to
-  // setData.
+  // setData. Returns false when there is no filter state or canSetFilterState refuses the key.
   static bool setFilterStateBytes(
       StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
       std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt,
       std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing = std::nullopt);
 
   // Set a typed filter state object from serialized bytes using the registered ObjectFactory.
+  // Returns false when no factory is registered for key, it rejects value, or canSetFilterState
+  // refuses the key.
   static bool
   setFilterStateTyped(StreamInfo::StreamInfo& stream_info, absl::string_view key,
                       absl::string_view value,

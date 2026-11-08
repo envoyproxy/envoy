@@ -58,6 +58,19 @@ envoy_cc_dyn_module_test(
 )
 
 envoy_cc_test(
+    name = "abi_context_accessors_test",
+    srcs = ["abi_context_accessors_test.cc"],
+    deps = [
+        "//envoy/registry",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "abi_impl_test",
     size = "large",
     srcs = ["abi_impl_test.cc"],
