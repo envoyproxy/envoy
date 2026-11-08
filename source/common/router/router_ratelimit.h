@@ -323,6 +323,7 @@ public:
                                 const Http::RequestHeaderMap&,
                                 const StreamInfo::StreamInfo& info) const override;
   bool applyOnStreamDone() const override { return apply_on_stream_done_; }
+  bool stopOnMatch() const override { return stop_on_match_; }
 
 private:
   const std::string disable_key_;
@@ -330,6 +331,7 @@ private:
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   std::optional<RateLimitOverrideActionPtr> limit_override_ = std::nullopt;
   const bool apply_on_stream_done_ = false;
+  const bool stop_on_match_ = false;
   const RateLimit::XRateLimitOption x_ratelimit_option_{};
 };
 

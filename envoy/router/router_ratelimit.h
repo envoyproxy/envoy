@@ -54,6 +54,13 @@ public:
   virtual bool applyOnStreamDone() const PURE;
 
   /**
+   * @return true if no later rate limit policy should be evaluated once this one has produced a
+   *         descriptor. Defaults to false so existing implementations keep evaluating every
+   *         policy.
+   */
+  virtual bool stopOnMatch() const { return false; }
+
+  /**
    * Potentially populate the descriptor array with new descriptors to query.
    * @param descriptors supplies the descriptor array to optionally fill.
    * @param local_service_cluster supplies the name of the local service cluster.
