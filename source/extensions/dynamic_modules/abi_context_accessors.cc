@@ -12,10 +12,13 @@
 #include "source/common/config/metadata.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -88,6 +91,36 @@ const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream
 }
 
 } // namespace
+
+std::optional<Http::LowerCaseString> moduleHeaderKey(absl::string_view name,
+                                                     absl::string_view value) {
+  if ((name.empty() || !Http::HeaderUtility::headerNameIsValid(name) ||
+       !Http::HeaderUtility::headerValueIsValid(value)) &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_reject_invalid_headers")) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "rejected header '{}' with an invalid name or value", absl::CEscape(name));
+    return std::nullopt;
+  }
+  return Http::LowerCaseString(name);
+}
+
+bool addModuleHeaders(Http::HeaderMap& map,
+                      const envoy_dynamic_module_type_module_http_header* headers,
+                      size_t headers_size) {
+  bool added_all = true;
+  for (size_t i = 0; i < headers_size; i++) {
+    const absl::string_view name(headers[i].key_ptr, headers[i].key_length);
+    const absl::string_view value(headers[i].value_ptr, headers[i].value_length);
+    const std::optional<Http::LowerCaseString> key = moduleHeaderKey(name, value);
+    if (!key.has_value()) {
+      added_all = false;
+      continue;
+    }
+    map.addCopy(*key, value);
+  }
+  return added_all;
+}
 
 HeadersMapOptConstRef
 ContextAccessor::headerMapByType(const Formatter::Context& context,

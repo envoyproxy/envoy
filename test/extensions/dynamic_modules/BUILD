@@ -58,6 +58,16 @@ envoy_cc_dyn_module_test(
 )
 
 envoy_cc_test(
+    name = "abi_context_accessors_test",
+    srcs = ["abi_context_accessors_test.cc"],
+    deps = [
+        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "abi_impl_test",
     size = "large",
     srcs = ["abi_impl_test.cc"],

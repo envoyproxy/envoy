@@ -21,6 +21,17 @@ inline bool isValidModuleBuffer(envoy_dynamic_module_type_module_buffer buffer) 
   return buffer.ptr != nullptr || buffer.length == 0;
 }
 
+// Returns the key for a header that a module names, or nullopt if the name is empty or invalid or
+// the value is invalid. The header map only asserts that names and values hold no CR, LF or NUL,
+// and an HTTP/1 peer would read a CR or LF as the start of another header.
+std::optional<Http::LowerCaseString> moduleHeaderKey(absl::string_view name,
+                                                     absl::string_view value = {});
+
+// Adds every header that moduleHeaderKey() accepts to `map`, and returns false if it skipped any.
+bool addModuleHeaders(Http::HeaderMap& map,
+                      const envoy_dynamic_module_type_module_http_header* headers,
+                      size_t headers_size);
+
 /**
  * Shared context accessors used by Dynamic Module extensions to expose Envoy request and
  * response state across the C ABI boundary. The access logger and formatter extensions both wrap
