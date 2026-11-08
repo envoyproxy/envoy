@@ -53,6 +53,8 @@ envoy_cc_library(
     deps = [
         ":rds_interface",
         "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:filter_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
