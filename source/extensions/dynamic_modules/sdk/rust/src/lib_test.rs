@@ -14627,8 +14627,15 @@ fn test_ai_filter_get_request_json_maps_results() {
 
 static AI_FILTERS_DROPPED: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Clone, Copy)]
+enum TestAiFilterNew {
+  Create,
+  Skip,
+  Panic,
+}
+
 struct TestAiFilterConfig {
-  skip: bool,
+  new: TestAiFilterNew,
 }
 
 impl ai_filter::AiFilterConfig for TestAiFilterConfig {
@@ -14636,10 +14643,10 @@ impl ai_filter::AiFilterConfig for TestAiFilterConfig {
     &self,
     _envoy_filter: &mut ai_filter::EnvoyAiFilter,
   ) -> Option<Box<dyn ai_filter::AiFilter>> {
-    if self.skip {
-      None
-    } else {
-      Some(Box::new(TestAiFilter))
+    match self.new {
+      TestAiFilterNew::Create => Some(Box::new(TestAiFilter)),
+      TestAiFilterNew::Skip => None,
+      TestAiFilterNew::Panic => panic!("intentional panic in new_ai_filter"),
     }
   }
 }
@@ -14661,33 +14668,56 @@ impl Drop for TestAiFilter {
   }
 }
 
+fn test_ai_filter_config_new(name: &str) -> *const std::ffi::c_void {
+  let new_config: NewAiFilterConfigFunction = |filter_name, _config| {
+    let new = match filter_name {
+      "filter" => TestAiFilterNew::Create,
+      "skip" => TestAiFilterNew::Skip,
+      "panic" => TestAiFilterNew::Panic,
+      _ => return None,
+    };
+    Some(Box::new(TestAiFilterConfig { new }))
+  };
+  ai_filter::envoy_dynamic_module_on_ai_filter_config_new_impl(name, b"", &new_config)
+}
+
+#[test]
+fn test_ai_filter_new_skips_or_fails_without_a_filter() {
+  assert!(test_ai_filter_config_new("unknown").is_null());
+  for (name, expected) in [
+    (
+      "skip",
+      abi::envoy_dynamic_module_type_on_ai_filter_new_status::Skip,
+    ),
+    (
+      "panic",
+      abi::envoy_dynamic_module_type_on_ai_filter_new_status::Error,
+    ),
+  ] {
+    let config = test_ai_filter_config_new(name);
+    assert!(!config.is_null());
+    let mut filter: abi::envoy_dynamic_module_type_ai_filter_module_ptr = std::ptr::null();
+    unsafe {
+      assert_eq!(
+        ai_filter::envoy_dynamic_module_on_ai_filter_new(config, std::ptr::null_mut(), &mut filter),
+        expected
+      );
+      ai_filter::envoy_dynamic_module_on_ai_filter_config_destroy(config);
+    }
+    assert!(filter.is_null());
+  }
+}
+
 #[test]
 fn test_ai_filter_lifecycle() {
-  let new_config: NewAiFilterConfigFunction = |name, _config| match name {
-    "filter" => Some(Box::new(TestAiFilterConfig { skip: false })),
-    "skip" => Some(Box::new(TestAiFilterConfig { skip: true })),
-    _ => None,
-  };
-  assert!(
-    ai_filter::envoy_dynamic_module_on_ai_filter_config_new_impl("unknown", b"", &new_config)
-      .is_null()
-  );
-
-  let skip_config =
-    ai_filter::envoy_dynamic_module_on_ai_filter_config_new_impl("skip", b"", &new_config);
-  assert!(!skip_config.is_null());
-  unsafe {
-    assert!(
-      ai_filter::envoy_dynamic_module_on_ai_filter_new(skip_config, std::ptr::null_mut()).is_null()
-    );
-    ai_filter::envoy_dynamic_module_on_ai_filter_config_destroy(skip_config);
-  }
-
-  let config =
-    ai_filter::envoy_dynamic_module_on_ai_filter_config_new_impl("filter", b"", &new_config);
+  let config = test_ai_filter_config_new("filter");
   assert!(!config.is_null());
   unsafe {
-    let filter = ai_filter::envoy_dynamic_module_on_ai_filter_new(config, std::ptr::null_mut());
+    let mut filter: abi::envoy_dynamic_module_type_ai_filter_module_ptr = std::ptr::null();
+    assert_eq!(
+      ai_filter::envoy_dynamic_module_on_ai_filter_new(config, std::ptr::null_mut(), &mut filter),
+      abi::envoy_dynamic_module_type_on_ai_filter_new_status::Created
+    );
     assert!(!filter.is_null());
     assert_eq!(
       ai_filter::envoy_dynamic_module_on_ai_filter_request(std::ptr::null_mut(), filter),

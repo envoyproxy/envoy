@@ -139,6 +139,18 @@ TEST_F(DynamicModuleAiFilterTest, ModuleSkipsStream) {
   EXPECT_EQ(filter("skip_on_header"), nullptr);
 }
 
+TEST_F(DynamicModuleAiFilterTest, FailedCreationFailsTheRequest) {
+  for (absl::string_view scenario : {"fail_new", "null_filter"}) {
+    SCOPED_TRACE(scenario);
+    auto failed = filter(scenario);
+    ASSERT_NE(failed, nullptr);
+    EXPECT_EQ(0, liveCount("ai_filter_test_live_filters"));
+    AiRequest request = chatRequest();
+    EXPECT_THAT(run(*failed, request), HasStatusCode(absl::StatusCode::kInternal));
+    EXPECT_FALSE(reply_code_.has_value());
+  }
+}
+
 TEST_F(DynamicModuleAiFilterTest, ErrorFailsRequest) {
   auto error = filter("error");
   AiRequest request = chatRequest();
@@ -195,14 +207,38 @@ TEST_F(DynamicModuleAiFilterTest, PayloadIsUnavailableOutsideTheRequestHook) {
             absl::StrCat(unavailable, ",", unavailable, ",", unavailable, ",0,0"));
 }
 
-TEST_F(DynamicModuleAiFilterTest, RejectsEmptyKeys) {
+TEST_F(DynamicModuleAiFilterTest, RejectsInvalidHeaders) {
+  auto invalid_headers = filter("invalid_headers");
+  AiRequest request = chatRequest();
+  EXPECT_OK(run(*invalid_headers, request));
+  // Empty, malformed, CR/LF and NUL writes and lookups fail; a valid write still succeeds.
+  EXPECT_EQ(filterState("invalid_headers"), "0,0,0,0,0,0,1");
+  EXPECT_EQ(headers_.get_("x-valid"), "ok");
+  EXPECT_FALSE(headers_.has("x-crlf"));
+  EXPECT_FALSE(headers_.has("x-nul"));
+  EXPECT_FALSE(headers_.has("x-injected"));
+}
+
+TEST_F(DynamicModuleAiFilterTest, StreamCallbacksFailOutsideHooks) {
+  headers_.addCopy("x-tenant", "acme");
   auto passthrough = filter("passthrough");
-  EXPECT_FALSE(envoy_dynamic_module_callback_ai_filter_set_request_header(passthrough.get(),
-                                                                          {nullptr, 0}, {"v", 1}));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_ai_filter_remove_request_header(passthrough.get(), {"", 0}));
+  ASSERT_NE(passthrough, nullptr);
+  envoy_dynamic_module_type_envoy_buffer result{"stale", 5};
+  size_t total_count = 1;
+  EXPECT_FALSE(envoy_dynamic_module_callback_ai_filter_get_request_header_value(
+      passthrough.get(), {"x-tenant", 8}, &result, 0, &total_count));
+  EXPECT_EQ(result.ptr, nullptr);
+  EXPECT_EQ(total_count, 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_ai_filter_set_request_header(
+      passthrough.get(), {"x-tenant", 8}, {"other", 5}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_ai_filter_remove_request_header(passthrough.get(),
+                                                                             {"x-tenant", 8}));
   EXPECT_FALSE(envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes(
-      passthrough.get(), {nullptr, 0}, {"v", 1}));
+      passthrough.get(), {"tenant", 6}, {"acme", 4}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_ai_filter_get_filter_state_bytes(
+      passthrough.get(), {"tenant", 6}, &result));
+  EXPECT_EQ(headers_.get_("x-tenant"), "acme");
+  EXPECT_EQ(filterState("tenant"), "");
 }
 
 } // namespace

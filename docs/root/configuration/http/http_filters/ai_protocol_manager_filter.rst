@@ -597,8 +597,9 @@ Strings longer than :ref:`inline_string_threshold_bytes
 are offloaded to the external buffer rather than held in memory, and a read of a value that is or
 holds one fails; raise the threshold for a module that inspects message content. A module may
 replace an offloaded value. A header the module rewrites reaches the upstream, but changing a
-header the route was selected on does not select another route. A module that fails the request
-ends it with a 502.
+header the route was selected on does not select another route, and a header name or value that is
+not valid, such as one holding a CR or LF, is rejected. A module may skip a stream when it creates
+the filter; a module that fails to create the filter, or fails the request, ends it with a 502.
 
 Response token-usage extraction
 -------------------------------

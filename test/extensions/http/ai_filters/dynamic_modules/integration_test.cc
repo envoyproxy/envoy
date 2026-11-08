@@ -131,5 +131,14 @@ TEST_P(DynamicModuleAiFilterIntegrationTest, ErrorFailsTheRequest) {
   EXPECT_EQ(response->headers().getStatusValue(), "502");
 }
 
+// The C module returns Error and the Rust module panics; neither lets the request pass unfiltered.
+TEST_P(DynamicModuleAiFilterIntegrationTest, FailedFilterCreationFailsTheRequest) {
+  initializeFilter("fail_new");
+  IntegrationStreamDecoderPtr response = sendChatRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "502");
+}
+
 } // namespace
 } // namespace Envoy

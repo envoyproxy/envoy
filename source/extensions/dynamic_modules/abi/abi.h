@@ -19878,7 +19878,7 @@ typedef const void* envoy_dynamic_module_type_ai_filter_config_module_ptr;
  * OWNERSHIP: Envoy owns the pointer. Callbacks may only be called with it from within
  * envoy_dynamic_module_on_ai_filter_new and envoy_dynamic_module_on_ai_filter_request, on the
  * thread running the hook: the request headers and the stream state the callbacks reach are only
- * guaranteed to exist for the duration of those hooks.
+ * guaranteed to exist for the duration of those hooks, and the callbacks fail outside them.
  */
 typedef void* envoy_dynamic_module_type_ai_filter_envoy_ptr;
 
@@ -19892,6 +19892,20 @@ typedef void* envoy_dynamic_module_type_ai_filter_envoy_ptr;
  * released when envoy_dynamic_module_on_ai_filter_destroy is called for the same pointer.
  */
 typedef const void* envoy_dynamic_module_type_ai_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_ai_filter_new_status is returned by
+ * envoy_dynamic_module_on_ai_filter_new.
+ */
+typedef enum envoy_dynamic_module_type_on_ai_filter_new_status {
+  // The module created the filter of the stream and stored it in filter_module_ptr_out.
+  envoy_dynamic_module_type_on_ai_filter_new_status_Created,
+  // The module does not filter the stream: the request is handed to the next AI filter.
+  envoy_dynamic_module_type_on_ai_filter_new_status_Skip,
+  // The module failed to create the filter. Envoy fails the request rather than letting it pass
+  // unfiltered.
+  envoy_dynamic_module_type_on_ai_filter_new_status_Error,
+} envoy_dynamic_module_type_on_ai_filter_new_status;
 
 /**
  * envoy_dynamic_module_type_on_ai_filter_request_status is returned by
@@ -19963,12 +19977,16 @@ void envoy_dynamic_module_on_ai_filter_config_destroy(
  *
  * @param config_module_ptr is the pointer to the in-module AI filter configuration.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
- * @return envoy_dynamic_module_type_ai_filter_module_ptr is the pointer to the in-module AI filter.
- * Returning nullptr skips the filter for this stream; the request is handed to the next AI filter.
+ * @param filter_module_ptr_out is where the module stores the pointer to the in-module AI filter
+ * when it returns Created. It is nullptr on entry.
+ * @return envoy_dynamic_module_type_on_ai_filter_new_status is whether the module created the
+ * filter, skips the stream, or failed. Created without a filter, Error, and any other value fail
+ * the request.
  */
-envoy_dynamic_module_type_ai_filter_module_ptr envoy_dynamic_module_on_ai_filter_new(
+envoy_dynamic_module_type_on_ai_filter_new_status envoy_dynamic_module_on_ai_filter_new(
     envoy_dynamic_module_type_ai_filter_config_module_ptr config_module_ptr,
-    envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr);
+    envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_ai_filter_module_ptr* filter_module_ptr_out);
 
 /**
  * envoy_dynamic_module_on_ai_filter_destroy is called on the worker thread of the stream when its
@@ -20097,8 +20115,10 @@ bool envoy_dynamic_module_callback_ai_filter_get_request_header_value(
  * Changing a header the route was selected on does not select another route.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
- * @param key is the key of the header. An empty key is rejected.
- * @param value is the value of the header.
+ * @param key is the key of the header. A key that is not a valid header name, such as an empty
+ * one, is rejected.
+ * @param value is the value of the header. A value holding a CR, LF or NUL is rejected, so a value
+ * copied from the request payload cannot end the header and start another.
  * @return true if the header was set, false otherwise.
  */
 bool envoy_dynamic_module_callback_ai_filter_set_request_header(
@@ -20110,7 +20130,8 @@ bool envoy_dynamic_module_callback_ai_filter_set_request_header(
  * every value of the request header with the given key.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
- * @param key is the key of the header. An empty key is rejected.
+ * @param key is the key of the header. A key that is not a valid header name, such as an empty
+ * one, is rejected.
  * @return true if the operation succeeded, including when the header did not exist.
  */
 bool envoy_dynamic_module_callback_ai_filter_remove_request_header(

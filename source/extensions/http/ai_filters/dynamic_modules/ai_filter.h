@@ -69,7 +69,8 @@ private:
 class DynamicModuleAiFilter : public Common::SyncAiFilter,
                               public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
-  // Creates the filter of a stream, or returns nullptr when the module skips the stream.
+  // Creates the filter of a stream, or returns nullptr when the module skips the stream. A filter
+  // the module failed to create fails the request instead of letting it pass unfiltered.
   static std::shared_ptr<DynamicModuleAiFilter>
   create(DynamicModuleAiFilterConfigSharedPtr config,
          const HttpFilters::AiProtocolManager::AiFilterContext& context);
@@ -82,7 +83,10 @@ public:
   absl::Status decodeSync(HttpFilters::AiProtocolManager::AiRequest& request,
                           HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
 
-  const HttpFilters::AiProtocolManager::AiFilterContext& context() const { return context_; }
+  // The stream's inputs; null outside the module's hooks, where they may no longer exist.
+  const HttpFilters::AiProtocolManager::AiFilterContext* context() const {
+    return in_hook_ ? &context_ : nullptr;
+  }
 
   // The request in scope; null outside the request hook.
   HttpFilters::AiProtocolManager::AiRequest* request() const { return request_; }
@@ -97,6 +101,7 @@ private:
   const DynamicModuleAiFilterConfigSharedPtr config_;
   const HttpFilters::AiProtocolManager::AiFilterContext context_;
   envoy_dynamic_module_type_ai_filter_module_ptr in_module_filter_{nullptr};
+  bool in_hook_{false};
   HttpFilters::AiProtocolManager::AiRequest* request_{nullptr};
   HttpFilters::AiProtocolManager::LocalReplier reply_locally_;
   std::string json_result_;

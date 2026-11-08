@@ -13,9 +13,12 @@
 typedef enum {
   scenario_passthrough,
   scenario_skip_on_header,
+  scenario_fail_new,
+  scenario_null_filter,
   scenario_error,
   scenario_local_reply,
   scenario_rewrite,
+  scenario_invalid_headers,
   scenario_outside_request,
 } scenario;
 
@@ -27,9 +30,12 @@ typedef struct {
 static const scenario_entry scenarios[] = {
     {"passthrough", scenario_passthrough},
     {"skip_on_header", scenario_skip_on_header},
+    {"fail_new", scenario_fail_new},
+    {"null_filter", scenario_null_filter},
     {"error", scenario_error},
     {"local_reply", scenario_local_reply},
     {"rewrite", scenario_rewrite},
+    {"invalid_headers", scenario_invalid_headers},
     {"outside_request", scenario_outside_request},
 };
 
@@ -78,15 +84,22 @@ void envoy_dynamic_module_on_ai_filter_config_destroy(
   --live_configs;
 }
 
-envoy_dynamic_module_type_ai_filter_module_ptr
+envoy_dynamic_module_type_on_ai_filter_new_status
 envoy_dynamic_module_on_ai_filter_new(envoy_dynamic_module_type_ai_filter_config_module_ptr config,
-                                      envoy_dynamic_module_type_ai_filter_envoy_ptr filter) {
+                                      envoy_dynamic_module_type_ai_filter_envoy_ptr filter,
+                                      envoy_dynamic_module_type_ai_filter_module_ptr* filter_out) {
   const scenario value = ((const scenario_entry*)config)->value;
   envoy_dynamic_module_type_envoy_buffer header;
   if (value == scenario_skip_on_header &&
       envoy_dynamic_module_callback_ai_filter_get_request_header_value(filter, str_buf("x-skip"),
                                                                        &header, 0, NULL)) {
-    return NULL;
+    return envoy_dynamic_module_type_on_ai_filter_new_status_Skip;
+  }
+  if (value == scenario_fail_new) {
+    return envoy_dynamic_module_type_on_ai_filter_new_status_Error;
+  }
+  if (value == scenario_null_filter) {
+    return envoy_dynamic_module_type_on_ai_filter_new_status_Created;
   }
   if (value == scenario_outside_request) {
     envoy_dynamic_module_type_envoy_buffer result;
@@ -101,9 +114,13 @@ envoy_dynamic_module_on_ai_filter_new(envoy_dynamic_module_type_ai_filter_config
     publish(filter, "outside_request", observed);
   }
   int* in_module_filter = malloc(sizeof(int));
+  if (in_module_filter == NULL) {
+    return envoy_dynamic_module_type_on_ai_filter_new_status_Error;
+  }
   *in_module_filter = value;
   ++live_filters;
-  return in_module_filter;
+  *filter_out = in_module_filter;
+  return envoy_dynamic_module_type_on_ai_filter_new_status_Created;
 }
 
 void envoy_dynamic_module_on_ai_filter_destroy(
@@ -150,6 +167,27 @@ static void rewrite(envoy_dynamic_module_type_ai_filter_envoy_ptr filter) {
   envoy_dynamic_module_callback_ai_filter_remove_request_header(filter, str_buf("x-remove-me"));
 }
 
+static void write_invalid_headers(envoy_dynamic_module_type_ai_filter_envoy_ptr filter) {
+  const envoy_dynamic_module_type_module_buffer nul_value = {"a\0b", 3};
+  envoy_dynamic_module_type_envoy_buffer value;
+  char observed[32];
+  snprintf(
+      observed, sizeof(observed), "%d,%d,%d,%d,%d,%d,%d",
+      envoy_dynamic_module_callback_ai_filter_set_request_header(filter, str_buf(""), str_buf("v")),
+      envoy_dynamic_module_callback_ai_filter_set_request_header(filter, str_buf("bad name"),
+                                                                 str_buf("v")),
+      envoy_dynamic_module_callback_ai_filter_set_request_header(filter, str_buf("x-crlf"),
+                                                                 str_buf("a\r\nx-injected: 1")),
+      envoy_dynamic_module_callback_ai_filter_set_request_header(filter, str_buf("x-nul"),
+                                                                 nul_value),
+      envoy_dynamic_module_callback_ai_filter_get_request_header_value(filter, str_buf("bad\nname"),
+                                                                       &value, 0, NULL),
+      envoy_dynamic_module_callback_ai_filter_remove_request_header(filter, str_buf("bad name")),
+      envoy_dynamic_module_callback_ai_filter_set_request_header(filter, str_buf("x-valid"),
+                                                                 str_buf("ok")));
+  publish(filter, "invalid_headers", observed);
+}
+
 static void reply_locally(envoy_dynamic_module_type_ai_filter_envoy_ptr filter) {
   char observed[32];
   const bool out_of_range =
@@ -174,6 +212,9 @@ envoy_dynamic_module_on_ai_filter_request(envoy_dynamic_module_type_ai_filter_en
     return envoy_dynamic_module_type_on_ai_filter_request_status_Error;
   case scenario_rewrite:
     rewrite(filter);
+    break;
+  case scenario_invalid_headers:
+    write_invalid_headers(filter);
     break;
   default:
     break;

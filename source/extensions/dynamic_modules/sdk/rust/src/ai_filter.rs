@@ -23,7 +23,8 @@ use std::ptr;
 /// The configuration is shared by every stream on every worker thread, so it must be
 /// `Send + Sync`. [`AiFilterConfig::new_ai_filter`] is called concurrently, once per stream.
 pub trait AiFilterConfig: Send + Sync {
-  /// Create the AI filter of a stream. Returning `None` skips the filter for this stream.
+  /// Create the AI filter of a stream. Returning `None` skips the filter for this stream; a panic
+  /// fails the request instead.
   ///
   /// `envoy_filter` can read the request headers and filter state to decide, but the request
   /// payload is not available yet.
@@ -209,7 +210,7 @@ impl EnvoyAiFilter {
   }
 
   /// Set the request header with the given key, replacing any existing values. Returns `false`
-  /// when the key is empty.
+  /// when the key is not a valid header name or the value holds a CR, LF or NUL.
   ///
   /// The request headers are held back until every AI filter has finished, so the header reaches
   /// the upstream. Changing a header the route was selected on does not select another route.
@@ -224,7 +225,7 @@ impl EnvoyAiFilter {
   }
 
   /// Remove every value of the request header with the given key. Returns `false` when the key is
-  /// empty; removing a key that does not exist succeeds.
+  /// not a valid header name; removing a key that does not exist succeeds.
   pub fn remove_request_header(&mut self, key: &str) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_ai_filter_remove_request_header(
@@ -346,18 +347,22 @@ ffi_export! {
   unsafe fn envoy_dynamic_module_on_ai_filter_new(
     config_ptr: abi::envoy_dynamic_module_type_ai_filter_config_module_ptr,
     filter_envoy_ptr: abi::envoy_dynamic_module_type_ai_filter_envoy_ptr,
-  ) -> *const c_void {
+    filter_module_ptr_out: *mut abi::envoy_dynamic_module_type_ai_filter_module_ptr,
+  ) -> abi::envoy_dynamic_module_type_on_ai_filter_new_status {
     // The configuration is shared by all worker threads and is only ever borrowed immutably here,
     // which is why `AiFilterConfig` requires `Send + Sync`.
     let config = &*(config_ptr as *const Box<dyn AiFilterConfig>);
     let mut envoy_filter = unsafe { EnvoyAiFilter::new(filter_envoy_ptr) };
     match config.new_ai_filter(&mut envoy_filter) {
-      Some(filter) => crate::wrap_into_c_void_ptr!(filter),
-      None => ptr::null(),
+      Some(filter) => {
+        *filter_module_ptr_out = crate::wrap_into_c_void_ptr!(filter);
+        abi::envoy_dynamic_module_type_on_ai_filter_new_status::Created
+      },
+      None => abi::envoy_dynamic_module_type_on_ai_filter_new_status::Skip,
     }
   }
-  // A null filter skips the stream rather than failing it.
-  on_panic = ptr::null()
+  // A stream the module could not inspect must not reach the upstream unfiltered.
+  on_panic = abi::envoy_dynamic_module_type_on_ai_filter_new_status::Error
 }
 
 ffi_export! {

@@ -2,6 +2,7 @@
 
 #include "envoy/http/header_map.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
@@ -15,6 +16,8 @@ namespace DynamicModules {
 namespace {
 
 using Extensions::DynamicModules::ContextAccessor;
+using Extensions::DynamicModules::HeadersMapOptConstRef;
+using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 
@@ -24,6 +27,12 @@ DynamicModuleAiFilter& filterOf(envoy_dynamic_module_type_ai_filter_envoy_ptr fi
 
 absl::string_view toStringView(envoy_dynamic_module_type_module_buffer buffer) {
   return buffer.ptr == nullptr ? absl::string_view() : absl::string_view(buffer.ptr, buffer.length);
+}
+
+// The header map asserts that names and values hold no CR, LF or NUL, and an HTTP/1 upstream would
+// read one as the start of another header, so module bytes are checked before they reach it.
+bool isValidHeaderName(absl::string_view name) {
+  return !name.empty() && Http::HeaderUtility::headerNameIsValid(name);
 }
 
 envoy_dynamic_module_type_ai_filter_json_result toJsonResult(const absl::Status& status) {
@@ -103,51 +112,59 @@ bool envoy_dynamic_module_callback_ai_filter_get_request_header_value(
     envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
-  return ContextAccessor::getHeaderValue(
-      makeOptRef<const Http::HeaderMap>(filterOf(filter_envoy_ptr).context().request_headers), key,
-      result, index, total_count_out);
+  const AiFilterContext* context = filterOf(filter_envoy_ptr).context();
+  HeadersMapOptConstRef headers;
+  if (context != nullptr && isValidHeaderName(toStringView(key))) {
+    headers = makeOptRef<const Http::HeaderMap>(context->request_headers);
+  }
+  return ContextAccessor::getHeaderValue(headers, key, result, index, total_count_out);
 }
 
 bool envoy_dynamic_module_callback_ai_filter_set_request_header(
     envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
-  const absl::string_view key_view = toStringView(key);
-  if (key_view.empty()) {
+  const AiFilterContext* context = filterOf(filter_envoy_ptr).context();
+  const absl::string_view name = toStringView(key);
+  const absl::string_view value_view = toStringView(value);
+  if (context == nullptr || !isValidHeaderName(name) ||
+      !Http::HeaderUtility::headerValueIsValid(value_view)) {
     return false;
   }
-  filterOf(filter_envoy_ptr)
-      .context()
-      .request_headers.setCopy(Http::LowerCaseString(key_view), toStringView(value));
+  context->request_headers.setCopy(Http::LowerCaseString(name), value_view);
   return true;
 }
 
 bool envoy_dynamic_module_callback_ai_filter_remove_request_header(
     envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key) {
-  const absl::string_view key_view = toStringView(key);
-  if (key_view.empty()) {
+  const AiFilterContext* context = filterOf(filter_envoy_ptr).context();
+  const absl::string_view name = toStringView(key);
+  if (context == nullptr || !isValidHeaderName(name)) {
     return false;
   }
-  filterOf(filter_envoy_ptr).context().request_headers.remove(Http::LowerCaseString(key_view));
+  context->request_headers.remove(Http::LowerCaseString(name));
   return true;
 }
 
 bool envoy_dynamic_module_callback_ai_filter_get_filter_state_bytes(
     envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
-  return ContextAccessor::getFilterStateBytes(filterOf(filter_envoy_ptr).context().stream_info, key,
-                                              result);
+  const AiFilterContext* context = filterOf(filter_envoy_ptr).context();
+  if (context == nullptr) {
+    return false;
+  }
+  return ContextAccessor::getFilterStateBytes(context->stream_info, key, result);
 }
 
 bool envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes(
     envoy_dynamic_module_type_ai_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  const AiFilterContext* context = filterOf(filter_envoy_ptr).context();
   const absl::string_view key_view = toStringView(key);
-  if (key_view.empty()) {
+  if (context == nullptr || key_view.empty()) {
     return false;
   }
-  return ContextAccessor::setFilterStateBytes(filterOf(filter_envoy_ptr).context().stream_info,
-                                              key_view, toStringView(value));
+  return ContextAccessor::setFilterStateBytes(context->stream_info, key_view, toStringView(value));
 }
 
 bool envoy_dynamic_module_callback_ai_filter_send_local_reply(

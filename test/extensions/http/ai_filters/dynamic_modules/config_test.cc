@@ -93,6 +93,11 @@ TEST_F(DynamicModuleAiFilterConfigFactoryTest, CreatesFilters) {
   auto skipping_cb = create(protoConfig("ai_filter", "skip_on_header"));
   ASSERT_OK(skipping_cb.status());
   EXPECT_EQ((*skipping_cb)(context), nullptr);
+
+  // A filter the module failed to create stays in the chain, where it fails the request.
+  auto failing_cb = create(protoConfig("ai_filter", "fail_new"));
+  ASSERT_OK(failing_cb.status());
+  EXPECT_NE((*failing_cb)(context), nullptr);
 }
 
 TEST_F(DynamicModuleAiFilterConfigFactoryTest, LoadsModuleFromLocalFile) {

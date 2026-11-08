@@ -15,7 +15,7 @@ fn init() -> bool {
 
 fn new_ai_filter_config_fn(name: &str, _config: &[u8]) -> Option<Box<dyn AiFilterConfig>> {
   match name {
-    "rewrite" | "local_reply" | "error" => Some(Box::new(TestAiFilterConfig {
+    "rewrite" | "local_reply" | "error" | "fail_new" => Some(Box::new(TestAiFilterConfig {
       name: name.to_string(),
     })),
     _ => None,
@@ -31,6 +31,7 @@ impl AiFilterConfig for TestAiFilterConfig {
     Some(match self.name.as_str() {
       "rewrite" => Box::new(RewriteFilter),
       "local_reply" => Box::new(LocalReplyFilter),
+      "fail_new" => panic!("new_ai_filter failed"),
       _ => Box::new(ErrorFilter),
     })
   }

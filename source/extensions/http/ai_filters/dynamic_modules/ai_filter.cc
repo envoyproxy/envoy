@@ -82,11 +82,21 @@ DynamicModuleAiFilter::create(DynamicModuleAiFilterConfigSharedPtr config,
                               const AiFilterContext& context) {
   auto filter = std::make_shared<DynamicModuleAiFilter>(std::move(config), context);
   // The module may call back into the filter from its new hook, so the filter must exist first.
-  filter->in_module_filter_ =
-      filter->config_->hooks_.filter_new(filter->config_->in_module_config_, filter.get());
-  if (filter->in_module_filter_ == nullptr) {
+  envoy_dynamic_module_type_ai_filter_module_ptr in_module_filter = nullptr;
+  filter->in_hook_ = true;
+  const envoy_dynamic_module_type_on_ai_filter_new_status status =
+      filter->config_->hooks_.filter_new(filter->config_->in_module_config_, filter.get(),
+                                         &in_module_filter);
+  filter->in_hook_ = false;
+  if (status == envoy_dynamic_module_type_on_ai_filter_new_status_Skip) {
     ENVOY_LOG(debug, "dynamic module AI filter skipped the stream");
     return nullptr;
+  }
+  if (status == envoy_dynamic_module_type_on_ai_filter_new_status_Created &&
+      in_module_filter != nullptr) {
+    filter->in_module_filter_ = in_module_filter;
+  } else {
+    ENVOY_LOG(debug, "dynamic module failed to create the AI filter of the stream");
   }
   return filter;
 }
@@ -102,10 +112,15 @@ DynamicModuleAiFilter::~DynamicModuleAiFilter() {
 }
 
 absl::Status DynamicModuleAiFilter::decodeSync(AiRequest& request, LocalReplier reply_locally) {
+  if (in_module_filter_ == nullptr) {
+    return absl::InternalError("dynamic module failed to create the AI filter of the stream");
+  }
   request_ = &request;
   reply_locally_ = std::move(reply_locally);
+  in_hook_ = true;
   const envoy_dynamic_module_type_on_ai_filter_request_status status =
       config_->hooks_.request(this, in_module_filter_);
+  in_hook_ = false;
   const bool replied_locally = reply_locally_ == nullptr;
   request_ = nullptr;
   reply_locally_ = nullptr;
