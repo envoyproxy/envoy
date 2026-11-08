@@ -70,12 +70,14 @@ public:
   // Builds a client for the given token endpoint URI, dispatches an access token request, and
   // returns the value of the ":scheme" pseudo-header on the outgoing request (empty if unset).
   std::string schemeForTokenEndpointUri(const std::string& token_endpoint_uri) {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     envoy::config::core::v3::HttpUri uri;
     uri.set_cluster("auth");
     uri.set_uri(token_endpoint_uri);
     uri.mutable_timeout()->set_seconds(1);
     std::shared_ptr<OAuth2Client> client =
         std::make_shared<OAuth2ClientImpl>(cm_, uri, nullptr, 0s);
+    client->setDecoderFilterCallbacks(decoder_callbacks);
 
     std::string scheme;
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -145,17 +147,22 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
 
 // The token endpoint request carries ":scheme https" when the configured URI is https.
 TEST_F(OAuth2ClientTest, SchemeHeaderSetFromHttpsUri) {
-  EXPECT_EQ("https", schemeForTokenEndpointUri("https://auth.com/oauth/token"));
+  EXPECT_LOG_CONTAINS("debug", "Dispatching OAuth request for access token.", {
+    EXPECT_EQ("https", schemeForTokenEndpointUri("https://auth.com/oauth/token"));
+  });
 }
 
 // The token endpoint request carries ":scheme http" when the configured URI is http.
 TEST_F(OAuth2ClientTest, SchemeHeaderSetFromHttpUri) {
-  EXPECT_EQ("http", schemeForTokenEndpointUri("http://auth.com/oauth/token"));
+  EXPECT_LOG_CONTAINS("debug", "Dispatching OAuth request for access token.", {
+    EXPECT_EQ("http", schemeForTokenEndpointUri("http://auth.com/oauth/token"));
+  });
 }
 
 // A scheme-less configured URI leaves ":scheme" unset, preserving behavior for existing configs.
 TEST_F(OAuth2ClientTest, SchemeHeaderNotSetForSchemelessUri) {
-  EXPECT_EQ("", schemeForTokenEndpointUri("auth.com/oauth/token"));
+  EXPECT_LOG_CONTAINS("debug", "Dispatching OAuth request for access token.",
+                      { EXPECT_EQ("", schemeForTokenEndpointUri("auth.com/oauth/token")); });
 }
 
 // With the runtime guard disabled, ":scheme" is left unset even for an https URI.
@@ -163,7 +170,9 @@ TEST_F(OAuth2ClientTest, SchemeHeaderNotSetWhenRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.oauth2_use_scheme_from_token_endpoint_uri", "false"}});
-  EXPECT_EQ("", schemeForTokenEndpointUri("https://auth.com/oauth/token"));
+  EXPECT_LOG_CONTAINS("debug", "Dispatching OAuth request for access token.", {
+    EXPECT_EQ("", schemeForTokenEndpointUri("https://auth.com/oauth/token"));
+  });
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenMissingExpiresIn) {
