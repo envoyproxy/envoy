@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -16,6 +17,7 @@ namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
+using HttpFilters::AiProtocolManager::MaxSafeCount;
 using HttpFilters::AiProtocolManager::MaxStringValueSize;
 using HttpFilters::AiProtocolManager::NullPolicy;
 using HttpFilters::AiProtocolManager::readArrayLength;
@@ -32,6 +34,20 @@ namespace {
 std::optional<uint64_t> readLimit(const nlohmann::json& json, absl::string_view key,
                                   bool& malformed) {
   return readCount(json, key, malformed, NullPolicy::AllowNullAsAbsent);
+}
+
+// Proto3 JSON accepts integer fields as either numbers or strings (`"maxOutputTokens": "256"`).
+std::optional<uint64_t> readLimitNumberOrString(const nlohmann::json& json, absl::string_view key,
+                                                bool& malformed) {
+  if (const std::optional<std::string> str = readString(json, key); str.has_value()) {
+    uint64_t count = 0;
+    if (!absl::SimpleAtoi(*str, &count) || count > MaxSafeCount) {
+      malformed = true;
+      return std::nullopt;
+    }
+    return count;
+  }
+  return readLimit(json, key, malformed);
 }
 
 void readCommon(const nlohmann::json& json, RequestAttributes& attrs) {
@@ -114,9 +130,11 @@ void readGeminiGenerateContent(const nlohmann::json& json, absl::string_view pat
                         NullPolicy::AllowNullAsAbsent);
   }
   if (config != nullptr) {
-    attrs.max_output_tokens = readLimit(*config, Keys::MaxOutputTokensCamel, attrs.malformed);
+    attrs.max_output_tokens =
+        readLimitNumberOrString(*config, Keys::MaxOutputTokensCamel, attrs.malformed);
     if (!attrs.max_output_tokens.has_value()) {
-      attrs.max_output_tokens = readLimit(*config, Keys::MaxOutputTokens, attrs.malformed);
+      attrs.max_output_tokens =
+          readLimitNumberOrString(*config, Keys::MaxOutputTokens, attrs.malformed);
     }
   }
   attrs.message_count = readArrayLength(json, Keys::Contents, attrs.malformed);

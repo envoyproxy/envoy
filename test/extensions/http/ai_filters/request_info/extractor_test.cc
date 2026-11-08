@@ -131,6 +131,20 @@ TEST(RequestInfoExtractorTest, GeminiAcceptsSnakeCaseAndVertexTarget) {
   EXPECT_FALSE(attrs.malformed);
 }
 
+TEST(RequestInfoExtractorTest, GeminiAcceptsStringMaxOutputTokens) {
+  const RequestAttributes attrs = extract(LLMProtocol::GeminiGenerateContent,
+                                          R"({"generationConfig":{"maxOutputTokens":"256"}})");
+  EXPECT_EQ(attrs.max_output_tokens, 256u);
+  EXPECT_FALSE(attrs.malformed);
+}
+
+TEST(RequestInfoExtractorTest, GeminiRejectsInvalidStringMaxOutputTokens) {
+  const RequestAttributes attrs = extract(LLMProtocol::GeminiGenerateContent,
+                                          R"({"generationConfig":{"maxOutputTokens":"lots"}})");
+  EXPECT_FALSE(attrs.max_output_tokens.has_value());
+  EXPECT_TRUE(attrs.malformed);
+}
+
 TEST(RequestInfoExtractorTest, GeminiIgnoresUnrecognizedTarget) {
   for (const absl::string_view path :
        {"/v1beta/models/gemini-2.5-pro:countTokens", "/v1beta/gemini-2.5-pro:generateContent",
