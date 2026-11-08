@@ -657,6 +657,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     }
   }
 
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    bootstrap_.mutable_node()->add_configured_bootstrap_extensions(bootstrap_extension.name());
+  }
+
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());

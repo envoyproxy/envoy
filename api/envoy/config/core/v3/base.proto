@@ -140,7 +140,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
@@ -213,6 +213,11 @@ message Node {
   // SocketAddress ``(0.0.0.0,80)``. The field is optional and just a hint.
   repeated Address listening_addresses = 11
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Names of bootstrap extensions configured in the bootstrap configuration. This list only
+  // includes extensions that are both compiled in and configured; see ``extensions`` for the
+  // extensions compiled into the binary.
+  repeated string configured_bootstrap_extensions = 13;
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
