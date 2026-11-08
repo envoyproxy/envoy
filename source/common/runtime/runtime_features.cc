@@ -49,6 +49,9 @@ RUNTIME_GUARD(envoy_reloadable_features_default_client_tls_max_version_is_1_3);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
+// When enabled, the dynamic module HTTP filter rejects header names and values from a module that
+// HTTP does not allow, such as an empty name or a value holding a CR, LF or NUL.
+RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_reject_invalid_headers);
 // When enabled, which is the default, dynamic modules are loaded with RTLD_NOW so that every
 // referenced symbol is resolved at load time instead of lazily on first use. A module that
 // references a symbol the main program does not provide then fails to load rather than crashing

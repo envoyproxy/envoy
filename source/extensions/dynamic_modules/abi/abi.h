@@ -1986,7 +1986,8 @@ bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to get the header from (request/response
  * headers/trailers).
- * @param key is the key of the header.
+ * @param key is the key of the header. A key that is not a valid header name, such as an empty
+ * one, is rejected.
  * @param result_buffer is the buffer where the value will be stored. If the key does not exist or
  * the index is out of range, this will be set to a null buffer (length 0).
  * @param index is the index of the header value in the list of values for the given key.
@@ -2021,7 +2022,8 @@ bool envoy_dynamic_module_callback_http_get_header(
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to get the header from (request/response
  * headers/trailers).
- * @param key is the key of the header.
+ * @param key is the key of the header. A key that is not a valid header name, such as an empty
+ * one, is rejected.
  * @param result_buffer is the output array where the values will be stored.
  * @return true if the operation is successful, false otherwise.
  *
@@ -2087,8 +2089,10 @@ bool envoy_dynamic_module_callback_http_get_headers(
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to add the header to (request/response
  * headers/trailers).
- * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param key is the key of the header. A key that is not a valid header name, such as an empty
+ * one, is rejected.
+ * @param value is the pointer to the buffer of the value. It can be null to remove the header. A
+ * value that is not a valid header value, such as one holding a CR, LF or NUL, is rejected.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -2111,8 +2115,10 @@ bool envoy_dynamic_module_callback_http_add_header(
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to set the header to (request/response
  * headers/trailers).
- * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param key is the key of the header. A key that is not a valid header name, such as an empty
+ * one, is rejected.
+ * @param value is the pointer to the buffer of the value. It can be null to remove the header. A
+ * value that is not a valid header value, such as one holding a CR, LF or NUL, is rejected.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only sets the header to the underlying Envoy object. Whether or not the header is
@@ -2135,7 +2141,7 @@ bool envoy_dynamic_module_callback_http_set_header(
  * corresponding HTTP filter.
  * @param status_code is the status code of the response.
  * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
- * the headers of the response.
+ * the headers of the response. A header with an invalid name or value is dropped.
  * @param headers_vector_size is the size of the headers_vector.
  * @param body is the body of the response.
  * @param details is the response code details of the response.
@@ -2156,7 +2162,7 @@ void envoy_dynamic_module_callback_http_send_response(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
- * the headers of the response.
+ * the headers of the response. A header with an invalid name or value is dropped.
  * @param headers_vector_size is the size of the headers_vector.
  * @param end_stream is a boolean indicating whether to end the stream.
  */
@@ -2185,7 +2191,7 @@ void envoy_dynamic_module_callback_http_send_response_data(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param trailers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
- * the trailers of the response.
+ * the trailers of the response. A trailer with an invalid name or value is dropped.
  * @param trailers_vector_size is the size of the trailers_vector.
  */
 void envoy_dynamic_module_callback_http_send_response_trailers(
@@ -3138,6 +3144,7 @@ void envoy_dynamic_module_callback_http_get_timing_info(
  * arbitrary and is used to differentiate between multiple calls from the same filter.
  * @param cluster_name is the name of the cluster to which the callout is sent.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * A header with an invalid name or value makes this return CannotCreateRequest.
  * @param headers_size is the size of the headers.
  * @param body is the body of the request.
  * @param timeout_milliseconds is the timeout for the callout in milliseconds.
@@ -3172,6 +3179,7 @@ envoy_dynamic_module_callback_http_filter_http_callout(
  * envoy_dynamic_module_callback_http_filter_reset_http_stream.
  * @param cluster_name is the name of the cluster to which the stream is sent.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * A header with an invalid name or value makes this return CannotCreateRequest.
  * @param headers_size is the size of the headers.
  * @param body is the body of the request.
  * @param end_stream is true if the request stream should be ended after sending headers and body.
@@ -3240,7 +3248,7 @@ bool envoy_dynamic_module_callback_http_stream_send_data(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param stream_id is the handle to the HTTP stream.
- * @param trailers is the trailers to send.
+ * @param trailers is the trailers to send. A trailer with an invalid name or value is dropped.
  * @param trailers_size is the size of the trailers.
  * @return false if the stream does not exist, and true otherwise, including when the trailers are
  * dropped.
@@ -3261,6 +3269,7 @@ bool envoy_dynamic_module_callback_http_stream_send_trailers(
  * be arbitrary and is used to differentiate between multiple calls from the same filter config.
  * @param cluster_name is the name of the cluster to which the callout is sent.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * A header with an invalid name or value makes this return CannotCreateRequest.
  * @param headers_size is the size of the headers.
  * @param body is the body of the request.
  * @param timeout_milliseconds is the timeout for the callout in milliseconds.
@@ -3293,6 +3302,7 @@ envoy_dynamic_module_callback_http_filter_config_http_callout(
  * envoy_dynamic_module_callback_http_filter_config_reset_http_stream.
  * @param cluster_name is the name of the cluster to which the stream is sent.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * A header with an invalid name or value makes this return CannotCreateRequest.
  * @param headers_size is the size of the headers.
  * @param body is the body of the request.
  * @param end_stream is true if the request stream should be ended after sending headers and body.
@@ -3362,7 +3372,7 @@ bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param stream_id is the handle to the HTTP stream.
- * @param trailers is the trailers to send.
+ * @param trailers is the trailers to send. A trailer with an invalid name or value is dropped.
  * @param trailers_size is the size of the trailers.
  * @return false if the stream does not exist, and true otherwise, including when the trailers are
  * dropped.
@@ -3874,7 +3884,8 @@ void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param headers is an optional array of new headers to use for the recreated stream. If null,
- * the original headers will be reused.
+ * the original headers will be reused. A header with an invalid name or value makes this
+ * return false.
  * @param headers_size is the size of the headers array.
  * @return true if the stream recreation was initiated successfully, false otherwise (e.g., if
  * the request body has not been fully received yet or if the stream cannot be recreated).

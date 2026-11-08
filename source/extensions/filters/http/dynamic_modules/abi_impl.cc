@@ -6,16 +6,20 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
+
+#include "absl/strings/escaping.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,20 +95,53 @@ HeadersMapOptRef getHeaderMapByType(DynamicModuleHttpFilter* filter,
   }
 }
 
+// Returns the key for a header that a module names, or nullopt if the name is empty or invalid or
+// the value is invalid. The header map only asserts that names and values hold no CR, LF or NUL,
+// and an HTTP/1 peer would read a CR or LF as the start of another header.
+std::optional<Http::LowerCaseString> headerKey(absl::string_view name,
+                                               absl::string_view value = {}) {
+  if ((name.empty() || !Http::HeaderUtility::headerNameIsValid(name) ||
+       !Http::HeaderUtility::headerValueIsValid(value)) &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_reject_invalid_headers")) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "rejected header '{}' with an invalid name or value", absl::CEscape(name));
+    return std::nullopt;
+  }
+  return Http::LowerCaseString(name);
+}
+
+// Adds every header that headerKey() accepts, and returns false if it skipped any.
+bool addHeaders(Http::HeaderMap& map, const envoy_dynamic_module_type_module_http_header* headers,
+                size_t headers_size) {
+  bool added_all = true;
+  for (size_t i = 0; i < headers_size; i++) {
+    const absl::string_view name(headers[i].key_ptr, headers[i].key_length);
+    const absl::string_view value(headers[i].value_ptr, headers[i].value_length);
+    const std::optional<Http::LowerCaseString> key = headerKey(name, value);
+    if (!key.has_value()) {
+      added_all = false;
+      continue;
+    }
+    map.addCopy(*key, value);
+  }
+  return added_all;
+}
+
 bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
                         envoy_dynamic_module_type_envoy_buffer* result, size_t index,
                         size_t* optional_size) {
-  if (!map.has_value()) {
+  // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
+  const std::optional<Http::LowerCaseString> name = headerKey({key.ptr, key.length});
+  if (!map.has_value() || !name.has_value()) {
     *result = {.ptr = nullptr, .length = 0};
     if (optional_size != nullptr) {
       *optional_size = 0;
     }
     return false;
   }
-  absl::string_view key_view(key.ptr, key.length);
 
-  // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
-  const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
+  const auto values = map->get(*name);
   if (optional_size != nullptr) {
     *optional_size = values.size();
   }
@@ -121,11 +158,11 @@ bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_mod
 
 bool getHeaderValuesImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
                          envoy_dynamic_module_type_envoy_buffer* result_buffer) {
-  if (!map.has_value()) {
+  const std::optional<Http::LowerCaseString> name = headerKey({key.ptr, key.length});
+  if (!map.has_value() || !name.has_value()) {
     return false;
   }
-  absl::string_view key_view(key.ptr, key.length);
-  const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
+  const auto values = map->get(*name);
   for (size_t i = 0; i < values.size(); i++) {
     const auto value = values[i]->value().getStringView();
     result_buffer[i] = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
@@ -143,7 +180,11 @@ bool addHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_b
   }
   absl::string_view key_view(key.ptr, key.length);
   absl::string_view value_view(value.ptr, value.length);
-  map->addCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  const std::optional<Http::LowerCaseString> name = headerKey(key_view, value_view);
+  if (!name.has_value()) {
+    return false;
+  }
+  map->addCopy(*name, value_view);
   return true;
 }
 
@@ -153,13 +194,17 @@ bool setHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_b
     return false;
   }
   absl::string_view key_view(key.ptr, key.length);
-  if (value.ptr == nullptr || value.length == 0) {
-    map->remove(Envoy::Http::LowerCaseString(key_view));
-    return true;
-  }
-  absl::string_view value_view(value.ptr, value.length);
+  const absl::string_view value_view = moduleBufferToStringView(value);
   // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
-  map->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  const std::optional<Http::LowerCaseString> name = headerKey(key_view, value_view);
+  if (!name.has_value()) {
+    return false;
+  }
+  if (value_view.empty()) {
+    map->remove(*name);
+  } else {
+    map->setCopy(*name, value_view);
+  }
   return true;
 }
 
@@ -1031,13 +1076,7 @@ void envoy_dynamic_module_callback_http_send_response(
   std::function<void(ResponseHeaderMap & headers)> modify_headers = nullptr;
   if (headers_vector != nullptr && headers_vector_size != 0) {
     modify_headers = [headers_vector, headers_vector_size](ResponseHeaderMap& headers) {
-      for (size_t i = 0; i < headers_vector_size; i++) {
-        const auto& header = &headers_vector[i];
-        const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-        const absl::string_view value(static_cast<const char*>(header->value_ptr),
-                                      header->value_length);
-        headers.addCopy(Http::LowerCaseString(key), value);
-      }
+      addHeaders(headers, headers_vector, headers_vector_size);
     };
   }
   absl::string_view body_view{body.ptr, body.length};
@@ -1065,13 +1104,7 @@ void envoy_dynamic_module_callback_http_send_response_headers(
   }
 
   std::unique_ptr<ResponseHeaderMapImpl> headers = ResponseHeaderMapImpl::create();
-  for (size_t i = 0; i < headers_vector_size; i++) {
-    const auto& header = &headers_vector[i];
-    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-    const absl::string_view value(static_cast<const char*>(header->value_ptr),
-                                  header->value_length);
-    headers->addCopy(Http::LowerCaseString(key), value);
-  }
+  addHeaders(*headers, headers_vector, headers_vector_size);
 
   filter->sendResponseHeaders(std::move(headers), end_stream);
 }
@@ -1097,13 +1130,7 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
   }
 
   std::unique_ptr<ResponseTrailerMapImpl> trailers = ResponseTrailerMapImpl::create();
-  for (size_t i = 0; i < trailers_vector_size; i++) {
-    const auto& trailer = &trailers_vector[i];
-    const absl::string_view key(static_cast<const char*>(trailer->key_ptr), trailer->key_length);
-    const absl::string_view value(static_cast<const char*>(trailer->value_ptr),
-                                  trailer->value_length);
-    trailers->addCopy(Http::LowerCaseString(key), value);
-  }
+  addHeaders(*trailers, trailers_vector, trailers_vector_size);
 
   filter->sendResponseTrailers(std::move(trailers));
 }
@@ -2369,12 +2396,8 @@ envoy_dynamic_module_callback_http_filter_http_callout(
   // Construct the request message, starting with the headers, checking for required headers, and
   // adding the body if present.
   std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
-  for (size_t i = 0; i < headers_size; i++) {
-    const auto& header = &headers[i];
-    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-    const absl::string_view value(static_cast<const char*>(header->value_ptr),
-                                  header->value_length);
-    hdrs->addCopy(Http::LowerCaseString(key), value);
+  if (!addHeaders(*hdrs, headers, headers_size)) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
@@ -2403,12 +2426,8 @@ envoy_dynamic_module_callback_http_filter_start_http_stream(
   // Construct the request message, starting with the headers, checking for required headers, and
   // adding the body if present.
   std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
-  for (size_t i = 0; i < headers_size; i++) {
-    const auto& header = &headers[i];
-    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-    const absl::string_view value(static_cast<const char*>(header->value_ptr),
-                                  header->value_length);
-    hdrs->addCopy(Http::LowerCaseString(key), value);
+  if (!addHeaders(*hdrs, headers, headers_size)) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
@@ -2448,13 +2467,7 @@ bool envoy_dynamic_module_callback_http_stream_send_trailers(
 
   // Construct the trailers.
   std::unique_ptr<RequestTrailerMapImpl> trailer_map = Http::RequestTrailerMapImpl::create();
-  for (size_t i = 0; i < trailers_size; i++) {
-    const auto& trailer = &trailers[i];
-    const absl::string_view key(static_cast<const char*>(trailer->key_ptr), trailer->key_length);
-    const absl::string_view value(static_cast<const char*>(trailer->value_ptr),
-                                  trailer->value_length);
-    trailer_map->addCopy(Http::LowerCaseString(key), value);
-  }
+  addHeaders(*trailer_map, trailers, trailers_size);
 
   return filter->sendStreamTrailers(stream_id, std::move(trailer_map));
 }
@@ -2510,12 +2523,8 @@ envoy_dynamic_module_callback_http_filter_config_http_callout(
   absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
 
   std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
-  for (size_t i = 0; i < headers_size; i++) {
-    const auto& header = &headers[i];
-    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-    const absl::string_view value(static_cast<const char*>(header->value_ptr),
-                                  header->value_length);
-    hdrs->addCopy(Http::LowerCaseString(key), value);
+  if (!addHeaders(*hdrs, headers, headers_size)) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
@@ -2541,12 +2550,8 @@ envoy_dynamic_module_callback_http_filter_config_start_http_stream(
   absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
 
   std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
-  for (size_t i = 0; i < headers_size; i++) {
-    const auto& header = &headers[i];
-    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-    const absl::string_view value(static_cast<const char*>(header->value_ptr),
-                                  header->value_length);
-    hdrs->addCopy(Http::LowerCaseString(key), value);
+  if (!addHeaders(*hdrs, headers, headers_size)) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
@@ -2586,13 +2591,7 @@ bool envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
 
   std::unique_ptr<RequestTrailerMapImpl> trailer_map = Http::RequestTrailerMapImpl::create();
-  for (size_t i = 0; i < trailers_size; i++) {
-    const auto& trailer = &trailers[i];
-    const absl::string_view key(static_cast<const char*>(trailer->key_ptr), trailer->key_length);
-    const absl::string_view value(static_cast<const char*>(trailer->value_ptr),
-                                  trailer->value_length);
-    trailer_map->addCopy(Http::LowerCaseString(key), value);
-  }
+  addHeaders(*trailer_map, trailers, trailers_size);
   return filter_config->sendStreamTrailers(stream_id, std::move(trailer_map));
 }
 
@@ -3054,10 +3053,8 @@ bool envoy_dynamic_module_callback_http_filter_recreate_stream(
   std::unique_ptr<Http::ResponseHeaderMapImpl> custom_headers;
   if (headers != nullptr && headers_size > 0) {
     custom_headers = Http::ResponseHeaderMapImpl::create();
-    for (size_t i = 0; i < headers_size; ++i) {
-      absl::string_view key(headers[i].key_ptr, headers[i].key_length);
-      absl::string_view value(headers[i].value_ptr, headers[i].value_length);
-      custom_headers->addCopy(Http::LowerCaseString(key), value);
+    if (!addHeaders(*custom_headers, headers, headers_size)) {
+      return false;
     }
     response_headers = custom_headers.get();
   }

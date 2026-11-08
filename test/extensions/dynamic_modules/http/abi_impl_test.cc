@@ -32,6 +32,7 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -93,6 +94,11 @@ public:
 };
 
 REGISTER_FACTORY(HttpNonSerializableObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+envoy_dynamic_module_type_module_http_header moduleHeader(absl::string_view key,
+                                                          absl::string_view value) {
+  return {key.data(), key.size(), value.data(), value.size()};
+}
 
 } // namespace
 
@@ -479,6 +485,100 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
   EXPECT_EQ(std::string(result_headers[2].value_ptr, result_headers[2].value_length), "value2");
 }
 
+// A CR, LF or NUL would trip the header map's asserts, and an HTTP/1 peer would read a CR or LF as
+// the start of another header.
+TEST_P(DynamicModuleHttpFilterHeaderTest, RejectInvalidHeaders) {
+  envoy_dynamic_module_type_http_header_type header_type = GetParam();
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {{"single", "value"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
+
+  Http::HeaderMap* header_map = nullptr;
+  if (header_type == envoy_dynamic_module_type_http_header_type_RequestHeader) {
+    header_map = &request_headers;
+  } else if (header_type == envoy_dynamic_module_type_http_header_type_RequestTrailer) {
+    header_map = &request_trailers;
+  } else if (header_type == envoy_dynamic_module_type_http_header_type_ResponseHeader) {
+    header_map = &response_headers;
+  } else {
+    header_map = &response_trailers;
+  }
+
+  const absl::string_view value = "value";
+  for (const absl::string_view name :
+       {absl::string_view(""), absl::string_view(":"), absl::string_view("bad name"),
+        absl::string_view("single\r"), absl::string_view("single\n"),
+        absl::string_view("single\0", 7)}) {
+    SCOPED_TRACE(testing::PrintToString(std::string(name)));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_add_header(
+        filter_.get(), header_type, {name.data(), name.size()}, {value.data(), value.size()}));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_set_header(
+        filter_.get(), header_type, {name.data(), name.size()}, {value.data(), value.size()}));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_set_header(
+        filter_.get(), header_type, {name.data(), name.size()}, {nullptr, 0}));
+
+    envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+    size_t size = 1;
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_header(
+        filter_.get(), header_type, {name.data(), name.size()}, &result, 0, &size));
+    EXPECT_EQ(result.ptr, nullptr);
+    EXPECT_EQ(size, 0);
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_header_values(
+        filter_.get(), header_type, {name.data(), name.size()}, &result));
+  }
+
+  const absl::string_view key = "single";
+  for (const absl::string_view bad_value :
+       {absl::string_view("a\rb"), absl::string_view("a\nb"), absl::string_view("a\0b", 3),
+        absl::string_view("value\r\nx-injected: 1")}) {
+    SCOPED_TRACE(testing::PrintToString(std::string(bad_value)));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_add_header(
+        filter_.get(), header_type, {key.data(), key.size()},
+        {bad_value.data(), bad_value.size()}));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_set_header(
+        filter_.get(), header_type, {key.data(), key.size()},
+        {bad_value.data(), bad_value.size()}));
+  }
+  EXPECT_EQ(header_map->size(), 1);
+  EXPECT_EQ(header_map->get(Http::LowerCaseString(key))[0]->value().getStringView(), value);
+
+  // HTTP allows upper case in names, and tabs and obs-text in values.
+  const absl::string_view mixed_case_key = "X-Mixed-Case";
+  const absl::string_view allowed_value = "a\tb \x80\xff";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_header(
+      filter_.get(), header_type, {mixed_case_key.data(), mixed_case_key.size()},
+      {allowed_value.data(), allowed_value.size()}));
+  EXPECT_EQ(header_map->get(Http::LowerCaseString("x-mixed-case"))[0]->value().getStringView(),
+            allowed_value);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, InvalidHeaderWrittenWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dynamic_modules_reject_invalid_headers", "false"}});
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers_)));
+
+  // HTTP does not allow these bytes, but the header map's asserts do not catch them.
+  const absl::string_view key = "bad name";
+  const absl::string_view value = "bell\a";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_header(
+      filter_.get(), envoy_dynamic_module_type_http_header_type_RequestHeader,
+      {key.data(), key.size()}, {value.data(), value.size()}));
+  EXPECT_EQ(request_headers_.get_("bad name"), value);
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::OK, Eq(""), _, Eq(0), Eq("dynamic_module")));
@@ -605,6 +705,45 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseTrailersSuppressesEncodeHook) {
                                                             trailers.size());
   EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue,
             filter_->encodeTrailers(response_trailers_));
+}
+
+// The callbacks that send to the downstream cannot report an error, so they drop the invalid
+// entries and send the rest.
+TEST_F(DynamicModuleHttpFilterTest, SendResponseDropsInvalidHeaders) {
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      moduleHeader("x-valid", "value"), moduleHeader("x-bad", "value\r\nx-injected: 1"),
+      moduleHeader("bad name", "value")};
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, Eq(""), _, Eq(0), Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce([](auto& headers, auto) {
+    EXPECT_EQ(headers.get(Http::LowerCaseString("x-valid"))[0]->value().getStringView(), "value");
+    EXPECT_TRUE(headers.get(Http::LowerCaseString("x-bad")).empty());
+    EXPECT_TRUE(headers.get(Http::LowerCaseString("x-injected")).empty());
+    EXPECT_TRUE(headers.get(Http::LowerCaseString("bad name")).empty());
+  });
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, headers.data(),
+                                                   headers.size(), {nullptr, 0}, {nullptr, 0});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendResponseHeadersAndTrailersDropInvalidEntries) {
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      moduleHeader(":status", "200"), moduleHeader("x-bad", "a\nb"), moduleHeader("", "value")};
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
+      .WillOnce([](Http::ResponseHeaderMap& sent, bool) {
+        EXPECT_EQ(sent.size(), 1);
+        EXPECT_EQ(sent.getStatusValue(), "200");
+      });
+  envoy_dynamic_module_callback_http_send_response_headers(filter_.get(), headers.data(),
+                                                           headers.size(), false);
+
+  std::vector<envoy_dynamic_module_type_module_http_header> trailers = {
+      moduleHeader("x-valid", "value"), moduleHeader("x-bad", absl::string_view("a\0b", 3))};
+  EXPECT_CALL(decoder_callbacks_, encodeTrailers_(_)).WillOnce([](Http::ResponseTrailerMap& sent) {
+    EXPECT_EQ(sent.size(), 1);
+    EXPECT_EQ(sent.get(Http::LowerCaseString("x-valid"))[0]->value().getStringView(), "value");
+  });
+  envoy_dynamic_module_callback_http_send_response_trailers(filter_.get(), trailers.data(),
+                                                            trailers.size());
 }
 
 TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
@@ -5274,6 +5413,14 @@ TEST_F(DynamicModuleHttpFilterTest, RecreateStreamNoCallbacks) {
                                                                          nullptr, 0));
 }
 
+TEST_F(DynamicModuleHttpFilterTest, RecreateStreamRejectsInvalidHeaders) {
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      moduleHeader(":status", "302"), moduleHeader("location", "/new\r\nx-injected: 1")};
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_recreate_stream(
+      filter_.get(), headers.data(), headers.size()));
+}
+
 TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCache) {
   NiceMock<Http::MockDownstreamStreamFilterCallbacks> downstream_callbacks;
   EXPECT_CALL(decoder_callbacks_, downstreamCallbacks())
@@ -5536,6 +5683,87 @@ TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStream_SendDataAnd
   // Clean up: call onComplete to remove the stream and break the circular reference.
   ASSERT_NE(captured_stream_callbacks, nullptr);
   captured_stream_callbacks->onComplete();
+}
+
+// A callout with an invalid header fails before it reaches the cluster.
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpCalloutsRejectInvalidHeaders) {
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_CALL(thread_local_cluster_.async_client_, start(_, _)).Times(0);
+
+  const std::string cluster_name = "test_cluster";
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      moduleHeader(":method", "GET"), moduleHeader(":path", "/"),
+      moduleHeader("host", "example.com"), moduleHeader("x-bad", "value\r\nx-injected: 1")};
+  uint64_t id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_http_callout(
+                filter_.get(), &id, {cluster_name.data(), cluster_name.size()}, headers.data(),
+                headers.size(), {nullptr, 0}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_start_http_stream(
+                filter_.get(), &id, {cluster_name.data(), cluster_name.size()}, headers.data(),
+                headers.size(), {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &id, {cluster_name.data(), cluster_name.size()},
+                headers.data(), headers.size(), {nullptr, 0}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &id, {cluster_name.data(), cluster_name.size()},
+                headers.data(), headers.size(), {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// Trailers end the stream, and false means that the stream does not exist, so an invalid trailer is
+// dropped and the rest are sent.
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpStreamTrailersDropInvalidTrailers) {
+  NiceMock<Http::MockAsyncClientStream> filter_stream;
+  NiceMock<Http::MockAsyncClientStream> config_stream;
+  Http::AsyncClient::StreamCallbacks* filter_stream_callbacks = nullptr;
+  Http::AsyncClient::StreamCallbacks* config_stream_callbacks = nullptr;
+  EXPECT_CALL(thread_local_cluster_.async_client_, start(_, _))
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cbs,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        filter_stream_callbacks = &cbs;
+        return &filter_stream;
+      })
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cbs,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        config_stream_callbacks = &cbs;
+        return &config_stream;
+      });
+
+  const std::string cluster_name = "test_cluster";
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      moduleHeader(":method", "POST"), moduleHeader(":path", "/"),
+      moduleHeader("host", "example.com")};
+  uint64_t filter_stream_id = 0;
+  uint64_t config_stream_id = 0;
+  ASSERT_EQ(envoy_dynamic_module_callback_http_filter_start_http_stream(
+                filter_.get(), &filter_stream_id, {cluster_name.data(), cluster_name.size()},
+                headers.data(), headers.size(), {nullptr, 0}, false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &config_stream_id, {cluster_name.data(), cluster_name.size()},
+                headers.data(), headers.size(), {nullptr, 0}, false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  std::vector<envoy_dynamic_module_type_module_http_header> trailers = {
+      moduleHeader("x-valid", "value"), moduleHeader("x-bad", "a\nb")};
+  const auto expect_valid_trailer_only = [](Http::RequestTrailerMap& sent) {
+    EXPECT_EQ(sent.size(), 1);
+    EXPECT_EQ(sent.get(Http::LowerCaseString("x-valid"))[0]->value().getStringView(), "value");
+  };
+  EXPECT_CALL(filter_stream, sendTrailers(_)).WillOnce(expect_valid_trailer_only);
+  EXPECT_CALL(config_stream, sendTrailers(_)).WillOnce(expect_valid_trailer_only);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_stream_send_trailers(
+      filter_.get(), filter_stream_id, trailers.data(), trailers.size()));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+      filter_config_.get(), config_stream_id, trailers.data(), trailers.size()));
+
+  ASSERT_NE(filter_stream_callbacks, nullptr);
+  ASSERT_NE(config_stream_callbacks, nullptr);
+  filter_stream_callbacks->onComplete();
+  config_stream_callbacks->onComplete();
 }
 
 TEST(ABIImpl, ReceivedBufferedRequestBody) {
