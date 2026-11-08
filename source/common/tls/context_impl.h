@@ -176,6 +176,9 @@ protected:
   std::vector<Ssl::TlsContext> tls_contexts_;
   CertValidatorPtr cert_validator_;
   Stats::Scope& scope_;
+  // Child scope holding all certificate expiration gauges for this context. Its destruction on
+  // context teardown removes those gauges so they stop being exported for removed certificates.
+  Stats::ScopeSharedPtr cert_scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;
   bssl::UniquePtr<X509> cert_chain_;
