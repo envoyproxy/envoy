@@ -243,9 +243,13 @@ such as when authorization is disabled or fails open.
 
 .. attention::
 
-  Authorization may run before the TLS handshake completes. Do not use policies that require
-  authenticated client certificate attributes. Metadata from subsequent network filters is also
-  unavailable.
+  Authorization does not wait for the downstream TLS handshake to complete, even when
+  :ref:`include_peer_certificate
+  <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.include_peer_certificate>`
+  is enabled. Do not use this option with policies that require authenticated client certificate
+  attributes, such as the source principal or peer certificate.
+
+  Metadata from subsequent network filters is also unavailable.
 
 This option sets ``envoy.tcp_proxy.receive_before_connect`` to allow downstream reads, including
 TLS handshake progress. An existing boolean ``true`` is preserved; ``false`` or an incorrectly

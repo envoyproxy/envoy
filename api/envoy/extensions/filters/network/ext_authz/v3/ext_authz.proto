@@ -115,8 +115,10 @@ message ExtAuthz {
   // subsequent network filters until the check allows the connection to continue. This supports
   // server-first protocols when this filter precedes a TCP proxy in IMMEDIATE mode.
   //
-  // The check may precede TLS handshake completion; do not use policies that require authenticated
-  // client certificate attributes. Metadata from subsequent network filters is also unavailable.
+  // Authorization does not wait for the downstream TLS handshake to complete, even when
+  // ``include_peer_certificate`` is enabled. Do not use this option with policies that require
+  // authenticated client certificate attributes, such as the source principal or peer certificate.
+  // Metadata from subsequent network filters is also unavailable.
   //
   // Sets ``envoy.tcp_proxy.receive_before_connect`` to true if absent. An existing boolean true
   // is preserved; false or an incorrectly typed value closes the connection.
