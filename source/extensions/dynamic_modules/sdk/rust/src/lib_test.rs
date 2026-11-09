@@ -14566,3 +14566,138 @@ fn test_envoy_route_specifier_config_impl() {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
 }
+
+// =============================================================================
+// Load Shed Point FFI stubs and tests.
+// =============================================================================
+
+// The filter types that can get a load shed point. Each one has its own Envoy side configuration,
+// so that a stub can check that the SDK calls the callback of the filter type it wraps.
+#[derive(Clone, Copy)]
+enum LoadShedPointFilter {
+  Http,
+  Network,
+  Listener,
+  UdpListener,
+}
+
+static LOAD_SHED_POINT_FILTER_CONFIGS: [u8; 4] = [0; 4];
+static SHEDDING_LOAD_SHED_POINT: bool = true;
+static ACCEPTING_LOAD_SHED_POINT: bool = false;
+
+fn load_shed_point_filter_config(filter: LoadShedPointFilter) -> *mut std::ffi::c_void {
+  &LOAD_SHED_POINT_FILTER_CONFIGS[filter as usize] as *const u8 as *mut std::ffi::c_void
+}
+
+fn lookup_test_load_shed_point(
+  filter: LoadShedPointFilter,
+  filter_config_envoy_ptr: *mut std::ffi::c_void,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  assert_eq!(
+    filter_config_envoy_ptr,
+    load_shed_point_filter_config(filter)
+  );
+  let name = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+  match name {
+    b"shedding" => &SHEDDING_LOAD_SHED_POINT as *const bool as *mut std::ffi::c_void,
+    b"accepting" => &ACCEPTING_LOAD_SHED_POINT as *const bool as *mut std::ffi::c_void,
+    _ => std::ptr::null_mut(),
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_load_shed_point_should_shed_load(
+  load_shed_point_envoy_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> bool {
+  unsafe { *(load_shed_point_envoy_ptr as *const bool) }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Http, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Network, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Listener, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(
+    LoadShedPointFilter::UdpListener,
+    filter_config_envoy_ptr,
+    name,
+  )
+}
+
+fn check_load_shed_points(
+  get_load_shed_point: impl Fn(&str) -> Option<Box<dyn EnvoyLoadShedPoint>>,
+) {
+  assert!(get_load_shed_point("shedding").unwrap().should_shed_load());
+  assert!(!get_load_shed_point("accepting").unwrap().should_shed_load());
+  assert!(get_load_shed_point("unknown").is_none());
+}
+
+#[test]
+fn test_http_filter_config_get_load_shed_point() {
+  let config = EnvoyHttpFilterConfigImpl {
+    raw_ptr: load_shed_point_filter_config(LoadShedPointFilter::Http),
+  };
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_network_filter_config_get_load_shed_point() {
+  let config =
+    EnvoyNetworkFilterConfigImpl::new(load_shed_point_filter_config(LoadShedPointFilter::Network));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_listener_filter_config_get_load_shed_point() {
+  let config = EnvoyListenerFilterConfigImpl::new(load_shed_point_filter_config(
+    LoadShedPointFilter::Listener,
+  ));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_udp_listener_filter_config_get_load_shed_point() {
+  let config = EnvoyUdpListenerFilterConfigImpl::new(load_shed_point_filter_config(
+    LoadShedPointFilter::UdpListener,
+  ));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_load_shed_point_mock() {
+  let mut config = network::MockEnvoyNetworkFilterConfig::new();
+  config.expect_get_load_shed_point().returning(|_| {
+    let mut load_shed_point = MockEnvoyLoadShedPoint::new();
+    load_shed_point.expect_should_shed_load().return_const(true);
+    Some(Box::new(load_shed_point))
+  });
+  assert!(config
+    .get_load_shed_point("shedding")
+    .unwrap()
+    .should_shed_load());
+}

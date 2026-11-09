@@ -343,4 +343,11 @@ type NetworkFilterConfigHandle interface {
 	// This should be called only during the plugin configuration phase, and the returned
 	// Scheduler can be used later even outside of the callbacks and at other threads.
 	GetScheduler() Scheduler
+
+	// GetLoadShedPoint returns a load shed point of the overload manager by name, to shed load at
+	// the plugin's own point of the connection processing. It returns nil if the overload manager
+	// has no load shed point with the name or the listener of the filter bypasses the overload
+	// manager. Filters of a filter chain that FCDS delivers do not see the bypass and get the load
+	// shed point.
+	GetLoadShedPoint(name string) LoadShedPoint
 }

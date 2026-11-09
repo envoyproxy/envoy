@@ -218,6 +218,13 @@ Compared to overload actions, Load Shed Points are also more flexible to
 integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
 has access to the Overload Manager to request the custom Load Shed Point.
 
+For example, the :ref:`dynamic module <arch_overview_dynamic_modules>` HTTP, network, listener
+and UDP listener filters can get custom Load Shed Points by name and shed load at them. A filter
+on a listener that :ref:`bypasses the overload manager
+<envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>` gets no Load Shed Point,
+unless the route configuration or the Filter Chain Discovery Service (FCDS) created it, and an
+upstream HTTP filter gets none.
+
 The following core load shed points are supported:
 
 .. list-table::

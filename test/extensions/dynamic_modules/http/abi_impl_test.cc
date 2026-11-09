@@ -22,6 +22,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -3857,6 +3858,35 @@ TEST_F(ABIImplGenericSecretTest, ReadUnknownId) {
   // 0 is never a valid ID, and IDs past the end are unknown.
   EXPECT_EQ(getSecret(0), std::nullopt);
   EXPECT_EQ(getSecret(id + 1), std::nullopt);
+}
+
+TEST(ABIImpl, GetLoadShedPoint) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context,
+      std::nullopt, overload_manager);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                                  filter_config.get(), {name.data(), name.size()}));
+}
+
+TEST(ABIImpl, GetLoadShedPointWithoutProvider) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context);
+
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                         filter_config.get(), {name.data(), name.size()}));
 }
 
 TEST(ABIImpl, Stats) {
