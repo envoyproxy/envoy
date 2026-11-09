@@ -402,7 +402,11 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   // QUIC session. Pass dispatcher_ so the client's 25ms delayed-ACK timer can
   // fire and ACK the response FIN, closing the QUIC stream on the server and
   // adding the session back to the idle list.
-  test_server_->waitForCounter("envoy.overload_actions.close_idle_http_connections.count", Eq(1),
+  const std::string close_idle_counter_name =
+      version_ == Network::Address::IpVersion::v4
+          ? "listener.127.0.0.1_0.downstream_cx_overload_close_idle"
+          : "listener.[__1]_0.downstream_cx_overload_close_idle";
+  test_server_->waitForCounter(close_idle_counter_name, Eq(1),
                                std::chrono::milliseconds(15000) * TIMEOUT_FACTOR,
                                dispatcher_.get());
 

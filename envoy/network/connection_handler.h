@@ -199,9 +199,8 @@ public:
 
   /**
    * Close idle HTTP connections.
-   * @return the number of closed idle connections.
    */
-  virtual uint64_t closeIdleHttpConnections(bool is_saturated) PURE;
+  virtual void closeIdleHttpConnections(bool is_saturated) PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.
@@ -269,10 +268,9 @@ public:
     virtual void onListenerDrainStart(ConnectionDrainEvent drain_event) PURE;
 
     // New method for handling idle connection closing
-    virtual uint64_t onCloseIdleHttpConnections(bool /*is_saturated*/) {
+    virtual void onCloseIdleHttpConnections(bool /*is_saturated*/) {
       // Default implementation does nothing.
       // Specific listener types (TCP, QUIC) will override this.
-      return 0;
     }
   };
 

@@ -84,7 +84,7 @@ public:
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
             crypto_stream_factory_, connection_id_generator_, std::nullopt,
-            std::make_unique<Http::SessionIdleList>(*dispatcher_)),
+            std::make_unique<Http::SessionIdleList>(*dispatcher_, listener_stats_)),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
             /*enable_early_data=*/true, /*enable_resumption=*/true,
@@ -737,9 +737,11 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
   getIdleList()->set_min_time_before_termination_allowed(absl::Hours(1));
   time_system_.advanceTimeAndRun(std::chrono::seconds(10), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(2u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true));
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
+  EXPECT_EQ(2u, listener_stats_.downstream_cx_overload_close_idle_.value());
   EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
-  EXPECT_EQ(1u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true));
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/true);
+  EXPECT_EQ(3u, listener_stats_.downstream_cx_overload_close_idle_.value());
   EXPECT_EQ(0u, envoy_quic_dispatcher_.NumSessions());
 }
 
@@ -766,13 +768,15 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
   EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
 
   // Sessions have not reach the minimal idle time yet.
-  EXPECT_EQ(0u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false));
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
+  EXPECT_EQ(0u, listener_stats_.downstream_cx_overload_close_idle_.value());
   EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
 
   // Advance time to make sessions idle.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(1u, envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false));
+  envoy_quic_dispatcher_.closeIdleQuicConnections(/*is_saturated=*/false);
+  EXPECT_EQ(1u, listener_stats_.downstream_cx_overload_close_idle_.value());
   EXPECT_EQ(2u, envoy_quic_dispatcher_.NumSessions());
 }
 

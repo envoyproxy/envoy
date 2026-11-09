@@ -2,7 +2,6 @@
 
 #include <compare>
 #include <cstddef>
-#include <cstdint>
 #include <tuple>
 
 #include "envoy/common/time.h"
@@ -11,6 +10,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/session_idle_list_interface.h"
+#include "source/server/listener_stats.h"
 
 #include "absl/container/btree_set.h"
 #include "absl/container/node_hash_map.h"
@@ -27,7 +27,8 @@ constexpr size_t kMaxSessionsToTerminateInOneRoundWhenSaturated = 50;
 // This class manages a list of idle sessions.
 class SessionIdleList : public SessionIdleListInterface, public Logger::Loggable<Logger::Id::http> {
 public:
-  explicit SessionIdleList(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {};
+  SessionIdleList(Event::Dispatcher& dispatcher, Server::ListenerStats& stats)
+      : dispatcher_(dispatcher), stats_(stats) {}
   ~SessionIdleList() override = default;
 
   // Adds a session to the idle list.
@@ -41,7 +42,7 @@ public:
   // Terminates idle sessions if they are eligible for termination. This is
   // called by the worker thread when the system is overloaded.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  uint64_t MaybeTerminateIdleSessions(bool is_saturated) override;
+  void MaybeTerminateIdleSessions(bool is_saturated) override;
 
   // Sets the minimum time before a session can be terminated.
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -138,6 +139,7 @@ private:
   absl::Duration MinTimeBeforeTerminationAllowed(bool is_saturated) const;
 
   Event::Dispatcher& dispatcher_;
+  Server::ListenerStats& stats_;
   // The sessions currently tracked.
   IdleSessions idle_sessions_;
   absl::Duration min_time_before_termination_allowed_ = absl::Minutes(1);

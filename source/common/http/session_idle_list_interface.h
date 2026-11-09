@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 namespace Envoy {
 namespace Http {
 
@@ -30,10 +28,9 @@ public:
   virtual void RemoveSession(IdleSessionInterface& session) = 0;
 
   // Terminates idle sessions if they are eligible for termination. This is
-  // called by the worker thread when the system is overloaded. Returns the
-  // number of terminated sessions.
+  // called by the worker thread when the system is overloaded.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  virtual uint64_t MaybeTerminateIdleSessions(bool is_saturated) = 0;
+  virtual void MaybeTerminateIdleSessions(bool is_saturated) = 0;
 };
 
 } // namespace Http
