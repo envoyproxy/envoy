@@ -61,7 +61,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                                                    options,
                                                    std::nullopt,
                                                    Utility::generateStats(scope),
-                                                   cm_.adsMux()};
+                                                   cm_.adsMux(),
+                                                   makeOptRef(xds_manager_.xdsSymbolTable())};
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
@@ -189,7 +190,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
                                                    options,
                                                    std::nullopt,
                                                    Utility::generateStats(scope),
-                                                   ads_grpc_mux};
+                                                   ads_grpc_mux,
+                                                   makeOptRef(xds_manager_.xdsSymbolTable())};
   static constexpr absl::string_view subscription_type = "envoy.config_subscription.ads";
   ConfigSubscriptionFactory* factory =
       Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
@@ -237,7 +239,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
                                                    options,
                                                    {collection_locator},
                                                    Utility::generateStats(scope),
-                                                   cm_.adsMux()};
+                                                   cm_.adsMux(),
+                                                   makeOptRef(xds_manager_.xdsSymbolTable())};
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());

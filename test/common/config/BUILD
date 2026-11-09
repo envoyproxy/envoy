@@ -299,6 +299,8 @@ envoy_cc_test(
     rbe_pool = "linux_x64_medium",
     deps = [
         "//source/common/config:xds_manager_lib",
+        "//source/common/config:xds_symbol_table_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -354,4 +356,18 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "xds_resource_decoder_benchmark_test",
     benchmark_binary = "xds_resource_decoder_benchmark",
+)
+
+envoy_cc_test(
+    name = "xds_symbol_table_test",
+    srcs = ["xds_symbol_table_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/config:xds_symbol_table_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings",
+    ],
 )

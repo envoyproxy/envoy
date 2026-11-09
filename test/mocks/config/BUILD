@@ -56,5 +56,6 @@ envoy_cc_mock(
     deps = [
         ":config_mocks",
         "//envoy/config:xds_manager_interface",
+        "//source/common/config:xds_symbol_table_lib",
     ],
 )

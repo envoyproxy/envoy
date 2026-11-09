@@ -65,6 +65,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      xds_symbol_table_(grpc_mux_context.xds_symbol_table_),
       target_xds_authority_(grpc_mux_context.target_xds_authority_),
       load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_) {
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_context.local_info_));
@@ -147,10 +148,11 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
     }
 
     // We don't yet have a subscription for type_url! Make one!
-    watch_map = watch_maps_
-                    .emplace(type_url, std::make_unique<WatchMap>(
-                                           type_url, config_validators_.get(), resources_cache))
-                    .first;
+    watch_map =
+        watch_maps_
+            .emplace(type_url, std::make_unique<WatchMap>(type_url, config_validators_.get(),
+                                                          resources_cache, xds_symbol_table_))
+            .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                          type_url, *watch_maps_[type_url], resource_decoder,
                                          xds_config_tracker_, xds_resources_delegate_,
@@ -523,11 +525,13 @@ template class GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
 
 // Delta- and SotW-specific concrete subclasses:
 GrpcMuxDelta::GrpcMuxDelta(GrpcMuxContext& grpc_mux_context)
-    : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(grpc_mux_context.dispatcher_),
+    : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(
+                      grpc_mux_context.dispatcher_, grpc_mux_context.xds_symbol_table_),
                   grpc_mux_context) {}
 
 GrpcMuxSotw::GrpcMuxSotw(GrpcMuxContext& grpc_mux_context)
-    : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(grpc_mux_context.dispatcher_),
+    : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(
+                      grpc_mux_context.dispatcher_, grpc_mux_context.xds_symbol_table_),
                   grpc_mux_context) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
@@ -575,8 +579,8 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      override {
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<XdsSymbolTable> xds_symbol_table = {}) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -597,7 +601,8 @@ public:
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
-        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
+        /*xds_symbol_table_=*/xds_symbol_table};
     return std::make_shared<GrpcMuxDelta>(grpc_mux_context);
   }
 };
@@ -614,8 +619,8 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          XdsResourcesDelegateOptRef,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      override {
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<XdsSymbolTable> xds_symbol_table = {}) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -636,7 +641,8 @@ public:
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
-        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
+        /*xds_symbol_table_=*/xds_symbol_table};
     return std::make_shared<GrpcMuxSotw>(grpc_mux_context);
   }
 };

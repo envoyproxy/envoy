@@ -106,9 +106,10 @@ public:
     SubscriptionStuff(const std::string& type_url, Event::Dispatcher& dispatcher,
                       CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
-                      EdsResourcesCacheOptRef eds_resources_cache)
-        : watch_map_(type_url, config_validators, eds_resources_cache),
-          sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker) {
+                      EdsResourcesCacheOptRef eds_resources_cache,
+                      OptRef<XdsSymbolTable> xds_symbol_table = {})
+        : watch_map_(type_url, config_validators, eds_resources_cache, xds_symbol_table),
+          sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker, xds_symbol_table) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(
           !eds_resources_cache.has_value() ||
@@ -248,6 +249,7 @@ private:
   XdsConfigTrackerOptRef xds_config_tracker_;
   const bool skip_subsequent_node_;
   EdsResourcesCachePtr eds_resources_cache_;
+  OptRef<XdsSymbolTable> xds_symbol_table_;
   bool first_request_on_stream_{true};
 
   // Used to track whether initial_resource_versions should be populated on the

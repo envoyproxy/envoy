@@ -1,14 +1,19 @@
 #pragma once
 
 #include <optional>
+#include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Config {
@@ -25,7 +30,8 @@ public:
                         OpaqueResourceDecoderSharedPtr resource_decoder,
                         XdsConfigTrackerOptRef xds_config_tracker,
                         XdsResourcesDelegateOptRef xds_resources_delegate,
-                        const std::string& target_xds_authority);
+                        const std::string& target_xds_authority,
+                        OptRef<XdsSymbolTable> xds_symbol_table = {});
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -52,6 +58,9 @@ private:
   void setResourceTtl(const DecodedResourceImpl& decoded_resource);
   bool isHeartbeatResource(const DecodedResource& resource, const std::string& version);
 
+  const bool compress_resource_names_;
+  XdsSymbolTableSharedPtr xds_symbol_table_;
+
   OpaqueResourceDecoderSharedPtr resource_decoder_;
 
   // The version_info carried by the last accepted DiscoveryResponse.
@@ -66,11 +75,15 @@ private:
   bool update_pending_{true};
 
   absl::flat_hash_set<std::string> names_tracked_;
+  absl::flat_hash_set<XdsResourceNameStorage, XdsResourceNameHash, XdsResourceNameEq>
+      compressed_names_tracked_;
 };
 
 class SotwSubscriptionStateFactory : public SubscriptionStateFactory<SotwSubscriptionState> {
 public:
-  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher,
+                               OptRef<XdsSymbolTable> xds_symbol_table = {})
+      : dispatcher_(dispatcher), xds_symbol_table_(xds_symbol_table) {}
   ~SotwSubscriptionStateFactory() override = default;
   std::unique_ptr<SotwSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
@@ -78,13 +91,14 @@ public:
                         XdsConfigTrackerOptRef xds_config_tracker,
                         XdsResourcesDelegateOptRef xds_resources_delegate,
                         const std::string& target_xds_authority) override {
-    return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
-                                                   resource_decoder, xds_config_tracker,
-                                                   xds_resources_delegate, target_xds_authority);
+    return std::make_unique<SotwSubscriptionState>(
+        type_url, callbacks, dispatcher_, resource_decoder, xds_config_tracker,
+        xds_resources_delegate, target_xds_authority, xds_symbol_table_);
   }
 
 private:
   Event::Dispatcher& dispatcher_;
+  OptRef<XdsSymbolTable> xds_symbol_table_;
 };
 
 } // namespace XdsMux

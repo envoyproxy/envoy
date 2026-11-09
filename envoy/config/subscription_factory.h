@@ -2,6 +2,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/backoff_strategy.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/grpc_mux.h"
@@ -26,6 +27,7 @@ class RawAsyncClient;
 namespace Config {
 class XdsResourcesDelegate;
 class XdsConfigTracker;
+class XdsSymbolTable;
 
 class SubscriptionFactory {
 public:
@@ -151,6 +153,7 @@ public:
     // An optional ADS gRPC mux to be used. Must be provided if ADS
     // is used.
     GrpcMuxSharedPtr ads_grpc_mux_;
+    OptRef<XdsSymbolTable> xds_symbol_table_;
   };
 
   std::string category() const override { return "envoy.config_subscription"; }
@@ -170,8 +173,8 @@ public:
          std::unique_ptr<CustomConfigValidators>&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
          OptRef<XdsResourcesDelegate> xds_resources_delegate,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      PURE;
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<XdsSymbolTable> xds_symbol_table = {}) PURE;
 };
 
 } // namespace Config

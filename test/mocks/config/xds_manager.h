@@ -2,6 +2,8 @@
 
 #include "envoy/config/xds_manager.h"
 
+#include "source/common/config/xds_symbol_table.h"
+
 #include "test/mocks/config/mocks.h"
 
 #include "gmock/gmock.h"
@@ -38,9 +40,11 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(SubscriptionFactory&, subscriptionFactory, ());
+  MOCK_METHOD(XdsSymbolTable&, xdsSymbolTable, (), (override));
 
   testing::NiceMock<MockSubscriptionFactory> subscription_factory_;
   std::shared_ptr<testing::NiceMock<MockGrpcMux>> ads_mux_;
+  XdsSymbolTableSharedPtr xds_symbol_table_{XdsSymbolTable::create()};
 };
 
 } // namespace Config

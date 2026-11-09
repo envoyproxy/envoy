@@ -1,7 +1,10 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/xds_source_id.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Config {
@@ -10,9 +13,16 @@ namespace XdsMux {
 SotwSubscriptionState::SotwSubscriptionState(
     std::string type_url, UntypedConfigUpdateCallbacks& callbacks, Event::Dispatcher& dispatcher,
     OpaqueResourceDecoderSharedPtr resource_decoder, XdsConfigTrackerOptRef xds_config_tracker,
-    XdsResourcesDelegateOptRef xds_resources_delegate, const std::string& target_xds_authority)
+    XdsResourcesDelegateOptRef xds_resources_delegate, const std::string& target_xds_authority,
+    OptRef<XdsSymbolTable> xds_symbol_table)
     : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher, xds_config_tracker,
                             xds_resources_delegate, target_xds_authority),
+      compress_resource_names_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names")),
+      xds_symbol_table_(compress_resource_names_
+                            ? (xds_symbol_table.has_value() ? xds_symbol_table->shared_from_this()
+                                                            : XdsSymbolTable::create())
+                            : nullptr),
       resource_decoder_(resource_decoder) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
@@ -20,11 +30,23 @@ SotwSubscriptionState::~SotwSubscriptionState() = default;
 void SotwSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
     const absl::flat_hash_set<std::string>& cur_removed) {
-  for (const auto& a : cur_added) {
-    names_tracked_.insert(a);
-  }
-  for (const auto& r : cur_removed) {
-    names_tracked_.erase(r);
+  if (compress_resource_names_) {
+    for (const auto& a : cur_added) {
+      compressed_names_tracked_.insert(xds_symbol_table_->encode(a));
+    }
+    for (const auto& r : cur_removed) {
+      absl::InlinedVector<uint8_t, 64> scratch;
+      if (const auto encoded = xds_symbol_table_->tryEncode(r, scratch); encoded.has_value()) {
+        compressed_names_tracked_.erase(*encoded);
+      }
+    }
+  } else {
+    for (const auto& a : cur_added) {
+      names_tracked_.insert(a);
+    }
+    for (const auto& r : cur_removed) {
+      names_tracked_.erase(r);
+    }
   }
   if (!cur_added.empty() || !cur_removed.empty()) {
     update_pending_ = true;
@@ -107,15 +129,24 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
 
   const XdsConfigSourceId source_id{target_xds_authority_, type_url_};
   TRY_ASSERT_MAIN_THREAD {
+    absl::flat_hash_set<std::string> materialized_names;
+    if (compress_resource_names_) {
+      materialized_names.reserve(compressed_names_tracked_.size());
+      for (const auto& name : compressed_names_tracked_) {
+        materialized_names.insert(xds_symbol_table_->toString(name.resourceName()));
+      }
+    }
+    const absl::flat_hash_set<std::string>& tracked_names =
+        compress_resource_names_ ? materialized_names : names_tracked_;
     std::vector<envoy::service::discovery::v3::Resource> resources =
-        xds_resources_delegate_->getResources(source_id, names_tracked_);
+        xds_resources_delegate_->getResources(source_id, tracked_names);
 
     Protobuf::Arena batch_arena(resource_decoder_->arenaOptions());
     std::vector<DecodedResourcePtr> decoded_resources;
     const auto scoped_update = ttl_.scopedTtlUpdate();
     std::string version_info;
-    size_t unaccounted = names_tracked_.size();
-    if (names_tracked_.size() == 1 && names_tracked_.contains(Envoy::Config::Wildcard)) {
+    size_t unaccounted = tracked_names.size();
+    if (tracked_names.size() == 1 && tracked_names.contains(Envoy::Config::Wildcard)) {
       // For wildcard requests, there are no expectations for the number of resources returned.
       unaccounted = 0;
     }
@@ -162,8 +193,14 @@ std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
 SotwSubscriptionState::getNextRequestInternal() {
   auto request = std::make_unique<envoy::service::discovery::v3::DiscoveryRequest>();
   request->set_type_url(typeUrl());
-  std::copy(names_tracked_.begin(), names_tracked_.end(),
-            Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names()));
+  if (compress_resource_names_) {
+    for (const auto& name : compressed_names_tracked_) {
+      request->add_resource_names(xds_symbol_table_->toString(name.resourceName()));
+    }
+  } else {
+    std::copy(names_tracked_.begin(), names_tracked_.end(),
+              Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names()));
+  }
   if (last_good_version_info_.has_value()) {
     request->set_version_info(last_good_version_info_.value());
   }

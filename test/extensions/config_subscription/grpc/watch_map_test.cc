@@ -6,11 +6,13 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/config/xds_symbol_table.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
 #include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/eds_resources_cache.h"
 #include "test/mocks/config/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -131,10 +133,22 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
   doDeltaUpdate(watch_map, sotw_resources, removed_names, version);
 }
 
+class WatchMapTest : public testing::TestWithParam<bool> {
+public:
+  WatchMapTest() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.compress_xds_resource_names", GetParam() ? "true" : "false"}});
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(WatchMapTest, WatchMapTest, testing::Bool());
+
 // Tests the simple case of a single watch. Checks that the watch will not be told of updates to
 // resources it doesn't care about. Checks that the watch can later decide it does care about them,
 // and then receive subsequent updates to them.
-TEST(WatchMapTest, Basic) {
+TEST_P(WatchMapTest, Basic) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -207,7 +221,7 @@ TEST(WatchMapTest, Basic) {
 // Second watch also loses interest ==> "remove it from subscription"
 // NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
 // which is treated as interest in all names.
-TEST(WatchMapTest, Overlap) {
+TEST_P(WatchMapTest, Overlap) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -273,7 +287,7 @@ TEST(WatchMapTest, Overlap) {
 
 // Checks that a resource is added to the cache the first time it is received,
 // and removed when there's no more interest.
-TEST(WatchMapTest, CacheResourceAddResource) {
+TEST_P(WatchMapTest, CacheResourceAddResource) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -360,7 +374,7 @@ TEST(WatchMapTest, CacheResourceAddResource) {
 
 // Checks that removing watched resources incrementally via the two-argument updateWatchInterest()
 // cleans up the EDS cache when the last watch loses interest.
-TEST(WatchMapTest, EdsResourcesCacheIncrementalUpdate) {
+TEST_P(WatchMapTest, EdsResourcesCacheIncrementalUpdate) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -407,7 +421,7 @@ TEST(WatchMapTest, EdsResourcesCacheIncrementalUpdate) {
 // These are regression tests for #11877, validate that when two watches point at the same
 // watched resource, and an update to one of the watches removes one or both of them, that
 // WatchMap defers deletes and doesn't crash.
-class SameWatchRemoval : public testing::Test {
+class SameWatchRemoval : public WatchMapTest {
 public:
   SameWatchRemoval() : watch_map_("ClusterLoadAssignmentType", &config_validators, {}) {}
 
@@ -446,7 +460,9 @@ public:
   bool watch_cb_invoked_{};
 };
 
-TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
+INSTANTIATE_TEST_SUITE_P(SameWatchRemoval, SameWatchRemoval, testing::Bool());
+
+TEST_P(SameWatchRemoval, SameWatchRemovalSotw) {
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(AtMost(1)).WillRepeatedly([this] {
     return removeAllInterest();
   });
@@ -456,7 +472,7 @@ TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
   watch_map_.onConfigUpdate(updated_resources_, "version1");
 }
 
-TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
+TEST_P(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> delta_resources =
       wrapInResource(updated_resources_, "version1");
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
@@ -470,7 +486,7 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
   watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
 
-TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
+TEST_P(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   *removed_names_proto.Add() = "alice";
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
@@ -488,7 +504,7 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
 // Second watch on that name ==> "add it to subscription"
 // NOTE: we need the resource name "dummy" to keep either watch from ever having no names watched,
 // which is treated as interest in all names.
-TEST(WatchMapTest, AddRemoveAdd) {
+TEST_P(WatchMapTest, AddRemoveAdd) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -546,7 +562,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
 }
 
 // Tests that nothing breaks if an update arrives that we entirely do not care about.
-TEST(WatchMapTest, UninterestingUpdate) {
+TEST_P(WatchMapTest, UninterestingUpdate) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -590,7 +606,7 @@ TEST(WatchMapTest, UninterestingUpdate) {
 
 // Tests that a watch that specifies no particular resource interest is treated as interested in
 // everything.
-TEST(WatchMapTest, WatchingEverything) {
+TEST_P(WatchMapTest, WatchingEverything) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
@@ -626,7 +642,7 @@ TEST(WatchMapTest, WatchingEverything) {
 // exercise those cases. Also, the removal-only case tests that SotW does call a watch's
 // onConfigUpdate even if none of the watch's interested resources are among the updated
 // resources. (Which ensures we deliver empty config updates when a resource is dropped.)
-TEST(WatchMapTest, DeltaOnConfigUpdate) {
+TEST_P(WatchMapTest, DeltaOnConfigUpdate) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   MockSubscriptionCallbacks callbacks3;
@@ -665,7 +681,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   doDeltaAndSotwUpdate(watch_map, update, {"removed"}, "version1");
 }
 
-TEST(WatchMapTest, OnConfigUpdateFailed) {
+TEST_P(WatchMapTest, OnConfigUpdateFailed) {
   NiceMock<MockCustomConfigValidators> config_validators;
   WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
   // calling on empty map doesn't break
@@ -684,7 +700,7 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
 }
 
 // Validate watch behavior when subscribed to xdstp:// glob collections.
-TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
+TEST_P(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -729,7 +745,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
 }
 
 // Validate watch behavior when subscribed to xdstp:// singletons.
-TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
+TEST_P(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -768,7 +784,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   }
 }
 
-TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
+TEST_P(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   MockSubscriptionCallbacks callbacks3;
@@ -832,7 +848,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
 
 // updateWatchInterest(add, remove) adds to a watch's interest without disturbing the names it
 // already watches, and only reports names that are new across the whole subscription in added_.
-TEST(WatchMapTest, IncrementalUpdateWatchInterest) {
+TEST_P(WatchMapTest, IncrementalUpdateWatchInterest) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -876,9 +892,10 @@ TEST(WatchMapTest, IncrementalUpdateWatchInterest) {
     doDeltaUpdate(watch_map, updated_resources, {}, "version1");
   }
   {
-    // Adding Dave while removing Bob and an untracked name (Eve) reports Dave in added_ and Bob
-    // in removed_.
-    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"dave"}, {"bob", "eve"});
+    // Adding Dave while removing Bob and an untracked name (Eve), and passing a name (noop_both)
+    // in both add and remove sets, reports Dave in added_ and Bob in removed_.
+    AddedRemoved added_removed =
+        watch_map.updateWatchInterest(watch, {"dave", "noop_both"}, {"bob", "eve", "noop_both"});
     EXPECT_EQ(absl::flat_hash_set<std::string>({"dave"}), added_removed.added_);
     EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed.removed_);
   }
@@ -893,7 +910,7 @@ TEST(WatchMapTest, IncrementalUpdateWatchInterest) {
 // accept() registers glob interest that affects routing only: the watch receives
 // resources matching a "<prefix>/*" glob, is not turned into a catch-all wildcard watch, and the
 // glob never enters watch_interest_ (so it never affects the subscription).
-TEST(WatchMapTest, AcceptOtherResourcesPrefixGlob) {
+TEST_P(WatchMapTest, AcceptOtherResourcesPrefixGlob) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -922,7 +939,7 @@ TEST(WatchMapTest, AcceptOtherResourcesPrefixGlob) {
 
 // accept("*") makes the watch accept every resource, without an empty
 // watch_interest_ entry (i.e. purely for routing).
-TEST(WatchMapTest, AcceptOtherResourcesWildcard) {
+TEST_P(WatchMapTest, AcceptOtherResourcesWildcard) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -942,6 +959,115 @@ TEST(WatchMapTest, AcceptOtherResourcesWildcard) {
   }
   expectDeltaUpdate(callbacks, expected_resources, {}, "version1");
   doDeltaUpdate(watch_map, updated_resources, {}, "version1");
+}
+
+// Verifies shared `XdsSymbolTable` token deduplication across multiple `WatchMap` instances,
+// protection against symbol pollution on unsolicited updates/removals, and full reclamation of
+// active symbols when watches drain and are removed.
+TEST_P(WatchMapTest, SharedSymbolTableCompressionAndReclamation) {
+  auto symbol_table = XdsSymbolTable::create();
+  const size_t initial_active = symbol_table->numActiveSymbols();
+  const size_t initial_total = symbol_table->numSymbols();
+
+  NiceMock<MockCustomConfigValidators> config_validators;
+  WatchMap watch_map_a("ClusterLoadAssignmentType", &config_validators, {},
+                       makeOptRef(*symbol_table));
+  WatchMap watch_map_b("ClusterType", &config_validators, {}, makeOptRef(*symbol_table));
+
+  MockSubscriptionCallbacks callbacks_a1;
+  MockSubscriptionCallbacks callbacks_a2;
+  MockSubscriptionCallbacks callbacks_b;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+
+  Watch* watch_a1 = watch_map_a.addWatch(callbacks_a1, resource_decoder);
+  Watch* watch_a2 = watch_map_a.addWatch(callbacks_a2, resource_decoder);
+  Watch* watch_b = watch_map_b.addWatch(callbacks_b, resource_decoder);
+
+  const std::string res_1 =
+      "xdstp://shared_authority/envoy.config.endpoint.v3.ClusterLoadAssignment/shared_ns/svc_1";
+  const std::string res_2 =
+      "xdstp://shared_authority/envoy.config.endpoint.v3.ClusterLoadAssignment/shared_ns/svc_2";
+  const std::string res_b =
+      "xdstp://shared_authority/envoy.config.cluster.v3.Cluster/shared_ns/svc_1";
+
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_1}),
+            watch_map_a.updateWatchInterest(watch_a1, {res_1}).added_);
+  // Overlapping watch on `res_1` in the same `WatchMap` reuses the existing compressed key.
+  EXPECT_TRUE(watch_map_a.updateWatchInterest(watch_a2, {res_1}).added_.empty());
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_2}),
+            watch_map_a.updateWatchInterest(watch_a1, {res_1, res_2}, {}).added_);
+
+  const size_t symbols_after_map_a = symbol_table->numSymbols();
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_b}),
+            watch_map_b.updateWatchInterest(watch_b, {res_b}).added_);
+
+  if (GetParam()) {
+    EXPECT_GT(symbol_table->numActiveSymbols(), initial_active);
+    // `res_b` shares `shared_authority`, `envoy`, `config`, `v3`, `shared_ns`, `svc`, and `1`
+    // with `res_1`; only `cluster` and `Cluster` are new tokens!
+    EXPECT_EQ(symbol_table->numSymbols() - symbols_after_map_a, 2);
+  } else {
+    EXPECT_EQ(symbol_table->numActiveSymbols(), initial_active);
+    EXPECT_EQ(symbol_table->numSymbols(), initial_total);
+  }
+
+  // Unsolicited updates and removals (both unseen tokens and known-token combinations not watched
+  // in `watch_map_b`) must NOT add any symbols to `symbol_table`.
+  const size_t symbols_before_unsolicited = symbol_table->numSymbols();
+  const size_t active_before_unsolicited = symbol_table->numActiveSymbols();
+  Protobuf::RepeatedPtrField<Protobuf::Any> unsolicited_update;
+  envoy::config::endpoint::v3::ClusterLoadAssignment unsolicited_cla;
+  unsolicited_cla.set_cluster_name("xdstp://unseen_authority/unseen_pkg/unseen_svc");
+  std::ignore = unsolicited_update.Add()->PackFrom(unsolicited_cla);
+  envoy::config::endpoint::v3::ClusterLoadAssignment known_tokens_unwatched_cla;
+  known_tokens_unwatched_cla.set_cluster_name(res_2);
+  std::ignore = unsolicited_update.Add()->PackFrom(known_tokens_unwatched_cla);
+
+  expectNoUpdate(callbacks_b, "v_unsolicited");
+  doDeltaAndSotwUpdate(watch_map_b, unsolicited_update,
+                       {"xdstp://unseen_removed_auth/unseen_removed_svc", res_2}, "v_unsolicited");
+  EXPECT_EQ(symbol_table->numSymbols(), symbols_before_unsolicited);
+  EXPECT_EQ(symbol_table->numActiveSymbols(), active_before_unsolicited);
+
+  // Incremental removal of a known-token resource (`res_2`) from `watch_a2` (which does not watch
+  // `res_2`) and incremental addition of a resource (`res_1` in `watch_map_b`) whose tokens are all
+  // already in `symbol_table` but not yet in `watch_map_b`.
+  EXPECT_TRUE(watch_map_a.updateWatchInterest(watch_a2, {}, {res_2}).removed_.empty());
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_1}),
+            watch_map_b.updateWatchInterest(watch_b, {res_1}, {}).added_);
+  // 1-arg `updateWatchInterest` with `res_2` (all tokens already in `symbol_table`, not yet in
+  // `watch_map_b`) and explicit wildcard `"*"` (testing `updateWildcardWatches` with `"*"` in
+  // `symbol_table` for both wildcard and non-wildcard watches).
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_2, "*"}),
+            watch_map_b.updateWatchInterest(watch_b, {res_2, "*"}).added_);
+  EXPECT_TRUE(watch_map_a.updateWatchInterest(watch_a2, {res_1}).added_.empty());
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_b}),
+            watch_map_b.updateWatchInterest(watch_b, {res_b}).added_);
+
+  // Deliver matching update for `res_1` to `watch_map_a` to verify both watches receive it.
+  Protobuf::RepeatedPtrField<Protobuf::Any> matching_update;
+  envoy::config::endpoint::v3::ClusterLoadAssignment matching_cla;
+  matching_cla.set_cluster_name(res_1);
+  std::ignore = matching_update.Add()->PackFrom(matching_cla);
+  expectDeltaAndSotwUpdate(callbacks_a1, {matching_cla}, {}, "v1");
+  expectDeltaAndSotwUpdate(callbacks_a2, {matching_cla}, {}, "v1");
+  doDeltaAndSotwUpdate(watch_map_a, matching_update, {}, "v1");
+
+  // Drain and remove `watch_a1` while `watch_a2` still watches `res_1` (exercising
+  // `watchTrackedInInterest` over non-empty interest maps), then drain and remove the rest; all
+  // active symbols must be reclaimed.
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_2}),
+            watch_map_a.updateWatchInterest(watch_a1, {}).removed_);
+  watch_map_a.removeWatch(watch_a1);
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_1}),
+            watch_map_a.updateWatchInterest(watch_a2, {}).removed_);
+  watch_map_a.removeWatch(watch_a2);
+  EXPECT_EQ(absl::flat_hash_set<std::string>({res_b}),
+            watch_map_b.updateWatchInterest(watch_b, {}).removed_);
+  watch_map_b.removeWatch(watch_b);
+
+  EXPECT_EQ(symbol_table->numActiveSymbols(), initial_active);
 }
 
 // TODO(adip): Add tests that use the eds cache.

@@ -1,14 +1,19 @@
 #pragma once
 
 #include <optional>
+#include <set>
+#include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/grpc/status.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
@@ -21,7 +26,8 @@ class DeltaSubscriptionState
                                    envoy::service::discovery::v3::DeltaDiscoveryRequest> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         Event::Dispatcher& dispatcher, XdsConfigTrackerOptRef xds_config_tracker);
+                         Event::Dispatcher& dispatcher, XdsConfigTrackerOptRef xds_config_tracker,
+                         OptRef<XdsSymbolTable> xds_symbol_table = {});
 
   ~DeltaSubscriptionState() override;
 
@@ -78,8 +84,21 @@ private:
 
   OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
   OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
+  OptRef<const std::string> getWildcardResourceVersion(absl::string_view resource_name) const;
+  OptRef<const std::string> getAmbiguousResourceVersion(absl::string_view resource_name) const;
+  bool containsRequestedResource(absl::string_view resource_name) const {
+    return getRequestedResourceState(resource_name).has_value();
+  }
+  bool requestedResourceStateEmpty() const {
+    return compress_resource_names_ ? compressed_requested_resource_state_.empty()
+                                    : requested_resource_state_.empty();
+  }
+  bool eraseWildcardOrAmbiguousResource(absl::string_view resource_name);
 
   bool isInitialRequestForLegacyWildcard();
+
+  const bool compress_resource_names_;
+  XdsSymbolTableSharedPtr xds_symbol_table_;
 
   // Not all xDS resources support heartbeats due to there being specific information encoded in
   // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
@@ -91,12 +110,18 @@ private:
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
   absl::node_hash_map<std::string, ResourceState> requested_resource_state_;
+  absl::flat_hash_map<XdsResourceNameStorage, ResourceState, XdsResourceNameHash, XdsResourceNameEq>
+      compressed_requested_resource_state_;
   // A map from resource name to per-resource version. The keys of this map are resource names we
   // have received as a part of the wildcard subscription.
   absl::node_hash_map<std::string, std::string> wildcard_resource_state_;
+  absl::flat_hash_map<XdsResourceNameStorage, std::string, XdsResourceNameHash, XdsResourceNameEq>
+      compressed_wildcard_resource_state_;
   // Used for storing resources that we lost interest in, but could
   // also be a part of wildcard subscription.
   absl::node_hash_map<std::string, std::string> ambiguous_resource_state_;
+  absl::flat_hash_map<XdsResourceNameStorage, std::string, XdsResourceNameHash, XdsResourceNameEq>
+      compressed_ambiguous_resource_state_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
@@ -111,7 +136,9 @@ private:
 
 class DeltaSubscriptionStateFactory : public SubscriptionStateFactory<DeltaSubscriptionState> {
 public:
-  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher,
+                                OptRef<XdsSymbolTable> xds_symbol_table = {})
+      : dispatcher_(dispatcher), xds_symbol_table_(xds_symbol_table) {}
   ~DeltaSubscriptionStateFactory() override = default;
   std::unique_ptr<DeltaSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
@@ -119,11 +146,12 @@ public:
                         XdsResourcesDelegateOptRef /*xds_resources_delegate*/,
                         const std::string& /*target_xds_authority*/) override {
     return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_,
-                                                    xds_config_tracker);
+                                                    xds_config_tracker, xds_symbol_table_);
   }
 
 private:
   Event::Dispatcher& dispatcher_;
+  OptRef<XdsSymbolTable> xds_symbol_table_;
 };
 
 } // namespace XdsMux

@@ -14,6 +14,7 @@ envoy_cc_test(
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
+        "//source/common/config:xds_symbol_table_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tls:context_lib",
