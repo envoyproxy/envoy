@@ -41,11 +41,16 @@ private:
   absl::StatusOr<QueuePolicyUniquePtr<ItemType>> createQueuePolicyTyped(
       const envoy::extensions::queue_policy::codel::v3::CodelQueuePolicyConfig& config,
       const std::string& stat_prefix, ProtobufMessage::ValidationVisitor& validation_visitor) {
-    const std::chrono::milliseconds target_delay(
-        config.has_target_delay() ? DurationUtil::durationToMilliseconds(config.target_delay())
-                                  : 5);
-    const std::chrono::milliseconds interval(
-        config.has_interval() ? DurationUtil::durationToMilliseconds(config.interval()) : 100);
+    const auto to_nanoseconds = [](const Protobuf::Duration& duration) {
+      // DurationUtil validates the range before conversion; retain the sub-millisecond remainder.
+      return std::chrono::milliseconds(DurationUtil::durationToMilliseconds(duration)) +
+             std::chrono::nanoseconds(duration.nanos() % 1000000);
+    };
+    const std::chrono::nanoseconds target_delay = config.has_target_delay()
+                                                      ? to_nanoseconds(config.target_delay())
+                                                      : std::chrono::milliseconds(5);
+    const std::chrono::nanoseconds interval =
+        config.has_interval() ? to_nanoseconds(config.interval()) : std::chrono::milliseconds(100);
     if (interval <= target_delay) {
       return absl::InvalidArgumentError("CoDel interval must be greater than target_delay");
     }

@@ -58,14 +58,16 @@ CoDel
 
 The :ref:`CoDel queue policy
 <envoy_v3_api_msg_extensions.queue_policy.codel.v3.CodelQueuePolicyConfig>` measures how long
-requests wait in the pending queue. During each observation interval, it records the minimum queue
-delay. If that minimum remains above the target delay for a complete interval, the queue is
-considered persistently overloaded. CoDel then drops selected requests whose delay is more than
-twice the target until queue delay recovers.
+the oldest request has waited in the pending queue, independently of dispatch order. During each
+observation interval, it records the minimum sampled delay. If that minimum remains above the
+target delay for a complete interval, the queue is considered persistently overloaded. CoDel then
+drops the oldest requests whose delay is more than twice the target until queue delay recovers.
 
-CoDel wraps another queue policy. The underlying policy selects the next request, while CoDel
-decides whether to dispatch or drop it. FIFO is used when no underlying policy is configured. The
-default target delay is 5 milliseconds and the default interval is 100 milliseconds.
+CoDel wraps another queue policy. Before dispatch, CoDel checks for requests to drop in enqueue
+order. The underlying policy selects the next request to dispatch from the remaining queue. FIFO is
+used when no underlying policy is configured. The default target delay is 5 milliseconds and the
+default interval is 100 milliseconds. Both values must be positive; sub-millisecond values are
+supported, and the interval must exceed the target.
 
 The following cluster fragment uses adaptive LIFO ordering inside CoDel:
 

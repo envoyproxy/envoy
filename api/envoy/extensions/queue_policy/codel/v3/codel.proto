@@ -20,14 +20,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Controlled Delay (CoDel) pending requests queue policy. CoDel observes the
 // minimum queue delay over each interval and drops delayed requests when the queue remains
-// persistently overloaded. The underlying queue policy determines dequeue order.
+// persistently overloaded. CoDel measures and drops the oldest request independently of the
+// underlying queue policy's dispatch order.
 message CodelQueuePolicyConfig {
-  // Target queue delay. Defaults to 5 milliseconds.
-  google.protobuf.Duration target_delay = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
+  // Target queue delay. Must be positive. Defaults to 5 milliseconds.
+  google.protobuf.Duration target_delay = 1 [(validate.rules).duration = {gt {}}];
 
-  // Observation interval. Defaults to 100 milliseconds and must be greater than
+  // Observation interval. Must be positive. Defaults to 100 milliseconds and must be greater than
   // ``target_delay``.
-  google.protobuf.Duration interval = 2 [(validate.rules).duration = {gte {nanos: 1000000}}];
+  google.protobuf.Duration interval = 2 [(validate.rules).duration = {gt {}}];
 
   // Queue policy used to determine dequeue order. If unset, FIFO is used. CoDel policies cannot be
   // nested.

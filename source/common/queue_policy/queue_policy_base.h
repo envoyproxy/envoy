@@ -19,8 +19,6 @@ struct QueueItemMetadata {
   MonotonicTime enqueue_time_;
 };
 
-enum class DequeueAction { Dispatch, Drop };
-
 // Base class that handles queuing for objects. Implementations are free to choose any internal
 // container; the interface is intentionally container-agnostic.
 template <class ItemType> class QueueBase {
@@ -44,9 +42,11 @@ public:
   // ownership of the returned item.
   virtual ItemType& pop() PURE;
 
-  // Called immediately before an item is removed for dispatch. The caller must remove the item
-  // regardless of the returned action. This is not called when an item is cancelled or purged.
-  virtual DequeueAction onDequeue(ItemType&, MonotonicTime) { return DequeueAction::Dispatch; }
+  // Returns an item to drop before dispatch, or nullptr if no drop is needed. The queue must be
+  // nonempty. The item remains queued until the caller removes it with remove(). It need not be
+  // the item selected by peek().
+  // The caller repeats this check after each drop. Not called during cancellation or purging.
+  virtual ItemType* peekToDrop(MonotonicTime) { return nullptr; }
 
   // Removes a specific item from the queue without destroying it.
   virtual void remove(ItemType& item) PURE;
