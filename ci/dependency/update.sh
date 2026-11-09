@@ -47,7 +47,7 @@ case "$task" in
             specs[0]="${specs[0]}=${version}"
         fi
         for spec in "${specs[@]}"; do
-            [[ "$spec" != "*" ]] || fail '`*` is only supported by the registry task'
+            [[ "$spec" != "*" ]] || fail "\`*\` is only supported by the registry task"
         done
         command='./ci/do_ci.sh deps.update'
         for spec in "${specs[@]}"; do
@@ -57,7 +57,7 @@ case "$task" in
         ;;
     registry)
         if [[ " ${specs[*]} " == *" * "* && ${#specs[@]} -gt 1 ]]; then
-            fail '`*` cannot be combined with other dependencies'
+            fail "\`*\` cannot be combined with other dependencies"
         fi
         command='./ci/do_ci.sh registry'
         for spec in "${specs[@]}"; do
