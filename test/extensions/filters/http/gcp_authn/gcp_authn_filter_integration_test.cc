@@ -844,7 +844,8 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtStripsPrivateKeyFromCombinedPemBun
   HttpIntegrationTest::initialize();
   initiateClientConnection();
 
-  // Verify the POST body sent to MDS contains only cert_pem and strips the private key.
+  // Verify the POST body sent to the metadata server contains only the certificate chain and
+  // strips the private key.
   waitForGcpAuthnServerResponseBoundJwt(cert_pem);
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
   cleanup();
