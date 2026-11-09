@@ -197,7 +197,8 @@ protected:
     waitForUpstreamRequestData((kRequestChunks - 1) * kChunkSize);
     verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/false);
 
-    // Client sends the final chunk (end_stream = true). With FC3 on, the side stream now pauses.
+    // Client sends the final chunk (end_stream = true). With flow control 3 on,
+    // the side stream now pauses.
     sendClientRequestChunks(/*num_chunks=*/1, kChunkSize, /*end_stream=*/true);
     echoRequestBytes(kChunkSize);
     verifyUpstreamAndSidestreamFlowControlPaused(
