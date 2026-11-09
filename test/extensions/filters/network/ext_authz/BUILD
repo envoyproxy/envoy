@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:filter_manager_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:bool_accessor_lib",

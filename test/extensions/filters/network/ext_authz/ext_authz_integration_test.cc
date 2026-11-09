@@ -96,6 +96,8 @@ typed_config:
     format_string:
       text_format_source:
         inline_string: "%DYNAMIC_METADATA(envoy.filters.network.ext_authz:cluster)%"
+      omit_empty_values: true
+    skip_if_empty: true
 )EOF",
                                   *filter_chain->add_filters());
       }
@@ -219,6 +221,28 @@ TEST_P(ExtAuthzNetworkIntegrationTest, ServerFirstDynamicClusterSelection) {
   ASSERT_TRUE(upstream->write("220 ready\r\n"));
   client->waitForData("220 ready\r\n");
   EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  client->close();
+  ASSERT_TRUE(upstream->close());
+  ASSERT_TRUE(upstream->waitForDisconnect());
+  cleanupExtAuthzConnection();
+}
+
+TEST_P(ExtAuthzNetworkIntegrationTest, ServerFirstWithoutClusterMetadataUsesFallback) {
+  initializeTest(false, false, false, true);
+  auto client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(waitForExtAuthzConnection());
+  ASSERT_TRUE(waitForExtAuthzRequest());
+  ASSERT_TRUE(ext_authz_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(0U, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
+  sendExtAuthzResponse(Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  ASSERT_TRUE(upstream->write("220 ready\r\n"));
+  client->waitForData("220 ready\r\n");
+  EXPECT_EQ(0U, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(1U, test_server_->counter("cluster.fallback.upstream_cx_total")->value());
   client->close();
   ASSERT_TRUE(upstream->close());
   ASSERT_TRUE(upstream->waitForDisconnect());

@@ -126,6 +126,13 @@ Network::FilterStatus Filter::checkAuthorization() {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
+  if (invalid_filter_state_) {
+    ENVOY_CONN_LOG(error, "invalid filter state for ext_authz with check_on_new_connection",
+                   filter_callbacks_->connection());
+    filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                          "ext_authz_bad_state_close");
+    return Network::FilterStatus::StopIteration;
+  }
   return config_->checkOnNewConnection() ? checkAuthorization() : Network::FilterStatus::Continue;
 }
 
@@ -140,12 +147,8 @@ void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbac
     if (filter_state.hasDataWithName(key)) {
       const auto* receive_before_connect =
           filter_state.getDataReadOnly<StreamInfo::BoolAccessor>(key);
-      if (receive_before_connect == nullptr || !receive_before_connect->value()) {
-        ENVOY_CONN_LOG(error, "invalid filter state for ext_authz with check_on_new_connection",
-                       filter_callbacks_->connection());
-        filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                              "ext_authz_bad_state_close");
-      }
+      // Defer closing until onNewConnection() so subsequent filters can be installed.
+      invalid_filter_state_ = receive_before_connect == nullptr || !receive_before_connect->value();
     } else {
       filter_state.setData(key, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
                            StreamInfo::FilterState::LifeSpan::Connection);

@@ -211,6 +211,7 @@ private:
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   FilterReturn filter_return_{FilterReturn::Stop};
+  bool invalid_filter_state_{false};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
   ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;

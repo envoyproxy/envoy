@@ -211,7 +211,7 @@ provides access to client certificates when using :ref:`include_peer_certificate
   an upstream connection, use ``check_on_new_connection`` as described below.
 
 Authorization-driven routing for server-first protocols
-------------------------------------------------------
+-------------------------------------------------------
 
 Enable :ref:`check_on_new_connection
 <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.check_on_new_connection>`
@@ -235,6 +235,8 @@ the set-filter-state configuration is:
     format_string:
       text_format_source:
         inline_string: "%DYNAMIC_METADATA(envoy.filters.network.ext_authz:cluster)%"
+      omit_empty_values: true
+    skip_if_empty: true
 
 Choose an appropriate TCP proxy fallback cluster for connections allowed without routing metadata,
 such as when authorization is disabled or fails open.
