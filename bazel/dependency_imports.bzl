@@ -19,11 +19,12 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 load("@shellcheck//:deps.bzl", "shellcheck_dependencies")
+load("//bazel:repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 # go version for rules_go
 GO_VERSION = "1.24.6"
@@ -291,4 +292,47 @@ def crates_repositories(cargo_bazel_lockfile):
         cargo_lockfile = "@envoy//:Cargo.lock",
         lockfile = Label(cargo_bazel_lockfile),
         manifests = ["@envoy//:Cargo.toml"],
+    )
+
+    # The crates that the wasmtime C API (`@wasmtime//:wasmtime_lib`) is built against.
+    #
+    # The C API itself is built from the `wasmtime` source archive, so the crate versions are
+    # taken from that pin and cannot drift from it. Everything else is pinned by the `Cargo.lock`,
+    # which is seeded from the one in the source archive.
+    #
+    # After updating `wasmtime`, replace `bazel/external/wasmtime/Cargo.lock` with the one from the
+    # new source archive and run:
+    #
+    #     CARGO_BAZEL_REPIN=1 CARGO_BAZEL_REPIN_ONLY=wasmtime_crates bazel sync --only=wasmtime_crates
+    #
+    wasmtime_version = "={}".format(REPOSITORY_LOCATIONS_SPEC["wasmtime"]["version"])
+    crates_repository(
+        name = "wasmtime_crates",
+        cargo_lockfile = "@envoy//bazel/external/wasmtime:Cargo.lock",
+        lockfile = "@envoy//bazel/external/wasmtime:Cargo.Bazel.lock",
+        packages = {
+            "log": crate.spec(
+                default_features = False,
+                version = "*",
+            ),
+            "tracing": crate.spec(
+                default_features = False,
+                version = "*",
+            ),
+            # The features must match `_C_API_FEATURES` in `bazel/external/wasmtime.BUILD`.
+            "wasmtime": crate.spec(
+                default_features = False,
+                features = [
+                    "cranelift",
+                    "gc",
+                    "gc-drc",
+                    "runtime",
+                    "std",
+                ],
+                version = wasmtime_version,
+            ),
+            "wasmtime-internal-c-api-macros": crate.spec(
+                version = wasmtime_version,
+            ),
+        },
     )
