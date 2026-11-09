@@ -41,7 +41,8 @@ public:
                             const std::string& version_info) PURE;
 
   /**
-   * Called when a VHDS subscription fails (e.g. gRPC error or timeout on config update).
+   * Called when a VHDS config update fails (e.g. initial-fetch timeout or rejected update).
+   * Transient gRPC stream failures are retried automatically and do not invoke this callback.
    */
   virtual void onVhdsFailure() PURE;
 };
@@ -62,7 +63,8 @@ public:
   virtual bool awaitingInitialVhdsUpdate() const { return false; }
 
   /**
-   * Called when a VHDS subscription fails (e.g. gRPC error or timeout on config update).
+   * Called when a VHDS config update fails (e.g. initial-fetch timeout or rejected update).
+   * Transient gRPC stream failures are retried automatically and do not invoke this callback.
    */
   virtual void onVhdsFailure() {}
   /**

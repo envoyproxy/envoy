@@ -1795,10 +1795,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
+  filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
 
   // Holding unmatched requests until the initial VHDS response arrives requires a top-level
   // RouteConfigProvider; Scoped RDS (SRDS) does not support on-demand VHDS updates.
-  if (!hasCachedRoute() && connection_manager_.config_->routeConfigProvider() != nullptr &&
+  if (!filter_manager_.streamInfo().virtualHost().has_value() &&
+      connection_manager_.config_->routeConfigProvider() != nullptr &&
       snapped_route_config_ != nullptr && snapped_route_config_->awaitingInitialVhdsUpdate() &&
       route_config_update_requester_.has_value() && !request_headers_->getHostValue().empty()) {
     state_.waiting_for_vhds_ = true;
@@ -1818,7 +1820,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
             cached_route_.value().get()));
   }
 
-  filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
   const FilterManager::CreateChainResult create_chain_result =
       filter_manager_.createDownstreamFilterChain();
   if (create_chain_result.upgradeAccepted()) {

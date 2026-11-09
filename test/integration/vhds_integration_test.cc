@@ -750,5 +750,32 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       StaticVirtualHostUnmatchedPathReturns404Immediately) {
+  initialize();
+
+  // 1. Connect to VHDS and confirm initial wildcard request is in flight without replying yet.
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  vhds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 2. Request matching an existing virtual host with an unmatched path immediately returns 404
+  // without waiting for VHDS.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/unmatched"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.rds.first"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy
