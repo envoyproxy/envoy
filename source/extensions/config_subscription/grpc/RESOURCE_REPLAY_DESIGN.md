@@ -1,7 +1,10 @@
 # Replaying cached xDS resources to late watches
 
-Status: implemented behind `envoy.reloadable_features.xds_replay_cached_resources` in
-`WatchMap`, so it covers `NewGrpcMuxImpl` (the default delta mux) and the unified
+Status: implemented for SDS (`tls.v3.Secret`) only, behind
+`envoy.reloadable_features.xds_replay_cached_resources` in `WatchMap`. Other type URLs neither
+cache nor replay; extending to EDS/RDS/etc. is a follow-up. Replay only targets a watch that has
+never been notified (`Watch::notified_`); a pending replay is dropped if a server response reaches
+the watch first. The change is in `WatchMap`, so it covers `NewGrpcMuxImpl` (the default delta mux) and the unified
 `XdsMux::GrpcMuxSotw`/`GrpcMuxDelta`. The legacy SotW `GrpcMuxImpl`, still the default for
 SotW while `envoy.reloadable_features.unified_mux` is false, is intentionally not changed.
 EDS cache retirement and SDS seeding removal (rollout steps 3 and 4) are not done.

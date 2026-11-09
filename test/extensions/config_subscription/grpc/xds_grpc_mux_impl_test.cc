@@ -4,6 +4,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -1726,6 +1728,44 @@ TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerTransitionToWildcardTest) {
 
   // Update to wildcard (empty set)
   watch->update({});
+}
+
+TEST_P(GrpcMuxImplTest, ReplaysCachedSecretToLateWatch) {
+  setup();
+  const std::string& type_url = Config::TestTypeUrl::get().Secret;
+  auto decoder = std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+      envoy::extensions::transport_sockets::tls::v3::Secret>>("name");
+  auto* replay_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  NiceMock<MockSubscriptionCallbacks> callbacks1;
+  auto watch1 = makeWatch(type_url, {"alice"}, callbacks1, decoder);
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"alice"}, "", true);
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_version_info("1");
+  envoy::extensions::transport_sockets::tls::v3::Secret secret;
+  secret.set_name("alice");
+  std::ignore = response->add_resources()->PackFrom(secret);
+  EXPECT_CALL(callbacks1, onConfigUpdate(_, "1"));
+  expectSendMessage(type_url, {"alice"}, "1");
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+
+  // No new request for an already-subscribed name; the cache replays with the SotW form.
+  EXPECT_CALL(*replay_cb, scheduleCallbackNextIteration());
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  auto watch2 = makeWatch(type_url, {"alice"}, callbacks2, decoder);
+  EXPECT_CALL(callbacks2, onConfigUpdate(_, "1"))
+      .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        EXPECT_EQ(1, resources.size());
+        EXPECT_TRUE(resources[0].get().fromCache());
+        return absl::OkStatus();
+      });
+  replay_cb->invokeCallback();
+
+  // Unsubscribe when the last watch on "alice" goes away.
+  expectSendMessage(type_url, {}, "1");
 }
 
 } // namespace

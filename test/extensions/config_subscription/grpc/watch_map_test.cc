@@ -3,6 +3,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -143,7 +145,8 @@ TEST(WatchMapTest, Basic) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   {
@@ -218,7 +221,8 @@ TEST(WatchMapTest, Overlap) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -289,7 +293,8 @@ TEST(WatchMapTest, CacheResourceAddResource) {
       Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
   NiceMock<Event::MockDispatcher> dispatcher;
   WatchMap watch_map(eds_type_url, &config_validators,
-                     makeOptRef<EdsResourcesCache>(eds_resources_cache), dispatcher);
+                     makeOptRef<EdsResourcesCache>(eds_resources_cache), dispatcher,
+                     /*is_delta=*/false);
   // The test uses 2 watchers to ensure that interest is kept regardless of
   // which watcher was the first to add a watch for the assignment.
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
@@ -377,7 +382,8 @@ TEST(WatchMapTest, EdsResourcesCacheIncrementalUpdate) {
       Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
   NiceMock<Event::MockDispatcher> dispatcher;
   WatchMap watch_map(eds_type_url, &config_validators,
-                     makeOptRef<EdsResourcesCache>(eds_resources_cache), dispatcher);
+                     makeOptRef<EdsResourcesCache>(eds_resources_cache), dispatcher,
+                     /*is_delta=*/false);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -417,7 +423,8 @@ TEST(WatchMapTest, EdsResourcesCacheIncrementalUpdate) {
 class SameWatchRemoval : public testing::Test {
 public:
   SameWatchRemoval()
-      : watch_map_("ClusterLoadAssignmentType", &config_validators, {}, dispatcher_) {}
+      : watch_map_("ClusterLoadAssignmentType", &config_validators, {}, dispatcher_,
+                   /*is_delta=*/false) {}
 
   void SetUp() override {
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -504,7 +511,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -562,7 +570,8 @@ TEST(WatchMapTest, UninterestingUpdate) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"alice"});
 
@@ -608,7 +617,8 @@ TEST(WatchMapTest, WatchingEverything) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   /*Watch* watch1 = */ watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   // watch1 never specifies any names, and so is treated as interested in everything.
@@ -646,7 +656,8 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
@@ -681,7 +692,8 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
 TEST(WatchMapTest, OnConfigUpdateFailed) {
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   // calling on empty map doesn't break
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 
@@ -704,7 +716,8 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz/*?some=thing&thing=some"});
 
@@ -750,7 +763,8 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz?some=thing&thing=some"});
 
@@ -792,7 +806,8 @@ TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
@@ -855,7 +870,8 @@ TEST(WatchMapTest, IncrementalUpdateWatchInterest) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   {
@@ -917,7 +933,8 @@ TEST(WatchMapTest, AcceptOtherResourcesPrefixGlob) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   // Accept everything under "prefix/". This must not make the watch a catch-all wildcard.
@@ -947,7 +964,8 @@ TEST(WatchMapTest, AcceptOtherResourcesWildcard) {
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
   NiceMock<Event::MockDispatcher> dispatcher;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {}, dispatcher,
+                     /*is_delta=*/false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   watch_map.accept(watch, {"*"});
@@ -968,26 +986,29 @@ TEST(WatchMapTest, AcceptOtherResourcesWildcard) {
 // Needs to test the following function onConfigUpdate (sotw&delta) and
 // updateWatchInterest
 
-// Fixture for replaying the last delivered resource to a watch that joins an already-subscribed
-// name, see RESOURCE_REPLAY_DESIGN.md.
 class WatchMapReplayTest : public testing::Test {
 protected:
-  WatchMapReplayTest()
-      : replay_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        watch_map_("ClusterLoadAssignmentType", &config_validators_, {}, dispatcher_) {
-    alice_.set_cluster_name("alice");
+  explicit WatchMapReplayTest(bool is_delta = false)
+      : is_delta_(is_delta), replay_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        watch_map_(getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>(),
+                   &config_validators_, {}, dispatcher_, is_delta) {
+    alice_.set_name("alice");
     std::ignore = resources_.Add()->PackFrom(alice_);
   }
 
   // The first watch subscribes to "alice" and receives it, so the name is cached.
-  Watch* subscribeAndDeliver(const std::string& version, bool delta = false) {
+  Watch* subscribeAndDeliver(const std::string& version) {
     Watch* watch = watch_map_.addWatch(callbacks1_, resource_decoder_);
     EXPECT_TRUE(watch_map_.updateWatchInterest(watch, {"alice"}).added_.contains("alice"));
-    if (delta) {
+    if (is_delta_) {
       EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, version));
-      doDeltaUpdate(watch_map_, resources_, {}, version);
+      doSecretDeltaUpdate(resources_, {}, version);
     } else {
-      EXPECT_CALL(callbacks1_, onConfigUpdate(_, version));
+      EXPECT_CALL(callbacks1_, onConfigUpdate(_, version))
+          .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+            EXPECT_FALSE(resources[0].get().fromCache());
+            return absl::OkStatus();
+          });
       watch_map_.onConfigUpdate(resources_, version);
     }
     EXPECT_TRUE(watch_map_.hasCachedResourceForTest("alice"));
@@ -1006,16 +1027,42 @@ protected:
     watch_map_.removeWatch(watch);
   }
 
+  // doDeltaUpdate() names resources as ClusterLoadAssignments; this one names them as secrets.
+  void doSecretDeltaUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& secrets,
+                           const std::vector<std::string>& removed_names,
+                           const std::string& version) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added;
+    for (const auto& any : secrets) {
+      envoy::extensions::transport_sockets::tls::v3::Secret secret;
+      ASSERT_TRUE(any.UnpackTo(&secret));
+      auto* resource = added.Add();
+      resource->set_name(secret.name());
+      resource->set_version(version);
+      resource->mutable_resource()->CopyFrom(any);
+    }
+    Protobuf::RepeatedPtrField<std::string> removed;
+    for (const auto& name : removed_names) {
+      *removed.Add() = name;
+    }
+    watch_map_.onConfigUpdate(added, removed, version);
+  }
+
+  const bool is_delta_;
   NiceMock<MockCustomConfigValidators> config_validators_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* replay_cb_;
   WatchMap watch_map_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::extensions::transport_sockets::tls::v3::Secret>
+      resource_decoder_{"name"};
   MockSubscriptionCallbacks callbacks1_;
   MockSubscriptionCallbacks callbacks2_;
-  envoy::config::endpoint::v3::ClusterLoadAssignment alice_;
+  envoy::extensions::transport_sockets::tls::v3::Secret alice_;
   Protobuf::RepeatedPtrField<Protobuf::Any> resources_;
+};
+
+class WatchMapDeltaReplayTest : public WatchMapReplayTest {
+protected:
+  WatchMapDeltaReplayTest() : WatchMapReplayTest(/*is_delta=*/true) {}
 };
 
 TEST_F(WatchMapReplayTest, LateWatchReceivesCachedSotwResource) {
@@ -1031,6 +1078,7 @@ TEST_F(WatchMapReplayTest, LateWatchReceivesCachedSotwResource) {
         EXPECT_EQ("v1", resources[0].get().version());
         EXPECT_TRUE(TestUtility::protoEqual(resources[0].get().resource(), alice_));
         EXPECT_EQ(nullptr, resources[0].get().resource().GetArena());
+        EXPECT_TRUE(resources[0].get().fromCache());
         return absl::OkStatus();
       });
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(0);
@@ -1045,8 +1093,8 @@ TEST_F(WatchMapReplayTest, LateWatchReceivesCachedSotwResource) {
   drain(watch2);
 }
 
-TEST_F(WatchMapReplayTest, LateWatchReceivesCachedDeltaResource) {
-  Watch* watch1 = subscribeAndDeliver("v1", /*delta=*/true);
+TEST_F(WatchMapDeltaReplayTest, LateWatchReceivesCachedDeltaResource) {
+  Watch* watch1 = subscribeAndDeliver("v1");
   EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration());
   Watch* watch2 = joinLate();
 
@@ -1055,6 +1103,7 @@ TEST_F(WatchMapReplayTest, LateWatchReceivesCachedDeltaResource) {
                        const Protobuf::RepeatedPtrField<std::string>& removed, const std::string&) {
         EXPECT_EQ(1, added.size());
         EXPECT_TRUE(TestUtility::protoEqual(added[0].get().resource(), alice_));
+        EXPECT_TRUE(added[0].get().fromCache());
         EXPECT_TRUE(removed.empty());
         return absl::OkStatus();
       });
@@ -1085,6 +1134,51 @@ TEST_F(WatchMapReplayTest, NoReplayForNameNotYetDelivered) {
   drain(watch2);
 }
 
+TEST_F(WatchMapReplayTest, NoReplayForAlreadyNotifiedWatch) {
+  Watch* watch1 = subscribeAndDeliver("v1");
+  // watch2 is notified for "bob" first, then widens its interest to the cached "alice".
+  Watch* watch2 = watch_map_.addWatch(callbacks2_, resource_decoder_);
+  watch_map_.updateWatchInterest(watch2, {"bob"});
+  envoy::extensions::transport_sockets::tls::v3::Secret bob;
+  bob.set_name("bob");
+  Protobuf::RepeatedPtrField<Protobuf::Any> update;
+  std::ignore = update.Add()->PackFrom(bob);
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, "v2"));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, "v2"));
+  watch_map_.onConfigUpdate(update, "v2");
+
+  EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration()).Times(0);
+  EXPECT_TRUE(watch_map_.updateWatchInterest(watch2, {"alice", "bob"}).added_.empty());
+  drain(watch1);
+  drain(watch2);
+}
+
+TEST_F(WatchMapReplayTest, NoCacheForNonSecretType) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(dispatcher, createSchedulableCallback_(_)).Times(0);
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators_, {}, dispatcher,
+                     /*is_delta=*/false);
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  Protobuf::RepeatedPtrField<Protobuf::Any> update;
+  std::ignore = update.Add()->PackFrom(alice);
+
+  Watch* watch1 = watch_map.addWatch(callbacks1_, resource_decoder);
+  watch_map.updateWatchInterest(watch1, {"alice"});
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, "v1"));
+  watch_map.onConfigUpdate(update, "v1");
+  EXPECT_FALSE(watch_map.hasCachedResourceForTest("alice"));
+
+  Watch* watch2 = watch_map.addWatch(callbacks2_, resource_decoder);
+  watch_map.updateWatchInterest(watch2, {"alice"});
+  for (Watch* watch : {watch1, watch2}) {
+    watch_map.updateWatchInterest(watch, {});
+    watch_map.removeWatch(watch);
+  }
+}
+
 TEST_F(WatchMapReplayTest, WildcardWatchDoesNotPopulateCache) {
   Watch* watch = watch_map_.addWatch(callbacks1_, resource_decoder_);
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, "v1"));
@@ -1105,10 +1199,10 @@ TEST_F(WatchMapReplayTest, CacheDroppedWithLastWatch) {
   drain(watch2);
 }
 
-TEST_F(WatchMapReplayTest, CacheDroppedOnDeltaRemoval) {
-  Watch* watch1 = subscribeAndDeliver("v1", /*delta=*/true);
+TEST_F(WatchMapDeltaReplayTest, CacheDroppedOnDeltaRemoval) {
+  Watch* watch1 = subscribeAndDeliver("v1");
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, "v2"));
-  doDeltaUpdate(watch_map_, Protobuf::RepeatedPtrField<Protobuf::Any>(), {"alice"}, "v2");
+  doSecretDeltaUpdate(Protobuf::RepeatedPtrField<Protobuf::Any>(), {"alice"}, "v2");
   EXPECT_FALSE(watch_map_.hasCachedResourceForTest("alice"));
   drain(watch1);
 }
@@ -1143,19 +1237,18 @@ TEST_F(WatchMapReplayTest, WatchDroppingNameBeforeReplayReceivesNothing) {
   drain(watch1);
 }
 
-TEST_F(WatchMapReplayTest, FreshDeliveryBeforeReplayWins) {
+TEST_F(WatchMapReplayTest, FreshDeliveryBeforeReplaySkipsReplay) {
   Watch* watch1 = subscribeAndDeliver("v1");
   EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration());
   Watch* watch2 = joinLate();
 
-  // The server sends a newer version before the replay runs; both watches get it, and the replay
-  // then carries the newer version as well.
-  alice_.add_endpoints();
+  alice_.mutable_generic_secret();
   resources_.Clear();
   std::ignore = resources_.Add()->PackFrom(alice_);
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, "v2"));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, "v2")).Times(2);
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, "v2"));
   watch_map_.onConfigUpdate(resources_, "v2");
+  // watch2 has been notified by the server, so the pending replay is dropped.
   replay_cb_->invokeCallback();
 
   drain(watch1);
@@ -1182,6 +1275,87 @@ TEST_F(WatchMapReplayTest, ReplayExceptionIsLogged) {
     return absl::OkStatus();
   });
   EXPECT_LOG_CONTAINS("warn", "failed: boom", replay_cb_->invokeCallback());
+  drain(watch1);
+  drain(watch2);
+}
+
+TEST_F(WatchMapReplayTest, ReplayGroupsNamesAndSkipsDroppedOnes) {
+  Watch* watch1 = watch_map_.addWatch(callbacks1_, resource_decoder_);
+  watch_map_.updateWatchInterest(watch1, {"alice", "bob", "carol"});
+  for (const auto& name : {"bob", "carol"}) {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(name);
+    std::ignore = resources_.Add()->PackFrom(secret);
+  }
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, "v1"));
+  watch_map_.onConfigUpdate(resources_, "v1");
+
+  EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration()).Times(3);
+  Watch* watch2 = watch_map_.addWatch(callbacks2_, resource_decoder_);
+  watch_map_.updateWatchInterest(watch2, {"alice", "bob", "carol"});
+  // Dropping one name keeps the others queued.
+  watch_map_.updateWatchInterest(watch2, {"alice", "carol"});
+
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, "v1"))
+      .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        std::vector<std::string> names;
+        for (const auto& resource : resources) {
+          names.push_back(resource.get().name());
+        }
+        EXPECT_THAT(names, testing::UnorderedElementsAre("alice", "carol"));
+        return absl::OkStatus();
+      });
+  replay_cb_->invokeCallback();
+
+  watch_map_.updateWatchInterest(watch1, {});
+  watch_map_.removeWatch(watch1);
+  drain(watch2);
+}
+
+TEST_F(WatchMapDeltaReplayTest, WatchJoiningDuringRemovalGetsNoReplay) {
+  Watch* watch1 = subscribeAndDeliver("v1");
+  Watch* watch2 = nullptr;
+  // watch2 joins from inside the removal callback, so it is queued but never told of the removal.
+  EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration());
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, "v2")).WillOnce(testing::InvokeWithoutArgs([&]() {
+    watch2 = joinLate();
+    return absl::OkStatus();
+  }));
+  doSecretDeltaUpdate(Protobuf::RepeatedPtrField<Protobuf::Any>(), {"alice"}, "v2");
+  EXPECT_FALSE(watch_map_.hasCachedResourceForTest("alice"));
+
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).Times(0);
+  replay_cb_->invokeCallback();
+  drain(watch1);
+  drain(watch2);
+}
+
+TEST_F(WatchMapDeltaReplayTest, ResourceWithoutPayloadIsNotCached) {
+  Watch* watch = watch_map_.addWatch(callbacks1_, resource_decoder_);
+  watch_map_.updateWatchInterest(watch, {"alice"});
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+  auto* resource = resources.Add();
+  resource->set_name("alice");
+  resource->set_version("v1");
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, "v1"));
+  watch_map_.onConfigUpdate(resources, {}, "v1");
+  EXPECT_FALSE(watch_map_.hasCachedResourceForTest("alice"));
+  drain(watch);
+}
+
+TEST_F(WatchMapDeltaReplayTest, NoReplayForWatchNotifiedByDeltaUpdate) {
+  Watch* watch1 = subscribeAndDeliver("v1");
+  envoy::extensions::transport_sockets::tls::v3::Secret bob;
+  bob.set_name("bob");
+  Protobuf::RepeatedPtrField<Protobuf::Any> update;
+  std::ignore = update.Add()->PackFrom(bob);
+  Watch* watch2 = watch_map_.addWatch(callbacks2_, resource_decoder_);
+  watch_map_.updateWatchInterest(watch2, {"bob"});
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, "v2"));
+  doSecretDeltaUpdate(update, {}, "v2");
+
+  EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration()).Times(0);
+  watch_map_.updateWatchInterest(watch2, {"alice", "bob"});
   drain(watch1);
   drain(watch2);
 }

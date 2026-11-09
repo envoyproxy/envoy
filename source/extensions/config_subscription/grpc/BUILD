@@ -229,6 +229,7 @@ envoy_cc_library(
         "//source/common/config:xds_resource_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

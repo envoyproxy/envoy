@@ -1,5 +1,6 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
@@ -35,6 +36,8 @@ Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
 void WatchMap::forgetWatch(Watch* watch) {
   wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
   forgetAccept(watch);
+  // Drop the queued replay so the pointer is not kept after the watch is freed below; a new
+  // watch allocated at the same address must not inherit it.
   pending_replays_.erase(watch);
   watches_.erase(watch);
 }
@@ -294,10 +297,12 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
       if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
         watch->state_of_the_world_empty_ = true;
+        watch->notified_ = true;
         THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, version_info));
       }
     } else {
       watch->state_of_the_world_empty_ = false;
+      watch->notified_ = true;
       THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info));
     }
   }
@@ -305,10 +310,11 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
   // A name absent from a state-of-the-world response is not evicted: for explicitly named
   // types (EDS, RDS, ...) the server may legitimately send a subset, and the watches that
   // already hold the resource keep it too. The cache follows what those watches hold.
-  delta_ = false;
-  for (uint32_t resource_idx = 0; resource_idx < resources.size(); ++resource_idx) {
-    if (interesting_resources[resource_idx]) {
-      cacheResource(*resources[resource_idx], version_info);
+  if (replay_enabled_) {
+    for (uint32_t resource_idx = 0; resource_idx < resources.size(); ++resource_idx) {
+      if (interesting_resources[resource_idx]) {
+        cacheResource(*resources[resource_idx], version_info);
+      }
     }
   }
 
@@ -398,6 +404,7 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
       continue;
     }
+    cur_watch->notified_ = true;
     const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
@@ -416,22 +423,25 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
       continue;
     }
+    cur_watch->notified_ = true;
     THROW_IF_NOT_OK(
         cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
   }
   // notify empty update
   if (added_resources.empty() && removed_resources.empty()) {
     for (auto& cur_watch : wildcard_watches_) {
+      cur_watch->notified_ = true;
       THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
     }
   }
 
-  delta_ = true;
-  for (const auto& resource : decoded_resources) {
-    cacheResource(*resource, resource->version());
-  }
-  for (const auto& name : removed_resources) {
-    cached_resources_.erase(name);
+  if (replay_enabled_) {
+    for (const auto& resource : decoded_resources) {
+      cacheResource(*resource, resource->version());
+    }
+    for (const auto& name : removed_resources) {
+      cached_resources_.erase(name);
+    }
   }
 
   if (eds_resources_cache_.has_value()) {
@@ -502,6 +512,11 @@ WatchMap::findRemovals(const absl::flat_hash_set<std::string>& newly_removed_fro
   return newly_removed_from_subscription;
 }
 
+const std::string& WatchMap::secretTypeUrl() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+}
+
 void WatchMap::cacheResource(const DecodedResource& resource, const std::string& version) {
   // Only explicitly named interest is cached: a resource routed through a wildcard or glob
   // watch has no per-name reference count, and a wildcard subscription is resent in full anyway.
@@ -516,8 +531,10 @@ void WatchMap::cacheResource(const DecodedResource& resource, const std::string&
 }
 
 void WatchMap::queueReplay(Watch* watch, const std::string& name) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_replay_cached_resources") ||
-      !cached_resources_.contains(name)) {
+  // A watch that has already been notified holds a state built from server responses; only a
+  // watch that has never heard anything is caught up from the cache.
+  if (!replay_enabled_ || watch->notified_ || !cached_resources_.contains(name) ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_replay_cached_resources")) {
     return;
   }
   pending_replays_[watch].insert(name);
@@ -529,17 +546,19 @@ void WatchMap::replayCachedResources() {
   auto pending = std::move(pending_replays_);
   pending_replays_.clear();
   for (auto& [watch, names] : pending) {
-    // The watch may have been removed since the replay was queued.
-    if (!watches_.contains(watch)) {
+    // The watch may have been removed since the replay was queued, or a server response may
+    // have reached it first, in which case the response wins.
+    if (!watches_.contains(watch) || watch->notified_) {
       continue;
     }
     std::vector<DecodedResourcePtr> decoded;
     std::vector<DecodedResourceRef> refs;
     std::string version;
     for (const auto& name : names) {
+      // The entry may be gone if a delta removal followed the join, e.g. a watch added from
+      // inside the removal's own callbacks, which are not told about the removal. The interest
+      // check is defensive: findRemovals() already drops a name the watch stopped watching.
       auto cached = cached_resources_.find(name);
-      // The entry may be gone if the server removed the resource, or the watch may have changed
-      // its interest in the meantime.
       if (cached == cached_resources_.end() || !watch->resource_names_.contains(name)) {
         continue;
       }
@@ -547,7 +566,8 @@ void WatchMap::replayCachedResources() {
           Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, cached->second.resource_->New());
       copy->CopyFrom(*cached->second.resource_);
       decoded.push_back(std::make_unique<DecodedResourceImpl>(
-          std::move(copy), name, cached->second.aliases_, cached->second.version_));
+          std::move(copy), name, cached->second.aliases_, cached->second.version_,
+          /*from_cache=*/true));
       refs.emplace_back(*decoded.back());
       version = cached->second.version_;
     }
@@ -557,9 +577,10 @@ void WatchMap::replayCachedResources() {
     ENVOY_LOG(debug, "Replaying {} cached {} resource(s) to a late watch", refs.size(), type_url_);
     // The resource was accepted when it arrived, and there is no response to NACK, so a failure
     // here is only logged. The watch keeps waiting for the server as it would without replay.
+    watch->notified_ = true;
     TRY_ASSERT_MAIN_THREAD {
       absl::Status status;
-      if (delta_) {
+      if (is_delta_) {
         status = watch->callbacks_.onConfigUpdate(refs, {}, version);
       } else {
         // The watch now holds resources, so a later state-of-the-world update that drops them

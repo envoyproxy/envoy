@@ -73,6 +73,14 @@ public:
    * @return optional ref<envoy::config::core::v3::Metadata> of a resource.
    */
   virtual const OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
+
+  /**
+   * @return bool true if the resource was replayed from the xDS client's local cache to a watch
+   *         that joined an already-subscribed name, rather than received from the management
+   *         server. A subscriber with its own caching logic may use this to treat the resource
+   *         as provisional.
+   */
+  virtual bool fromCache() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;

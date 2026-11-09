@@ -1,6 +1,7 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
 #include <memory>
+#include <type_traits>
 
 #include "envoy/common/exception.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
@@ -147,11 +148,11 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
     }
 
     // We don't yet have a subscription for type_url! Make one!
-    watch_map =
-        watch_maps_
-            .emplace(type_url, std::make_unique<WatchMap>(type_url, config_validators_.get(),
-                                                          resources_cache, dispatcher_))
-            .first;
+    watch_map = watch_maps_
+                    .emplace(type_url, std::make_unique<WatchMap>(
+                                           type_url, config_validators_.get(), resources_cache,
+                                           dispatcher_, std::is_same_v<S, DeltaSubscriptionState>))
+                    .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                          type_url, *watch_maps_[type_url], resource_decoder,
                                          xds_config_tracker_, xds_resources_delegate_,
