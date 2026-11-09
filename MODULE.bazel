@@ -173,6 +173,20 @@ git_override(
     strip_prefix = "bazel",
 )
 
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "835e3e0e18a24543549e4ad5b7a34e6b00b642fa",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
+
+git_override(
+    module_name = "rules_jq",
+    commit = "835e3e0e18a24543549e4ad5b7a34e6b00b642fa",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "rules_jq",
+)
+
 ####################################################################################
 # setup: Compilers
 ####################################################################################
