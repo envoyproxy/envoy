@@ -165,6 +165,14 @@ single_version_override(
 #     strip_prefix = "bazel",
 # )
 
+# TESTING: envoyproxy/toolshed#5580 (per-test lcov stripping). Do not merge.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "38239f968bda8f341d5152fe592fddc423e6536d",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
 ####################################################################################
 # setup: Compilers
 ####################################################################################

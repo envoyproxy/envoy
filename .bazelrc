@@ -217,6 +217,7 @@ build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:coverage --define=dynamic_link_tests=false
 # Use custom report generator that also generates HTML
 build:coverage --coverage_report_generator=@envoy//tools/coverage:report
+build:coverage --coverage_output_generator=@envoy_toolshed//coverage:lcov_merger
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
