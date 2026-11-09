@@ -33,6 +33,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod resource_monitor;
 pub mod route_specifier;
 pub mod stats_sink;
 pub mod timing;
@@ -866,6 +867,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
+/// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
 ///
 /// # Examples
 ///
@@ -1126,6 +1128,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION,
       $fn,
       "NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register resource_monitor : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_RESOURCE_MONITOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -2065,6 +2074,29 @@ pub type NewTlsCertificateSelectorConfigFunction =
 pub static NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION: OnceLock<
   NewTlsCertificateSelectorConfigFunction,
 > = OnceLock::new();
+
+// =================================================================================================
+// Resource Monitor Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new resource monitor.
+///
+/// The `name` is the value of `resource_monitor_name` from the `dynamic_modules` resource monitor
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `resource_monitor_config` field. The `envoy_config` handle creates a
+/// [`resource_monitor::EnvoyResourceMonitorConfigScheduler`] while the configuration is being
+/// created. Returning `None` causes Envoy to fail to start.
+pub type NewResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: &mut resource_monitor::EnvoyResourceMonitorConfig,
+  ) -> Option<Box<dyn resource_monitor::ResourceMonitor>>;
+
+/// The global factory function for resource monitors. This is set via the `resource_monitor:` arm
+/// of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<NewResourceMonitorConfigFunction> =
+  OnceLock::new();
 
 // =============================================================================
 // Config Validator

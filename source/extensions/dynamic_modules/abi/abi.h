@@ -19955,6 +19955,200 @@ bool envoy_dynamic_module_on_header_formatter_format(
     envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* result);
 
+// =============================================================================
+// ============================= Resource Monitor ==============================
+// =============================================================================
+//
+// This extension enables custom overload manager resource monitors via dynamic modules. At each
+// refresh interval of the overload manager, the module reports the pressure of the monitored
+// resource, which is the ratio of its usage to its limit. The overload actions and load shed points
+// with a trigger on the resource act on that pressure.
+
+// =============================================================================
+// Resource Monitor Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleResourceMonitorConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It remains valid until
+ * envoy_dynamic_module_on_resource_monitor_config_destroy returns, or until
+ * envoy_dynamic_module_on_resource_monitor_config_new returns if that returns nullptr.
+ */
+typedef void* envoy_dynamic_module_type_resource_monitor_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_config_module_ptr is a pointer to an in-module
+ * resource monitor configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_resource_monitor_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleResourceMonitorConfigScheduler class in Envoy.
+ *
+ * The scheduler reports the outcome of a pending update from any thread, which lets a module
+ * compute the pressure off the main thread. It is created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new, used via
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage and
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure, and destroyed by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Since its lifecycle is owned by the module, this has the _module_ptr
+ * suffix.
+ */
+typedef void* envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_update_status is returned by
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage to report the outcome of an
+ * update. There is no related C++ enum. Envoy reports a successful update with
+ * Server::ResourceUpdateCallbacks::onSuccess and a failed one with onFailure.
+ */
+typedef enum envoy_dynamic_module_type_resource_monitor_update_status {
+  // The module wrote the pressure of the resource to resource_pressure.
+  envoy_dynamic_module_type_resource_monitor_update_status_Success = 0,
+  // The update failed. The overload manager counts it in the failed_updates statistic of the
+  // resource and keeps acting on the last reported pressure.
+  envoy_dynamic_module_type_resource_monitor_update_status_Failure = 1,
+  // The module reports the outcome later with
+  // envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage or
+  // envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure.
+  envoy_dynamic_module_type_resource_monitor_update_status_Pending = 2,
+} envoy_dynamic_module_type_resource_monitor_update_status;
+
+// =============================================================================
+// Resource Monitor Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_config_new is called by the main thread when the
+ * overload manager creates the resource monitor during server initialization. This happens before
+ * clusters, listeners and worker threads are created.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @param name is the resource_monitor_name from the configuration. It is owned by Envoy and valid
+ * only for the duration of this call.
+ * @param config is the resource monitor configuration bytes owned by Envoy and valid only for the
+ * duration of this call.
+ * @return a pointer to the in-module resource monitor configuration. Returning nullptr indicates a
+ * failure to initialize the module, and Envoy fails to start.
+ */
+envoy_dynamic_module_type_resource_monitor_config_module_ptr
+envoy_dynamic_module_on_resource_monitor_config_new(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_config_destroy is called by the main thread when the
+ * resource monitor is destroyed. This happens when the server shuts down, and during startup when
+ * Envoy rejects the configuration after the module has created its own. Worker threads can still be
+ * running at that point, so state that the module shares with its other extensions must stay
+ * valid. A pending update is dropped without being reported. The module may be unloaded once this
+ * returns, so it must stop the threads it started before returning.
+ *
+ * In validation mode, the module must not call envoy_dynamic_module_callback_get_concurrency or
+ * envoy_dynamic_module_callback_is_validation_mode here.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ */
+void envoy_dynamic_module_on_resource_monitor_config_destroy(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage is called by the main thread at
+ * each refresh interval of the overload manager to get the pressure of the resource.
+ * Implementations must not block. A module that needs slow work returns
+ * envoy_dynamic_module_type_resource_monitor_update_status_Pending and reports the outcome later.
+ *
+ * While an update is pending, the overload manager skips the following refreshes of the resource
+ * and counts them in the skipped_updates statistic of the resource. Envoy does not time out a
+ * pending update, so the overload manager keeps acting on the last reported pressure until the
+ * module reports the outcome.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @param resource_pressure is where the module writes the pressure of the resource before it
+ * returns envoy_dynamic_module_type_resource_monitor_update_status_Success. The pressure is the
+ * ratio of the resource usage to its limit. Envoy treats a value above 1 as 1, and a negative or
+ * non-finite value as a failed update.
+ * @return the outcome of the update.
+ */
+envoy_dynamic_module_type_resource_monitor_update_status
+envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
+    double* resource_pressure);
+
+// =============================================================================
+// Resource Monitor Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new creates a new resource
+ * monitor configuration scheduler, which reports the outcome of a pending update from any thread,
+ * including the ones managed by the module.
+ *
+ * The caller must delete the scheduler with
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete when it is no longer
+ * needed. See the comment on
+ * envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @return a pointer to the created scheduler.
+ */
+envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr
+envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage reports
+ * the pressure of the resource for the update that
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage left pending.
+ *
+ * This can be called from any thread. Envoy applies the report on the main thread to the update
+ * that is pending then, and drops it if no update is pending or the resource monitor is destroyed
+ * or the server shuts down first.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ * @param resource_pressure is the pressure of the resource. Envoy treats a value above 1 as 1, and
+ * a negative or non-finite value as a failed update.
+ */
+void envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr,
+    double resource_pressure);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure reports that the
+ * update that envoy_dynamic_module_on_resource_monitor_update_resource_usage left pending failed.
+ *
+ * This can be called from any thread. Envoy applies the report on the main thread to the update
+ * that is pending then, and drops it if no update is pending or the resource monitor is destroyed
+ * or the server shuts down first.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete deletes the scheduler
+ * created by envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ *
+ * This can be called from any thread, even after the resource monitor is destroyed.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr);
+
 #ifdef __cplusplus
 }
 #endif

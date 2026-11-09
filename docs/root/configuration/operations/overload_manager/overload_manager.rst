@@ -87,6 +87,37 @@ This can be combined with actions to shed load when memory pressure increases:
            threshold:
              value: 0.95  # Trigger at 95% memory utilization
 
+.. _config_overload_manager_dynamic_modules:
+
+Dynamic Modules
+^^^^^^^^^^^^^^^
+
+A :ref:`dynamic module <arch_overview_dynamic_modules>` can implement a resource monitor through the
+:ref:`dynamic module resource monitor
+<envoy_v3_api_msg_extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor>`.
+At each refresh interval the module reports the pressure of the resource, right away or later from
+any thread through a scheduler. Envoy treats a pressure above 1 as 1, and a negative or non-finite
+pressure as a failed update.
+
+The following configuration sheds new requests once the pressure that the module reports for the
+``queue_latency`` resource reaches 0.9.
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "queue_latency"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor
+         dynamic_module_config:
+           name: "my_module"
+         resource_monitor_name: "latency"
+   loadshed_points:
+     - name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+       triggers:
+         - name: "queue_latency"
+           threshold:
+             value: 0.9
+
 .. _config_overload_manager_triggers:
 
 Triggers
