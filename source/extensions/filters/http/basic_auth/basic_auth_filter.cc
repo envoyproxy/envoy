@@ -83,6 +83,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   if (auth_header.empty()) {
     if (config_->allowMissing()) {
+      if (!config_->forwardUsernameHeader().empty()) {
+        headers.remove(Http::LowerCaseString(config_->forwardUsernameHeader()));
+      }
       return Http::FilterHeadersStatus::Continue;
     }
     return onDenied("User authentication failed. Missing username and password.",
@@ -93,6 +96,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   if (!absl::StartsWith(auth_value, "Basic ")) {
     if (config_->allowMissing()) {
+      if (!config_->forwardUsernameHeader().empty()) {
+        headers.remove(Http::LowerCaseString(config_->forwardUsernameHeader()));
+      }
       return Http::FilterHeadersStatus::Continue;
     }
     return onDenied("User authentication failed. Expected 'Basic' authentication scheme.",

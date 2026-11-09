@@ -39,7 +39,9 @@ message BasicAuth {
   // This field specifies the header name to forward a successfully authenticated user to
   // the backend. The header will be added to the request with the username as the value.
   //
-  // If it is not specified, the username will not be forwarded.
+  // If it is not specified, the username will not be forwarded. When ``allow_missing`` is true
+  // and the request does not contain valid Basic credentials, any existing value for this header
+  // is removed before the request is passed to the next filter.
   string forward_username_header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
