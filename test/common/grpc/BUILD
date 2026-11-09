@@ -25,6 +25,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -126,6 +127,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
