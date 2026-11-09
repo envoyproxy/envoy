@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.ratelimit.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 import "envoy/type/v3/http_status.proto";
 
 import "google/protobuf/duration.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -174,7 +175,9 @@ message RateLimit {
   // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
   // will be ignored. However, :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
-  // will take precedence over this field.
+  // will take precedence over this field, unless :ref:`rate_limits_override_option
+  // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits_override_option>`
+  // resolves to ``ALL_LEVELS``, in which case both are applied.
   //
   // .. note::
   //   Not all configuration fields of
@@ -200,8 +203,17 @@ message RateLimit {
   //
   // Disabled by default.
   bool enable_retry_after_header = 19;
+
+  // The filter level default of
+  // :ref:`rate_limits_override_option
+  // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits_override_option>`.
+  // The filter level config is the least specific one, so the value is only used if all the
+  // per-route configs leave the option ``UNSPECIFIED``.
+  common.ratelimit.v3.RateLimitsOverrideOption rate_limits_override_option = 20
+      [(validate.rules).enum = {defined_only: true}];
 }
 
+// [#next-free-field: 6]
 message RateLimitPerRoute {
   // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
   enum VhRateLimitsOptions {
@@ -246,7 +258,10 @@ message RateLimitPerRoute {
   // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`,
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` and
   // :ref:`RateLimit.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>` fields
-  // will be ignored.
+  // will be ignored. If :ref:`rate_limits_override_option
+  // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits_override_option>`
+  // resolves to ``ALL_LEVELS``, the ``rate_limits`` of the less specific per-route configs and
+  // ``RateLimit.rate_limits`` are applied as well.
   //
   // .. note::
   //   Not all configuration fields of
@@ -261,4 +276,21 @@ message RateLimitPerRoute {
 
   // Overrides the domain. If not set, uses the filter-level domain instead.
   string domain = 4;
+
+  // Determines how the ``rate_limits`` of the per-route configs at different levels and the
+  // filter level :ref:`rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>`
+  // are applied. The value of the most specific config that is not ``UNSPECIFIED`` takes effect,
+  // and the filter level :ref:`rate_limits_override_option
+  // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits_override_option>`
+  // is the least specific one. If all of them are ``UNSPECIFIED``,
+  // :ref:`MOST_SPECIFIC_WINS <envoy_v3_api_enum_value_extensions.common.ratelimit.v3.RateLimitsOverrideOption.MOST_SPECIFIC_WINS>`
+  // is used.
+  //
+  // If ``ALL_LEVELS`` is used, the descriptors generated from the ``rate_limits`` of all levels,
+  // including the filter level, are merged and sent to the rate limit service in a single request,
+  // with the descriptors from the more specific levels first. The :ref:`domain
+  // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.domain>` of the most
+  // specific per-route config is still used if set, otherwise the filter level domain is used.
+  common.ratelimit.v3.RateLimitsOverrideOption rate_limits_override_option = 5
+      [(validate.rules).enum = {defined_only: true}];
 }

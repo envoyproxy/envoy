@@ -81,8 +81,8 @@ public:
           std::make_shared<FilterConfigPerRoute>(factory_context_, settings, creation_status);
       EXPECT_OK(creation_status);
 
-      EXPECT_CALL(filter_callbacks_, mostSpecificPerFilterConfig())
-          .WillOnce(Return(route_config_.get()));
+      ON_CALL(filter_callbacks_, perFilterConfigs())
+          .WillByDefault(Return(Router::RouteSpecificFilterConfigs{route_config_.get()}));
     }
   }
 
@@ -1931,8 +1931,8 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
@@ -1981,8 +1981,8 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
@@ -2029,8 +2029,8 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
@@ -2079,8 +2079,8 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -2128,8 +2128,8 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -2177,8 +2177,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0))
@@ -2222,8 +2222,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0))
@@ -2259,8 +2259,8 @@ TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config_));
+  EXPECT_CALL(*filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&per_route_config_}));
 
   EXPECT_CALL(*client_, limit(_, per_route_domain,
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -2813,6 +2813,278 @@ TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDoneResponseHeader
   EXPECT_CALL(*client_, limit(_, _, _, _, _, _)).Times(0);
   EXPECT_CALL(*client_, detach()).Times(0);
   filter_->onDestroy();
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsMostSpecificWins) {
+  const std::string route_config_yaml = R"EOF(
+  rate_limits_override_option: MOST_SPECIFIC_WINS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  )EOF";
+  setUpTest(filter_config_, route_config_yaml);
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
+  TestUtility::loadFromYaml(R"EOF(
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "vh-key"
+  )EOF",
+                            vh_settings);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute vh_config(factory_context_, vh_settings, creation_status);
+  EXPECT_OK(creation_status);
+  EXPECT_CALL(filter_callbacks_, perFilterConfigs())
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&vh_config, route_config_.get()}));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "route-key"}}}}),
+                              _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAllLevels) {
+  const std::string vh_config_yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "vh-key"
+  - actions:
+    - generic_key:
+        descriptor_value: "vh-done-key"
+    apply_on_stream_done: true
+  )EOF";
+  const std::string route_config_yaml = R"EOF(
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  - actions:
+    - generic_key:
+        descriptor_value: "route-done-key"
+    apply_on_stream_done: true
+  )EOF";
+  setUpTest(filter_config_, route_config_yaml);
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
+  TestUtility::loadFromYaml(vh_config_yaml, vh_settings);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute vh_config(factory_context_, vh_settings, creation_status);
+  EXPECT_OK(creation_status);
+  // A config without embedded rate limits contributes nothing.
+  FilterConfigPerRoute empty_config(
+      factory_context_, envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute(),
+      creation_status);
+  EXPECT_OK(creation_status);
+
+  // Ascending order of specificity.
+  EXPECT_CALL(filter_callbacks_, perFilterConfigs())
+      .WillOnce(Return(
+          Router::RouteSpecificFilterConfigs{&empty_config, &vh_config, route_config_.get()}));
+
+  // Route level rate limits are ignored when the embedded rate limits are set.
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+
+  // Descriptors from the more specific level come first.
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "route-key"}}}, {{{"generic_key", "vh-key"}}}}),
+                              _, _, 0))
+      .WillOnce([this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string&,
+                       const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&,
+                       OptRef<const StreamInfo::StreamInfo>,
+                       uint32_t) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  // The stream done descriptors are merged from the same configs.
+  EXPECT_CALL(*client_,
+              limit(_, "foo",
+                    testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                        {{{"generic_key", "route-done-key"}}}, {{{"generic_key", "vh-done-key"}}}}),
+                    _, _, 0))
+      .WillOnce([this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string&,
+                       const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&,
+                       OptRef<const StreamInfo::StreamInfo>,
+                       uint32_t) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(*client_, detach());
+  filter_->onDestroy();
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsUnspecifiedFallsBackToMostSpecificWins) {
+  const std::string route_config_yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  )EOF";
+  setUpTest(filter_config_, route_config_yaml);
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
+  TestUtility::loadFromYaml(R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "vh-key"
+  )EOF",
+                            vh_settings);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute vh_config(factory_context_, vh_settings, creation_status);
+  EXPECT_OK(creation_status);
+  EXPECT_CALL(filter_callbacks_, perFilterConfigs())
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&vh_config, route_config_.get()}));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "route-key"}}}}),
+                              _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAllLevelsInheritedAndFilterLevelIncluded) {
+  const std::string filter_config_yaml = R"EOF(
+  domain: foo
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "filter-key"
+  )EOF";
+  // No option at the most specific level.
+  const std::string route_config_yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  )EOF";
+  setUpTest(filter_config_yaml, route_config_yaml);
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
+  TestUtility::loadFromYaml(R"EOF(
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "vh-key"
+  )EOF",
+                            vh_settings);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute vh_config(factory_context_, vh_settings, creation_status);
+  EXPECT_OK(creation_status);
+  EXPECT_CALL(filter_callbacks_, perFilterConfigs())
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{&vh_config, route_config_.get()}));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "route-key"}}},
+                                  {{{"generic_key", "vh-key"}}},
+                                  {{{"generic_key", "filter-key"}}}}),
+                              _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(HttpRateLimitFilterTest, FilterLevelAllLevelsOption) {
+  const std::string filter_config_yaml = R"EOF(
+  domain: foo
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "filter-key"
+  )EOF";
+  const std::string route_config_yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  )EOF";
+  setUpTest(filter_config_yaml, route_config_yaml);
+
+  EXPECT_CALL(*client_,
+              limit(_, "foo",
+                    testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                        {{{"generic_key", "route-key"}}}, {{{"generic_key", "filter-key"}}}}),
+                    _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteOptionOverridesFilterLevelOption) {
+  const std::string filter_config_yaml = R"EOF(
+  domain: foo
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "filter-key"
+  )EOF";
+  const std::string route_config_yaml = R"EOF(
+  rate_limits_override_option: MOST_SPECIFIC_WINS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  )EOF";
+  setUpTest(filter_config_yaml, route_config_yaml);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "route-key"}}}}),
+                              _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(HttpRateLimitFilterTest, AllLevelsWithoutPerRouteConfigs) {
+  const std::string filter_config_yaml = R"EOF(
+  domain: foo
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "filter-key"
+  )EOF";
+  setUpTest(filter_config_yaml);
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "filter-key"}}}}),
+                              _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(HttpRateLimitFilterTest, AllLevelsWithoutEmbeddedRateLimitsFallsBackToRoutePolicy) {
+  const std::string filter_config_yaml = R"EOF(
+  domain: foo
+  rate_limits_override_option: ALL_LEVELS
+  )EOF";
+  setUpTest(filter_config_yaml, R"EOF(
+  domain: bar
+  )EOF");
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+
+  EXPECT_CALL(*client_, limit(_, "bar",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _, _, 0));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 }
 
 } // namespace
