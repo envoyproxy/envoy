@@ -14643,3 +14643,255 @@ fn test_envoy_route_specifier_config_impl() {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
 }
+
+// =============================================================================
+// Resource Monitor
+// =============================================================================
+
+thread_local! {
+  // The id of the last scheduler created on this thread.
+  static LAST_RESOURCE_MONITOR_SCHEDULER_ID: std::cell::Cell<u64> =
+    const { std::cell::Cell::new(0) };
+}
+
+// A scheduler can be used and dropped on any thread, so its events are kept per scheduler id.
+static NEXT_RESOURCE_MONITOR_SCHEDULER_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(1);
+static RESOURCE_MONITOR_SCHEDULER_EVENTS: std::sync::Mutex<Vec<(u64, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+// Stands for the Envoy side configuration, so the stubs can check that the SDK passes it on.
+fn resource_monitor_envoy_config(
+) -> abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr {
+  static ENVOY_CONFIG: u8 = 0;
+  &ENVOY_CONFIG as *const u8 as *mut _
+}
+
+fn record_resource_monitor_scheduler_event(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+  event: String,
+) {
+  let id = unsafe { *(scheduler as *const u64) };
+  RESOURCE_MONITOR_SCHEDULER_EVENTS
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .push((id, event));
+}
+
+fn resource_monitor_scheduler_events(id: u64) -> Vec<String> {
+  RESOURCE_MONITOR_SCHEDULER_EVENTS
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .iter()
+    .filter(|(event_id, _)| *event_id == id)
+    .map(|(_, event)| event.clone())
+    .collect()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr {
+  assert_eq!(config_envoy_ptr, resource_monitor_envoy_config());
+  let id = NEXT_RESOURCE_MONITOR_SCHEDULER_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  LAST_RESOURCE_MONITOR_SCHEDULER_ID.set(id);
+  Box::into_raw(Box::new(id)) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+  resource_pressure: f64,
+) {
+  record_resource_monitor_scheduler_event(scheduler, format!("usage {resource_pressure}"));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+) {
+  record_resource_monitor_scheduler_event(scheduler, "failure".to_string());
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+) {
+  record_resource_monitor_scheduler_event(scheduler, "delete".to_string());
+  unsafe { drop(Box::from_raw(scheduler as *mut u64)) };
+}
+
+fn resource_monitor_envoy_config_handle() -> resource_monitor::EnvoyResourceMonitorConfig {
+  unsafe { resource_monitor::EnvoyResourceMonitorConfig::new(resource_monitor_envoy_config()) }
+}
+
+struct TestResourceMonitor(resource_monitor::ResourceMonitorUpdate);
+
+impl resource_monitor::ResourceMonitor for TestResourceMonitor {
+  fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+    self.0
+  }
+}
+
+fn update_resource_monitor(
+  monitor: Box<dyn resource_monitor::ResourceMonitor>,
+) -> (
+  abi::envoy_dynamic_module_type_resource_monitor_update_status,
+  f64,
+) {
+  let config_ptr = wrap_into_c_void_ptr!(monitor);
+  // Envoy reads the pressure only on Success, so a marker value shows whether the hook wrote it.
+  let mut resource_pressure = -7.0;
+  let status = unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+      resource_monitor_envoy_config(),
+      config_ptr,
+      &mut resource_pressure,
+    )
+  };
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  (status, resource_pressure)
+}
+
+#[test]
+fn test_resource_monitor_config_new_and_destroy() {
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+  struct DroppedMonitor;
+  impl Drop for DroppedMonitor {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl resource_monitor::ResourceMonitor for DroppedMonitor {
+    fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+      resource_monitor::ResourceMonitorUpdate::Failure
+    }
+  }
+
+  let new_fn: NewResourceMonitorConfigFunction = |name, config, _envoy_config| {
+    assert_eq!(config, b"config");
+    (name == "monitor")
+      .then(|| Box::new(DroppedMonitor) as Box<dyn resource_monitor::ResourceMonitor>)
+  };
+  let mut envoy_config = resource_monitor_envoy_config_handle();
+
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    "unknown",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
+  assert!(config_ptr.is_null());
+
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    "monitor",
+    b"config",
+    &mut envoy_config,
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  assert_eq!(DROPPED.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn test_resource_monitor_update_outcomes() {
+  use abi::envoy_dynamic_module_type_resource_monitor_update_status as Status;
+  use resource_monitor::ResourceMonitorUpdate;
+
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Pressure(0.25)
+    ))),
+    (Status::Success, 0.25)
+  );
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Failure
+    ))),
+    (Status::Failure, -7.0)
+  );
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Pending
+    ))),
+    (Status::Pending, -7.0)
+  );
+}
+
+#[test]
+fn test_resource_monitor_update_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::ResourceMonitor for PanicMonitor {
+    fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+      panic!("intentional panic in update_resource_usage");
+    }
+  }
+
+  assert_eq!(
+    update_resource_monitor(Box::new(PanicMonitor)),
+    (
+      abi::envoy_dynamic_module_type_resource_monitor_update_status::Failure,
+      -7.0
+    )
+  );
+}
+
+#[test]
+fn test_resource_monitor_scheduler_reports_and_delete() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  let scheduler = resource_monitor_envoy_config_handle().new_config_scheduler();
+  let id = LAST_RESOURCE_MONITOR_SCHEDULER_ID.get();
+  scheduler.report_resource_usage(0.5);
+
+  // The scheduler is Send, so a module thread can report and drop it.
+  std::thread::spawn(move || scheduler.report_failure())
+    .join()
+    .unwrap();
+
+  assert_eq!(
+    resource_monitor_scheduler_events(id),
+    ["usage 0.5", "failure", "delete"]
+  );
+}
+
+#[test]
+fn test_resource_monitor_boxed_scheduler_reports() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  fn report(scheduler: &impl EnvoyResourceMonitorConfigScheduler) {
+    scheduler.report_resource_usage(0.75);
+    scheduler.report_failure();
+  }
+
+  let scheduler: Box<dyn EnvoyResourceMonitorConfigScheduler> =
+    Box::new(resource_monitor_envoy_config_handle().new_config_scheduler());
+  let id = LAST_RESOURCE_MONITOR_SCHEDULER_ID.get();
+  report(&scheduler);
+  drop(scheduler);
+
+  assert_eq!(
+    resource_monitor_scheduler_events(id),
+    ["usage 0.75", "failure", "delete"]
+  );
+}
+
+#[test]
+fn test_resource_monitor_scheduler_mock() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  let mut mock_scheduler = resource_monitor::MockEnvoyResourceMonitorConfigScheduler::new();
+  mock_scheduler
+    .expect_report_resource_usage()
+    .with(mockall::predicate::eq(0.42))
+    .times(1)
+    .return_const(());
+  mock_scheduler.report_resource_usage(0.42);
+}
