@@ -200,14 +200,8 @@ impl bindgen::callbacks::ParseCallbacks for TrimEnumNameFromVariantName {
 
 #[derive(Debug)]
 // Derives strum_macros::{FromRepr,VariantArray} for envoy_dynamic_module_type_response_flag:
-// FromRepr gives a bit-index -> flag lookup (see
-// envoy_dynamic_module_type_response_flag::iter_from_bitmask in access_log.rs), and VariantArray
-// gives Self::VARIANTS (a const &[Self] of every variant, used to const-fold
-// VALID_RESPONSE_FLAG_MASK without a hand-maintained list). Both are generated from the same
-// bindgen enum as abi.h itself. Neither needs more than #[repr(uN)] (already emitted by bindgen
-// for this enum), so (unlike e.g. enumset::EnumSetType) they don't need a derive-helper attribute
-// and aren't affected by bindgen's enum-attribute ordering (custom attributes are always emitted
-// before the final #[derive(...)] for enums, which breaks any derive needing one of its own).
+// FromRepr gives a bit-index -> flag lookup and VariantArray gives Self::VARIANTS, both generated
+// from the bindgen-derived enum definition itself to prevent version skew issues.
 struct StrumDerivesForResponseFlag;
 
 impl bindgen::callbacks::ParseCallbacks for StrumDerivesForResponseFlag {
