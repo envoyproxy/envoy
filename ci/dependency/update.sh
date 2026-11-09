@@ -93,11 +93,20 @@ for line in "${changed[@]}"; do
     summary+="- \`${line% *}\` -> ${line#* }"$'\n'
 done
 
+# The updater skips a name that is not declared (eg misspelt) or already current, so a requested
+# dependency that did not change is an error, rather than a PR that silently leaves it out.
+unchanged=()
+for spec in "${specs[@]}"; do
+    [[ "$spec" == "*" ]] && continue
+    if [[ " ${changed_names[*]} " != *" ${spec%%=*} "* ]]; then
+        unchanged+=("${spec%%=*}")
+    fi
+done
+(( ${#unchanged[@]} == 0 )) \
+    || fail "Not updated (${unchanged[*]}): already current, or not declared"
+
 case "$task" in
     bazel)
-        # An undeclared (eg misspelt) name is skipped by the updater, so no change is an error.
-        (( ${#changed_names[@]} > 0 )) \
-            || fail "No dependency was updated (${specs[*]}): already current, or not declared"
         if (( ${#changed_names[@]} == 1 )); then
             name="${changed_names[0]}"
             output="${version_short:-${changed[0]#* }}"

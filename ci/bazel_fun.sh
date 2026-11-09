@@ -412,8 +412,9 @@ _registry_modules_update_all_mod() {
     local -a deps=()
 
     report_path="$(mktemp)"
+    # A RETURN trap is not scoped to the function that sets it, so clear it once it has fired.
     # shellcheck disable=SC2064
-    trap "rm -f '${report_path}'" RETURN
+    trap "rm -f '${report_path}'; trap - RETURN" RETURN
 
     workspace_bazel_run "$module_dir" update_module -- --report "--json-out=${report_path}" \
         > /dev/null || return
