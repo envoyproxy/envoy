@@ -73,7 +73,6 @@ public:
     upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
                                                           details);
   }
-  void executeLocalReplyIfPrepared() override {}
   // Returns true if the decoder filter chain should stop (local reply sent or downstream reset).
   bool isAborted() {
     return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_;
