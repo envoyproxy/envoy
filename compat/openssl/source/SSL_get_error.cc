@@ -1,7 +1,7 @@
 #include <openssl/ssl.h>
 #include <ossl.h>
 
-extern "C" int SSL_get_error(const SSL *ssl, int ret_code) {
+extern "C" int SSL_get_error(const SSL* ssl, int ret_code) {
   int err = ossl.ossl_SSL_get_error(ssl, ret_code);
 
   // OpenSSL returns SSL_ERROR_WANT_CLIENT_HELLO_CB when the client hello

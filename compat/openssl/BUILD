@@ -967,7 +967,8 @@ cc_library(
         "source/CRYPTO_BUFFER.h",
         "source/SSL_CTX_set_select_certificate_cb.h",
         "source/SSL_get_curve_name.cc",
-        "source/ssl_compliance_policy.h",
+        "source/custom_bio.cc",
+        "source/custom_bio.h",
         "source/err.cc",
         "source/ext_SSL_get_all_async_fds.c",
         "source/iana_2_ossl_names.cc",
@@ -979,10 +980,10 @@ cc_library(
         "source/ossl_dlutil.h",
         "source/override.cc",
         "source/override.h",
+        "source/ssl_compliance_policy.h",
         "source/stack.c",
-        "source/custom_bio.h",
-        "source/custom_bio.cc",
     ],
+    copts = ["-fvisibility=hidden"],
 
     # Add the OpenSSL shared libraries as a *data* dependency, so they get
     # propagated to dependant targets, and made available in their runfiles
@@ -998,7 +999,6 @@ cc_library(
         'OSSL_RUNFILES_LIB_DIR=\\"%s/%s\\"' % (repo_name() or "_main", package_name()),
     ],
     linkstatic = True,
-    copts = ["-fvisibility=hidden"],
     visibility = ["//visibility:public"],
 )
 
