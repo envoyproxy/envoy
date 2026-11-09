@@ -1341,7 +1341,7 @@ impl LogContext {
 
 impl abi::envoy_dynamic_module_type_response_flag {
   /// Returns the single bit this flag occupies in a response-flag bitmask.
-  // 
+  //
   /// Returns `u64` to match [`LogContext::response_flags`].
   pub const fn to_bitmask(self) -> u64 {
     1u64 << (self as u32)
