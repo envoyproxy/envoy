@@ -19834,7 +19834,9 @@ bool envoy_dynamic_module_on_header_formatter_format(
 // This extension enables custom overload manager resource monitors via dynamic modules. At each
 // refresh interval of the overload manager, the module reports the pressure of the monitored
 // resource, which is the ratio of its usage to its limit. The overload actions and load shed points
-// with a trigger on the resource act on that pressure.
+// with a trigger on the resource act on that pressure. A module can also enable synchronous
+// feedback, in which case the load shed points with a trigger on the resource ask the module for
+// the pressure each time they decide whether to shed load, and tell it about the load they accept.
 
 // =============================================================================
 // Resource Monitor Types
@@ -19923,8 +19925,11 @@ envoy_dynamic_module_on_resource_monitor_config_new(
  * valid. A pending update is dropped without being reported. The module may be unloaded once this
  * returns, so it must stop the threads it started before returning.
  *
- * In validation mode, the module must not call envoy_dynamic_module_callback_get_concurrency or
- * envoy_dynamic_module_callback_is_validation_mode here.
+ * When the server shuts down, if the module enables synchronous feedback and a load shed point has
+ * a trigger on the resource, this runs only after the worker threads have stopped and the bootstrap
+ * extensions have been destroyed. In that case and in validation mode, the module must not call
+ * envoy_dynamic_module_callback_get_concurrency or envoy_dynamic_module_callback_is_validation_mode
+ * here.
  *
  * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
  */
@@ -19942,6 +19947,9 @@ void envoy_dynamic_module_on_resource_monitor_config_destroy(
  * pending update, so the overload manager keeps acting on the last reported pressure until the
  * module reports the outcome.
  *
+ * This hook is not called when the module enables synchronous feedback, and Envoy then accepts the
+ * configuration without it.
+ *
  * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
  * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
  * @param resource_pressure is where the module writes the pressure of the resource before it
@@ -19956,9 +19964,62 @@ envoy_dynamic_module_on_resource_monitor_update_resource_usage(
     envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
     double* resource_pressure);
 
+/**
+ * envoy_dynamic_module_on_resource_monitor_get_resource_usage is called to get the pressure of the
+ * resource when the module enables synchronous feedback. The load shed points with a trigger on the
+ * resource call it each time they decide whether to shed load, on the thread that makes the
+ * decision, and the overload manager calls it on the main thread at each refresh interval. It runs
+ * concurrently on several threads, so implementations must be thread-safe and must not block.
+ *
+ * This hook is required when the module enables synchronous feedback, and Envoy rejects the
+ * configuration without it. Other modules do not need to implement it.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @return the pressure of the resource, which is the ratio of its usage to its limit. Envoy treats
+ * a negative or NaN pressure as 0, and a pressure above 1 as 1.
+ */
+double envoy_dynamic_module_on_resource_monitor_get_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_load_accepted is called when the module enables
+ * synchronous feedback and a load shed point with a trigger on the resource decides not to shed
+ * load, on the thread that makes the decision. This lets the module account for the accepted load
+ * right away. It runs concurrently on several threads, so implementations must be thread-safe and
+ * must not block.
+ *
+ * This hook is optional. Modules that do not account for accepted load do not need to implement
+ * it.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @param load_shed_point_name is the name of the load shed point. It is owned by Envoy and valid
+ * only for the duration of this call.
+ */
+void envoy_dynamic_module_on_resource_monitor_load_accepted(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer load_shed_point_name);
+
 // =============================================================================
 // Resource Monitor Callbacks
 // =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback enables
+ * synchronous feedback for the resource monitor. Envoy then gets the pressure from
+ * envoy_dynamic_module_on_resource_monitor_get_resource_usage instead of
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage, and reports the load that the
+ * load shed points accept to envoy_dynamic_module_on_resource_monitor_load_accepted. See
+ * envoy_dynamic_module_on_resource_monitor_config_destroy for when the destroy hook runs.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_resource_monitor_config_new.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @return true if synchronous feedback is enabled, false if this is not called on the main thread
+ * during envoy_dynamic_module_on_resource_monitor_config_new.
+ */
+bool envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new creates a new resource

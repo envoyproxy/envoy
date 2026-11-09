@@ -2510,6 +2510,9 @@ WEAK_STUB(RouteSpecifierConfigHasBuiltRouteCache,
           envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(nullptr))
 WEAK_STUB(RouteSpecifierSetVirtualCluster,
           envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(nullptr, {nullptr, 0}))
+WEAK_STUB(
+    ResourceMonitorConfigEnableSynchronousFeedback,
+    envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(nullptr))
 WEAK_STUB(ResourceMonitorConfigSchedulerNew,
           envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(nullptr))
 WEAK_STUB(ResourceMonitorConfigSchedulerReportResourceUsage,

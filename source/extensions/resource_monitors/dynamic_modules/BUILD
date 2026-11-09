@@ -34,8 +34,11 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":resource_monitor_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/strings",
     ],
     alwayslink = True,
 )

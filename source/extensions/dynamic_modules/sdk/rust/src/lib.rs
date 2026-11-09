@@ -824,6 +824,9 @@ macro_rules! declare_network_filter_init_functions {
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
 /// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
+/// - `synchronous_feedback_resource_monitor:` —
+///   [`NewSynchronousFeedbackResourceMonitorConfigFunction`] for resource monitors with synchronous
+///   feedback
 ///
 /// # Examples
 ///
@@ -1091,6 +1094,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION,
       $fn,
       "NEW_RESOURCE_MONITOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register synchronous_feedback_resource_monitor : $fn:expr) => {
+    $crate::set_factory_once!(
+      $crate::NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -2053,6 +2063,23 @@ pub type NewResourceMonitorConfigFunction =
 /// of [`declare_all_init_functions!`] and is not intended to be set directly.
 pub static NEW_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<NewResourceMonitorConfigFunction> =
   OnceLock::new();
+
+/// The function signature for creating a new resource monitor with synchronous feedback.
+///
+/// The `name` and `config` are the same as for [`NewResourceMonitorConfigFunction`]. The SDK calls
+/// this factory first, and calls the `resource_monitor:` factory only when it returns `None`.
+pub type NewSynchronousFeedbackResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>>;
+
+/// The global factory function for resource monitors with synchronous feedback. This is set via
+/// the `synchronous_feedback_resource_monitor:` arm of [`declare_all_init_functions!`] and is not
+/// intended to be set directly.
+pub static NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<
+  NewSynchronousFeedbackResourceMonitorConfigFunction,
+> = OnceLock::new();
 
 // =============================================================================
 // Config Validator
