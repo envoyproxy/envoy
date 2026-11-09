@@ -3712,6 +3712,25 @@ WEAK_STUB(envoy_dynamic_module_type_host_health,
 WEAK_STUB(bool, envoy_dynamic_module_callback_health_checker_set_health_metadata, false,
           envoy_dynamic_module_type_health_checker_session_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+// ---------------------- Resource Monitor callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the resource monitor abi_impl.cc when the resource monitor extension is used.
+
+WEAK_STUB(envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+          envoy_dynamic_module_callback_resource_monitor_config_scheduler_new, nullptr,
+          envoy_dynamic_module_type_resource_monitor_config_envoy_ptr)
+
+WEAK_STUB_VOID(
+    envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage,
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr, double)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure,
+               envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete,
+               envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr)
+
 #undef WEAK_STUB
 #undef WEAK_STUB_VOID
 

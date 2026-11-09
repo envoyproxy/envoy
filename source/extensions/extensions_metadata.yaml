@@ -1559,6 +1559,13 @@ envoy.resource_monitors.cgroup_memory:
   status: alpha
   type_urls:
   - envoy.extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig
+envoy.resource_monitors.dynamic_modules:
+  categories:
+  - envoy.resource_monitors
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor
 envoy.retry_host_predicates.omit_canary_hosts:
   categories:
   - envoy.retry_host_predicates
