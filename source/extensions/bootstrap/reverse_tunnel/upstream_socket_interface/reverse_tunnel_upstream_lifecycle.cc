@@ -22,23 +22,6 @@ namespace ReverseConnection {
 
 namespace {
 
-UpstreamSocketManager* getThreadLocalSocketManager() {
-  auto* upstream_interface =
-      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-  if (upstream_interface == nullptr) {
-    return nullptr;
-  }
-
-  auto* acceptor = const_cast<ReverseTunnelAcceptor*>(
-      dynamic_cast<const ReverseTunnelAcceptor*>(upstream_interface));
-  if (acceptor == nullptr) {
-    return nullptr;
-  }
-
-  auto* tls_registry = acceptor->getLocalRegistry();
-  return (tls_registry != nullptr) ? tls_registry->socketManager() : nullptr;
-}
-
 void maybeSetStringFilterState(StreamInfo::FilterState& filter_state, absl::string_view key,
                                absl::string_view value) {
   if (value.empty() || filter_state.hasDataWithName(key)) {
@@ -81,7 +64,7 @@ Network::FilterStatus ReverseTunnelUpstreamLifecycleFilter::onNewConnection() {
   // socket, preventing FD recycling before lifecycle tracking cleanup. All reverse
   // tunnel FD-indexed maps follow this same ownership pattern.
   fd_ = socket->ioHandle().fdDoNotUse();
-  auto* socket_manager = getThreadLocalSocketManager();
+  auto* socket_manager = ReverseTunnelAcceptorExtension::getThreadLocalSocketManager();
   if (socket_manager == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -116,7 +99,7 @@ void ReverseTunnelUpstreamLifecycleFilter::onEvent(Network::ConnectionEvent even
     return;
   }
 
-  auto* socket_manager = getThreadLocalSocketManager();
+  auto* socket_manager = ReverseTunnelAcceptorExtension::getThreadLocalSocketManager();
   if (socket_manager == nullptr) {
     return;
   }

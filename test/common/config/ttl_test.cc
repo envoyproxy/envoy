@@ -79,6 +79,35 @@ TEST_F(TtlManagerTest, ScopedUpdate) {
     EXPECT_CALL(*ttl_timer, disableTimer());
   }
 }
+
+TEST_F(TtlManagerTest, OverdueTtl) {
+  std::vector<std::string> last_expired;
+  auto cb = [&](const auto& expired) {
+    last_expired = expired;
+    // Simulate time passing during callback past "second"'s expiry (5ms).
+    test_time_.advanceTimeWait(std::chrono::milliseconds(9));
+  };
+  auto ttl_timer = new testing::NiceMock<Event::MockTimer>(&dispatcher_);
+  TtlManager ttl(cb, dispatcher_, dispatcher_.timeSource());
+
+  EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1), _));
+  ttl.add(std::chrono::milliseconds(1), "first");
+  ttl.add(std::chrono::milliseconds(5), "second");
+
+  // Advance time to 1ms to trigger the first TTL.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(1));
+  // The callback advances time to 10ms (past "second"'s expiry of 5ms).
+  // The overdue timer must be scheduled with 0ms instead of a negative duration.
+  EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(0), _));
+  ttl_timer->invokeCallback();
+  EXPECT_EQ(last_expired, std::vector<std::string>({"first"}));
+
+  // Now trigger the 0ms timer callback for the overdue "second" entry.
+  EXPECT_CALL(*ttl_timer, disableTimer());
+  ttl_timer->invokeCallback();
+  EXPECT_EQ(last_expired, std::vector<std::string>({"second"}));
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

@@ -1,4 +1,4 @@
-//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks
+//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks -aux_files=github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared=common.go
 package shared
 
 // HTTP filter SDK surface for dynamic modules — handle, buffer, header, span, and watermark
@@ -6,7 +6,7 @@ package shared
 //
 // Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
 // HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
-// ClusterHostCounts, HttpHeaderType) live in types.go.
+// ClusterHostCounts, TimingInfo, HttpHeaderType) live in types.go.
 
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
@@ -90,12 +90,43 @@ const (
 	HttpFilterStreamResetReasonLocalRefusedStreamReset
 )
 
+// FilterStateLifeSpan specifies the lifespan of a filter state entry. Corresponds to
+// envoy_dynamic_module_type_filter_state_life_span.
+type FilterStateLifeSpan uint32
+
+const (
+	FilterStateLifeSpanFilterChain FilterStateLifeSpan = iota
+	FilterStateLifeSpanRequest
+	FilterStateLifeSpanConnection
+)
+
+// FilterStateStreamSharing specifies the upstream connection sharing option of a filter state
+// entry. Corresponds to envoy_dynamic_module_type_filter_state_stream_sharing.
+type FilterStateStreamSharing uint32
+
+const (
+	FilterStateStreamSharingNone FilterStateStreamSharing = iota
+	FilterStateStreamSharingSharedWithUpstreamConnection
+	FilterStateStreamSharingSharedWithUpstreamConnectionOnce
+)
+
+// FilterStateObjectDestroyer is optionally implemented by values passed to SetFilterStateObject.
+// OnFilterStateObjectDestroy is called once when Envoy destroys the filter state entry.
+type FilterStateObjectDestroyer interface {
+	OnFilterStateObjectDestroy()
+}
+
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
-// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span -
-// it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module owns.
+// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
+// because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
+// owns. A span may be stored and used in a later event hook on the same worker thread. Do not use
+// a span after the stream has ended or move it to another goroutine.
 type Span interface {
 	// SetTag sets a key/value tag on the span.
 	SetTag(key, value string)
+
+	// SetTags sets multiple key/value tags on the span.
+	SetTags(tags [][2]string)
 
 	// SetOperation sets the operation name on the span.
 	SetOperation(operation string)
@@ -136,7 +167,8 @@ type Span interface {
 }
 
 // ChildSpan is a tracing span owned by the module. It must be finished by calling Finish when
-// the module is done with it.
+// the module is done with it. A child span may be stored and finished in a later event hook on the
+// same worker thread, for example to cover off-thread work that resumes in a scheduled callback.
 type ChildSpan interface {
 	Span
 
@@ -173,6 +205,11 @@ type HttpFilterHandle interface {
 	// preserving the exact message type via the Any type_url. A buffer that does not parse as a
 	// google.protobuf.Any is a no-op.
 	SetTypedMetadata(metadataNamespace string, serializedAny []byte)
+
+	// GetTypedMetadata retrieves the type URL and serialized message payload from typed metadata.
+	// The returned buffers are owned by Envoy and are valid until the end of the current event hook
+	// unless a setter modifies the metadata. Empty fields are valid results.
+	GetTypedMetadata(source MetadataSourceType, metadataNamespace string) (typeURL, value UnsafeEnvoyBuffer, found bool)
 
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
 	// Returns list of keys in the namespace, or nil if the namespace does not exist.
@@ -235,6 +272,10 @@ type HttpFilterHandle interface {
 	// SetFilterState sets the serialized filter state value of the stream.
 	SetFilterState(key string, value []byte)
 
+	// SetFilterStateValue sets the serialized filter state value of the stream with the given
+	// lifespan and upstream connection sharing options.
+	SetFilterStateValue(key string, value []byte, lifeSpan FilterStateLifeSpan, streamSharing FilterStateStreamSharing) bool
+
 	// SetFilterStateTyped sets the typed filter state value stored under the given key. The key
 	// MUST match a registered ObjectFactory; the bytes are passed to createFromBytes on that
 	// factory. This is the form required for interop with built-in Envoy filters that read filter
@@ -257,6 +298,9 @@ type HttpFilterHandle interface {
 	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
 
+	// GetTimingInfo returns a snapshot of the current stream timing information.
+	GetTimingInfo() TimingInfo
+
 	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
 	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered
 	// typed object, so it works for any filter state object type (not just StringAccessor).
@@ -264,6 +308,18 @@ type HttpFilterHandle interface {
 	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
 	// need to keep it past the current callback.
 	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
+
+	// HasFilterState checks whether a filter state entry with the given key exists, regardless of
+	// its type. Unlike the getter methods, this does not read or serialize the stored object.
+	HasFilterState(key string) bool
+
+	// SetFilterStateObject stores a Go value in the filter state without serializing it.
+	// Returns false if the filter state is not accessible or the key exists with a different
+	// lifespan; the value is destroyed in that case.
+	SetFilterStateObject(key string, value any, lifeSpan FilterStateLifeSpan) bool
+
+	// GetFilterStateObject returns the value stored with SetFilterStateObject under the given key.
+	GetFilterStateObject(key string) (any, bool)
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
@@ -359,6 +415,24 @@ type HttpFilterHandle interface {
 	// Returns host counts and true if successful, otherwise a zero-valued struct and false.
 	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
 
+	// GetUpstreamRemoteAddress returns the remote address of the connected upstream socket,
+	// including the port. This can differ from AttributeIDUpstreamAddress, which exposes the
+	// selected upstream host address. The buffer is owned by Envoy and is valid until the current
+	// event hook returns.
+	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
+	// GetDownstreamDirectRemoteAddress returns the downstream socket peer address, including
+	// the port, before XFF processing. Returns an empty buffer and false if unavailable.
+	// The buffer is owned by Envoy and is valid until the current event hook returns.
+	GetDownstreamDirectRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
+	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
+	// are owned by Envoy and are valid until the current event hook returns.
+	GetUpstreamHostsAttempted() []UnsafeEnvoyBuffer
+
+	// GetUpstreamConnectionIDsAttempted returns the upstream connection IDs in attempt order.
+	GetUpstreamConnectionIDsAttempted() []uint64
+
 	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first
 	// if it exists in the routed cluster. Useful for sticky sessions or host affinity. When
 	// strict is false, normal load balancing is used as a fallback. Returns false if the host
@@ -372,6 +446,10 @@ type HttpFilterHandle interface {
 	// SendGoAwayAndClose sends a GOAWAY frame to the downstream and closes the connection. If
 	// graceful is true, a graceful drain is initiated before closing.
 	SendGoAwayAndClose(graceful bool)
+
+	// DrainConnectionUponCompletion marks the downstream connection to be drained once the
+	// current HTTP stream completes.
+	DrainConnectionUponCompletion()
 
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
@@ -479,16 +557,20 @@ type HttpFilterHandle interface {
 	StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool, timeoutMs uint64,
 		cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
 
-	// SendHttpStreamData sends data on an existing HTTP stream. Returns true if the data was
-	// sent successfully.
+	// SendHttpStreamData sends data on an existing HTTP stream. Returns false if the stream does
+	// not exist, and true otherwise. When Envoy reset the stream and did not call the reset
+	// callback yet, the data is dropped, and the reset callback follows unless the filter is
+	// destroyed first.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// from a scheduled function, so that it runs on the thread where the stream is being
 	// processed.
 	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
 
-	// SendHttpStreamTrailers sends trailers on an existing HTTP stream. Returns true if the
-	// trailers were sent successfully.
+	// SendHttpStreamTrailers sends trailers on an existing HTTP stream. Returns false if the
+	// stream does not exist, and true otherwise. When Envoy reset the stream and did not call the
+	// reset callback yet, the trailers are dropped, and the reset callback follows unless the
+	// filter is destroyed first.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// from a scheduled function, so that it runs on the thread where the stream is being
@@ -543,6 +625,8 @@ type HttpFilterHandle interface {
 // implementations. It supports config-scoped logging, metric definition, generic secret
 // subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
+	CommonHandle
+
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
 
@@ -587,11 +671,15 @@ type HttpFilterConfigHandle interface {
 		timeoutMs uint64, cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
 
 	// SendHttpStreamData sends data on an existing HTTP stream started via StartHttpStream.
-	// Returns true if the data was sent successfully.
+	// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+	// and did not call the reset callback yet, the data is dropped, and the reset callback
+	// follows unless the configuration is destroyed first.
 	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
 
 	// SendHttpStreamTrailers sends trailers on an existing HTTP stream started via StartHttpStream.
-	// Returns true if the trailers were sent successfully.
+	// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+	// and did not call the reset callback yet, the trailers are dropped, and the reset callback
+	// follows unless the configuration is destroyed first.
 	SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool
 
 	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.

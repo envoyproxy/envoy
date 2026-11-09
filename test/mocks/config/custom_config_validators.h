@@ -12,6 +12,8 @@ public:
   MockConfigValidator();
   ~MockConfigValidator() override;
 
+  MOCK_METHOD(absl::string_view, typeUrl, (), (const));
+
   MOCK_METHOD(void, validate,
               (const Server::Instance& server, const std::vector<DecodedResourcePtr>& resources));
 

@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/common/logger.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
@@ -36,7 +37,7 @@ class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
   static void SetUpTestSuite() {
     // Set debug log level to ensure coverage of debug log statements
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+    Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
   }
 
   RoleBasedAccessControlNetworkFilterTest() = default;
@@ -232,20 +233,20 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>(NetworkFilterNames::get().Rbac,
                                                                obj));
-        }));
+        });
 
     ON_CALL(stream_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
-        }));
+        });
   }
 
   NiceMock<Network::MockReadFilterCallbacks> callbacks_;
@@ -713,7 +714,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   setRequestedServerName("www.cncf.io");
 
   // Force debug level on
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   // Mock SSL setup
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -732,6 +733,27 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   // Explicitly verify any counters that would be affected by this code path
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+// The filter's stats carry the stat prefix and the shadow rules prefix as explicit tags.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, StatsAreTagged) {
+  setupPolicy();
+
+  const Stats::Counter& allowed = config_->stats().allowed_;
+  EXPECT_EQ("tcp.rbac.allowed", allowed.name());
+  EXPECT_EQ("rbac.allowed", allowed.tagExtractedName());
+  ASSERT_EQ(1U, allowed.tags().size());
+  EXPECT_EQ("envoy.rbac_prefix", allowed.tags()[0].name_);
+  EXPECT_EQ("tcp", allowed.tags()[0].value_);
+
+  const Stats::Counter& shadow_allowed = config_->stats().shadow_allowed_;
+  EXPECT_EQ("tcp.rbac.shadow_rules_prefix_.shadow_allowed", shadow_allowed.name());
+  EXPECT_EQ("rbac.shadow_allowed", shadow_allowed.tagExtractedName());
+  ASSERT_EQ(2U, shadow_allowed.tags().size());
+  EXPECT_EQ("envoy.rbac_prefix", shadow_allowed.tags()[0].name_);
+  EXPECT_EQ("tcp", shadow_allowed.tags()[0].value_);
+  EXPECT_EQ("envoy.rbac_rules_prefix", shadow_allowed.tags()[1].name_);
+  EXPECT_EQ("shadow_rules_prefix_", shadow_allowed.tags()[1].value_);
 }
 
 } // namespace RBACFilter

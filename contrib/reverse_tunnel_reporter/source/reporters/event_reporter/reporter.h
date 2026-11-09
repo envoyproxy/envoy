@@ -27,7 +27,7 @@ struct EventReporterStats {
 
 struct ConnectionEntry {
   std::shared_ptr<ReverseTunnelEvent::Connected> connection;
-  std::size_t count;
+  absl::InlinedVector<int, 1> fds; // Not a lot of fds per node.
 };
 
 /// Aggregates reverse-tunnel connection/disconnection events, de-duplicates by
@@ -43,15 +43,18 @@ public:
 
   void onServerInitialized() override;
   void reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                             absl::string_view tenant_id, int64_t initiation_time_ms) override;
-  void reportDisconnectionEvent(absl::string_view node_id, absl::string_view cluster_id) override;
+                             absl::string_view tenant_id, int64_t initiation_time_ms,
+                             int fd) override;
+  void reportDisconnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
+                                int fd) override;
+  void reportGoAwayEvent(absl::string_view node_id, absl::string_view cluster_id, int fd) override;
   ReverseTunnelEvent::ConnectionsList getAllConnections() override;
 
 private:
   static EventReporterStats generateStats(const std::string& prefix, Stats::Scope& scope);
   void notifyClients(ReverseTunnelEvent::TunnelUpdates&& updates);
-  void addConnection(std::shared_ptr<ReverseTunnelEvent::Connected>&& connection);
-  void removeConnection(std::shared_ptr<ReverseTunnelEvent::Disconnected>&& disconnection);
+  void addConnection(std::shared_ptr<ReverseTunnelEvent::Connected>&& connection, int fd);
+  void removeConnection(std::shared_ptr<ReverseTunnelEvent::Disconnected>&& disconnection, int fd);
 
   Server::Configuration::ServerFactoryContext& context_;
   std::vector<ReverseTunnelReporterClientPtr> clients_;

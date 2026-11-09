@@ -103,7 +103,9 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
     for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
       for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
-        ASSERT(!hosts.empty());
+        if (hosts.empty()) {
+          continue;
+        }
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
@@ -184,7 +186,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
 
         // Upstream locality stats
 
-        bool should_send_locality_stats = rq_issued != 0;
+        bool should_send_locality_stats = false;
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.report_load_for_non_zero_stats")) {
           bool has_host_custom_metrics = false;
@@ -197,8 +199,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
           }
           should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 ||
                                        rq_issued != 0 || has_host_custom_metrics;
-        } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                                  "report_load_when_rq_active_is_non_zero")) {
+        } else {
           // If rq_active is non-zero, we should send the locality stats even if
           // rq_issued is zero (no new requests have been issued in this poll
           // window). This is needed to report long-lived connections/requests (e.g., when

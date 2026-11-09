@@ -2,9 +2,7 @@
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "source/common/http/header_map_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
-#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -59,8 +57,8 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
   if (vhds_context_) {
-    vhds_context_->requestVirtualHostsUpdate(for_domain, thread_local_dispatcher,
-                                             route_config_updated_cb);
+    vhds_context_->config_update_info_->requestVirtualHostsUpdate(
+        for_domain, thread_local_dispatcher, route_config_updated_cb);
     return;
   }
   // If no VHDS is configured, immediately notify the callback asynchronously that the
@@ -78,13 +76,12 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     const envoy::config::route::v3::RouteConfiguration& config,
     Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     Rds::ProtoTraits& proto_traits)
-    : config_update_info_(
-          std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits, factory_context, "")),
-      factory_context_(factory_context), route_config_name_(config.name()),
+    : config_update_info_(std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits,
+                                                                          factory_context, "",
+                                                                          /*from_rds=*/false)),
       tls_(factory_context.threadLocal()),
       local_init_target_(
-          fmt::format("StaticRouteConfigProvider local-init-target {}", route_config_name_),
-          []() {}) {
+          fmt::format("StaticRouteConfigProvider local-init-target {}", config.name()), []() {}) {
   init_manager.add(local_init_target_);
   config_update_info_->setObserver(*this);
 
@@ -111,54 +108,7 @@ void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
   // VHDS fetch.
   local_init_target_.ready();
 
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
-  // Regular (non-VHDS) updates don't populate aliases fields in resources.
-  if (aliases.empty()) {
-    return;
-  }
-
-  const auto config = std::static_pointer_cast<const ConfigImpl>(parsed_config);
-  // Notifies connections that RouteConfiguration update has been propagated.
-  // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
-  // the VHDS update request do not match the aliases in the update response
-  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
-    auto found = aliases.find(it->alias_);
-    if (found != aliases.end()) {
-      auto host_header = Http::RequestHeaderMapImpl::create();
-      host_header->setHost(VhdsSubscription::aliasToDomainName(it->alias_));
-      const bool host_exists = config->virtualHostExists(*host_header);
-      std::weak_ptr<Http::RouteConfigUpdatedCallback> current_cb(it->cb_);
-      it->thread_local_dispatcher_.post([current_cb, host_exists] {
-        if (auto cb = current_cb.lock()) {
-          (*cb)(host_exists);
-        }
-      });
-      it = config_update_callbacks_.erase(it);
-    } else {
-      it++;
-    }
-  }
-}
-
-void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
-    const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
-    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  // When a request for a VHDS update happens, Envoy needs to send the alias as
-  // the resource name.
-  auto alias = VhdsSubscription::domainNameToAlias(route_config_name_, for_domain);
-  // The StaticRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
-  // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
-  // the StaticRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
-  // determine if the StaticRouteConfigProviderImpl instance is still valid.
-  factory_context_.mainThreadDispatcher().post(
-      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
-       route_config_updated_cb]() -> void {
-        if (maybe_still_alive.lock()) {
-          config_update_info_->updateOnDemand(alias);
-          config_update_callbacks_.push_back(
-              {alias, thread_local_dispatcher, route_config_updated_cb});
-        }
-      });
+  config_update_info_->onVhdsConfigPublished();
 }
 
 } // namespace Router

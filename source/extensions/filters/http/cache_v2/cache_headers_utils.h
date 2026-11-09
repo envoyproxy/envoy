@@ -79,8 +79,8 @@ struct ResponseCacheControl {
   // https://httpwg.org/specs/rfc7230.html#message.transformations
   bool no_transform_ = false;
 
-  // no_stale is true if any of 'must-revalidate' or 'proxy-revalidate' directives is present
-  // This response must not be served stale without successful validation with the origin
+  // no_stale is true if 'must-revalidate', 'proxy-revalidate', or a valid 's-maxage' is present.
+  // This response must not be served stale without successful validation with the origin.
   bool no_stale_ = false;
 
   // 'public' directive is not used now

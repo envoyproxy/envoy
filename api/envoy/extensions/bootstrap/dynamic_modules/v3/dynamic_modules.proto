@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Bootstrap extensions run on the main thread and are initialized when Envoy starts. They can:
 //
 // * Perform initialization tasks when the server is initialized.
-// * Perform per-worker thread initialization when worker threads start.
+// * Run code on every worker thread.
 // * Access server-level resources like the cluster manager and dispatcher.
 //
 message DynamicModuleBootstrapExtension {
@@ -54,7 +54,8 @@ message DynamicModuleBootstrapExtension {
   // one for metric initialization, ``extension_name`` is used to choose the implementation. The
   // ``extension_config`` can be used to configure the specific behavior of each implementation.
   //
-  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.Struct`` and the ``value`` field of ``xds.type.v3.TypedStruct`` are
+  // serialized as JSON before passing them to the module.
   // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
   // without the wrapper.
   //

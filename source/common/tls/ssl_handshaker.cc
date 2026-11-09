@@ -16,6 +16,53 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+namespace {
+
+// Applies certificate-level tls_params to ssl after SSL_set_SSL_CTX (which only transfers cert
+// material).
+absl::Status applyTlsParamsToSsl(const Ssl::TlsParams& params, const Ssl::TlsContext& ctx,
+                                 SSL* ssl) {
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  if (params.min_protocol_version != TlsProto::TLS_AUTO) {
+    if (SSL_set_min_proto_version(
+            ssl, Utility::tlsVersionFromProto(params.min_protocol_version, 0)) != 1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert min TLS version: ",
+                                              Utility::getLastCryptoError().value_or("")));
+    }
+  }
+  if (params.max_protocol_version != TlsProto::TLS_AUTO) {
+    if (SSL_set_max_proto_version(
+            ssl, Utility::tlsVersionFromProto(params.max_protocol_version, 0)) != 1) {
+      return absl::InternalError(absl::StrCat("Failed to set per-cert max TLS version: ",
+                                              Utility::getLastCryptoError().value_or("")));
+    }
+  }
+  const Utility::EffectiveTlsParams effective =
+      Utility::effectiveTlsParams(params, ctx.provides_ciphers_and_curves_, ctx.provides_sigalgs_);
+  if (!effective.cipher_suites.empty() &&
+      SSL_set_strict_cipher_list(ssl, effective.cipher_suites.c_str()) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to set per-cert cipher suites: ",
+                                            Utility::getLastCryptoError().value_or("")));
+  }
+  if (!effective.ecdh_curves.empty() &&
+      SSL_set1_curves_list(ssl, effective.ecdh_curves.c_str()) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to set per-cert ECDH curves: ",
+                                            Utility::getLastCryptoError().value_or("")));
+  }
+  if (!effective.signature_algorithms.empty() &&
+      SSL_set1_sigalgs_list(ssl, effective.signature_algorithms.c_str()) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to set per-cert signature algorithms: ",
+                                            Utility::getLastCryptoError().value_or("")));
+  }
+  // Compliance policy must be applied last.
+  if (params.compliance_policy.has_value()) {
+    RETURN_IF_NOT_OK(Utility::applyCompliancePolicyToSsl(params.compliance_policy.value(), ssl));
+  }
+  return absl::OkStatus();
+}
+
+} // namespace
+
 void ValidateResultCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
 
 void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
@@ -98,8 +145,20 @@ void SslExtendedSocketInfoImpl::onCertificateSelectionCompleted(
     // This will only return NULL if memory allocation fails.
     RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_handshaker_.ssl(), selected_ctx->ssl_ctx_.get()) != nullptr,
                    "");
+    // QUIC selects certs via ProofSource::GetProof(), not cert_cb, so tls_params_ never applies
+    // there.
+    bool params_ok = true;
+    if (selected_ctx->tls_params_.has_value()) {
+      if (absl::Status s =
+              applyTlsParamsToSsl(*selected_ctx->tls_params_, *selected_ctx, ssl_handshaker_.ssl());
+          !s.ok()) {
+        ENVOY_LOG_MISC(warn, "Failed to apply per-certificate tls_params: {}", s.message());
+        cert_selection_result_ = Ssl::CertificateSelectionStatus::Failed;
+        params_ok = false;
+      }
+    }
 
-    if (staple) {
+    if (params_ok && staple) {
       // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
       RELEASE_ASSERT(selected_ctx->ocsp_response_,
                      "OCSP response must be present under OcspStapleAction::Staple");

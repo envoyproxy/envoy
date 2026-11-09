@@ -80,7 +80,7 @@ public:
     };
   }
 
-  size_t execute(const char* slice, int len) {
+  size_t execute(const char* slice, size_t len) {
     return http_parser_execute(&parser_, &settings_, slice, len);
   }
 
@@ -91,7 +91,14 @@ public:
     return CallbackResult::Success;
   }
 
-  int getErrno() { return HTTP_PARSER_ERRNO(&parser_); }
+  int getErrno() {
+    // HTTP_PARSER_ERRNO is a C macro with a C-style cast; http_parser.h is
+    // vendored and consumed from C++ here.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+    return HTTP_PARSER_ERRNO(&parser_);
+#pragma GCC diagnostic pop
+  }
 
   Envoy::Http::Code statusCode() const { return static_cast<Http::Code>(parser_.status_code); }
 
@@ -138,7 +145,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
 // same compilation unit so that the destructor has a complete definition of Impl.
 LegacyHttpParserImpl::~LegacyHttpParserImpl() = default;
 
-size_t LegacyHttpParserImpl::execute(const char* slice, int len) {
+size_t LegacyHttpParserImpl::execute(const char* slice, size_t len) {
   return impl_->execute(slice, len);
 }
 

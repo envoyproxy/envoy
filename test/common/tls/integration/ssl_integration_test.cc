@@ -5,11 +5,14 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/ssl/ssl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -84,8 +87,17 @@ BORINGSSL_TEST_P(SslIntegrationTest, UnknownSslAlert) {
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-// Test that stats produced by the tls transport socket have correct tag extraction.
+// Test that stats produced by the tls transport socket have the same flat names, tag-extracted
+// names and tags whether the tags are derived by the legacy tag-extraction rules (IPv4) or
+// supplied explicitly (IPv6).
 TEST_P(SslIntegrationTest, StatsTagExtraction) {
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  const bool explicit_tags = version_ == Network::Address::IpVersion::v6;
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicit_tags);
+
   // Configure TLS to use specific parameters so the exact metrics the test expects are created.
   // TLSv1.3 doesn't allow specifying the cipher suites, so use TLSv1.2 to force a specific cipher
   // suite to simplify the test.
@@ -120,6 +132,12 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
 
   testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
   checkStats();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicit_tags);
 
   using ExpectedResultsMap =
       absl::node_hash_map<std::string, std::pair<std::string, Stats::TagVector>>;
@@ -487,16 +505,11 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
-      *context_manager_, *api_);
+      *context_manager_, *api_, &server_factory_context_.serverScope());
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -541,18 +554,19 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
-      *context_manager_, *api_);
+      *context_manager_, *api_, &server_factory_context_.serverScope());
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -565,17 +579,12 @@ typed_config:
   while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
-      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
-          *client_transport_socket_factory_ptr)
-          .sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
   connection.reset();
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -591,18 +600,19 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
-      *context_manager_, *api_);
+      *context_manager_, *api_, &server_factory_context_.serverScope());
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -615,16 +625,11 @@ typed_config:
   while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
-      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
-          *client_transport_socket_factory_ptr)
-          .sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -649,8 +654,8 @@ protected:
       return false;
     };
 
-    auto client_transport_socket_factory_ptr =
-        createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
+        {}, *context_manager_, *api_, &server_factory_context_.serverScope());
     std::string response;
     auto connection = createConnectionDriver(
         lookupPort("http"), write_request_cb,
@@ -1067,6 +1072,170 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientAllCurve
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
+}
+
+// RSA cert has tls_params restricting to AES128, ECDSA cert to AES256. Two connections are made:
+// one RSA-only client (selects RSA cert, negotiates AES128) and one ECDSA-only client (selects
+// ECDSA cert, negotiates AES256). Both cipher counters confirm per-cert tls_params take effect.
+// Certificate selection does not consider per-cert tls_params, so each client offers only the
+// cipher its own cert permits, keeping the selected cert compatible with the params applied to the
+// connection after selection.
+TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParams) {
+  // TLS 1.3 ignores the cipher list; cipher-based per-cert tls_params can't be tested there.
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    return;
+  }
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
+        "");
+    auto* common = tls_context.mutable_common_tls_context();
+    auto* rsa_params = common->mutable_tls_certificates(0)->mutable_tls_params();
+    rsa_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    rsa_params->add_ecdh_curves("P-256");
+    auto* ecdsa_params = common->mutable_tls_certificates(1)->mutable_tls_params();
+    ecdsa_params->add_cipher_suites("ECDHE-ECDSA-AES256-GCM-SHA384");
+    ecdsa_params->add_ecdh_curves("P-256");
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context),
+        "");
+  });
+
+  initialize();
+
+  // RSA-only client: server selects RSA cert, per-cert tls_params restrict to AES128.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"})));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
+                   ->value());
+  codec_client_->close();
+
+  // ECDSA-only client: server selects ECDSA cert, per-cert tls_params restrict to AES256.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-ECDSA-AES256-GCM-SHA384"})));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1,
+            test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384"))
+                ->value());
+}
+
+// Single RSA cert with tls_params restricting to AES256. Client offers both AES128 and AES256:
+// only AES256 can be negotiated, confirming per-cert tls_params are applied for single-cert
+// servers.
+TEST_P(SslCertficateIntegrationTest, SingleCertPerCertTlsParams) {
+  // TLS 1.3 ignores the cipher list; cipher-based per-cert tls_params can't be tested there.
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    return;
+  }
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = false;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
+        "");
+    auto* rsa_params =
+        tls_context.mutable_common_tls_context()->mutable_tls_certificates(0)->mutable_tls_params();
+    rsa_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+    rsa_params->add_ecdh_curves("P-256");
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context),
+        "");
+  });
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(
+        ClientSslTransportOptions{}
+            .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+            .setCipherSuites({"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"}));
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
+}
+
+// Two RSA certs covering different domains, each with distinct tls_params. Two connections with
+// different SNIs verify that domain-based cert selection applies the correct per-cert tls_params:
+// SNI lyft.com selects servercert (AES128), SNI lyft2.com selects server2cert (AES256).
+TEST_P(SslCertficateIntegrationTest, MultiCertPerCertTlsParamsBySni) {
+  // TLS 1.3 ignores the cipher list; cipher-based per-cert tls_params can't be tested there.
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+    return;
+  }
+  server_rsa_cert_ = false;
+  server_ecdsa_cert_ = false;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->UnpackTo(&tls_context),
+        "");
+
+    auto* common = tls_context.mutable_common_tls_context();
+
+    // servercert.pem covers lyft.com, restricted to AES128.
+    auto* cert1 = common->add_tls_certificates();
+    cert1->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
+    cert1->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    auto* params1 = cert1->mutable_tls_params();
+    params1->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    params1->add_ecdh_curves("P-256");
+
+    // server2cert.pem covers lyft2.com, restricted to AES256.
+    auto* cert2 = common->add_tls_certificates();
+    cert2->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem"));
+    cert2->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem"));
+    auto* params2 = cert2->mutable_tls_params();
+    params2->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+    params2->add_ecdh_curves("P-256");
+
+    RELEASE_ASSERT(
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context),
+        "");
+  });
+
+  initialize();
+
+  // SNI lyft.com: selects servercert, per-cert tls_params restrict to AES128.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"})
+          .setSni("lyft.com")));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"))
+                   ->value());
+  codec_client_->close();
+
+  // SNI lyft2.com: selects server2cert, per-cert tls_params restrict to AES256.
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384"})
+          .setSni("lyft2.com")));
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ(1, test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384"))
+                   ->value());
 }
 
 // Server has an RSA certificate with an OCSP response works.

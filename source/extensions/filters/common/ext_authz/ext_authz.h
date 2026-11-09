@@ -177,6 +177,19 @@ public:
    * Returns streamInfo of the current request if possible. By default just return a nullptr.
    */
   virtual StreamInfo::StreamInfo const* streamInfo() const { return nullptr; }
+
+  /**
+   * Set whether to emit client span for check requests.
+   */
+  virtual void setEmitClientSpan(bool emit_client_span) { emit_client_span_ = emit_client_span; }
+
+  /**
+   * Returns whether to emit client span for check requests.
+   */
+  bool emitClientSpan() const { return emit_client_span_; }
+
+protected:
+  bool emit_client_span_{true};
 };
 
 using ClientPtr = std::unique_ptr<Client>;

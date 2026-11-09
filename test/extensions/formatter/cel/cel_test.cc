@@ -364,6 +364,24 @@ TEST_F(CELFormatterTest, TestRequestHeaderWithLegacyConfiguration) {
   EXPECT_EQ("GET", formatter->format(formatter_context_, stream_info_));
 }
 
+TEST_F(CELFormatterTest, TestCelConfigEnablesStringFunctions) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers['x-envoy-original-path'].replace('/original', '/mutated'))%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+        cel_config:
+          enable_string_functions: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("/mutated/path?secret=parameter", formatter->format(formatter_context_, stream_info_));
+}
+
 TEST_F(CELFormatterTest, TestRequestHeader) {
   const std::string yaml = R"EOF(
   text_format_source:

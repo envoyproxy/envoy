@@ -707,6 +707,30 @@ TEST(UtilityTest, ImportKeysDERWithInvalidData) {
       << "Single byte DER private key should fail";
 }
 
+TEST(UtilityTest, TestSha256DigestFromStringView) {
+  const auto digest = UtilitySingleton::get().getSha256Digest(absl::string_view("test data"));
+  EXPECT_EQ("916f0027a575074ce72a331777c3478d6513f786a591bd892da1a577bf2335f9",
+            Hex::encode(digest));
+}
+
+TEST(UtilityTest, TestSha256DigestFromEmptyStringView) {
+  const auto digest = UtilitySingleton::get().getSha256Digest(absl::string_view());
+  EXPECT_EQ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            Hex::encode(digest));
+}
+
+TEST(UtilityTest, TestSha256DigestFromStringViewMatchesBuffer) {
+  // The string_view overload must agree with the buffer overload, including for data spread
+  // across multiple slices.
+  Buffer::OwnedImpl buffer("slice 1");
+  buffer.appendSliceForTest("slice 2");
+  buffer.appendSliceForTest("slice 3");
+  ASSERT_EQ(3, buffer.getRawSlices().size());
+
+  EXPECT_EQ(Hex::encode(UtilitySingleton::get().getSha256Digest(buffer)),
+            Hex::encode(UtilitySingleton::get().getSha256Digest(buffer.toString())));
+}
+
 } // namespace
 } // namespace Crypto
 } // namespace Common

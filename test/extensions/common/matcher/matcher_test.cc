@@ -157,7 +157,7 @@ http_request_generic_body_match:
 
   const auto& ctx = reinterpret_cast<HttpGenericBodyMatcherCtx*>(statuses_[0].ctx_.get());
   // 6 is length of "generic"
-  ASSERT_THAT(ctx->overlap_.capacity(), 6);
+  ASSERT_GE(ctx->overlap_.capacity(), 6);
   // 2 patterns must be located
   ASSERT_THAT(ctx->patterns_index_.size(), 2);
 

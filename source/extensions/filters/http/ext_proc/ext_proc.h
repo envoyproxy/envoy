@@ -276,6 +276,8 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  std::optional<uint32_t> maxStreamedBodyChunkSize() const { return max_streamed_body_chunk_size_; }
+
   bool observabilityMode() const { return observability_mode_; }
 
   const std::chrono::milliseconds& deferredCloseTimeout() const { return deferred_close_timeout_; }
@@ -371,6 +373,8 @@ public:
 
   bool keepContentLength() const { return allow_content_length_header_; }
 
+  bool emitClientSpan() const { return emit_client_span_; }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -442,6 +446,8 @@ private:
   const bool graceful_grpc_close_ = false;
 
   const bool allow_content_length_header_ = false;
+  const bool emit_client_span_ = true;
+  const std::optional<uint32_t> max_streamed_body_chunk_size_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -493,6 +499,10 @@ public:
   }
   const std::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
+  const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
+
+  std::optional<uint32_t> maxStreamedBodyChunkSize() const { return max_streamed_body_chunk_size_; }
+
   bool hasProcessingRequestModifierConfig() const {
     return processing_request_modifier_factory_cb_ != nullptr;
   }
@@ -519,6 +529,8 @@ private:
       untyped_cluster_metadata_forwarding_namespaces_;
   const std::optional<const std::vector<std::string>> typed_cluster_metadata_forwarding_namespaces_;
   const std::optional<bool> failure_mode_allow_;
+  const std::optional<bool> emit_client_span_;
+  const std::optional<uint32_t> max_streamed_body_chunk_size_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
       processing_request_modifier_factory_cb_;
@@ -562,7 +574,9 @@ public:
             config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
         on_processing_response_(config->createOnProcessingResponse()),
-        failure_mode_allow_(config->failureModeAllow()) {}
+        failure_mode_allow_(config->failureModeAllow()),
+        emit_client_span_(config->emitClientSpan()),
+        max_streamed_body_chunk_size_(config->maxStreamedBodyChunkSize()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
@@ -609,6 +623,9 @@ public:
   setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data,
+                             ProcessorState::CallbackState new_state, bool end_stream);
+  std::optional<uint32_t> maxStreamedBodyChunkSize() const { return max_streamed_body_chunk_size_; }
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                     bool observability_mode = false);
@@ -714,6 +731,12 @@ private:
   absl::Status handleStreamingImmediateResponse(
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 
+  bool emptyDataWithFalseEos(const Buffer::Instance& data, bool end_stream) const {
+    return (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.ext_proc_not_send_empty_data_with_false_eos") &&
+            data.length() == 0 && !end_stream);
+  }
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
@@ -762,6 +785,11 @@ private:
 
   // If true, the protocol configurations are already sent to the server.
   bool protocol_config_encoded_ = false;
+
+  // Whether to emit client-side spans for external processing requests.
+  bool emit_client_span_{true};
+
+  std::optional<uint32_t> max_streamed_body_chunk_size_;
 };
 
 extern std::string responseCaseToString(

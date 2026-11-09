@@ -12,7 +12,6 @@ api_proto_package(
         "//envoy/config/metrics/v3:pkg",
         "//envoy/type/v3:pkg",
         "@xds//udpa/annotations:pkg",
-        "@xds//xds/annotations/v3:pkg",
         "@xds//xds/core/v3:pkg",
         "@xds//xds/type/matcher/v3:pkg",
     ],

@@ -11,6 +11,7 @@
 #include "datadog/dict_writer.h"
 #include "datadog/sampling_priority.h"
 #include "datadog/span_config.h"
+#include "datadog/trace_id.h"
 #include "datadog/trace_segment.h"
 
 namespace Envoy {
@@ -147,12 +148,14 @@ std::string Span::getTraceId() const {
   if (!span_) {
     return EMPTY_STRING;
   }
-  return absl::StrCat(absl::Hex(span_->id()));
+  return span_->trace_id().hex_padded();
 }
 
 std::string Span::getSpanId() const {
-  // TODO(#34412): This method is not yet implemented for Datadog.
-  return EMPTY_STRING;
+  if (!span_) {
+    return EMPTY_STRING;
+  }
+  return absl::StrCat(absl::Hex(span_->id(), absl::kZeroPad16));
 }
 
 } // namespace Datadog

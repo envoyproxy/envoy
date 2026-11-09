@@ -208,7 +208,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   }
 }
 
-size_t BalsaParser::execute(const char* slice, int len) {
+size_t BalsaParser::execute(const char* slice, size_t len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {

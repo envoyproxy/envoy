@@ -63,6 +63,7 @@ public:
                     Formatter::FormatterConstSharedPtr client_ip_formatter);
 
   void incTotal() { incCounter(stat_name_set_->getBuiltin("total", unknown_hit_)); }
+  void incSkipped() { incCounter(stat_name_set_->getBuiltin("skipped", unknown_hit_)); }
 
   /**
    * @return the optional formatter for extracting the client IP address.

@@ -1,36 +1,97 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
-load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
-load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
-load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and a
+# javabuilder workaround while https://github.com/protocolbuffers/protobuf/issues/20760 is open.
+# MODULE.bazel registers this compile toolchain plus the runtime toolchains below so downstream
+# bzlmod consumers get the same hermetic Java setup without copying .bazelrc flags.
 default_java_toolchain(
     name = "envoy_java_toolchain",
     java_runtime = "@rules_java//toolchains:remotejdk_25",
     javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
+    # protobuf-java's UnsafeUtil uses sun.misc.Unsafe memory accessors that JDK 23+ marks
+    # forRemoval (JEP 471). Compile-time counterpart of
+    # --sun-misc-unsafe-memory-access=allow above; remove once protobuf migrates off Unsafe.
+    misc = ["-Xlint:-removal"],
     source_version = "11",
     target_version = "11",
 )
+
+# Hermetic default Java runtime. Registered from MODULE.bazel so that consumers of @envoy do not
+# need to set --java_runtime_version / --tool_java_runtime_version. The
+# @rules_java//toolchains:remotejdk_25 target is a java_runtime_version_alias that resolves its
+# runtime via toolchain resolution, so these wrappers must point at the concrete per-platform
+# @remotejdk25_*//:jdk targets to avoid a self-cycle through runtime toolchain resolution.
+_JDK_PLATFORMS = {
+    "linux": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    "linux_aarch64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    "linux_ppc64le": [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc64le",
+    ],
+    "linux_s390x": [
+        "@platforms//os:linux",
+        "@platforms//cpu:s390x",
+    ],
+    "macos": [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+    "macos_aarch64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+    "win": [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+    "win_arm64": [
+        "@platforms//os:windows",
+        "@platforms//cpu:aarch64",
+    ],
+}
+
+[
+    toolchain(
+        name = "envoy_java_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
+
+[
+    toolchain(
+        name = "envoy_java_bootstrap_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
 
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
-    "repository_locations.bzl",
     "deps.yaml",
     "gazelle.patch",
     "googleapis.patch",
@@ -38,20 +99,6 @@ exports_files([
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
-
-# TODO(phlax): Cleanup once bzlmod migration is complete
-bool_flag(
-    name = "enable_bzlmod",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "bzlmod_mode",
-    flag_values = {
-        ":enable_bzlmod": "True",
-    },
-    visibility = ["//visibility:public"],
-)
 
 sh_library(
     name = "volatile_env",
@@ -99,10 +146,57 @@ genrule(
     stamp = 1,
 )
 
+# For Windows, which must list each exported symbol individually.
+genrule(
+    name = "exported_symbols_windows",
+    srcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
+    outs = ["exported_symbols_windows.def"],
+    cmd = "$(location //tools/windows:gen_dynamic_modules_exports) $(location //source/extensions/dynamic_modules/abi:abi.h) $@",
+    tools = ["//tools/windows:gen_dynamic_modules_exports"],
+)
+
+bool_flag(
+    name = "shared_unwind",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "shared_unwind_enabled",
+    flag_values = {":shared_unwind": "True"},
+)
+
+selects.config_setting_group(
+    name = "linux_x86_64_shared_unwind",
+    match_all = [
+        ":shared_unwind_enabled",
+        ":linux_x86_64",
+    ],
+)
+
+# By default, Linux builds use the toolchain's libunwind.a, selected by -unwindlib=libunwind
+# in MODULE.bazel's extra_link_flags. Clang reuses -static-libgcc to link the unwinder
+# statically even when it is LLVM libunwind, not libgcc; the misleading name is intentional.
+# --//bazel:shared_unwind=true (set by build:asan in .bazelrc) disables that unwinder with
+# -unwindlib=none and uses @unwind_libs//:libunwind from envoy_toolshed's unwind_extension
+# instead, on Linux x86_64 only because unwind_libs only ships x86_64.
+# ASAN's dlsym(RTLD_NEXT) lookup cannot see a static unwinder, risking mixed LLVM/libgcc_s
+# unwinders and broken Rust dynamic-module panics.
+# The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
+# See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
+# With -unwindlib=none clang has nothing to apply the toolchain's -static-libgcc to and warns
+# "argument unused during compilation" on every link, so that warning is silenced here.
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        "//bazel:linux": ["-static-libgcc"],
+        ":linux_x86_64_shared_unwind": [
+            "-unwindlib=none",
+            "-Wno-unused-command-line-argument",
+        ],
+        ":linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":linux_x86_64_shared_unwind": ["@unwind_libs//:libunwind"],
         "//conditions:default": [],
     }),
 )
@@ -117,40 +211,47 @@ config_setting(
 
 config_setting(
     name = "windows_opt_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "opt",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "opt"},
 )
 
 config_setting(
     name = "windows_dbg_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "dbg",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "dbg"},
 )
 
 config_setting(
     name = "windows_fastbuild_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "fastbuild",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "fastbuild"},
 )
 
 config_setting(
     name = "clang_cl_build",
-    values = {
-        "cpu": "x64_windows",
-        "define": "clang_cl=1",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"define": "clang_cl=1"},
 )
 
 config_setting(
     name = "clang_cl_opt_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "opt",
     },
@@ -158,8 +259,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_dbg_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "dbg",
     },
@@ -167,8 +271,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_fastbuild_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "fastbuild",
     },
@@ -200,14 +307,6 @@ config_setting(
 )
 
 config_setting(
-    name = "local_asan_build",
-    flag_values = {
-        "@envoy_repo//:use_local_llvm_flag": "True",
-    },
-    values = {"define": "ENVOY_CONFIG_ASAN=1"},
-)
-
-config_setting(
     name = "tsan_build",
     values = {"define": "ENVOY_CONFIG_TSAN=1"},
 )
@@ -232,6 +331,16 @@ config_setting(
 config_setting(
     name = "clang_pch_build",
     values = {"define": "ENVOY_CLANG_PCH=1"},
+)
+
+config_setting(
+    name = "gcc_requested",
+    flag_values = {":use_gcc": "true"},
+)
+
+bool_flag(
+    name = "use_gcc",
+    build_setting_default = False,
 )
 
 config_setting(
@@ -266,6 +375,16 @@ config_setting(
 bool_flag(
     name = "jemalloc",
     build_setting_default = False,
+)
+
+bool_flag(
+    name = "deprecated_repo_arg_allowed",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "deprecated_repo_arg_is_allowed",
+    flag_values = {":deprecated_repo_arg_allowed": "True"},
 )
 
 config_setting(
@@ -529,19 +648,32 @@ config_setting(
     values = {"define": "perf_annotation=enabled"},
 )
 
+bool_flag(
+    name = "execution_context",
+    build_setting_default = False,
+)
+
 config_setting(
-    name = "enable_execution_context",
+    name = "enable_execution_context_flag",
+    flag_values = {":execution_context": "True"},
+)
+
+config_setting(
+    name = "enable_execution_context_define",
     values = {"define": "execution_context=enabled"},
+)
+
+selects.config_setting_group(
+    name = "enable_execution_context",
+    match_any = [
+        ":enable_execution_context_flag",
+        ":enable_execution_context_define",
+    ],
 )
 
 config_setting(
     name = "enable_perf_tracing",
     values = {"define": "perf_tracing=enabled"},
-)
-
-config_setting(
-    name = "force_libcpp",
-    values = {"define": "force_libcpp=enabled"},
 )
 
 # SSL library selection using label_flag and bool_flag
@@ -553,6 +685,54 @@ label_flag(
 label_flag(
     name = "crypto",
     build_setting_default = "@boringssl//:crypto",
+)
+
+label_flag(
+    name = "test_main",
+    build_setting_default = "//test:main",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "test_pch",
+    build_setting_default = "//test:test_pch",
+    visibility = ["//visibility:public"],
+)
+
+# Use prebuilt artifacts for dependencies that offer them (currently wee8). Set to False to
+# build every such dependency from source, e.g. in environments that disallow prebuilt
+# artifacts: --//bazel:use_prebuilt_libs=False
+# Toolchain components (compiler, sysroot, libc++/libunwind runtimes) are not covered.
+bool_flag(
+    name = "use_prebuilt_libs",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "prebuilt_libs_disabled",
+    flag_values = {":use_prebuilt_libs": "False"},
+)
+
+selects.config_setting_group(
+    name = "wee8_source_build",
+    match_any = [
+        ":prebuilt_libs_disabled",
+        ":asan_build",
+        ":msan_build",
+        ":tsan_build",
+    ],
+)
+
+# wee8 engine: envoy_toolshed prebuilt by default, source when :use_prebuilt_libs is False
+# or for configs the prebuilt is incompatible with (sanitizers need instrumented deps).
+# envoy_toolshed itself falls back to source on unsupported platforms.
+alias(
+    name = "wee8_engine",
+    actual = select({
+        ":wee8_source_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        "//conditions:default": "@envoy_toolshed//v8:wee8",
+    }),
+    visibility = ["//visibility:public"],
 )
 
 bool_flag(
@@ -700,14 +880,19 @@ config_setting(
 
 config_setting(
     name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )
 
 # Configuration settings to make doing selects for Apple vs non-Apple platforms
 # easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
 config_setting(
     name = "darwin",
-    values = {"cpu": "darwin"},
+    constraint_values = [
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -728,37 +913,65 @@ config_setting(
 
 config_setting(
     name = "ios_i386",
-    values = {"cpu": "ios_i386"},
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_x86_64",
-    values = {"cpu": "ios_x86_64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_armv7",
-    values = {"cpu": "ios_armv7"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
+# armv7s has no platforms constraint, so this matches the same platforms as `ios_armv7`.
 config_setting(
     name = "ios_armv7s",
-    values = {"cpu": "ios_armv7s"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64",
-    values = {"cpu": "ios_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_sim_arm64",
-    values = {"cpu": "ios_sim_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64e",
-    values = {"cpu": "ios_arm64e"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64e",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
@@ -957,61 +1170,12 @@ selects.config_setting_group(
 )
 
 alias(
-    name = "remote_jdk11",
-    actual = "@rules_java//toolchains:remote_jdk11",
-)
-
-alias(
     name = "windows",
     actual = "@bazel_tools//src/conditions:windows",
 )
 
-json_data(
-    name = "legacy_all_repository_locations_version_info",
-    data = merge_dicts(
-        load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-        load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
-    ),
-)
-
 json_merge(
-    name = "legacy_all_repository_locations",
-    srcs = [":legacy_all_repository_locations_version_info"],
-    filter = """
-    .[0] as $versions
-    | .[1] as $metadata1
-    | .[2] as $metadata2
-    | ($metadata1 * $metadata2) as $metadata
-    | $metadata
-    | keys
-    | reduce .[] as $k ({};
-        ([$k,
-          ($metadata[$k].apparent_name // empty),
-          ($k | gsub("-"; "_")),
-          ($k | gsub("_"; "-"))]
-         | map(select($versions[.] != null))
-         | first) as $vkey
-        | . + {($k): (
-          (if $vkey then $versions[$vkey] else {} end) + $metadata[$k]
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
-    """,
-    yaml_srcs = [
-        ":deps.yaml",
-        "@envoy_api//bazel:deps.yaml",
-    ],
-)
-
-json_merge(
-    name = "bzlmod_all_repository_locations",
+    name = "all_repository_locations",
     srcs = [
         "@envoy_mod_graph//:deps.json",
     ],
@@ -1065,10 +1229,6 @@ py_test(
     srcs = ["all_repository_locations_test.py"],
     args = ["$(location :all_repository_locations)"],
     data = [":all_repository_locations"],
-    target_compatible_with = select({
-        ":bzlmod_mode": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
 )
 
 # A dependency required by python protobuf
@@ -1078,31 +1238,6 @@ py_test(
 cc_library(
     name = "python_headers",
     visibility = ["//visibility:public"],
-)
-
-# These can be run as follows:
-#
-# $ bazel run //bazel:update ENVOY_DEP NEW_VERSION
-# $ bazel run //bazel:api-update API_DEP NEW_VERSION
-updater(
-    name = "update",
-    data = ["//tools/dependency:check"],
-    dependencies = "//tools/dependency:filtered-dependencies",
-    post_script = ":version_update_post.sh",
-    pydict = True,
-    tags = ["skip_on_windows"],
-    version_file = ":repository_locations.bzl",
-)
-
-updater(
-    name = "api-update",
-    data = ["//tools/dependency:check"],
-    dependencies = "@envoy_api//bazel:legacy_repository_locations",
-    post_script = ":version_update_post.sh",
-    pydict = True,
-    tags = ["skip_on_windows"],
-    version_file = "@envoy_api//bazel:repository_locations.bzl",
-    version_path_replace = "external/envoy_api:api",
 )
 
 cc_library(
@@ -1145,39 +1280,29 @@ config_setting(
     },
 )
 
-bool_flag(
-    name = "libc++",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "libc++_enabled",
-    flag_values = {
-        ":libc++": "True",
-    },
-)
-
-bool_flag(
-    name = "libstdc++",
-    build_setting_default = False,
-)
-
-config_setting(
+# The C++ standard library is derived from the compiler: clang and Apple builds use libc++,
+# gcc uses libstdc++. Other combinations (e.g. clang + libstdc++) are not supported; if you
+# need one you must provide your own cc_toolchain.
+alias(
     name = "libstdc++_enabled",
-    flag_values = {
-        ":libstdc++": "True",
-    },
+    actual = ":gcc_build",
+)
+
+selects.config_setting_group(
+    name = "libc++_enabled",
+    match_any = [
+        ":apple",
+        ":clang_build",
+    ],
+)
+
+# Back-compat for existing //bazel:force_libcpp label references.
+alias(
+    name = "force_libcpp",
+    actual = ":libc++_enabled",
 )
 
 alias(
     name = "cpp_runfiles",
     actual = "@bazel_tools//tools/cpp/runfiles",
-)
-
-alias(
-    name = "all_repository_locations",
-    actual = select({
-        ":bzlmod_mode": ":bzlmod_all_repository_locations",
-        "//conditions:default": ":legacy_all_repository_locations",
-    }),
 )

@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/common:fmt_lib",
         "//source/common/common:statusor_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -149,6 +150,7 @@ envoy_cc_library(
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "//source/common/version:version_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],

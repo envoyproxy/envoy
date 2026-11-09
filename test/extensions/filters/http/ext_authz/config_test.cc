@@ -1,6 +1,8 @@
 // Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
 // generally should not change or remove existing tests.
 
+#include <atomic>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
@@ -27,7 +29,6 @@
 
 using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
@@ -92,12 +93,11 @@ public:
     // Delegate call to mock async client manager to real async client manager.
     ON_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClientWithHashKey(_, _, _))
-        .WillByDefault(
-            Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                       Stats::Scope& scope, bool skip_cluster_check) {
-              return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
-                  config_with_hash_key, scope, skip_cluster_check);
-            }));
+        .WillByDefault([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                           Stats::Scope& scope, bool skip_cluster_check) {
+          return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+              config_with_hash_key, scope, skip_cluster_check);
+        });
     ExtAuthzFilterConfig factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_).value();
   }
@@ -720,15 +720,14 @@ TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
       &context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_);
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
               send_(_, _, _))
-      .WillOnce(Invoke([&async_request](Http::RequestMessagePtr&,
-                                        Http::AsyncClient::Callbacks& callbacks,
-                                        const Http::AsyncClient::RequestOptions&)
-                           -> Http::AsyncClient::Request* {
+      .WillOnce([&async_request](
+                    Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
         Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
             Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
         callbacks.onSuccess(async_request, std::move(response));
         return nullptr;
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
@@ -740,6 +739,57 @@ TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
 
   std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
   decoder_filter->onDestroy();
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteEmitClientSpanConfiguration) {
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    emit_client_span: false
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_OK(route_config);
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_TRUE(typed_config.emitClientSpan().has_value());
+  EXPECT_FALSE(typed_config.emitClientSpan().value());
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteEmitClientSpanMerge) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute vh_proto;
+  TestUtility::loadFromYaml(R"EOF(
+  check_settings:
+    emit_client_span: false
+  )EOF",
+                            vh_proto);
+  FilterConfigPerRoute vh_config = makePerRoute(vh_proto);
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute route_proto;
+  TestUtility::loadFromYaml(R"EOF(
+  check_settings:
+    emit_client_span: true
+  )EOF",
+                            route_proto);
+  FilterConfigPerRoute route_config = makePerRoute(route_proto);
+
+  // More specific overrides less specific.
+  FilterConfigPerRoute merged(vh_config, route_config);
+  EXPECT_TRUE(merged.emitClientSpan().has_value());
+  EXPECT_TRUE(merged.emitClientSpan().value());
+
+  // Empty more specific inherits from less specific.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute empty_route_proto;
+  FilterConfigPerRoute empty_route_config = makePerRoute(empty_route_proto);
+  FilterConfigPerRoute merged_inherited(vh_config, empty_route_config);
+  EXPECT_TRUE(merged_inherited.emitClientSpan().has_value());
+  EXPECT_FALSE(merged_inherited.emitClientSpan().value());
 }
 
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
@@ -854,13 +904,15 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
   FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_proto);
 
   auto mock_per_route_grpc_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
-  bool per_route_cluster_requested = false;
+  // `runOnAllWorkersBlocking()` below releases every worker into the body at once, so this is
+  // written concurrently from all of them.
+  std::atomic<bool> per_route_cluster_requested{false};
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, true))
       .WillRepeatedly(
-          Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                     Stats::Scope& scope,
-                     bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+          [&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+              Stats::Scope& scope,
+              bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
             // The per-route gRPC client creation should call getOrCreateRawAsyncClientWithHashKey
             // with a config matching the per-route cluster "per_route_ext_authz_cluster".
             if (config_with_hash_key.config().envoy_grpc().cluster_name() ==
@@ -872,7 +924,7 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
             // A client is made for the default cluster during initialization.
             return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
                 config_with_hash_key, scope, skip_cluster_check);
-          }));
+          });
 
   EXPECT_CALL(*mock_per_route_grpc_client, sendRaw(_, _, _, _, _, _))
       .WillRepeatedly([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,

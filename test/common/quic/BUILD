@@ -98,6 +98,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_ssl_connection_info_test",
+    srcs = envoy_select_enable_http3(["quic_ssl_connection_info_test.cc"]),
+    data = ["//test/common/tls/test_data:certs"],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:quic_ssl_connection_info_lib",
+        "//test/common/tls:ssl_test_utils",
+        "//test/common/tls/test_data:cert_infos",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
+    ]),
+)
+
+envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = envoy_select_enable_http3(["quic_stat_names_test.cc"]),
     rbe_pool = "linux_x64_small",
@@ -230,6 +245,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_config_peer_lib",
+        "@quiche//:quic_test_tools_session_peer_lib",
         "@quiche//:quic_test_tools_stream_peer_lib",
         "@quiche//:quic_test_tools_server_session_base_peer",
         "@quiche//:quic_test_tools_test_utils_lib",
@@ -272,6 +288,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":fake_quic_packet_writer_lib",
         ":test_proof_source_lib",
+        ":mock_quic_connection_id_generator_factory_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
         "//source/common/listener_manager:connection_handler_lib",
@@ -286,8 +303,11 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -339,6 +359,16 @@ envoy_cc_test_library(
     deps = [
         "//source/common/quic:envoy_quic_proof_verifier_base_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "mock_quic_connection_id_generator_factory_lib",
+    hdrs = envoy_select_enable_http3(["mock_quic_connection_id_generator_factory.h"]),
+    deps = envoy_select_enable_http3([
+        "//source/common/protobuf:utility_lib",
+        "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+        "//test/common/config:dummy_config_proto_cc_proto",
+    ]),
 )
 
 envoy_cc_test_library(
@@ -448,6 +478,8 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_test_certificates_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
 )
 

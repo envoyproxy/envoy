@@ -122,6 +122,23 @@ static int ssl_ctx_client_hello_cb(SSL* ssl, int* alert, void* arg) {
   };
 }
 
+/*
+ * BoringSSL persists the client's SNI into the SSL_SESSION on the server side automatically, so
+ * SSL_get_servername() returns it even on resumed connections. OpenSSL only copies the SNI into
+ * the session (and thus only returns it on TLSv1.2 resumption, see SSL_get_servername()) when a
+ * servername callback acknowledges the name by returning SSL_TLSEXT_ERR_OK; without such a callback
+ * OpenSSL leaves the default SSL_TLSEXT_ERR_NOACK and the name is lost on resumption. Envoy drives
+ * server-side certificate selection through the ClientHello callback and never installs an OpenSSL
+ * servername callback, so we install a default one here that acknowledges the SNI. This keeps the
+ * BoringSSL semantics that SSL_get_servername() works on resumed server connections. The name has
+ * already been validated by the ClientHello callback above, so unconditionally acknowledging it is
+ * correct.
+ */
+static int default_servername_cb(SSL* /*ssl*/, int* /*out_alert*/, void* /*arg*/) {
+  return ossl_SSL_TLSEXT_ERR_OK;
+}
+
 extern "C" void SSL_CTX_set_select_certificate_cb(SSL_CTX* ctx, select_certificate_cb_t cb) {
   ossl_SSL_CTX_set_client_hello_cb(ctx, ssl_ctx_client_hello_cb, reinterpret_cast<void*>(cb));
+  ossl.ossl_SSL_CTX_set_tlsext_servername_callback(ctx, default_servername_cb);
 }

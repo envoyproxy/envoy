@@ -78,6 +78,12 @@ SliceDataPtr WatermarkBuffer::extractMutableFrontSlice() {
   return result;
 }
 
+SliceDataPtr WatermarkBuffer::extractImmutableFrontSlice() {
+  auto result = OwnedImpl::extractImmutableFrontSlice();
+  checkLowWatermark();
+  return result;
+}
+
 // Adjust the reservation size based on space available before hitting
 // the high watermark to avoid overshooting by a lot and thus violating the limits
 // the watermark is imposing.

@@ -75,6 +75,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
+        "@benchmark",
     ],
 )
 

@@ -6,17 +6,19 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 #include "source/server/active_udp_listener.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -80,21 +82,28 @@ public:
     ON_CALL(*udp_listener_config_, packetWriterFactory())
         .WillByDefault(ReturnRef(udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
-        .WillByDefault(
-            Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
+        .WillByDefault([&](Network::IoHandle& io_handle, Stats::Scope& scope,
+                           Envoy::Event::Dispatcher&,
+                           absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
-              return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
+          return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
-              UNREFERENCED_PARAMETER(scope);
-              return std::make_unique<Network::UdpDefaultWriter>(io_handle);
+          UNREFERENCED_PARAMETER(scope);
+          return std::make_unique<Network::UdpDefaultWriter>(io_handle);
 #endif
-            }));
+        });
 
     EXPECT_CALL(cb_.udp_listener_, onDestroy());
 
     active_listener_ = std::make_unique<TestActiveRawUdpListener>(
         0, concurrency, conn_handler_, listen_socket_, dispatcher_, listener_config_);
+  }
+
+  Network::UdpRecvData makeRecvData(uint32_t peer_port) {
+    Network::UdpRecvData data;
+    data.addresses_.local_ = listen_socket_->connectionInfoProvider().localAddress();
+    data.addresses_.peer_ = Network::Utility::getAddressWithPort(*local_address_, peer_port);
+    return data;
   }
 
   std::string listener_stat_prefix_{"listener_stat_prefix"};
@@ -121,39 +130,35 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnData) {
   setup();
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
-  EXPECT_CALL(*test_filter, onData(_))
-      .WillOnce(Invoke([](Network::UdpRecvData&) -> Network::FilterStatus {
-        return Network::FilterStatus::Continue;
-      }));
+  EXPECT_CALL(*test_filter, onData(_)).WillOnce([](Network::UdpRecvData&) -> Network::FilterStatus {
+    return Network::FilterStatus::Continue;
+  });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onData(_))
-      .WillOnce(Invoke([](Network::UdpRecvData&) -> Network::FilterStatus {
+      .WillOnce([](Network::UdpRecvData&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter});
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
 
-  Network::UdpRecvData data;
-  active_listener_->onDataWorker(std::move(data));
+  active_listener_->onDataWorker(makeRecvData(1000));
 }
 
 TEST_P(ActiveUdpListenerTest, MultipleFiltersOnDataStopIteration) {
   setup();
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
-  EXPECT_CALL(*test_filter, onData(_))
-      .WillOnce(Invoke([](Network::UdpRecvData&) -> Network::FilterStatus {
-        return Network::FilterStatus::StopIteration;
-      }));
+  EXPECT_CALL(*test_filter, onData(_)).WillOnce([](Network::UdpRecvData&) -> Network::FilterStatus {
+    return Network::FilterStatus::StopIteration;
+  });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onData(_)).Times(0);
 
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter});
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
 
-  Network::UdpRecvData data;
-  active_listener_->onDataWorker(std::move(data));
+  active_listener_->onDataWorker(makeRecvData(1000));
 }
 
 TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveError) {
@@ -161,19 +166,18 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveError) {
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter, onReceiveError(_))
-      .WillOnce(Invoke([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
+      .WillOnce([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
         return Network::FilterStatus::Continue;
-      }));
+      });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onReceiveError(_))
-      .WillOnce(Invoke([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
+      .WillOnce([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter});
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
 
-  Network::UdpRecvData data;
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 }
 
@@ -182,17 +186,85 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter, onReceiveError(_))
-      .WillOnce(Invoke([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
+      .WillOnce([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onReceiveError(_)).Times(0);
 
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter});
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
 
-  Network::UdpRecvData data;
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+}
+
+TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownSessions) {
+  setup();
+
+  auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
+  // Only the post-shutdown datagram of the registered session is served locally.
+  EXPECT_CALL(*test_filter, onData(_));
+  active_listener_->addReadFilter(std::move(test_filter));
+
+  // A filter registers a session, as udp_proxy would on the first datagram.
+  auto session = makeRecvData(1000);
+  auto handle = active_listener_->registerHotRestartSession(session.addresses_.local_,
+                                                            session.addresses_.peer_);
+
+  Network::MockNonDispatchedUdpPacketHandler packet_handler;
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = packet_handler;
+  active_listener_->shutdownListener(options);
+  EXPECT_NE(active_listener_->listener(), nullptr);
+
+  // The registered session is still served locally.
+  active_listener_->onData(makeRecvData(1000));
+
+  // An unregistered session is forwarded to the child instance without creating local state,
+  // so a repeated datagram is forwarded again.
+  EXPECT_CALL(packet_handler, handle(0, _, _)).Times(3);
+  active_listener_->onData(makeRecvData(2000));
+  active_listener_->onData(makeRecvData(2000));
+
+  // After the handle is dropped, the session is forwarded too.
+  handle.reset();
+  active_listener_->onData(makeRecvData(1000));
+}
+
+TEST_P(ActiveUdpListenerTest, HotRestartShutdownGuardDisabledServesLocally) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_hot_restart_session_handoff", "false"}});
+  setup();
+
+  auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
+  // With the guard disabled the draining parent serves every datagram locally, registered or not.
+  EXPECT_CALL(*test_filter, onData(_)).Times(2);
+  active_listener_->addReadFilter(std::move(test_filter));
+
+  Network::MockNonDispatchedUdpPacketHandler packet_handler;
+  EXPECT_CALL(packet_handler, handle(_, _, _)).Times(0);
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = packet_handler;
+  active_listener_->shutdownListener(options);
+
+  EXPECT_NE(active_listener_->listener(), nullptr);
+  active_listener_->onData(makeRecvData(1000));
+  active_listener_->onData(makeRecvData(2000));
+}
+
+TEST_P(ActiveUdpListenerTest, RegularShutdownDestroysListener) {
+  setup();
+
+  auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
+  EXPECT_CALL(*test_filter, onData(_)).Times(0);
+  active_listener_->addReadFilter(std::move(test_filter));
+
+  active_listener_->shutdownListener({});
+  EXPECT_EQ(active_listener_->listener(), nullptr);
+
+  // Packets after teardown are dropped.
+  active_listener_->onData(makeRecvData(1000));
 }
 
 // Drain notifications are broadcast to every listener the connection handler owns, so a UDP

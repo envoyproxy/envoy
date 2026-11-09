@@ -8,7 +8,6 @@ envoy_mobile_package()
 envoy_cc_test_with_engine_builder(
     name = "send_headers_test",
     srcs = ["send_headers_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -22,7 +21,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "send_trailers_test",
     srcs = ["send_trailers_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -36,7 +34,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "send_data_test",
     srcs = ["send_data_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -50,7 +47,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "receive_headers_test",
     srcs = ["receive_headers_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -63,7 +59,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "receive_data_test",
     srcs = ["receive_data_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -76,7 +71,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "receive_trailers_test",
     srcs = ["receive_trailers_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -89,7 +83,6 @@ envoy_cc_test_with_engine_builder(
 envoy_cc_test_with_engine_builder(
     name = "lifetimes_test",
     srcs = ["lifetimes_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/http:header_utility_lib",
@@ -108,7 +101,6 @@ envoy_cc_test_library(
         "base/test_engine_and_server.h",
         "base/test_engine_builder.h",
     ],
-    repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_base_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
@@ -132,7 +124,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "integration_test",
     srcs = ["base/integration_test.cc"],
-    repository = "@envoy",
     deps = [
         ":test_base_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",

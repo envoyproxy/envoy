@@ -36,12 +36,7 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
       auto concurrency = context->options().concurrency();
       worker_index = concurrency; // Set main/test thread on free index.
     } else {
-      const std::string& worker_name = dispatcher.name();
-      auto pos = worker_name.find_first_of('_');
-      ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-      if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-        IS_ENVOY_BUG("failed to parse worker index from name");
-      }
+      worker_index = dispatcher.workerId().value_or(0);
     }
     // Create a thread-local logger wrapper first, then pass it to the module.
     auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config, worker_index);

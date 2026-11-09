@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/optref.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
@@ -64,10 +65,12 @@ public:
                             Server::Configuration::ServerFactoryContext& context,
                             const std::string& stats_prefix, OptRef<Init::Manager> init_manager,
                             absl::Status& creation_status);
+  ~FilterChainPerRouteConfig() override;
 
   OptRef<const FilterChain> filterChain() const { return makeOptRefFromPtr(filter_chain_.get()); }
 
 private:
+  Event::Dispatcher& main_dispatcher_;
   FilterChainConstSharedPtr filter_chain_;
 };
 

@@ -1,6 +1,7 @@
 #include "envoy/access_log/access_log_config.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 
@@ -13,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -36,9 +36,9 @@ public:
   void setupGrpcConfig() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-        }));
+        });
 
     access_log_config_.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
     access_log_config_.set_log_name("foo");
@@ -82,9 +82,9 @@ TEST_F(OpenTelemetryAccessLogConfigTest, HttpConfigOk) {
 TEST_F(OpenTelemetryAccessLogConfigTest, TopLevelGrpcServiceConfigOk) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+      });
 
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("otel_collector");
@@ -135,6 +135,21 @@ TEST_F(OpenTelemetryAccessLogConfigTest, NoTransportConfigFails) {
       EnvoyException,
       "OpenTelemetry access logger requires one of: grpc_service, http_service, or "
       "common_config.grpc_service to be configured.");
+}
+
+// Verifies that configuring a valid resource detector succeeds.
+TEST_F(OpenTelemetryAccessLogConfigTest, ValidResourceDetectorOk) {
+  setupGrpcConfig();
+  auto* detector = access_log_config_.add_resource_detectors();
+  detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+  envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig env_config;
+  std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
+  TestUtility::jsonConvert(access_log_config_, *message_);
+
+  ::Envoy::AccessLog::InstanceSharedPtr instance =
+      factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
+  EXPECT_NE(nullptr, instance);
 }
 
 } // namespace

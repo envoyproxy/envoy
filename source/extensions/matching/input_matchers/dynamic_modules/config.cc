@@ -39,8 +39,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (!on_config_new.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
-    throw EnvoyException("Failed to resolve symbol: " +
-                         std::string(on_config_new.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to resolve symbol: ", on_config_new.status().message()));
   }
 
   auto on_config_destroy = dynamic_module->getFunctionPointer<OnMatcherConfigDestroyType>(
@@ -48,8 +48,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (!on_config_destroy.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
-    throw EnvoyException("Failed to resolve symbol: " +
-                         std::string(on_config_destroy.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to resolve symbol: ", on_config_destroy.status().message()));
   }
 
   auto on_match = dynamic_module->getFunctionPointer<OnMatcherMatchType>(
@@ -57,7 +57,7 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (!on_match.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
-    throw EnvoyException("Failed to resolve symbol: " + std::string(on_match.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to resolve symbol: ", on_match.status().message()));
   }
 
   // Parse the matcher config.
@@ -67,8 +67,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
           context, matcher_name, Extensions::DynamicModules::ConfigInitErrorStat);
-      throw EnvoyException("Failed to parse matcher config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(
+          absl::StrCat("Failed to parse matcher config: ", config_or_error.status().message()));
     }
     matcher_config_str = std::move(config_or_error.value());
   }
@@ -97,8 +97,17 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
       in_module_config, [shared_module, on_config_destroy = on_config_destroy.value()](
                             const void* config) { on_config_destroy(config); });
 
-  return [shared_module, on_match = on_match.value(), shared_config] {
-    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_match, shared_config);
+  // Map the on_error policy to the result the matcher returns when the module cannot complete an
+  // evaluation.
+  using DynamicModuleMatcherProto =
+      envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher;
+  const auto on_error_result = proto_config.on_error() == DynamicModuleMatcherProto::MATCH
+                                   ? ::Envoy::Matcher::MatchResult::Matched
+                                   : ::Envoy::Matcher::MatchResult::NoMatch;
+
+  return [shared_module, on_match = on_match.value(), shared_config, on_error_result] {
+    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_match, shared_config,
+                                                       on_error_result);
   };
 }
 

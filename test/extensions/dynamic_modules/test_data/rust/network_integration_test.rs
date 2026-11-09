@@ -31,6 +31,9 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig)),
     "read_attributes" => Some(Box::new(ReadAttributesFilterConfig)),
+    "http_callout_reentrancy_probe" => Some(Box::new(HttpCalloutReentrancyProbeFilterConfig::new(
+      envoy_filter_config,
+    ))),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -321,7 +324,8 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for BufferLimitsFilter {
 
 // Sets several string entries under one namespace via the batch setter, then reads them back to
 // prove the batch and the getter round trip through the ABI. An empty batch must not create a
-// namespace.
+// namespace. It also sets a namespace from a serialized google.protobuf.Struct and a typed
+// namespace from a serialized google.protobuf.Any.
 struct DynamicMetadataFilterConfig;
 
 impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for DynamicMetadataFilterConfig {
@@ -375,6 +379,28 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for DynamicMetadataFilter {
       Some(vec![0xff, 0x00, 0xfe])
     );
 
+    // A serialized google.protobuf.Struct with "k" set to "v".
+    assert!(envoy_filter.set_dynamic_metadata_struct(
+      "dynamic_modules.struct",
+      &[0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76],
+    ));
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.struct", "k")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"v".to_vec())
+    );
+
+    // A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+    assert!(envoy_filter.set_dynamic_typed_metadata(
+      "dynamic_modules.typed",
+      &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02],
+    ));
+
+    // A struct that does not parse and an Any without a type URL are rejected.
+    assert!(!envoy_filter.set_dynamic_metadata_struct("dynamic_modules.struct", &[0x0f]));
+    assert!(!envoy_filter.set_dynamic_typed_metadata("dynamic_modules.typed", &[]));
+
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }
@@ -400,7 +426,7 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for UpstreamConnectionIdFilter 
     _data_length: usize,
     _end_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }
@@ -434,5 +460,66 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for ReadAttributesFilter {
       .unwrap_or(0);
     assert!(connection_id > 0);
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+}
+
+// =============================================================================
+// HTTP Callout Reentrancy Probe Test Filter
+// =============================================================================
+
+// Issues an HTTP callout on new connection and increments a counter from on_http_callout_done. The
+// unit tests complete the callout inline, so the gate must keep on_http_callout_done from running
+// and the counter must stay at zero.
+struct HttpCalloutReentrancyProbeFilterConfig {
+  callout_done_total: EnvoyCounterId,
+}
+
+impl HttpCalloutReentrancyProbeFilterConfig {
+  fn new<EC: EnvoyNetworkFilterConfig>(config: &mut EC) -> Self {
+    Self {
+      callout_done_total: config.define_counter("callout_done_total").unwrap(),
+    }
+  }
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for HttpCalloutReentrancyProbeFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(HttpCalloutReentrancyProbeFilter {
+      callout_done_total: self.callout_done_total,
+    })
+  }
+}
+
+struct HttpCalloutReentrancyProbeFilter {
+  callout_done_total: EnvoyCounterId,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for HttpCalloutReentrancyProbeFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    let _ = envoy_filter.send_http_callout(
+      "callout_cluster",
+      vec![
+        (":method", b"GET"),
+        (":path", b"/"),
+        ("host", b"example.com"),
+      ],
+      None,
+      1000,
+    );
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut ENF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _body_chunks: Vec<EnvoyBuffer>,
+  ) {
+    let _ = envoy_filter.increment_counter(self.callout_done_total, 1);
   }
 }

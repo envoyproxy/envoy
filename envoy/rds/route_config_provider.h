@@ -17,9 +17,12 @@ namespace Rds {
 class RouteConfigProvider {
 public:
   struct ConfigInfo {
-    // A reference to the currently loaded route configuration. Do not hold this reference beyond
-    // the caller of configInfo()'s scope.
-    const Protobuf::Message& config_;
+    // The route configuration as a Protobuf::Any. Do not hold this reference beyond the caller of
+    // configInfo()'s scope.
+    const Protobuf::Any& config_;
+
+    // The name of the route configuration.
+    const std::string name_;
 
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.
@@ -50,6 +53,12 @@ public:
   /**
    * Callback used to notify RouteConfigProvider about configuration changes.
    * @return Status indicating if the call was successful or had graceful error handling.
+   *
+   * NOTE: a non-OK status does NOT affect xDS configuration loading. This runs after the route
+   * configuration has been warmed up, which publishes it regardless of the result, and it is not
+   * necessarily called on the xDS update call stack - an update that warms up asynchronously
+   * completes long after the xDS response was accepted - so there is nothing left to reject. A
+   * failure is only logged as a warning.
    */
   virtual absl::Status onConfigUpdate() PURE;
 };

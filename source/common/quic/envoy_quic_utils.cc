@@ -232,11 +232,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // If setting a higher cache size, try profiling std::deque instead of std::vector for the
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
-  size_t max_addresses_cache_size =
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
-          ? 4u
-          : 0u;
+  constexpr size_t max_addresses_cache_size = 4u;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram,
       // Use the loopback address if `local_addr` is null, to pass in the socket interface used to

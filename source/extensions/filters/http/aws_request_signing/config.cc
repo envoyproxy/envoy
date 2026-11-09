@@ -33,11 +33,11 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoHelper(
 
   auto signer = createSigner(config, server_context);
   if (!signer.ok()) {
-    return absl::InvalidArgumentError(std::string(signer.status().message()));
+    return absl::InvalidArgumentError(signer.status().message());
   }
-  auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer.value()), stats_prefix, scope,
-                                         config.host_rewrite(), config.use_unsigned_payload());
+  auto filter_config = std::make_shared<FilterConfigImpl>(
+      std::move(signer.value()), stats_prefix, scope, config.host_rewrite(),
+      config.use_unsigned_payload(), server_context.mainThreadDispatcher());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
@@ -49,8 +49,8 @@ AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config,
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactoryFromProtoHelper(config, extra_context.stats_prefix, server_context,
-                                            extra_context.scopeOr(server_context));
+  return createFilterFactoryFromProtoHelper(config, extra_context.statsPrefixOr(), server_context,
+                                            extra_context.statsPrefixScopeOr(server_context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
@@ -61,13 +61,14 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
 
   auto signer = createSigner(per_route_config.aws_request_signing(), server_context);
   if (!signer.ok()) {
-    return absl::InvalidArgumentError(std::string(signer.status().message()));
+    return absl::InvalidArgumentError(signer.status().message());
   }
 
   return std::make_shared<const FilterConfigImpl>(
       std::move(signer.value()), per_route_config.stat_prefix(), server_context.scope(),
       per_route_config.aws_request_signing().host_rewrite(),
-      per_route_config.aws_request_signing().use_unsigned_payload());
+      per_route_config.aws_request_signing().use_unsigned_payload(),
+      server_context.mainThreadDispatcher());
 }
 
 absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
@@ -130,7 +131,7 @@ AwsRequestSigningFilterFactory::createSigner(
   }
 
   if (!credentials_provider.ok()) {
-    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
+    return absl::InvalidArgumentError(credentials_provider.status().message());
   }
 
   const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(

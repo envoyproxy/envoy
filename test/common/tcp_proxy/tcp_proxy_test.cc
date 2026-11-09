@@ -55,8 +55,6 @@ using ::testing::_;
 using testing::AnyOf;
 using ::testing::DoAll;
 using testing::HasSubstr;
-using ::testing::Invoke;
-using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnPointee;
@@ -68,11 +66,11 @@ public:
   TcpProxyTest() {
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 chooseHost(_))
-        .WillRepeatedly(Invoke([this] {
+        .WillRepeatedly([this] {
           return Upstream::HostSelectionResponse{
               factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
                   .host_};
-        }));
+        });
   }
   using TcpProxyTestBase::setup;
 
@@ -120,8 +118,7 @@ public:
     if (config.has_on_demand()) {
       EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
                   allocateOdCdsApi(_, _, _, _))
-          .WillOnce(
-              Invoke([this]() { return Upstream::MockOdCdsApiHandlePtr(mock_odcds_api_handle_); }));
+          .WillOnce([this]() { return Upstream::MockOdCdsApiHandlePtr(mock_odcds_api_handle_); });
     }
 
     configure(config);
@@ -155,11 +152,11 @@ public:
             .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
-            .WillOnce(Invoke(
+            .WillOnce(
                 [=, this](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
                   conn_pool_callbacks_.push_back(&cb);
                   return onNewConnection(conn_pool_handles_.at(i).get());
-                }))
+                })
             .RetiresOnSaturation();
       }
       EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
@@ -1274,6 +1271,7 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   Buffer::OwnedImpl inject_data;
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.injectDecodedDataToFilterChain(inject_data, false));
+  EXPECT_NO_THROW(stream_decoder_callbacks.injectDecodedHeadersToFilterChain(false));
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedTrailers());
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedMetadata());
@@ -1754,8 +1752,7 @@ TEST_P(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   // connection.
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(0);
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _))
-      .WillOnce(InvokeWithoutArgs(
-          [&]() -> void { upstream_connections_.at(0)->runLowWatermarkCallbacks(); }));
+      .WillOnce([&]() -> void { upstream_connections_.at(0)->runLowWatermarkCallbacks(); });
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -1920,14 +1917,14 @@ TEST_P(TcpProxyTest, IntermediateLogEntry) {
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(10);
   EXPECT_CALL(*mock_access_logger_, log(_, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
 
             EXPECT_EQ(stream_info.getDownstreamBytesMeter()->wireBytesReceived(), 10);
             EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
                         testing::IsNull());
-          }));
+          });
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
@@ -1935,7 +1932,7 @@ TEST_P(TcpProxyTest, IntermediateLogEntry) {
 
   filter_callbacks_.connection_.stream_info_.downstream_bytes_meter_->addWireBytesReceived(9);
   EXPECT_CALL(*mock_access_logger_, log(_, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpPeriodic);
 
@@ -1944,14 +1941,14 @@ TEST_P(TcpProxyTest, IntermediateLogEntry) {
                           ->bytesAtLastDownstreamPeriodicLog()
                           ->wire_bytes_received,
                       10);
-          }));
+          });
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
   flush_timer->invokeCallback();
 
   EXPECT_CALL(*mock_access_logger_, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+      .WillOnce([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
         EXPECT_EQ(log_context.accessLogType(), AccessLog::AccessLogType::TcpConnectionEnd);
-      }));
+      });
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
@@ -2271,10 +2268,10 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterNoBackoffOptions) 
 
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_0", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+      .WillOnce([&](auto&&, auto&& cb, auto&&) {
         cluster_discovery_callback = std::move(cb);
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   setup(1, config);
@@ -2301,9 +2298,9 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterNoBackoffOptions) 
       .RetiresOnSaturation();
 
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_1", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
+      .WillOnce([&](auto&&, auto&&, auto&&) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
 
   retry_timer->invokeCallback();
   EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
@@ -2340,10 +2337,10 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterWithBackoffOptions
 
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_0", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+      .WillOnce([&](auto&&, auto&& cb, auto&&) {
         cluster_discovery_callback = std::move(cb);
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   setup(1, config);
@@ -2371,9 +2368,9 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterWithBackoffOptions
       .RetiresOnSaturation();
 
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_1", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
+      .WillOnce([&](auto&&, auto&&, auto&&) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
 
   retry_timer->invokeCallback();
   EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
@@ -2417,9 +2414,9 @@ TEST_P(TcpProxyTest, OdcdsCancelIfConnectionClose) {
       .RetiresOnSaturation();
 
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
+      .WillOnce([&](auto&&, auto&&, auto&&) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
   setup(0, config);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -2443,10 +2440,10 @@ TEST_P(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
   timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+      .WillOnce([&](auto&&, auto&& cb, auto&&) {
         cluster_discovery_callback = std::move(cb);
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
 
   setup(1, config);
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
@@ -2483,10 +2480,10 @@ TEST_P(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
 
   Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
   EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
-      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+      .WillOnce([&](auto&&, auto&& cb, auto&&) {
         cluster_discovery_callback = std::move(cb);
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
-      }));
+      });
 
   setup(0, config);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
@@ -2809,13 +2806,12 @@ TEST_P(TcpProxyTest, BufferOverflowOnlyReadDisables) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // First data chunk - should trigger connection.
   // Since buffer (5 bytes) < max (10 bytes), we don't read-disable yet.
@@ -2852,18 +2848,17 @@ TEST_P(TcpProxyTest, SingleConnectionTriggerWithMultipleDataChunks) {
   int connection_attempts = 0;
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
-      .WillRepeatedly(Invoke([&](auto, auto, auto) {
+      .WillRepeatedly([&](auto, auto, auto) {
         connection_attempts++;
         return Upstream::TcpPoolData([]() {}, &conn_pool_);
-      }));
+      });
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillRepeatedly(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillRepeatedly([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // For new API with max_early_data_bytes=1024, readDisable(true) is only called when buffer
   // exceeds limit. Each chunk is 6 bytes, so we won't exceed 1024, so readDisable shouldn't be
@@ -2909,6 +2904,144 @@ TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
   EXPECT_TRUE(conn_pool_callbacks_.empty());
 }
 
+// Test load shedding in onData() when receive_before_connect is enabled.
+TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnection) {
+  // Mock load shed point
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(nullptr));
+
+  // Configure TCP Proxy
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  // Verify if TCP filter ready to receive downstream data
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Mock TCP memory overload
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  // Mock TCP package data
+  Buffer::OwnedImpl data("hello");
+
+  // Verify TCP connection dropped when memory overloaded
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test that early downstream data triggers upstream connection when not overloaded.
+TEST_P(TcpProxyTest, OnDataLoadShedPointNotTriggeredWhenNotOverloaded) {
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(nullptr));
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  // Verify if TCP filter ready to receive downstream data
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
+
+  Buffer::OwnedImpl data("hello");
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  // Verify that the load shedding is not triggered and the TCP connection is not dropped
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  // Verifies that the connection was not flagged with an overload failure
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+}
+
+// Test load shedding in onData() when upstream is already connected.
+TEST_P(TcpProxyTest, OnDataLoadShedPointCanCloseConnectionWhenUpstreamConnected) {
+  Server::MockLoadShedPoint on_data_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(&on_data_loadshed_point));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(nullptr));
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(on_data_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test that overload manager is bypassed when context.shouldBypassOverloadManager() returns true.
+TEST_P(TcpProxyTest, OnDataLoadShedPointBypassedWhenOverloadManagerBypassed) {
+  EXPECT_CALL(factory_context_, shouldBypassOverloadManager()).WillRepeatedly(Return(true));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_, getLoadShedPoint(_))
+      .Times(0);
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  setupOnDownstreamDataMode(config, true);
+
+  EXPECT_EQ(nullptr, config_->tcpProxyOnDataLoadShedPoint());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+}
+
 // Test that StopIteration in ON_DOWNSTREAM_DATA mode still allows reading.
 TEST_P(TcpProxyTest, StopIterationAllowsReading) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
@@ -2928,13 +3061,12 @@ TEST_P(TcpProxyTest, StopIterationAllowsReading) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // For new API with max_early_data_bytes=1024, readDisable(true) is only called when buffer
   // exceeds limit. "test_data" is 9 bytes, so we won't exceed 1024, so readDisable shouldn't be
@@ -2964,13 +3096,12 @@ TEST_P(TcpProxyTest, LargeBufferScenario) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // With new API, readDisable is only called when buffer exceeds limit, not when it reaches it.
   // So with 65536 bytes and limit 65536, readDisable should NOT be called.
@@ -3226,13 +3357,12 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithTlsConnection_WaitsForHand
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // Simulate TLS handshake completion.
   filter_->onDownstreamTlsHandshakeComplete();
@@ -3276,13 +3406,12 @@ TEST_P(TcpProxyTlsHandshakeTest,
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // Simulate TLS handshake completion.
   filter_->onDownstreamTlsHandshakeComplete();
@@ -3299,13 +3428,12 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithNonTlsConnection_Immediate
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   setupTlsMode();
 
@@ -3340,13 +3468,12 @@ TEST_P(TcpProxyTlsHandshakeTest, EarlyDataBufferExceedsMaxSize) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // First, send small amount of data. We should buffer it and trigger connection.
   // Since buffer (5 bytes) < max (10 bytes), we don't read-disable yet.
@@ -3380,13 +3507,12 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeViaConnectedEvent) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // Simulate TLS handshake completion via Connected event.
   // This triggers the DownstreamCallbacks which calls onDownstreamEvent internally.
@@ -3479,13 +3605,12 @@ TEST_P(TcpProxyTest, BufferExactlyAtLimitDoesNotReadDisable) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // Send exactly 5 bytes. It should trigger connection but NOT readDisable.
   Buffer::OwnedImpl exact_data("hello"); // 5 bytes exactly
@@ -3526,13 +3651,12 @@ TEST_P(TcpProxyTest, MultipleTinyChunksSetInitialDataReceivedOnce) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // First tiny chunk. It should trigger connection but NOT readDisable.
   Buffer::OwnedImpl chunk1("h");
@@ -3579,13 +3703,12 @@ TEST_P(TcpProxyTest, DelayRouteSelectionAllowsFilterStateChanges) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // First tiny chunk. It should trigger connection but NOT readDisable.
   Buffer::OwnedImpl chunk1("h");
@@ -3614,13 +3737,12 @@ TEST_P(TcpProxyTest, ZeroBufferTriggersReadDisable) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // Data should trigger connection and readDisable (since buffer will be at limit).
   // With max_buffered_bytes=0, any data will cause readDisable.
@@ -3645,13 +3767,12 @@ TEST_P(TcpProxyTest, ReadDisableFalseOnlyWhenActuallyDisabled) {
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            conn_pool_callbacks_.push_back(&cb);
-            return conn_pool_handles_
-                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
-                .get();
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        conn_pool_callbacks_.push_back(&cb);
+        return conn_pool_handles_
+            .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+            .get();
+      });
 
   // Send data that exceeds buffer (11 bytes > 10 byte limit). readDisable(true) should be called.
   Buffer::OwnedImpl data("hello world"); // 11 bytes
@@ -3932,6 +4053,52 @@ TEST_P(TcpProxyTest, AppendToDownstreamTlvsPreservesDuplicates) {
 
   EXPECT_EQ(0xF0, tlvs[4].type);
   EXPECT_EQ("tcp_proxy_f0", std::string(tlvs[4].value.begin(), tlvs[4].value.end()));
+}
+
+// Test load shedding in establishUpstreamConnection() during onNewConnection().
+TEST_P(TcpProxyTest, UpstreamConnectLoadShedPointCanCloseConnection) {
+  Server::MockLoadShedPoint upstream_connect_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(&upstream_connect_loadshed_point));
+
+  // Use setup(0) to instantiate and initialize filter_ without automatically calling
+  // onNewConnection(), preventing setup() from triggering the connection flow before mock
+  // expectations are configured and allowing this test to explicitly verify onNewConnection().
+  setup(0);
+
+  EXPECT_CALL(upstream_connect_loadshed_point, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().OverloadManagerClose));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_EQ(1U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
+}
+
+// Test load shedding in establishUpstreamConnection() is bypassed when shouldShedLoad() returns
+// false.
+TEST_P(TcpProxyTest, UpstreamConnectLoadShedPointBypassedWhenFalse) {
+  Server::MockLoadShedPoint upstream_connect_loadshed_point;
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyOnData))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context_.server_factory_context_.overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect))
+      .WillOnce(Return(&upstream_connect_loadshed_point));
+
+  EXPECT_CALL(upstream_connect_loadshed_point, shouldShedLoad()).WillOnce(Return(false));
+  setup(1);
+
+  EXPECT_EQ(0U, config_->stats().downstream_cx_overload_close_.value());
+  EXPECT_FALSE(filter_callbacks_.connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::OverloadManager));
 }
 
 } // namespace

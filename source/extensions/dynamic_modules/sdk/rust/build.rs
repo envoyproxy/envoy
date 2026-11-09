@@ -1,6 +1,5 @@
 use std::env;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // Resolves a `$(location ...)` value produced by Bazel to an absolute path.
 //
@@ -57,18 +56,23 @@ fn bazel_clang_args() -> Vec<String> {
   }
 
   // This allows the cross-compilation of the SDK to succeed by providing the necessary system
-  // headers for the target platform.
-  for (env_var, triple) in [
-    ("ENVOY_SYSROOT_AMD64_ANCHOR", "x86_64-linux-gnu"),
-    ("ENVOY_SYSROOT_ARM64_ANCHOR", "aarch64-linux-gnu"),
+  // headers for the target platform. Only add the sysroot matching the build target to avoid
+  // pulling in incompatible headers (e.g. amd64 stubs-32.h when targeting arm64).
+  let target = env::var("TARGET").unwrap_or_default();
+  for (env_var, triple, target_prefix) in [
+    ("ENVOY_SYSROOT_AMD64_ANCHOR", "x86_64-linux-gnu", "x86_64"),
+    ("ENVOY_SYSROOT_ARM64_ANCHOR", "aarch64-linux-gnu", "aarch64"),
   ] {
+    if !target.is_empty() && !target.starts_with(target_prefix) {
+      continue;
+    }
     if let Ok(sysroot_anchor) = env::var(env_var) {
-      if let Some(anchor) = resolve_bazel_location(&sysroot_anchor) {
-        // The anchor is `<sysroot>/usr/include/stdio.h`, so its parent is `usr/include`.
-        if let Some(include_dir) = anchor.parent() {
-          args.push(format!("-isystem {}", include_dir.display()));
-          args.push(format!("-isystem {}/{}", include_dir.display(), triple));
-        }
+      if let Some(sysroot_dir) = resolve_bazel_location(&sysroot_anchor) {
+        let include_dir = sysroot_dir.join("usr/include");
+        args.push("-isystem".to_string());
+        args.push(format!("{}", include_dir.display()));
+        args.push("-isystem".to_string());
+        args.push(format!("{}/{}", include_dir.display(), triple));
       }
     }
   }
@@ -85,11 +89,49 @@ fn main() {
   // will try to use the system clang from PATH. So, this doesn't affect the local builds.
   // In any case, clang must be found to build the bindings.
 
-  let abi_header = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("abi/abi.h");
+  // On Windows, clang-sys looks for libclang.dll in LIBCLANG_PATH or PATH. When built by Bazel,
+  // CC points to clang-cl, which is installed next to libclang.dll, so use its directory if
+  // LIBCLANG_PATH is not set.
+  #[cfg(target_os = "windows")]
+  if env::var_os("LIBCLANG_PATH").is_none() {
+    if let Some(dir) = env::var_os("CC")
+      .map(PathBuf::from)
+      .and_then(|cc| cc.parent().map(Path::to_path_buf))
+    {
+      if dir.join("libclang.dll").exists() {
+        env::set_var("LIBCLANG_PATH", dir);
+      }
+    }
+  }
+
+  // ENVOY_ABI_HEADER is set by Bazel on Windows, where the abi/abi.h symlink may be checked out as
+  // a plain text file.
+  let abi_header = env::var("ENVOY_ABI_HEADER")
+    .ok()
+    .and_then(|location| resolve_bazel_location(&location))
+    .unwrap_or_else(|| PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("abi/abi.h"));
 
   println!("cargo:rerun-if-changed={}", abi_header.display());
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+  // Bake the prefix into the exported macro: env! inside its body would read the
+  // consuming crate's environment instead of the SDK's environment.
+  println!("cargo:rerun-if-env-changed=ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX");
+  let prefix = env::var("ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX").unwrap_or_default();
+  std::fs::write(
+    out_path.join("export_name.rs"),
+    format!(
+      r#"
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __export_name_impl {{
+  ($name:expr) => {{ concat!({prefix:?}, $name) }};
+}}
+"#
+    ),
+  )
+  .expect("Couldn't write export naming macro");
 
   let bindings = bindgen::Builder::default()
     .header(abi_header.to_str().unwrap())
@@ -100,9 +142,29 @@ fn main() {
     })
     .derive_partialeq(true)
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-    .parse_callbacks(Box::new(TrimEnumNameFromVariantName))
-    .generate()
-    .expect("Unable to generate bindings");
+    .parse_callbacks(Box::new(TrimEnumNameFromVariantName));
+
+  // Set when building the SDK for a dynamic module DLL on Windows. See src/windows_delay_load.rs.
+  println!("cargo:rustc-check-cfg=cfg(envoy_dynamic_module_dll)");
+
+  // A dynamic module DLL imports the Envoy callbacks from `envoy.dll`, which
+  // src/windows_delay_load.rs redirects to the host executable at runtime. This requires the DLL to
+  // be linked with `/DELAYLOAD:envoy.dll`. A static module (non-empty prefix) is linked into the
+  // Envoy binary itself, where the callbacks are defined directly, so the import stubs would
+  // collide with those definitions. Only the Envoy ABI items are generated, since every function
+  // declared in the system headers that abi.h includes, such as the CRT's __security_init_cookie,
+  // would otherwise be imported from `envoy.dll` too.
+  #[cfg(target_os = "windows")]
+  let bindings = if prefix.is_empty() {
+    println!("cargo:rustc-cfg=envoy_dynamic_module_dll");
+    bindings
+      .allowlist_item("envoy_.*")
+      .extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]")
+  } else {
+    bindings
+  };
+
+  let bindings = bindings.generate().expect("Unable to generate bindings");
 
   bindings
     .write_to_file(out_path.join("bindings.rs"))

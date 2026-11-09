@@ -197,7 +197,8 @@ public:
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
   }
 
   std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& alpn,
@@ -371,6 +372,10 @@ public:
         matcher_(std::get<1>(GetParam())) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
+    // These tests assert that the connections of a deleted filter chain are drain-closed at the
+    // first opportunity, which is what the immediate drain strategy does. The default gradual
+    // strategy ramps the drain close over the drain window instead.
+    drain_strategy_ = Server::DrainStrategy::Immediate;
     autonomous_upstream_ = true;
     setUpstreamCount(2);
 
@@ -467,7 +472,8 @@ public:
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }
 
@@ -493,7 +499,10 @@ public:
     EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {
       EXPECT_EQ("close", response->headers().getConnectionValue());
-
+      // Honor Connection: close locally so a later remote close cannot interrupt another client's
+      // handshake on the shared dispatcher. Waiting for the server would also let the drain
+      // deadline close other deleted filter chains before their requests are sent.
+      codec_client.close();
     } else {
       EXPECT_EQ(nullptr, response->headers().Connection());
     }

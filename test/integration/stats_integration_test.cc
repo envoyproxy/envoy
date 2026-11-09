@@ -3,6 +3,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
@@ -15,8 +18,11 @@
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/expired_cert_info.h"
 #include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
+#include "test/integration/filters/test_filters.pb.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -255,11 +261,12 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
 
   initialize();
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(), 0);
+  auto cert_expiry = TestUtility::parseTime(TEST_EXPIRED__CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   EXPECT_EQ(
       test_server_
           ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds")
           ->value(),
-      1743788480);
+      absl::ToUnixSeconds(cert_expiry));
 }
 
 // Verifies that the stats interface is unchanged whether the stats store derives tags with the
@@ -274,6 +281,40 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
 // global `TestListener` restores all absl flags at the end of each test, so the override does not
 // leak into the rest of the binary.
 //
+// A single expected stat: its flat name, the name it should be tag-extracted to, and the tags
+// that should be attached to it.
+struct StatExpectation {
+  std::string name_;
+  std::string tag_extracted_name_;
+  std::vector<std::pair<std::string, std::string>> tags_;
+};
+
+std::vector<std::pair<std::string, std::string>> tagsOf(const Stats::Metric& metric) {
+  std::vector<std::pair<std::string, std::string>> tags;
+  for (const Stats::Tag& tag : metric.tags()) {
+    tags.emplace_back(tag.name_, tag.value_);
+  }
+  std::sort(tags.begin(), tags.end());
+  return tags;
+}
+
+void checkExpectation(IntegrationTestServer& server, const StatExpectation& expectation) {
+  Stats::CounterSharedPtr counter = server.counter(expectation.name_);
+  Stats::GaugeSharedPtr gauge = server.gauge(expectation.name_);
+  Stats::ParentHistogramSharedPtr histogram = server.histogram(expectation.name_);
+  const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
+                                : gauge != nullptr ? static_cast<Stats::Metric*>(gauge.get())
+                                                   : static_cast<Stats::Metric*>(histogram.get());
+  ASSERT_NE(metric, nullptr) << "no counter, gauge or histogram named '" << expectation.name_
+                             << "'";
+
+  EXPECT_EQ(metric->tagExtractedName(), expectation.tag_extracted_name_)
+      << " for stat '" << expectation.name_ << "'";
+  std::vector<std::pair<std::string, std::string>> expected_tags = expectation.tags_;
+  std::sort(expected_tags.begin(), expected_tags.end());
+  EXPECT_EQ(tagsOf(*metric), expected_tags) << " for stat '" << expectation.name_ << "'";
+}
+
 // Migrating a new scope to the tag-friendly API means adding its stats to `expectations()` below.
 class StatsTagsModeIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
@@ -294,14 +335,6 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  // A single expected stat: its flat name, the name it should be tag-extracted to, and the tags
-  // that should be attached to it.
-  struct StatExpectation {
-    std::string name_;
-    std::string tag_extracted_name_;
-    std::vector<std::pair<std::string, std::string>> tags_;
-  };
-
   // The listener stats scope is named after the listener's `stat_prefix`, or after its address if
   // no prefix is configured.
   std::string mainListenerScope() const {
@@ -310,8 +343,11 @@ public:
 
   std::vector<StatExpectation> expectations() const {
     const std::string& cluster_name = Config::TagNames::get().CLUSTER_NAME;
+    const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
     const std::string& listener_address = Config::TagNames::get().LISTENER_ADDRESS;
+    const std::string& response_code_class = Config::TagNames::get().RESPONSE_CODE_CLASS;
     const std::string& tcp_prefix = Config::TagNames::get().TCP_PREFIX;
+    const std::string& worker_id = Config::TagNames::get().WORKER_ID;
     const std::string& xds_resource_name = Config::TagNames::get().XDS_RESOURCE_NAME;
 
     return {
@@ -330,13 +366,92 @@ public:
         {"listener.tcp_listener.downstream_cx_total",
          "listener.downstream_cx_total",
          {{listener_address, "tcp_listener"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         // The admin listener is deliberately excluded from listener address tagging, in both the
         // legacy extraction rules and the explicit-tags scope.
         {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total", {}},
+#endif
         // TCP proxy scope, `source/common/tcp_proxy/tcp_proxy.cc`.
         {"tcp.tcp_stats.downstream_cx_total",
          "tcp.downstream_cx_total",
          {{tcp_prefix, "tcp_stats"}}},
+        // HTTP connection manager scope, `source/common/http/conn_manager_impl.cc`. The stats of
+        // the connection manager itself live at the root, and its listener stats live in the
+        // listener's scope, where they carry the listener's tag as well. Note the leaf names below
+        // deliberately avoid the '_rq_<code>' forms, which carry response code tags of their own.
+        {"http.config_test.downstream_rq_total",
+         "http.downstream_rq_total",
+         {{hcm_prefix, "config_test"}}},
+        {"http.config_test.downstream_cx_total",
+         "http.downstream_cx_total",
+         {{hcm_prefix, "config_test"}}},
+        {"http.config_test.tracing.random_sampling",
+         "http.tracing.random_sampling",
+         {{hcm_prefix, "config_test"}}},
+        {absl::StrCat("listener.", mainListenerScope(),
+                      ".http.config_test.downstream_rq_completed"),
+         "listener.http.downstream_rq_completed",
+         {{listener_address, mainListenerScope()}, {hcm_prefix, "config_test"}}},
+        // The response code class is a tag of its own, so the flat name keeps the class while the
+        // tag-extracted name drops it. This holds both for the connection manager's own stats and
+        // for its listener stats.
+        {"http.config_test.downstream_rq_2xx",
+         "http.downstream_rq_xx",
+         {{hcm_prefix, "config_test"}, {response_code_class, "2"}}},
+        {"http.config_test.downstream_rq_5xx",
+         "http.downstream_rq_xx",
+         {{hcm_prefix, "config_test"}, {response_code_class, "5"}}},
+        {absl::StrCat("listener.", mainListenerScope(), ".http.config_test.downstream_rq_2xx"),
+         "listener.http.downstream_rq_xx",
+         {{listener_address, mainListenerScope()},
+          {hcm_prefix, "config_test"},
+          {response_code_class, "2"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+        {"listener.admin.http.admin.downstream_rq_2xx",
+         "listener.admin.http.downstream_rq_xx",
+         {{hcm_prefix, "admin"}, {response_code_class, "2"}}},
+#endif
+        // The router filter, `source/common/router/router.cc`. Its own stats are created in the
+        // connection manager's scope, while its virtual host and route level stats stay at the
+        // root.
+        {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
+        {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+        // The admin listener runs a connection manager too, with 'admin' as its stat prefix. As
+        // with the listener address, the admin listener scope itself is not tagged.
+        {"http.admin.downstream_rq_total", "http.downstream_rq_total", {{hcm_prefix, "admin"}}},
+        {"listener.admin.http.admin.downstream_rq_completed",
+         "listener.admin.http.downstream_rq_completed",
+         {{hcm_prefix, "admin"}}},
+#endif
+        // Per-thread scopes of the worker id migration: a worker thread's 'worker_<id>' segment
+        // carries the envoy.worker_id tag and tag-extracts to a literal 'worker', while the main
+        // thread's name stays a plain, untagged segment.
+        // Dispatcher histograms, `source/common/event/dispatcher_impl.cc`.
+        {"server.dispatcher.loop_duration_us", "server.dispatcher.loop_duration_us", {}},
+        {"listener_manager.worker_0.dispatcher.loop_duration_us",
+         "listener_manager.worker.dispatcher.loop_duration_us",
+         {{worker_id, "0"}}},
+        // Thread local cluster manager gauges, `source/common/upstream/cluster_manager_impl.cc`.
+        {"thread_local_cluster_manager.main_thread.clusters_inflated",
+         "thread_local_cluster_manager.main_thread.clusters_inflated",
+         {}},
+        {"thread_local_cluster_manager.worker_0.clusters_inflated",
+         "thread_local_cluster_manager.worker.clusters_inflated",
+         {{worker_id, "0"}}},
+        // Per-handler listener stats, `source/server/active_listener_base.h`. The admin listener
+        // is served from the main thread, so its handler contributes no worker tag.
+        {absl::StrCat("listener.", mainListenerScope(), ".worker_0.downstream_cx_total"),
+         "listener.worker.downstream_cx_total",
+         {{listener_address, mainListenerScope()}, {worker_id, "0"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+        {"listener.admin.main_thread.downstream_cx_total",
+         "listener.admin.main_thread.downstream_cx_total",
+         {}},
+#endif
+        // Per-thread watchdog counters, `source/server/guarddog_impl.cc`.
+        {"server.main_thread.watchdog_miss", "server.main_thread.watchdog_miss", {}},
+        {"server.worker_0.watchdog_miss", "server.worker.watchdog_miss", {{worker_id, "0"}}},
         // SDS scope, `source/common/secret/sds_api.cc`.
         {"sds.server_cert.key_rotation_failed",
          "sds.key_rotation_failed",
@@ -355,29 +470,6 @@ public:
          {{Config::TagNames::get().GOOGLE_GRPC_CLIENT_PREFIX, "grpc_stats"}}},
 #endif
     };
-  }
-
-  static std::vector<std::pair<std::string, std::string>> tagsOf(const Stats::Metric& metric) {
-    std::vector<std::pair<std::string, std::string>> tags;
-    for (const Stats::Tag& tag : metric.tags()) {
-      tags.emplace_back(tag.name_, tag.value_);
-    }
-    std::sort(tags.begin(), tags.end());
-    return tags;
-  }
-
-  void checkExpectation(const StatExpectation& expectation) {
-    Stats::CounterSharedPtr counter = test_server_->counter(expectation.name_);
-    Stats::GaugeSharedPtr gauge = test_server_->gauge(expectation.name_);
-    const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
-                                                     : static_cast<Stats::Metric*>(gauge.get());
-    ASSERT_NE(metric, nullptr) << "no counter or gauge named '" << expectation.name_ << "'";
-
-    EXPECT_EQ(metric->tagExtractedName(), expectation.tag_extracted_name_)
-        << " for stat '" << expectation.name_ << "'";
-    std::vector<std::pair<std::string, std::string>> expected_tags = expectation.tags_;
-    std::sort(expected_tags.begin(), expected_tags.end());
-    EXPECT_EQ(tagsOf(*metric), expected_tags) << " for stat '" << expectation.name_ << "'";
   }
 };
 
@@ -405,6 +497,10 @@ resources:
 
   config_helper_.addConfigModifier([this, secret_path](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Dispatcher stats are off by default; enable them so the per-thread dispatcher histograms
+    // exist.
+    bootstrap.set_enable_dispatcher_stats(true);
+
     // Serve the default listener over TLS with a dynamic secret, which creates the SDS scope.
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* sds_secret_config =
@@ -458,9 +554,104 @@ resources:
   ASSERT_NE(store, nullptr);
   EXPECT_EQ(store->useExplicitTags(), explicitTags());
 
+  // The watchdog counters and the dispatcher histograms are created on their own threads, so wait
+  // for them before checking the expectations. Waiting for a histogram's samples also proves it
+  // exists.
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitUntilHistogramHasSamples("server.dispatcher.loop_duration_us");
+  test_server_->waitUntilHistogramHasSamples(
+      "listener_manager.worker_0.dispatcher.loop_duration_us");
+
   for (const StatExpectation& expectation : expectations()) {
-    checkExpectation(expectation);
+    checkExpectation(*test_server_, expectation);
   }
+}
+
+// Verifies that the stats an HTTP request produces are unchanged whether the stats store derives
+// tags with the legacy tag-extraction rules or with the explicit-tags logic. The suite above only
+// covers stats that exist at startup; these are created on the request path, so a real request has
+// to flow through the connection manager first.
+class HttpStatsTagsModeIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
+public:
+  HttpStatsTagsModeIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  static std::string testName(const testing::TestParamInfo<ParamType>& info) {
+    return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(info.param)),
+                        std::get<1>(info.param) ? "_ExplicitTags" : "_LegacyTags");
+  }
+
+  bool explicitTags() const { return std::get<1>(GetParam()); }
+
+  void initialize() override {
+    // As above, the mode is latched during server initialization, so it has to be set directly.
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndTagsMode, HttpStatsTagsModeIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    HttpStatsTagsModeIntegrationTest::testName);
+
+TEST_P(HttpStatsTagsModeIntegrationTest, RequestStatsTagsAndNamesAreIdenticalInBothModes) {
+  initialize();
+
+  // Sanity check that the parameterized mode really took effect.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
+
+  // An iOS user agent, so that the per-device user agent stats are created.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "host"},
+                                                       {"user-agent", "aaa iOS bbb"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->close();
+
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  const std::string& http_user_agent = Config::TagNames::get().HTTP_USER_AGENT;
+  const std::string& response_code_class = Config::TagNames::get().RESPONSE_CODE_CLASS;
+
+  test_server_->waitForCounter("http.config_test.downstream_rq_2xx", testing::Eq(1));
+
+  const std::vector<StatExpectation> expectations{
+      // The response code class of the request that just completed, both on the connection
+      // manager's own stats and on its listener stats.
+      {"http.config_test.downstream_rq_2xx",
+       "http.downstream_rq_xx",
+       {{hcm_prefix, "config_test"}, {response_code_class, "2"}}},
+      // The user agent stats, `source/common/http/user_agent.cc`, which are only created once a
+      // request with a recognized device arrives.
+      {"http.config_test.user_agent.ios.downstream_cx_total",
+       "http.user_agent.downstream_cx_total",
+       {{hcm_prefix, "config_test"}, {http_user_agent, "ios"}}},
+      {"http.config_test.user_agent.ios.downstream_rq_total",
+       "http.user_agent.downstream_rq_total",
+       {{hcm_prefix, "config_test"}, {http_user_agent, "ios"}}},
+  };
+  for (const StatExpectation& expectation : expectations) {
+    checkExpectation(*test_server_, expectation);
+  }
+
+  // The user agent histogram is neither a counter nor a gauge, so it is checked directly.
+  const Stats::ParentHistogramSharedPtr histogram =
+      test_server_->histogram("http.config_test.user_agent.ios.downstream_cx_length_ms");
+  ASSERT_NE(histogram, nullptr);
+  EXPECT_EQ(histogram->tagExtractedName(), "http.user_agent.downstream_cx_length_ms");
+  const std::vector<std::pair<std::string, std::string>> expected_histogram_tags{
+      {hcm_prefix, "config_test"}, {http_user_agent, "ios"}};
+  EXPECT_EQ(tagsOf(*histogram), expected_histogram_tags);
 }
 
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved
@@ -676,6 +867,62 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
     // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
   EXPECT_MEMORY_LE(m_per_host, 3500); // Round up to allow platform variations.
+}
+
+TEST_P(HttpStatsTagsModeIntegrationTest, RouterAndUpstreamFilterStatsAreIdenticalInBothModes) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto& router_filter = *hcm.mutable_http_filters()->rbegin();
+        ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
+        envoy::extensions::filters::http::router::v3::Router router;
+        std::ignore = router_filter.typed_config().UnpackTo(&router);
+
+        // Creates its stats with statsPrefixScopeOr() and statsPrefixOr().
+        auto* stats_prefix_filter = router.add_upstream_http_filters();
+        stats_prefix_filter->set_name("stats-prefix-filter");
+        std::ignore = stats_prefix_filter->mutable_typed_config()->PackFrom(
+            test::integration::filters::StatsPrefixFilterConfig());
+
+        auto* codec_filter = router.add_upstream_http_filters();
+        codec_filter->set_name("envoy.filters.http.upstream_codec");
+        std::ignore = codec_filter->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec());
+
+        std::ignore = router_filter.mutable_typed_config()->PackFrom(router);
+      });
+  initialize();
+
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->close();
+
+  test_server_->waitForCounter("http.config_test.rq_total", testing::Eq(1));
+  test_server_->waitForCounter("http.config_test.stats_prefix_filter.rq_total", testing::Eq(1));
+  // The upstream filter prefix used to lose its trailing dot.
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_teststats_prefix_filter.rq_total"));
+
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  const std::vector<StatExpectation> expectations{
+      {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
+      {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
+      {"http.config_test.rq_direct_response",
+       "http.rq_direct_response",
+       {{hcm_prefix, "config_test"}}},
+      {"http.config_test.stats_prefix_filter.rq_total",
+       "http.stats_prefix_filter.rq_total",
+       {{hcm_prefix, "config_test"}}},
+  };
+  for (const StatExpectation& expectation : expectations) {
+    checkExpectation(*test_server_, expectation);
+  }
 }
 
 } // namespace

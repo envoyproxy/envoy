@@ -17,7 +17,8 @@ Envoy::Config::ConfigValidatorPtr MinimumClustersValidatorFactory::createConfigV
       envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator>(
       config, validation_visitor);
 
-  return std::make_unique<MinimumClustersValidator>(validator_config);
+  return std::make_unique<MinimumClustersValidator>(
+      validator_config, Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>());
 }
 
 Envoy::ProtobufTypes::MessagePtr MinimumClustersValidatorFactory::createEmptyConfigProto() {
@@ -27,10 +28,6 @@ Envoy::ProtobufTypes::MessagePtr MinimumClustersValidatorFactory::createEmptyCon
 
 std::string MinimumClustersValidatorFactory::name() const {
   return absl::StrCat(category(), ".minimum_clusters_validator");
-}
-
-std::string MinimumClustersValidatorFactory::typeUrl() const {
-  return Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
 }
 
 /**

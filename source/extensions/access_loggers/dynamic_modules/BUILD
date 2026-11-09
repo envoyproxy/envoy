@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
         "@envoy_api//envoy/extensions/access_loggers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
@@ -50,6 +51,7 @@ envoy_cc_extension(
         ":access_log_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/access_loggers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

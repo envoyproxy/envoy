@@ -26,7 +26,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
                 OptRef<Init::Manager> init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), server_context, init_manager);
+        config.sds_config(), config.name(), server_context, init_manager, true);
   } else {
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
@@ -54,10 +54,10 @@ absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createHttpFilterFactoryFrom
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
       std::move(secret_provider_certificate), std::move(secret_provider_private_key),
-      server_context.threadLocal(), server_context.api());
+      server_context.threadLocal(), server_context.api(), server_context.mainThreadDispatcher());
   auto config = std::make_shared<FilterConfig>(proto_config, server_context.timeSource(),
-                                               secret_reader, extra_context.stats_prefix,
-                                               extra_context.scopeOr(server_context));
+                                               secret_reader, extra_context.statsPrefixOr(),
+                                               extra_context.statsPrefixScopeOr(server_context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     const EncoderPtr encoder = std::make_unique<EncoderImpl>(config);
     callbacks.addStreamFilter(std::make_shared<Filter>(config, encoder));

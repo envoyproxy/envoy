@@ -37,9 +37,9 @@ function headingOf(section) {
 /**
  * The heading's own text, without the permalink.
  *
- * sphinx_rtd_theme puts a Font Awesome glyph inside `a.headerlink` as a real
- * character rather than generated content, so `textContent` on the heading
- * comes back with a U+F0C1 on the end and nothing matches.
+ * conf.py blanks the Font Awesome glyph sphinx_rtd_theme puts inside
+ * `a.headerlink`; the anchor is skipped regardless, so a build that keeps the
+ * glyph still recognises its symbols.
  */
 function titleOf(heading) {
   return Array.from(heading.childNodes)

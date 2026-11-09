@@ -123,9 +123,11 @@ public:
     Buffer::OwnedImpl data_to_write;
     doDataList.moveOut(data_to_write);
 
-    ENVOY_LOG(debug, "golang filter injecting data to filter chain, end_stream: {}",
-              do_end_stream_);
-    injectDataToFilterChain(data_to_write, do_end_stream_);
+    // Data followed by trailers never ends the stream. do_end_stream_ is true while processing
+    // the trailers, when buffered data can still be pending.
+    const bool end_stream = do_end_stream_ && trailers == nullptr;
+    ENVOY_LOG(debug, "golang filter injecting data to filter chain, end_stream: {}", end_stream);
+    injectDataToFilterChain(data_to_write, end_stream);
   }
 
   void processHeader(bool end_stream) {

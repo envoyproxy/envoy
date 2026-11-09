@@ -12,7 +12,6 @@ envoy_cc_test(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/apple:utility_lib",

@@ -49,6 +49,123 @@ TEST(MetadataTest, MetadataValuePath) {
             Protobuf::Value::KindCase::KIND_NOT_SET);
 }
 
+TEST(MetadataTest, MetadataValuePathWithIndex) {
+  const std::string filter = "com.test";
+  envoy::config::core::v3::Metadata metadata;
+  Protobuf::Struct& filter_struct = (*metadata.mutable_filter_metadata())[filter];
+
+  // Create a ListValue with string elements
+  Protobuf::Value list_val;
+  auto* list = list_val.mutable_list_value();
+  *list->add_values() = ValueUtil::stringValue("first");
+  *list->add_values() = ValueUtil::stringValue("second");
+  *list->add_values() = ValueUtil::stringValue("third");
+  (*filter_struct.mutable_fields())["tenant_ids"] = list_val;
+
+  // Test: access first element via index
+  {
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("tenant_ids");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(0);
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).string_value(), "first");
+  }
+
+  // Test: access second element via index
+  {
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("tenant_ids");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(1);
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).string_value(), "second");
+  }
+
+  // Test: access third element via index
+  {
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("tenant_ids");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(2);
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).string_value(), "third");
+  }
+
+  // Test: out of bounds index returns empty
+  {
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("tenant_ids");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(10);
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).kind_case(),
+              Protobuf::Value::KindCase::KIND_NOT_SET);
+  }
+
+  // Test: index on non-list returns empty
+  {
+    (*filter_struct.mutable_fields())["scalar"] = ValueUtil::stringValue("not_a_list");
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("scalar");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(0);
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).kind_case(),
+              Protobuf::Value::KindCase::KIND_NOT_SET);
+  }
+
+  // Test: nested struct inside list element
+  {
+    Protobuf::Value nested_list_val;
+    auto* nested_list = nested_list_val.mutable_list_value();
+    auto nested_struct = MessageUtil::keyValueStruct("inner", "value");
+    Protobuf::Value struct_val;
+    *struct_val.mutable_struct_value() = nested_struct;
+    *nested_list->add_values() = struct_val;
+    (*filter_struct.mutable_fields())["nested"] = nested_list_val;
+
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("nested");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(0);
+    auto* seg3 = metadata_key.add_path();
+    seg3->set_key("inner");
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).string_value(), "value");
+  }
+
+  // Test: list of numbers
+  {
+    Protobuf::Value num_list_val;
+    auto* num_list = num_list_val.mutable_list_value();
+    *num_list->add_values() = ValueUtil::numberValue(42.0);
+    *num_list->add_values() = ValueUtil::numberValue(123.0);
+    (*filter_struct.mutable_fields())["numbers"] = num_list_val;
+
+    envoy::type::metadata::v3::MetadataKey metadata_key;
+    metadata_key.set_key(filter);
+    auto* seg1 = metadata_key.add_path();
+    seg1->set_key("numbers");
+    auto* seg2 = metadata_key.add_path();
+    seg2->set_index(0);
+    MetadataKey key(metadata_key);
+    EXPECT_EQ(Metadata::metadataValue(&metadata, key).number_value(), 42.0);
+  }
+}
+
 TEST(MetadataTest, MetadataLabelMatch) {
   envoy::config::core::v3::Metadata metadata;
   const std::string filter = "com.test";

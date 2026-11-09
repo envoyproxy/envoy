@@ -37,8 +37,26 @@ fn new_cluster_config(
       metrics: envoy_cluster_metrics,
     })),
     "async_host_selection" => Some(Box::new(AsyncHostSelectionClusterConfig {
-      upstream_address: config_str.to_string(),
+      upstream_addresses: vec![config_str.to_string()],
+      logical_hostnames: Vec::new(),
     })),
+    "async_logical_hostnames" => {
+      // Each line is "<logical hostname>,<connection address>", for example:
+      // "a.lyft.com,127.0.0.1:10001" or "b.lyft.com,[::1]:10002".
+      // Split on the comma to keep the TLS hostname separate from the socket address.
+      let hosts: Option<Vec<_>> = config_str
+        .lines()
+        .map(|line| line.split_once(','))
+        .collect();
+      let (logical_hostnames, upstream_addresses) = hosts?
+        .into_iter()
+        .map(|(hostname, address)| (hostname.to_string(), address.to_string()))
+        .unzip();
+      Some(Box::new(AsyncHostSelectionClusterConfig {
+        upstream_addresses,
+        logical_hostnames,
+      }))
+    },
     "scheduler_host_update" => Some(Box::new(SchedulerHostUpdateClusterConfig {
       upstream_address: config_str.to_string(),
     })),
@@ -65,6 +83,16 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "persistent_host_map" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("persistent_host_map_hits_total")
+        .ok();
+      Some(Box::new(PersistentHostMapClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     "member_update_packed_address" => {
       let counter_id = envoy_cluster_metrics
         .define_counter("packed_address_verified_total")
@@ -75,6 +103,48 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "healthy_hosts_rebuild" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("healthy_hosts_rebuilt_total")
+        .ok();
+      Some(Box::new(HealthyHostsRebuildClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
+    "host_churn" | "host_churn_module_opt_in" => {
+      if name == "host_churn_module_opt_in" {
+        assert!(envoy_cluster_metrics.use_persistent_host_partitions());
+      }
+      let counter_id = envoy_cluster_metrics
+        .define_counter("host_churn_converged_total")
+        .ok();
+      let health_changes_id = envoy_cluster_metrics
+        .define_counter("host_churn_health_changes_total")
+        .ok();
+      Some(Box::new(HostChurnClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        health_changes_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
+    "health_patch_removal" | "health_patch_window" => {
+      let converged_id = envoy_cluster_metrics
+        .define_counter("health_patch_converged_total")
+        .ok();
+      let unknown_id = envoy_cluster_metrics
+        .define_counter("health_patch_unknown_total")
+        .ok();
+      Some(Box::new(HealthPatchClusterConfig {
+        upstream_address: config_str.to_string(),
+        remove_after_flips: name == "health_patch_removal",
+        converged_id,
+        unknown_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     "worker_timer" => {
       let armed_id = envoy_cluster_metrics
         .define_counter("timer_armed_total")
@@ -82,10 +152,20 @@ fn new_cluster_config(
       let fired_id = envoy_cluster_metrics
         .define_counter("timer_fired_total")
         .ok();
+      // Resolve a counter vec handle once so the timer records by handle from the worker thread.
+      let fired_handle = envoy_cluster_metrics
+        .define_counter_vec("timer_fired_by_outcome", &["outcome"])
+        .ok()
+        .and_then(|id| {
+          envoy_cluster_metrics
+            .resolve_counter_vec(id, &["fired"])
+            .ok()
+        });
       Some(Box::new(WorkerTimerClusterConfig {
         upstream_address: config_str.to_string(),
         armed_id,
         fired_id,
+        fired_handle,
         metrics: envoy_cluster_metrics,
       }))
     },
@@ -187,28 +267,39 @@ impl ClusterLb for SyncHostSelectionLb {
 // =============================================================================
 
 struct AsyncHostSelectionClusterConfig {
-  upstream_address: String,
+  upstream_addresses: Vec<String>,
+  logical_hostnames: Vec<String>,
 }
 
 impl ClusterConfig for AsyncHostSelectionClusterConfig {
   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
     Box::new(AsyncHostSelectionCluster {
-      upstream_address: self.upstream_address.clone(),
+      upstream_addresses: self.upstream_addresses.clone(),
+      logical_hostnames: self.logical_hostnames.clone(),
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
     })
   }
 }
 
 struct AsyncHostSelectionCluster {
-  upstream_address: String,
+  upstream_addresses: Vec<String>,
+  logical_hostnames: Vec<String>,
   hosts: SharedHostList,
 }
 
 impl Cluster for AsyncHostSelectionCluster {
   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
-    let addresses = vec![self.upstream_address.clone()];
-    let weights = vec![1u32];
-    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+    let weights = vec![1u32; self.upstream_addresses.len()];
+    let host_ptrs = if self.logical_hostnames.is_empty() {
+      envoy_cluster.add_hosts(&self.upstream_addresses, &weights)
+    } else {
+      envoy_cluster.add_hosts_with_hostnames(
+        &self.upstream_addresses,
+        &self.logical_hostnames,
+        &weights,
+      )
+    };
+    if let Some(host_ptrs) = host_ptrs {
       self.hosts.lock().unwrap().0 = host_ptrs;
     }
     envoy_cluster.pre_init_complete();
@@ -220,6 +311,8 @@ impl Cluster for AsyncHostSelectionCluster {
   ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
+      select_by_header: !self.logical_hostnames.is_empty(),
+      completion_threads: Vec::new(),
     }))
   }
 }
@@ -241,25 +334,57 @@ impl AsyncCompletionTask {
 
 struct AsyncHostSelectionLb {
   hosts: SharedHostList,
+  select_by_header: bool,
+  completion_threads: Vec<std::thread::JoinHandle<()>>,
+}
+
+// A completion thread runs module code until it has exited, so it must not outlive the module.
+// Envoy destroys every load balancer before it can unload the module, so join the threads here.
+impl Drop for AsyncHostSelectionLb {
+  fn drop(&mut self) {
+    for thread in self.completion_threads.drain(..) {
+      let _ = thread.join();
+    }
+  }
 }
 
 impl ClusterLb for AsyncHostSelectionLb {
   fn choose_host(
     &mut self,
-    _context: Option<&dyn ClusterLbContext>,
+    context: Option<&dyn ClusterLbContext>,
     async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
   ) -> HostSelectionResult {
     let hosts = self.hosts.lock().unwrap();
     if hosts.0.is_empty() {
       return HostSelectionResult::NoHost;
     }
+    let index = if self.select_by_header {
+      // The test sets x-upstream-index to 0 or 1 to select A or B in a fixed order.
+      // The argument 0 reads the first header value; its contents select the upstream.
+      let index = context
+        .and_then(|context| context.get_downstream_header("x-upstream-index", 0))
+        .and_then(|(value, _)| {
+          std::str::from_utf8(value.as_slice())
+            .ok()?
+            .parse::<usize>()
+            .ok()
+        });
+      match index {
+        Some(index) if index < hosts.0.len() => index,
+        _ => return HostSelectionResult::NoHost,
+      }
+    } else {
+      0
+    };
     let task = AsyncCompletionTask {
       completion: async_completion,
-      host: hosts.0[0],
+      host: hosts.0[index],
     };
     // Spawn a background thread to complete the host selection asynchronously.
     // The ABI implementation posts the completion to the correct worker thread.
-    std::thread::spawn(move || task.run());
+    self
+      .completion_threads
+      .push(std::thread::spawn(move || task.run()));
     HostSelectionResult::AsyncPending(Box::new(AsyncHandle {
       cancelled: Arc::new(AtomicBool::new(false)),
     }))
@@ -590,7 +715,7 @@ impl Cluster for WorkerLocalRebuildCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == WORKER_LOCAL_REBUILD_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }
@@ -625,14 +750,14 @@ impl ClusterLb for WorkerLocalRebuildLb {
     num_hosts_removed: usize,
   ) {
     // Drop removed hosts resolved directly from the member update.
-    for i in 0..num_hosts_removed {
+    for i in 0 .. num_hosts_removed {
       if let Some(host) = envoy_lb.get_member_update_host(i, false) {
         let addr = host as usize;
         self.hosts.retain(|&existing| existing != addr);
       }
     }
     // Learn added hosts directly from the member update so routing uses the pointer it returns.
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       if let Some(host) = envoy_lb.get_member_update_host(i, true) {
         self.hosts.push(host as usize);
       }
@@ -645,6 +770,93 @@ impl ClusterLb for WorkerLocalRebuildLb {
       && !self.hosts.is_empty()
       && envoy_lb.get_hosts_count(0) == self.hosts.len();
     if converged {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Persistent cross-priority host map.
+// =============================================================================
+//
+// Selects the persistent host map during init and resolves the routed host on each worker through
+// find_host_by_address, which reads the cross-priority host map published to that worker.
+
+struct PersistentHostMapClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for PersistentHostMapClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(PersistentHostMapCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct PersistentHostMapCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for PersistentHostMapCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.use_persistent_host_map();
+    envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
+    envoy_cluster.pre_init_complete();
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(PersistentHostMapLb {
+      upstream_address: self.upstream_address.clone(),
+      host: None,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+}
+
+struct PersistentHostMapLb {
+  upstream_address: String,
+  host: Option<usize>,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for PersistentHostMapLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    match self.host {
+      Some(host) => {
+        HostSelectionResult::Selected(host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr)
+      },
+      None => HostSelectionResult::NoHost,
+    }
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    self.host = envoy_lb
+      .find_host_by_address(&self.upstream_address)
+      .map(|host| host as usize);
+    if self.host.is_some() {
       if let Some(counter_id) = self.counter_id {
         let _ = self.metrics.increment_counter(counter_id, 1);
       }
@@ -707,7 +919,7 @@ impl Cluster for MemberUpdatePackedAddressCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == PACKED_ADDRESS_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }
@@ -760,7 +972,7 @@ impl ClusterLb for MemberUpdatePackedAddressLb {
     num_hosts_added: usize,
     _num_hosts_removed: usize,
   ) {
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       // The packed bytes must agree with the formatted address for the same host.
       let verified = match (
         envoy_lb.get_member_update_host_packed_address(i, true),
@@ -798,6 +1010,7 @@ struct WorkerTimerClusterConfig {
   upstream_address: String,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -808,6 +1021,7 @@ impl ClusterConfig for WorkerTimerClusterConfig {
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     })
   }
@@ -818,6 +1032,7 @@ struct WorkerTimerCluster {
   hosts: SharedHostList,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -840,6 +1055,7 @@ impl Cluster for WorkerTimerCluster {
       timer: None,
       armed_id: self.armed_id,
       fired_id: self.fired_id,
+      fired_handle: self.fired_handle,
       metrics: self.metrics.clone(),
     }))
   }
@@ -850,6 +1066,7 @@ struct WorkerTimerLb {
   timer: Option<Box<dyn EnvoyClusterWorkerTimer>>,
   armed_id: Option<EnvoyCounterId>,
   fired_id: Option<EnvoyCounterId>,
+  fired_handle: Option<EnvoyResolvedCounter>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -891,6 +1108,10 @@ impl ClusterLb for WorkerTimerLb {
   ) {
     if let Some(fired_id) = self.fired_id {
       let _ = self.metrics.increment_counter(fired_id, 1);
+    }
+    // Record the same fire through the resolved handle, which allocates nothing per call.
+    if let Some(fired_handle) = self.fired_handle {
+      fired_handle.add(1);
     }
     // Re-arm for periodic firing.
     timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));
@@ -974,5 +1195,428 @@ impl ClusterLb for NativeLbTestLb {
       let _ = self.metrics.increment_counter(counter_id, 1);
     }
     HostSelectionResult::Selected(hosts.0[idx])
+  }
+}
+
+// =============================================================================
+// Healthy-partition bulk rebuild.
+// =============================================================================
+//
+// Mirrors the worker-local-rebuild flow, but on_host_membership_update rebuilds the routable set
+// from get_healthy_hosts in one ABI crossing rather than applying the member-update delta. It
+// increments a counter once the bulk read agrees with get_healthy_host_count, so the test can wait
+// for every worker to converge before routing through a pointer the bulk getter returned.
+
+const HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID: u64 = 400;
+
+struct HealthyHostsRebuildClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for HealthyHostsRebuildClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(HealthyHostsRebuildCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct HealthyHostsRebuildCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for HealthyHostsRebuildCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID);
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(HealthyHostsRebuildLb {
+      hosts: Vec::new(),
+      index: 0,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id == HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID {
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
+    }
+  }
+}
+
+struct HealthyHostsRebuildLb {
+  hosts: Vec<usize>,
+  index: usize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for HealthyHostsRebuildLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    if self.hosts.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index % self.hosts.len();
+    self.index += 1;
+    HostSelectionResult::Selected(
+      self.hosts[idx] as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    )
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    // Rebuild the routable set from the whole healthy partition in one crossing.
+    let mut healthy = Vec::new();
+    if !envoy_lb.get_healthy_hosts(0, &mut healthy) {
+      return;
+    }
+    self.hosts = healthy.iter().map(|&host| host as usize).collect();
+    // Increment once the bulk read is non-empty and agrees with the per-host count, so the test can
+    // wait for every worker to converge.
+    if !self.hosts.is_empty() && self.hosts.len() == envoy_lb.get_healthy_host_count(0) {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Host churn.
+// =============================================================================
+//
+// Churns hosts and health; the counter increments once a worker's healthy partition is just the
+// upstream. A second counter records the health-changed hosts Envoy reports.
+
+const HOST_CHURN_EVENT_ID: u64 = 500;
+const HOST_CHURN_DECOY_ADDRESSES: [&str; 2] = ["127.0.0.1:1", "127.0.0.1:2"];
+
+struct HostChurnClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  health_changes_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for HostChurnClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(HostChurnCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      health_changes_id: self.health_changes_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct HostChurnCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  health_changes_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for HostChurnCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(HOST_CHURN_EVENT_ID);
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(HostChurnLb {
+      healthy_host: None,
+      counter_id: self.counter_id,
+      health_changes_id: self.health_changes_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id != HOST_CHURN_EVENT_ID {
+      return;
+    }
+    let addresses = vec![
+      self.upstream_address.clone(),
+      HOST_CHURN_DECOY_ADDRESSES[0].to_string(),
+      HOST_CHURN_DECOY_ADDRESSES[1].to_string(),
+    ];
+    let Some(hosts) = envoy_cluster.add_hosts(&addresses, &[1u32, 1, 1]) else {
+      return;
+    };
+    envoy_cluster.update_host_health(
+      hosts[0],
+      abi::envoy_dynamic_module_type_host_health::Degraded,
+    );
+    envoy_cluster.update_host_health(
+      hosts[0],
+      abi::envoy_dynamic_module_type_host_health::Healthy,
+    );
+    envoy_cluster.remove_hosts(&[hosts[1]]);
+    envoy_cluster.update_host_health(
+      hosts[2],
+      abi::envoy_dynamic_module_type_host_health::Unhealthy,
+    );
+  }
+}
+
+struct HostChurnLb {
+  healthy_host: Option<usize>,
+  counter_id: Option<EnvoyCounterId>,
+  health_changes_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for HostChurnLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    match self.healthy_host {
+      Some(host) => {
+        HostSelectionResult::Selected(host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr)
+      },
+      None => HostSelectionResult::NoHost,
+    }
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    let mut healthy = Vec::new();
+    if !envoy_lb.get_healthy_hosts(0, &mut healthy) {
+      return;
+    }
+    let converged = healthy.len() == 1
+      && envoy_lb.get_healthy_host_count(0) == 1
+      && envoy_lb.get_hosts_count(0) == 2
+      && envoy_lb.get_degraded_hosts_count(0) == 0;
+    self.healthy_host = healthy.first().map(|&host| host as usize);
+    if let Some(count) = envoy_lb.get_member_update_health_changed_host_count() {
+      let reported = (0 .. count)
+        .filter(|&index| {
+          envoy_lb
+            .get_member_update_health_changed_host(index)
+            .is_some()
+        })
+        .count();
+      if let Some(health_changes_id) = self.health_changes_id {
+        let _ = self
+          .metrics
+          .increment_counter(health_changes_id, reported as u64);
+      }
+    }
+    if converged {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Health patch.
+// =============================================================================
+//
+// Adds the upstream and three decoys, then marks two decoys unhealthy in one main-thread event, so
+// both flips land in one update_merge_window. The removal variant then removes the last decoy,
+// which cancels the merged update and delivers the flips with the removal; the window variant
+// marks the last decoy unhealthy too and lets the merge timer deliver all three. Each load balancer
+// keeps its healthy set only from the reported membership and health deltas, treating added hosts
+// as healthy, and counts once when that set matches Envoy's healthy hosts with just the upstream
+// healthy.
+
+const HEALTH_PATCH_EVENT_ID: u64 = 600;
+const HEALTH_PATCH_DECOY_ADDRESSES: [&str; 3] = ["127.0.0.1:11", "127.0.0.1:12", "127.0.0.1:13"];
+
+struct HealthPatchClusterConfig {
+  upstream_address: String,
+  remove_after_flips: bool,
+  converged_id: Option<EnvoyCounterId>,
+  unknown_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for HealthPatchClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(HealthPatchCluster {
+      upstream_address: self.upstream_address.clone(),
+      remove_after_flips: self.remove_after_flips,
+      converged_id: self.converged_id,
+      unknown_id: self.unknown_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct HealthPatchCluster {
+  upstream_address: String,
+  remove_after_flips: bool,
+  converged_id: Option<EnvoyCounterId>,
+  unknown_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for HealthPatchCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(HEALTH_PATCH_EVENT_ID);
+  }
+
+  fn new_load_balancer(
+    &self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    // Hosts the worker already holds arrive before the first membership update.
+    let mut initial = Vec::new();
+    let healthy = if envoy_lb.get_healthy_hosts(0, &mut initial) {
+      initial.into_iter().map(|host| host as usize).collect()
+    } else {
+      std::collections::HashSet::new()
+    };
+    Some(Box::new(HealthPatchLb {
+      healthy,
+      converged: false,
+      converged_id: self.converged_id,
+      unknown_id: self.unknown_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id != HEALTH_PATCH_EVENT_ID {
+      return;
+    }
+    let mut addresses = vec![self.upstream_address.clone()];
+    addresses.extend(
+      HEALTH_PATCH_DECOY_ADDRESSES
+        .iter()
+        .map(|address| address.to_string()),
+    );
+    let Some(hosts) = envoy_cluster.add_hosts(&addresses, &[1u32, 1, 1, 1]) else {
+      return;
+    };
+    envoy_cluster.update_host_health(
+      hosts[1],
+      abi::envoy_dynamic_module_type_host_health::Unhealthy,
+    );
+    envoy_cluster.update_host_health(
+      hosts[2],
+      abi::envoy_dynamic_module_type_host_health::Unhealthy,
+    );
+    // Either way the upstream ends up the only healthy host.
+    if self.remove_after_flips {
+      envoy_cluster.remove_hosts(&[hosts[3]]);
+    } else {
+      envoy_cluster.update_host_health(
+        hosts[3],
+        abi::envoy_dynamic_module_type_host_health::Unhealthy,
+      );
+    }
+  }
+}
+
+struct HealthPatchLb {
+  healthy: std::collections::HashSet<usize>,
+  converged: bool,
+  converged_id: Option<EnvoyCounterId>,
+  unknown_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for HealthPatchLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    match self.healthy.iter().next() {
+      Some(&host) if self.converged => {
+        HostSelectionResult::Selected(host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr)
+      },
+      _ => HostSelectionResult::NoHost,
+    }
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    num_hosts_added: usize,
+    num_hosts_removed: usize,
+  ) {
+    let Some(changed) = envoy_lb.get_member_update_health_changed_host_count() else {
+      // Envoy cannot say which hosts changed health, so reread them. The test expects none of
+      // these, since a reread would hide a missed health change.
+      if let Some(unknown_id) = self.unknown_id {
+        let _ = self.metrics.increment_counter(unknown_id, 1);
+      }
+      let mut healthy = Vec::new();
+      if envoy_lb.get_healthy_hosts(0, &mut healthy) {
+        self.healthy = healthy.into_iter().map(|host| host as usize).collect();
+      }
+      return;
+    };
+    for index in 0 .. num_hosts_removed {
+      if let Some(host) = envoy_lb.get_member_update_host(index, false) {
+        self.healthy.remove(&(host as usize));
+      }
+    }
+    for index in 0 .. num_hosts_added {
+      if let Some(host) = envoy_lb.get_member_update_host(index, true) {
+        self.healthy.insert(host as usize);
+      }
+    }
+    for index in 0 .. changed {
+      if let Some((host, _priority, health)) = envoy_lb.get_member_update_health_changed_host(index)
+      {
+        if health == abi::envoy_dynamic_module_type_host_health::Healthy {
+          self.healthy.insert(host as usize);
+        } else {
+          self.healthy.remove(&(host as usize));
+        }
+      }
+    }
+
+    let mut actual = Vec::new();
+    if !envoy_lb.get_healthy_hosts(0, &mut actual) {
+      return;
+    }
+    let actual: std::collections::HashSet<usize> =
+      actual.into_iter().map(|host| host as usize).collect();
+    if !self.converged && actual.len() == 1 && self.healthy == actual {
+      self.converged = true;
+      if let Some(converged_id) = self.converged_id {
+        let _ = self.metrics.increment_counter(converged_id, 1);
+      }
+    }
   }
 }

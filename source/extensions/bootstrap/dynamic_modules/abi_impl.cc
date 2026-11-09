@@ -2,6 +2,8 @@
 
 // This file provides host-side implementations for ABI callbacks specific to bootstrap extensions.
 
+#include <vector>
+
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -12,10 +14,33 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/strings/str_cat.h"
+
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleClusterWriter;
+using Envoy::Extensions::DynamicModules::MetricRegistry;
+
+namespace {
+
+// Serializes a metric name into the reused buffer and returns a view over it. This avoids the
+// std::string that Metric::name() allocates on every call. The view is valid until the buffer is
+// next written on the same thread.
+absl::string_view serializeMetricName(const Envoy::Stats::Metric& metric,
+                                      std::vector<char>& buffer) {
+  const Envoy::Stats::SymbolTable& symbol_table = metric.constSymbolTable();
+  const Envoy::Stats::StatName stat_name = metric.statName();
+  size_t required = symbol_table.serializeToBuffer(stat_name, buffer.data(), buffer.size());
+  if (required > buffer.size()) {
+    buffer.resize(required);
+    symbol_table.serializeToBuffer(stat_name, buffer.data(), buffer.size());
+  }
+  return absl::string_view(buffer.data(), required);
+}
+
+} // namespace
 
 extern "C" {
 
@@ -45,6 +70,12 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
 void envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    // Envoy cannot finish initializing without the signal, so deliver it on the main thread.
+    config->postSignalInitComplete();
+    return;
+  }
   config->signalInitComplete();
 }
 
@@ -56,6 +87,10 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
     uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
 
   // Build the HTTP request message.
@@ -94,10 +129,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachCounter() to enable early exit once the stat is found.
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Counter> counter_callback =
       [&name_view, &found, value_ptr](const Envoy::Stats::CounterSharedPtr& counter) -> bool {
-    if (counter->name() == name_view) {
+    if (serializeMetricName(*counter, name_buffer) == name_view) {
       *value_ptr = counter->value();
       found = true;
       return false; // Stop iteration.
@@ -116,10 +152,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachGauge() to enable early exit once the stat is found.
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Gauge> gauge_callback =
       [&name_view, &found, value_ptr](const Envoy::Stats::GaugeSharedPtr& gauge) -> bool {
-    if (gauge->name() == name_view) {
+    if (serializeMetricName(*gauge, name_buffer) == name_view) {
       *value_ptr = gauge->value();
       found = true;
       return false; // Stop iteration.
@@ -138,11 +175,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
   Envoy::Stats::Store& stats_store = extension->statsStore();
   const absl::string_view name_view(name.ptr, name.length);
 
+  thread_local std::vector<char> name_buffer;
   bool found = false;
   stats_store.forEachHistogram(
       [](size_t) {},
       [&name_view, &found, sample_count_ptr, sample_sum_ptr](Envoy::Stats::ParentHistogram& hist) {
-        if (!found && hist.name() == name_view) {
+        if (!found && serializeMetricName(hist, name_buffer) == name_view) {
           const auto& stats = hist.cumulativeStatistics();
           *sample_count_ptr = stats.sampleCount();
           *sample_sum_ptr = stats.sampleSum();
@@ -158,17 +196,20 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
-  stats_store.forEachCounter([](size_t) {},
-                             [iterator_fn, user_data](Envoy::Stats::Counter& counter) {
-                               std::string name = counter.name();
-                               envoy_dynamic_module_type_envoy_buffer name_buffer{name.data(),
-                                                                                  name.size()};
-                               auto action = iterator_fn(name_buffer, counter.value(), user_data);
-                               // Note: forEachCounter doesn't support early exit, so we ignore Stop
-                               // action. The module should handle this by setting a flag in
-                               // user_data.
-                               (void)action;
-                             });
+  // Snapshot the counters so the module callback runs without the allocator lock held. A stats call
+  // from the callback would otherwise re-enter the non-recursive allocator lock and deadlock. The
+  // snapshot holds a reference to each counter so it stays alive during iteration, and a local name
+  // buffer keeps a nested iteration from clobbering it.
+  const std::vector<Envoy::Stats::CounterSharedPtr> counters = stats_store.counters();
+  std::vector<char> name_buffer;
+  for (const auto& counter : counters) {
+    absl::string_view name = serializeMetricName(*counter, name_buffer);
+    envoy_dynamic_module_type_envoy_buffer name_buf{name.data(), name.size()};
+    if (iterator_fn(name_buf, counter->value(), user_data) ==
+        envoy_dynamic_module_type_stats_iteration_action_Stop) {
+      break;
+    }
+  }
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
@@ -177,17 +218,36 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
-  stats_store.forEachGauge([](size_t) {},
-                           [iterator_fn, user_data](Envoy::Stats::Gauge& gauge) {
-                             std::string name = gauge.name();
-                             envoy_dynamic_module_type_envoy_buffer name_buffer{name.data(),
-                                                                                name.size()};
-                             auto action = iterator_fn(name_buffer, gauge.value(), user_data);
-                             // Note: forEachGauge doesn't support early exit, so we ignore Stop
-                             // action. The module should handle this by setting a flag in
-                             // user_data.
-                             (void)action;
-                           });
+  // Snapshot the gauges so the module callback runs without the allocator lock held. A stats call
+  // from the callback would otherwise re-enter the non-recursive allocator lock and deadlock. The
+  // snapshot holds a reference to each gauge so it stays alive during iteration, and a local name
+  // buffer keeps a nested iteration from clobbering it.
+  const std::vector<Envoy::Stats::GaugeSharedPtr> gauges = stats_store.gauges();
+  std::vector<char> name_buffer;
+  for (const auto& gauge : gauges) {
+    absl::string_view name = serializeMetricName(*gauge, name_buffer);
+    envoy_dynamic_module_type_envoy_buffer name_buf{name.data(), name.size()};
+    if (iterator_fn(name_buf, gauge->value(), user_data) ==
+        envoy_dynamic_module_type_stats_iteration_action_Stop) {
+      break;
+    }
+  }
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names must "
+                 "be called on the main thread");
+    return;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  config->getActiveResourceNames(kind, [name_fn, user_data](absl::string_view name) {
+    envoy_dynamic_module_type_envoy_buffer name_buffer{const_cast<char*>(name.data()), name.size()};
+    name_fn(name_buffer, user_data);
+  });
 }
 
 // -------------------- Stats Definition and Update Callbacks --------------------
@@ -196,8 +256,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
 
 namespace {
 
-// Builds the tag vector using a caller-owned stack-local pool so the shared `stat_name_pool_`
-// is not mutated from worker threads. Returned tags borrow storage from `dynamic_pool`.
+// Builds the tag vector using a caller-owned stack-local pool so the registry's shared stat name
+// pool is not mutated from worker threads. Returned tags borrow storage from `dynamic_pool`.
 Envoy::Stats::StatNameTagVector buildTagsForBootstrapMetric(
     Envoy::Stats::StatNameDynamicPool& dynamic_pool, const Envoy::Stats::StatNameVec& label_names,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length) {
@@ -227,22 +287,23 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
-  Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
+  Envoy::Stats::StatName main_stat_name = config->metrics().statNamePool().add(name_view);
 
   // Handle the special case where the labels size is zero.
   if (label_names_length == 0) {
     Envoy::Stats::Counter& c =
-        Envoy::Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
-    *counter_id_ptr = config->addCounter({c});
+        Envoy::Stats::Utility::counterFromStatNames(config->metrics().scope(), {main_stat_name});
+    *counter_id_ptr = config->metrics().addCounter(MetricRegistry::CounterHandle(c));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
   Envoy::Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
     absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
-    label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
+    label_names_vec.push_back(config->metrics().statNamePool().add(label_name_view));
   }
-  *counter_id_ptr = config->addCounterVec({main_stat_name, label_names_vec});
+  *counter_id_ptr = config->metrics().addCounterVec(
+      MetricRegistry::CounterVecHandle(main_stat_name, std::move(label_names_vec)));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -255,7 +316,7 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
 
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto counter = config->getCounterById(id);
+    auto counter = config->metrics().getCounterById(id);
     if (!counter.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
@@ -263,17 +324,17 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
-  auto counter = config->getCounterVecById(id);
+  auto counter = config->metrics().getCounterVecById(id);
   if (!counter.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != counter->getLabelNames().size()) {
+  if (label_values_length != counter->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, counter->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, counter->labelNames(), label_values,
                                           label_values_length);
-  counter->add(*config->stats_scope_, tags, value);
+  counter->add(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -288,23 +349,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
-  Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
+  Envoy::Stats::StatName main_stat_name = config->metrics().statNamePool().add(name_view);
   Envoy::Stats::Gauge::ImportMode import_mode = Envoy::Stats::Gauge::ImportMode::Accumulate;
 
   // Handle the special case where the labels size is zero.
   if (label_names_length == 0) {
     Envoy::Stats::Gauge& g = Envoy::Stats::Utility::gaugeFromStatNames(
-        *config->stats_scope_, {main_stat_name}, import_mode);
-    *gauge_id_ptr = config->addGauge({g});
+        config->metrics().scope(), {main_stat_name}, import_mode);
+    *gauge_id_ptr = config->metrics().addGauge(MetricRegistry::GaugeHandle(g));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
   Envoy::Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
     absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
-    label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
+    label_names_vec.push_back(config->metrics().statNamePool().add(label_name_view));
   }
-  *gauge_id_ptr = config->addGaugeVec({main_stat_name, label_names_vec, import_mode});
+  *gauge_id_ptr = config->metrics().addGaugeVec(
+      MetricRegistry::GaugeVecHandle(main_stat_name, std::move(label_names_vec), import_mode));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -316,24 +378,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto gauge = config->getGaugeById(id);
+    auto gauge = config->metrics().getGaugeById(id);
     if (!gauge.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
     gauge->set(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto gauge = config->getGaugeVecById(id);
+  auto gauge = config->metrics().getGaugeVecById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != gauge->getLabelNames().size()) {
+  if (label_values_length != gauge->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->labelNames(), label_values,
                                           label_values_length);
-  gauge->set(*config->stats_scope_, tags, value);
+  gauge->set(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -345,24 +407,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto gauge = config->getGaugeById(id);
+    auto gauge = config->metrics().getGaugeById(id);
     if (!gauge.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
-    gauge->add(value);
+    gauge->increase(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto gauge = config->getGaugeVecById(id);
+  auto gauge = config->metrics().getGaugeVecById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != gauge->getLabelNames().size()) {
+  if (label_values_length != gauge->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->labelNames(), label_values,
                                           label_values_length);
-  gauge->add(*config->stats_scope_, tags, value);
+  gauge->increase(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -374,24 +436,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto gauge = config->getGaugeById(id);
+    auto gauge = config->metrics().getGaugeById(id);
     if (!gauge.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
-    gauge->sub(value);
+    gauge->decrease(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto gauge = config->getGaugeVecById(id);
+  auto gauge = config->metrics().getGaugeVecById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != gauge->getLabelNames().size()) {
+  if (label_values_length != gauge->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->labelNames(), label_values,
                                           label_values_length);
-  gauge->sub(*config->stats_scope_, tags, value);
+  gauge->decrease(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -406,23 +468,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   absl::string_view name_view(name.ptr, name.length);
-  Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
+  Envoy::Stats::StatName main_stat_name = config->metrics().statNamePool().add(name_view);
   Envoy::Stats::Histogram::Unit unit = Envoy::Stats::Histogram::Unit::Unspecified;
 
   // Handle the special case where the labels size is zero.
   if (label_names_length == 0) {
     Envoy::Stats::Histogram& h = Envoy::Stats::Utility::histogramFromStatNames(
-        *config->stats_scope_, {main_stat_name}, unit);
-    *histogram_id_ptr = config->addHistogram({h});
+        config->metrics().scope(), {main_stat_name}, unit);
+    *histogram_id_ptr = config->metrics().addHistogram(MetricRegistry::HistogramHandle(h));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
   Envoy::Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
     absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
-    label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
+    label_names_vec.push_back(config->metrics().statNamePool().add(label_name_view));
   }
-  *histogram_id_ptr = config->addHistogramVec({main_stat_name, label_names_vec, unit});
+  *histogram_id_ptr = config->metrics().addHistogramVec(
+      MetricRegistry::HistogramVecHandle(main_stat_name, std::move(label_names_vec), unit));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -434,24 +497,24 @@ envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   // Handle the special case where the labels size is zero.
   if (label_values_length == 0) {
-    auto histogram = config->getHistogramById(id);
+    auto histogram = config->metrics().getHistogramById(id);
     if (!histogram.has_value()) {
       return envoy_dynamic_module_type_metrics_result_MetricNotFound;
     }
     histogram->recordValue(value);
     return envoy_dynamic_module_type_metrics_result_Success;
   }
-  auto histogram = config->getHistogramVecById(id);
+  auto histogram = config->metrics().getHistogramVecById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (label_values_length != histogram->getLabelNames().size()) {
+  if (label_values_length != histogram->labelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
-  auto tags = buildTagsForBootstrapMetric(dynamic_pool, histogram->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->metrics().scope().symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, histogram->labelNames(), label_values,
                                           label_values_length);
-  histogram->recordValue(*config->stats_scope_, tags, value);
+  histogram->recordValue(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -464,6 +527,10 @@ envoy_dynamic_module_callback_bootstrap_extension_timer_new(
 
   // Allocate the timer wrapper first so we can capture a stable heap pointer in the callback.
   auto* timer_wrapper = new DynamicModuleBootstrapExtensionTimer(config->weak_from_this());
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return static_cast<void*>(timer_wrapper);
+  }
 
   // Create the timer on the main thread dispatcher. The callback captures a weak_ptr to the config
   // to safely handle the case where the config is destroyed before the timer fires. The
@@ -488,20 +555,39 @@ envoy_dynamic_module_callback_bootstrap_extension_timer_new(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr,
     uint64_t delay_milliseconds) {
-  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
-  timer->timer().enableTimer(std::chrono::milliseconds(delay_milliseconds));
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return;
+  }
+  Envoy::OptRef<Envoy::Event::Timer> timer =
+      static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr)->timer();
+  if (timer.has_value()) {
+    timer->enableTimer(std::chrono::milliseconds(delay_milliseconds));
+  }
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
-  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
-  timer->timer().disableTimer();
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return;
+  }
+  Envoy::OptRef<Envoy::Event::Timer> timer =
+      static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr)->timer();
+  if (timer.has_value()) {
+    timer->disableTimer();
+  }
 }
 
 bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
-  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
-  return timer->timer().enabled();
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  Envoy::OptRef<Envoy::Event::Timer> timer =
+      static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr)->timer();
+  return timer.has_value() && timer->enabled();
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
@@ -524,6 +610,10 @@ void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
 bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path, uint32_t events) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
 
   // Create a new filesystem watcher for this path. Envoy owns the watcher lifetime.
@@ -553,6 +643,10 @@ bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
 void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer response_body) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   if (response_body.ptr != nullptr && response_body.length > 0) {
     config->admin_response_body_.assign(response_body.ptr, response_body.length);
@@ -563,8 +657,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix,
     envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  Envoy::OptRef<Envoy::Server::Admin> admin = config->context_.admin();
+  Envoy::OptRef<Envoy::Server::Admin> admin = config->admin();
   if (!admin.has_value()) {
     return false;
   }
@@ -572,14 +670,17 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
   const std::string prefix_str(path_prefix.ptr, path_prefix.length);
   const std::string help_str(help_text.ptr, help_text.length);
 
-  // Capture a shared_ptr to the config to ensure it stays alive during admin handler callbacks.
-  auto config_shared = config->shared_from_this();
-
+  // The admin server outlives the bootstrap extensions, so the handler must not keep the config
+  // alive.
   return admin->addHandler(
       prefix_str, help_str,
-      [config_shared](Envoy::Http::ResponseHeaderMap& response_headers,
-                      Envoy::Buffer::Instance& response,
-                      Envoy::Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+      [weak_config = config->weak_from_this()](
+          Envoy::Http::ResponseHeaderMap& response_headers, Envoy::Buffer::Instance& response,
+          Envoy::Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+        std::shared_ptr<DynamicModuleBootstrapExtensionConfig> config_shared = weak_config.lock();
+        if (config_shared == nullptr) {
+          return Envoy::Http::Code::NotFound;
+        }
         const auto& request_headers = admin_stream.getRequestHeaders();
         const auto method_entry = request_headers.getMethodValue();
         const auto path_entry = request_headers.getPathValue();
@@ -619,8 +720,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  Envoy::OptRef<Envoy::Server::Admin> admin = config->context_.admin();
+  Envoy::OptRef<Envoy::Server::Admin> admin = config->admin();
   if (!admin.has_value()) {
     return false;
   }
@@ -633,6 +738,10 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableClusterLifecycle();
 }
@@ -641,8 +750,74 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableListenerLifecycle();
+}
+
+// -------------------- Run On All Workers Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t event_id) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->runOnAllWorkers(event_id);
+}
+
+// -------------------- Cluster Writer Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableClusterWriter();
+}
+
+envoy_dynamic_module_type_bootstrap_cluster_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_buffer cluster,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out) {
+  *update_id_out = 0;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleClusterWriter* cluster_writer = config->cluster_writer_.get();
+  if (cluster_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed;
+  }
+  return cluster_writer->addOrUpdateCluster(
+      {cluster_name.ptr, cluster_name.length}, {cluster.ptr, cluster.length},
+      {version_info.ptr, version_info.length}, *update_id_out);
+}
+
+envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleClusterWriter* cluster_writer = config->cluster_writer_.get();
+  if (cluster_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed;
+  }
+  return cluster_writer->removeCluster({cluster_name.ptr, cluster_name.length});
 }
 
 } // extern "C"

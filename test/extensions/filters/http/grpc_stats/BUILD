@@ -35,6 +35,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/http/grpc_stats:config",
         "//test/integration:http_integration_lib",
     ],

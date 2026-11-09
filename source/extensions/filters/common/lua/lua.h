@@ -431,13 +431,69 @@ using YieldCallback = std::function<absl::Status()>;
 /**
  * This is a wrapper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
  * real threads, only cooperatively scheduled coroutines.
+ *
+ * A coroutine that ran to completion can be used again for an unrelated body. The interpreter's
+ * "cannot resume dead coroutine" rule lives in the coroutine library, not in lua_resume(), which
+ * accepts any thread with no active C frame and a status of OK or YIELD and starts it at the
+ * function on the bottom of its stack -- which is exactly how this class starts a brand new
+ * thread. So on destruction a reusable thread goes back to a pool held by the state it came from,
+ * rather than being released and rebuilt per handler per request. The destructor says which
+ * threads qualify, and Pool::release() what happens to the rest.
  */
 class Coroutine : Logger::Loggable<Logger::Id::lua> {
 public:
-  enum class State { NotStarted, Yielded, Finished };
+  /**
+   * Idle coroutine threads belonging to one Lua state, one pool per worker. Owns the registry
+   * references that keep the collector away from the threads while they wait.
+   */
+  class Pool {
+  public:
+    // Bounds retention. The pool only ever holds threads that are idle, so its natural size is
+    // the peak number of concurrent streams on this worker; the cap stops a burst from pinning
+    // that many threads for the life of the worker. It bounds the count, not the memory: `LuaJIT`
+    // shrinks an idle thread's stack when it traverses it, so a thread that once ran a
+    // stack-hungry script does not go on holding that stack here.
+    static constexpr size_t MaxSize = 256;
 
-  Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state);
-  lua_State* luaState() { return coroutine_state_.get(); }
+    struct Thread {
+      int ref;
+      // Held alongside the reference so that reusing a thread costs no Lua C API calls at all.
+      // The reference is what keeps the thread reachable while it waits here, and the `LuaJIT`
+      // collector does not move objects, so this cannot go stale.
+      lua_State* state;
+    };
+
+    explicit Pool(lua_State* parent_state) : parent_state_(parent_state) {}
+
+    // An idle thread, or a fresh one referenced from the parent state's registry.
+    Thread acquire();
+
+    // Takes a thread back. A reusable one joins the idle list while there is room for it;
+    // anything else is unreferenced and left to the collector.
+    void release(Thread thread, bool reusable);
+
+  private:
+    // The state these threads were created on. Referencing and unreferencing both go through its
+    // registry.
+    lua_State* const parent_state_;
+    std::vector<Thread> idle_;
+  };
+
+  // `Errored` is terminal and distinct from `Finished`: such a thread cannot be resumed again
+  // at all.
+  enum class State { NotStarted, Yielded, Finished, Errored };
+
+  // `pool` is where this coroutine's thread is returned on destruction, and must outlive this
+  // object -- the same requirement the parent state has always had, since the destructor has
+  // always had to reach that state's registry.
+  Coroutine(Pool::Thread thread, Pool& pool);
+  ~Coroutine();
+
+  // Owns a thread it hands back on destruction, so it cannot be copied.
+  Coroutine(const Coroutine&) = delete;
+  Coroutine& operator=(const Coroutine&) = delete;
+
+  lua_State* luaState() { return thread_.state; }
   State state() { return state_; }
 
   /**
@@ -463,13 +519,27 @@ public:
   absl::Status resume(int num_args, const YieldCallback& yield_callback);
 
 private:
-  LuaRef<lua_State> coroutine_state_;
+  const Pool::Thread thread_;
+  Pool& pool_;
   State state_{State::NotStarted};
 };
 
 using CoroutinePtr = std::unique_ptr<Coroutine>;
 using Initializer = std::function<void(lua_State*)>;
 using InitializerList = std::vector<Initializer>;
+
+/**
+ * Additional module search patterns for a Lua state, prepended to the interpreter's built-in
+ * defaults so that a script can require() modules from locations the interpreter does not search
+ * on its own. Each member holds patterns already joined in Lua's own ';'-separated syntax, or is
+ * empty to leave that search path untouched.
+ */
+struct PackagePaths {
+  // Prepended to `package.path`, for modules that are Lua source.
+  std::string path;
+  // Prepended to `package.cpath`, for modules that are loadable C libraries.
+  std::string cpath;
+};
 
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every
@@ -479,8 +549,11 @@ using InitializerList = std::vector<Initializer>;
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
   // creation_status is set (and construction stops early) if the supplied code cannot be parsed.
-  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                   absl::Status& creation_status);
+  // package_paths is applied to every state this object creates, including the one the code is
+  // parsed on, so that a require() at the top level of the code resolves the same way there as it
+  // will on a worker.
+  ThreadLocalState(const std::string& code, const PackagePaths& package_paths,
+                   ThreadLocal::SlotAllocator& tls, absl::Status& creation_status);
 
   /**
    * @return CoroutinePtr a new coroutine.
@@ -527,10 +600,13 @@ public:
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
-    LuaThreadLocal(const std::string& code);
+    LuaThreadLocal(const std::string& code, const PackagePaths& package_paths);
 
     CSmartPtr<lua_State, lua_close> state_;
     std::vector<int> global_slots_;
+    // Holds registry reference ids, so there is nothing to release here: lua_close() on state_
+    // frees the registry and every thread it was keeping alive.
+    Coroutine::Pool coroutine_pool_{state_.get()};
   };
 
   CSmartPtr<lua_State, lua_close>& tlsState() { return (*tls_slot_)->state_; }

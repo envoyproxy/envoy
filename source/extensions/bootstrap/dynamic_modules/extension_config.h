@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
@@ -9,18 +10,20 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
-#include "source/common/stats/utility.h"
+#include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/functional/function_ref.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,6 +65,12 @@ using OnBootstrapExtensionListenerAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
 using OnBootstrapExtensionListenerRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
+using OnBootstrapExtensionWorkerEventType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_worker_event);
+using OnBootstrapExtensionRunOnAllWorkersDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done);
+using OnBootstrapExtensionClusterWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 
 class DynamicModuleBootstrapExtension;
 
@@ -128,6 +137,11 @@ public:
   void signalInitComplete();
 
   /**
+   * Runs signalInitComplete() on the main thread. This can be called from any thread.
+   */
+  void postSignalInitComplete();
+
+  /**
    * Enables cluster lifecycle event notifications. When enabled, the module will receive
    * on_bootstrap_extension_cluster_add_or_update and on_bootstrap_extension_cluster_removal
    * callbacks when clusters are added, updated, or removed.
@@ -147,11 +161,14 @@ public:
   /**
    * Sets the listener manager reference. Must be called during onServerInitialized before
    * the module can enable listener lifecycle events. Marks the server as initialized so the
-   * cluster manager can be accessed safely.
+   * cluster manager can be accessed safely and the cluster writer accepts writes.
    */
   void setListenerManager(Server::ListenerManager& listener_manager) {
     listener_manager_ = &listener_manager;
     server_initialized_ = true;
+    if (cluster_writer_ != nullptr) {
+      cluster_writer_->onServerInitialized();
+    }
   }
 
   /**
@@ -170,6 +187,58 @@ public:
   void onListenerAddOrUpdate(absl::string_view listener_name,
                              const Network::ListenerConfig& listener_config) override;
   void onListenerRemoval(const std::string& listener_name) override;
+
+  /**
+   * Enumerates the names of the currently active resources of a single kind: the active listeners'
+   * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
+   * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
+   * is invoked at most once per name. A no-op before the server is initialized and once the
+   * extension is destroyed. Main thread only.
+   *
+   * @param kind selects which kind of active resource to enumerate.
+   * @param emit is invoked for each name; the string_view is valid only during that invocation.
+   */
+  void getActiveResourceNames(envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+                              absl::FunctionRef<void(absl::string_view)> emit);
+
+  /**
+   * Helper function to compute the transport socket match names present in every cluster that has
+   * matches. A match is observed only once it is in all such clusters; clusters with no matches do
+   * not constrain the result. Exposed for testing.
+   */
+  static std::vector<absl::string_view> transportSocketMatchIntersection(
+      const std::vector<std::vector<absl::string_view>>& per_cluster_matches);
+
+  /**
+   * Runs the module's worker event hook on every worker thread, followed by its done hook on the
+   * main thread. Must be called on the main thread.
+   * @return false before the server is initialized or after shutdown began.
+   */
+  bool runOnAllWorkers(uint64_t event_id);
+
+  /**
+   * Creates the cluster writer, which lets the module add, update and remove clusters. Must be
+   * called on the main thread.
+   * @return false if the cluster writer already exists or shutdown began.
+   */
+  bool enableClusterWriter();
+
+  /**
+   * Called on the main thread when the server begins to shut down and when the extension is
+   * destroyed.
+   */
+  void onShutdown();
+
+  /**
+   * Called on the main thread when the extension is destroyed. The server destroys its context
+   * before its bootstrap extensions, so the callbacks that use the context stop working.
+   */
+  void onExtensionDestroyed();
+
+  /**
+   * Returns the admin server, or nothing once the extension is destroyed.
+   */
+  OptRef<Server::Admin> admin();
 
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
@@ -197,6 +266,16 @@ public:
       nullptr;
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
+  // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
+  OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
+      nullptr;
+  OnBootstrapExtensionClusterWriterUpdateDoneType
+      on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
+
+  // The name of the extension.
+  const std::string extension_name_;
+
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 
@@ -205,7 +284,7 @@ public:
 
   // File watchers created by
   // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the
-  // lifetime — watchers are destroyed when the config is destroyed.
+  // lifetime, so watchers are destroyed when the config is destroyed.
   std::vector<Filesystem::WatcherPtr> file_watchers_;
 
   // The server factory context for accessing cluster manager lazily. ClusterManager is not
@@ -221,184 +300,15 @@ public:
   std::unique_ptr<Init::TargetImpl> init_target_;
 
   // ----------------------------- Metrics Support -----------------------------
-  // Handle classes for storing defined metrics. These follow the same pattern as the HTTP
-  // filter config metrics support.
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
 
-  class ModuleCounterHandle {
-  public:
-    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
-    void add(uint64_t value) const { counter_.add(value); }
-
-  private:
-    Stats::Counter& counter_;
-  };
-
-  class ModuleCounterVecHandle {
-  public:
-    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
-        : name_(name), label_names_(label_names) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-  };
-
-  class ModuleGaugeHandle {
-  public:
-    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-    void add(uint64_t value) const { gauge_.add(value); }
-    void sub(uint64_t value) const { gauge_.sub(value); }
-    void set(uint64_t value) const { gauge_.set(value); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
-  class ModuleGaugeVecHandle {
-  public:
-    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                         Stats::Gauge::ImportMode import_mode)
-        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
-    }
-    void sub(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
-    }
-    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Gauge::ImportMode import_mode_;
-  };
-
-  class ModuleHistogramHandle {
-  public:
-    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
-    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
-
-  private:
-    Stats::Histogram& histogram_;
-  };
-
-  class ModuleHistogramVecHandle {
-  public:
-    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                             Stats::Histogram::Unit unit)
-        : name_(name), label_names_(label_names), unit_(unit) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-
-    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t value) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Histogram::Unit unit_;
-  };
-
-// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
-// for our internal storage. These helper functions do that conversion.
-#define ID_TO_INDEX(id) ((id) - 1)
-
-  size_t addCounter(ModuleCounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-
-  size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    counter_vecs_.push_back(std::move(counter_vec));
-    return counter_vecs_.size();
-  }
-
-  size_t addGauge(ModuleGaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-
-  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    gauge_vecs_.push_back(std::move(gauge_vec));
-    return gauge_vecs_.size();
-  }
-
-  size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    histograms_.push_back(std::move(histogram));
-    return histograms_.size();
-  }
-
-  size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
-    histogram_vecs_.push_back(std::move(histogram_vec));
-    return histogram_vecs_.size();
-  }
-
-  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id == 0 || id > counters_.size()) {
-      return {};
-    }
-    return counters_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id == 0 || id > counter_vecs_.size()) {
-      return {};
-    }
-    return counter_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id == 0 || id > gauges_.size()) {
-      return {};
-    }
-    return gauges_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id == 0 || id > gauge_vecs_.size()) {
-      return {};
-    }
-    return gauge_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id == 0 || id > histograms_.size()) {
-      return {};
-    }
-    return histograms_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id == 0 || id > histogram_vecs_.size()) {
-      return {};
-    }
-    return histogram_vecs_[ID_TO_INDEX(id)];
-  }
-
-#undef ID_TO_INDEX
-
-  // Stats scope for metric creation.
+  // Owns the scope the registry references. Must precede metrics_ so it initializes first.
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // We only allow the module to create stats during on_bootstrap_extension_config_new, and not
-  // later from worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  // later from worker threads, so that we don't have to wrap the metrics registry pool in a lock.
   // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
   // callbacks (see abi_impl.cc).
   bool stat_creation_frozen_ = false;
@@ -407,6 +317,9 @@ public:
   // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
   // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
   std::string admin_response_body_;
+
+  // The cluster writer, or nullptr until the module enables it.
+  DynamicModuleClusterWriterPtr cluster_writer_;
 
 private:
   /**
@@ -437,19 +350,17 @@ private:
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
+  /**
+   * Whether the server still notifies the shutdown that releases the lifecycle registrations. A
+   * server in init only mode exits without it.
+   */
+  bool shutdownNotificationExpected() const;
+
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
 
   absl::flat_hash_map<uint64_t,
                       std::unique_ptr<DynamicModuleBootstrapExtensionConfig::HttpCalloutCallback>>
       http_callouts_;
-
-  // Metric storage.
-  std::vector<ModuleCounterHandle> counters_;
-  std::vector<ModuleCounterVecHandle> counter_vecs_;
-  std::vector<ModuleGaugeHandle> gauges_;
-  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
-  std::vector<ModuleHistogramHandle> histograms_;
-  std::vector<ModuleHistogramVecHandle> histogram_vecs_;
 
   // Cluster lifecycle callback handle. Set when the module enables cluster lifecycle events
   // via enableClusterLifecycle(). Reset during shutdown to avoid use-after-free since the
@@ -474,6 +385,14 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
+  ThreadLocal::TypedSlotPtr<> worker_slot_;
+
+  // Set once the server begins to shut down or the extension is destroyed.
+  bool shutdown_started_ = false;
+  // Set when the extension is destroyed, after which context_ can be gone.
+  bool extension_destroyed_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
@@ -530,7 +449,8 @@ public:
    */
   void setTimer(Event::TimerPtr timer) { timer_ = std::move(timer); }
 
-  Event::Timer& timer() { return *timer_; }
+  // The underlying Envoy timer. Empty when the timer was requested off the main thread.
+  OptRef<Event::Timer> timer() { return makeOptRefFromPtr(timer_.get()); }
 
 private:
   // The config that this timer is associated with. Using a weak pointer to avoid unnecessarily

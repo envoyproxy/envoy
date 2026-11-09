@@ -8,6 +8,8 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -42,25 +44,57 @@ void LuaLoggable::scriptLog(spdlog::level::level_enum level, absl::string_view m
   }
 }
 
-Coroutine::Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state)
-    : coroutine_state_(new_thread_state, false) {}
+Coroutine::Pool::Thread Coroutine::Pool::acquire() {
+  if (!idle_.empty()) {
+    const Thread thread = idle_.back();
+    idle_.pop_back();
+    return thread;
+  }
+
+  lua_State* state = lua_newthread(parent_state_);
+  // luaL_ref() pops the new thread and hands back a registry reference to it.
+  const int ref = luaL_ref(parent_state_, LUA_REGISTRYINDEX);
+  ASSERT(ref != LUA_REFNIL);
+  return {ref, state};
+}
+
+void Coroutine::Pool::release(Thread thread, bool reusable) {
+  if (reusable && idle_.size() < MaxSize) {
+    // Drop whatever the body left behind, so the next user starts from an empty stack and nothing
+    // the last request touched stays reachable through this thread.
+    lua_settop(thread.state, 0);
+    idle_.push_back(thread);
+    return;
+  }
+
+  luaL_unref(parent_state_, LUA_REGISTRYINDEX, thread.ref);
+}
+
+Coroutine::Coroutine(Pool::Thread thread, Pool& pool) : thread_(thread), pool_(pool) {}
+
+Coroutine::~Coroutine() {
+  // A thread that never started is pristine, and one that finished cleanly can start a fresh
+  // body. `Errored` cannot be resumed at all, and `Yielded` would resume the body it was in the
+  // middle of.
+  pool_.release(thread_, state_ == State::NotStarted || state_ == State::Finished);
+}
 
 absl::Status Coroutine::start(int function_ref, int num_args, const YieldCallback& yield_callback) {
   ASSERT(state_ == State::NotStarted);
 
   state_ = State::Yielded;
-  lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
-  ASSERT(lua_isfunction(coroutine_state_.get(), -1));
+  lua_rawgeti(thread_.state, LUA_REGISTRYINDEX, function_ref);
+  ASSERT(lua_isfunction(thread_.state, -1));
 
   // The function needs to come before the arguments but the arguments are already on the stack,
   // so we need to move it into position.
-  lua_insert(coroutine_state_.get(), -(num_args + 1));
+  lua_insert(thread_.state, -(num_args + 1));
   return resume(num_args, yield_callback);
 }
 
 absl::Status Coroutine::resume(int num_args, const YieldCallback& yield_callback) {
   ASSERT(state_ == State::Yielded);
-  int rc = lua_resume(coroutine_state_.get(), num_args);
+  int rc = lua_resume(thread_.state, num_args);
 
   if (0 == rc) {
     state_ = State::Finished;
@@ -71,8 +105,8 @@ absl::Status Coroutine::resume(int num_args, const YieldCallback& yield_callback
     ENVOY_LOG(debug, "coroutine yielded");
     return yield_callback();
   } else {
-    state_ = State::Finished;
-    const char* error = lua_tostring(coroutine_state_.get(), -1);
+    state_ = State::Errored;
+    const char* error = lua_tostring(thread_.state, -1);
     if (!error) {
       error = "unspecified lua error";
     }
@@ -80,14 +114,45 @@ absl::Status Coroutine::resume(int num_args, const YieldCallback& yield_callback
   }
 }
 
-ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                                   absl::Status& creation_status)
+namespace {
+
+// Prepends patterns to one of the package table's search paths, keeping the interpreter's built-in
+// value after them so that a module found in both places resolves to the configured one.
+void prependPackagePath(lua_State* state, const char* field, const std::string& patterns) {
+  if (patterns.empty()) {
+    return;
+  }
+
+  lua_getglobal(state, "package");
+  ASSERT(lua_istable(state, -1), "the package library is opened by luaL_openlibs()");
+  lua_getfield(state, -1, field);
+  const char* existing = lua_tostring(state, -1);
+  const std::string updated =
+      existing == nullptr ? patterns : absl::StrCat(patterns, ";", existing);
+  lua_pop(state, 1);
+  lua_pushstring(state, updated.c_str());
+  lua_setfield(state, -2, field);
+  lua_pop(state, 1);
+}
+
+// Must be called on every state, and before the state runs any code, so that the search paths a
+// require() sees do not depend on which state it runs in.
+void applyPackagePaths(lua_State* state, const PackagePaths& package_paths) {
+  prependPackagePath(state, "path", package_paths.path);
+  prependPackagePath(state, "cpath", package_paths.cpath);
+}
+
+} // namespace
+
+ThreadLocalState::ThreadLocalState(const std::string& code, const PackagePaths& package_paths,
+                                   ThreadLocal::SlotAllocator& tls, absl::Status& creation_status)
     : tls_slot_(ThreadLocal::TypedSlot<LuaThreadLocal>::makeUnique(tls)) {
 
   // First verify that the supplied code can be parsed.
   CSmartPtr<lua_State, lua_close> state(luaL_newstate());
   RELEASE_ASSERT(state.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state.get());
+  applyPackagePaths(state.get(), package_paths);
 
   if (0 != luaL_dostring(state.get(), code.c_str())) {
     SET_AND_RETURN(absl::InvalidArgumentError(
@@ -96,7 +161,9 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
   }
 
   // Now initialize on all threads.
-  tls_slot_->set([code](Event::Dispatcher&) { return std::make_shared<LuaThreadLocal>(code); });
+  tls_slot_->set([code, package_paths](Event::Dispatcher&) {
+    return std::make_shared<LuaThreadLocal>(code, package_paths);
+  });
 }
 
 int ThreadLocalState::getGlobalRef(uint64_t slot) {
@@ -125,15 +192,19 @@ uint64_t ThreadLocalState::registerGlobal(const std::string& global,
 }
 
 CoroutinePtr ThreadLocalState::createCoroutine() {
-  lua_State* state = tlsState().get();
-  return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
+  Coroutine::Pool& pool = (*tls_slot_)->coroutine_pool_;
+  return std::make_unique<Coroutine>(pool.acquire(), pool);
 }
 
-ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code)
+ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code,
+                                                 const PackagePaths& package_paths)
     : state_(luaL_newstate()) {
 
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state_.get());
+  applyPackagePaths(state_.get(), package_paths);
+  // The assert holds because ThreadLocalState's constructor already ran this code, with the same
+  // search paths, on the main thread.
   int rc = luaL_dostring(state_.get(), code.c_str());
   ASSERT(rc == 0);
 }

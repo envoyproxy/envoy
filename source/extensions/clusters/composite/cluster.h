@@ -78,6 +78,12 @@ public:
   Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
 
 private:
+  // Select a host from the cluster at `start_index`, advancing to the subsequent clusters when a
+  // cluster is not available or has no host to offer. `attempt_count` is only used for logging.
+  Upstream::HostSelectionResponse selectHostWithFailover(Upstream::LoadBalancerContext* context,
+                                                         size_t start_index,
+                                                         uint32_t attempt_count);
+
   Upstream::ClusterInfoConstSharedPtr parent_info_;
   Upstream::ClusterManager& cluster_manager_;
   const ClusterSetConstSharedPtr clusters_;

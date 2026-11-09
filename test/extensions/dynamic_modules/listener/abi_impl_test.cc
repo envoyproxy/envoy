@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstdint>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -21,6 +23,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
@@ -46,6 +49,19 @@ public:
 };
 
 REGISTER_FACTORY(ListenerTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// A second typed object factory under a distinct name, so a test can store two filter-state values
+// and verify that consecutive getter calls do not invalidate each other.
+class ListenerSecondTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.listener_set_typed_object_second"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ListenerSecondTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 #ifdef SOL_IP
 // Helper action to set sockaddr in arg2 for getSocketOption mocking.
@@ -97,10 +113,9 @@ public:
     filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
-    ON_CALL(callbacks_, filterState())
-        .WillByDefault(testing::Invoke([this]() -> StreamInfo::FilterState& {
-          return *callbacks_.stream_info_.filterState();
-        }));
+    ON_CALL(callbacks_, filterState()).WillByDefault([this]() -> StreamInfo::FilterState& {
+      return *callbacks_.stream_info_.filterState();
+    });
 
     filter_ = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
     filter_->onAccept(callbacks_);
@@ -1348,11 +1363,11 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketSuccess) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
         return {len, Api::IoError::none()};
-      }));
+      });
 
   char data[] = "S";
   envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
@@ -1365,11 +1380,11 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketMultipleBytes) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
         return {len, Api::IoError::none()};
-      }));
+      });
 
   char data[] = "hello world";
   envoy_dynamic_module_type_module_buffer data_buf = {data, 11};
@@ -1409,9 +1424,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketIoError) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance&) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance&) -> Api::IoCallUint64Result {
         return {0, Network::IoSocketError::create(ECONNRESET)};
-      }));
+      });
 
   char data[] = "S";
   envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
@@ -1534,6 +1549,72 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatch
   // Should not crash with null callbacks.
   envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
       static_cast<void*>(filter.get()), ns_buf, entries.data(), entries.size());
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStruct) {
+  const std::string ns = "test_ns";
+  const auto& metadata = callbacks_.stream_info_.metadata_;
+  // Only the two non-empty structs that parse reach the stream info.
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(ns, testing::_)).Times(2);
+
+  // A nested struct round trips into the namespace.
+  Protobuf::Struct nested;
+  (*(*nested.mutable_fields())["outer"].mutable_struct_value()->mutable_fields())["inner"]
+      .set_string_value("value");
+  (*nested.mutable_fields())["key"].set_string_value("old");
+  std::string serialized;
+  ASSERT_TRUE(nested.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {serialized.data(), serialized.size()}));
+  EXPECT_EQ("value", metadata.filter_metadata()
+                         .at(ns)
+                         .fields()
+                         .at("outer")
+                         .struct_value()
+                         .fields()
+                         .at("inner")
+                         .string_value());
+
+  // A later struct overwrites the keys it sets and keeps the others.
+  Protobuf::Struct update;
+  (*update.mutable_fields())["key"].set_string_value("new");
+  ASSERT_TRUE(update.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {serialized.data(), serialized.size()}));
+  EXPECT_EQ("new", metadata.filter_metadata().at(ns).fields().at("key").string_value());
+  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+
+  // An empty struct does not create the namespace, and a buffer that does not parse as a
+  // google.protobuf.Struct is rejected.
+  const std::string invalid = serialized + '\x0f';
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {"empty_ns", 8}, {nullptr, 0}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
+  EXPECT_FALSE(metadata.filter_metadata().contains("empty_ns"));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      static_cast<void*>(filter.get()), {"test_ns", 7}, {"", 0}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullNamespace) {
+  Protobuf::Struct value;
+  (*value.mutable_fields())["key"].set_string_value("value");
+  std::string serialized;
+  ASSERT_TRUE(value.SerializeToString(&serialized));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {nullptr, 7}, {serialized.data(), serialized.size()}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullValue) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {"test_ns", 7}, {nullptr, 8}));
 }
 
 // =============================================================================
@@ -1662,6 +1743,52 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTyped) {
   EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
       filterPtr(), key_buf, &result_buf));
   EXPECT_EQ("typed_value", std::string(result_buf.ptr, result_buf.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConsecutiveFilterStateGettersStayValid) {
+  std::string key1 = "envoy.test.listener_set_typed_object";
+  std::string value1 = "first_value";
+  std::string key2 = "envoy.test.listener_set_typed_object_second";
+  std::string value2 = "second_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), {key1.data(), key1.size()}, {value1.data(), value1.size()}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), {key2.data(), key2.size()}, {value2.data(), value2.size()}));
+
+  // The first view must stay valid after the second getter call.
+  envoy_dynamic_module_type_envoy_buffer result1 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), {key1.data(), key1.size()}, &result1));
+  envoy_dynamic_module_type_envoy_buffer result2 = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), {key2.data(), key2.size()}, &result2));
+
+  EXPECT_EQ(value1, std::string(result1.ptr, result1.length));
+  EXPECT_EQ(value2, std::string(result2.ptr, result2.length));
+}
+
+// A nested hook keeps the outer scratch, and only the outermost hook clears it.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, FilterStateScratchClearedAtOutermostHook) {
+  std::string key = "envoy.test.listener_set_typed_object";
+  std::string value = "value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), {key.data(), key.size()}, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  {
+    DynamicModuleListenerFilter::HookScope outer(*filter_);
+    EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+        filterPtr(), {key.data(), key.size()}, &result));
+    {
+      DynamicModuleListenerFilter::HookScope inner(*filter_);
+      EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+          filterPtr(), {key.data(), key.size()}, &result));
+    }
+    // A nested hook does not clear the scratch.
+    EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 2);
+  }
+  // The outermost hook clears the scratch.
+  EXPECT_EQ(filter_->filterStateScratchSizeForTest(), 0);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedNullCallbacks) {
@@ -1884,18 +2011,42 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNullCallbac
   EXPECT_EQ(0, value_out.length);
 }
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSuccess) {
-  char ns[] = "test_ns";
-  char key[] = "key1";
-  char value[] = "value1";
-  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
-  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
-  envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadata) {
+  const std::string ns = "test_ns";
+  const auto& typed_metadata = callbacks_.stream_info_.metadata_.typed_filter_metadata();
+  Protobuf::StringValue payload;
+  Protobuf::Any any;
 
-  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_));
+  // A packed Any round trips into the typed metadata with its type URL preserved.
+  payload.set_value("hello");
+  ASSERT_TRUE(any.PackFrom(payload));
+  std::string hello;
+  ASSERT_TRUE(any.SerializeToString(&hello));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {hello.data(), hello.size()}));
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(typed_metadata.at(ns).UnpackTo(&unpacked));
+  EXPECT_EQ("hello", unpacked.value());
 
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
-                                                                            key_buf, value_buf);
+  // A later Any replaces the entry even when its value is empty.
+  ASSERT_TRUE(any.PackFrom(Protobuf::StringValue()));
+  std::string empty_value;
+  ASSERT_TRUE(any.SerializeToString(&empty_value));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {empty_value.data(), empty_value.size()}));
+  EXPECT_TRUE(typed_metadata.at(ns).value().empty());
+
+  // An empty buffer has no type URL, so it is rejected with the same warning as a buffer that
+  // does not parse as a google.protobuf.Any.
+  EXPECT_LOG_CONTAINS("warn", "with a buffer of 0 bytes that is not a google.protobuf.Any", {
+    EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+        filterPtr(), {ns.data(), ns.size()}, {nullptr, 0}));
+  });
+  const std::string invalid = hello + '\x0f';
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
+  EXPECT_TRUE(typed_metadata.at(ns).Is<Protobuf::StringValue>());
+  EXPECT_TRUE(typed_metadata.at(ns).value().empty());
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCallbacks) {
@@ -1903,16 +2054,22 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
   filter->onAccept(callbacks_);
   filter->setCallbacksForTest(nullptr);
 
-  char ns[] = "test_ns";
-  char key[] = "key1";
-  char value[] = "value1";
-  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
-  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
-  envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      static_cast<void*>(filter.get()), {"test_ns", 7}, {"", 0}));
+}
 
-  // TODO(wbpcode): this should never happen in practice, but ensure it doesn't crash.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
-      static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullNamespace) {
+  Protobuf::Any any;
+  ASSERT_TRUE(any.PackFrom(Protobuf::StringValue()));
+  std::string serialized;
+  ASSERT_TRUE(any.SerializeToString(&serialized));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {nullptr, 7}, {serialized.data(), serialized.size()}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullValue) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {"test_ns", 7}, {nullptr, 8}));
 }
 
 // =============================================================================
@@ -2181,9 +2338,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 789);
 
@@ -2203,9 +2360,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 999);
 
@@ -2226,9 +2383,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
 
@@ -2259,9 +2416,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SchedulerRequiresSharedOwners
   auto* shared_scheduler =
       envoy_dynamic_module_callback_listener_filter_scheduler_new(shared_filter.get());
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(shared_scheduler, 1);
   captured_cb();
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(shared_scheduler);
@@ -2275,9 +2432,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
 
@@ -2315,9 +2472,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   ASSERT_NE(nullptr, scheduler);
 
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   std::thread foreign(
       [&]() { envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 42); });
@@ -2388,6 +2545,36 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntFailure) {
   bool result =
       envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1, 2, 123);
   EXPECT_FALSE(result);
+}
+
+// A level, name, or value outside the int range is rejected before the socket is touched, so a
+// truncated option is never applied or read.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SocketOptionRejectsOutOfRange) {
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(testing::_, testing::_, testing::_, testing::_))
+      .Times(0);
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(testing::_, testing::_, testing::_, testing::_))
+      .Times(0);
+  const int64_t too_large = static_cast<int64_t>(std::numeric_limits<int>::max()) + 1;
+  const int64_t too_small = static_cast<int64_t>(std::numeric_limits<int>::min()) - 1;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+      filterPtr(), too_large, 2, 123));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1,
+                                                                                   2, too_large));
+
+  char bytes[] = "x";
+  envoy_dynamic_module_type_module_buffer bytes_buf = {bytes, 1};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      filterPtr(), too_small, 2, bytes_buf));
+
+  int64_t int_out = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+      filterPtr(), too_large, 2, &int_out));
+
+  char buf[8];
+  size_t actual = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, too_large, buf, sizeof(buf), &actual));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntNullCallbacks) {
@@ -2491,12 +2678,13 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntNullCallbac
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesSuccess) {
   Api::SysCallIntResult success_result{0, 0};
   EXPECT_CALL(callbacks_.socket_, getSocketOption(1, 2, testing::_, testing::_))
-      .WillOnce(testing::DoAll(testing::Invoke([](int, int, void* optval, socklen_t* optlen) {
-                                 const char* data = "test";
-                                 memcpy(optval, data, 4);
-                                 *optlen = 4;
-                               }),
-                               testing::Return(success_result)));
+      .WillOnce(testing::DoAll(
+          [](int, int, void* optval, socklen_t* optlen) {
+            const char* data = "test";
+            memcpy(optval, data, 4);
+            *optlen = 4;
+          },
+          testing::Return(success_result)));
 
   char buffer[16] = {0};
   size_t actual_size = 0;
@@ -2798,6 +2986,77 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutFailureReset) 
   filter_.reset();
 }
 
+namespace {
+
+size_t g_http_callout_done_calls = 0;
+uint64_t g_last_http_callout_id = 0;
+envoy_dynamic_module_type_http_callout_result g_last_http_callout_result{};
+
+void testOnHttpCalloutDone(envoy_dynamic_module_type_listener_filter_envoy_ptr,
+                           envoy_dynamic_module_type_listener_filter_module_ptr,
+                           uint64_t callout_id,
+                           envoy_dynamic_module_type_http_callout_result result,
+                           envoy_dynamic_module_type_envoy_http_header*, size_t,
+                           envoy_dynamic_module_type_envoy_buffer*, size_t) {
+  g_http_callout_done_calls++;
+  g_last_http_callout_id = callout_id;
+  g_last_http_callout_result = result;
+}
+
+} // namespace
+
+// A callout failure reaches the module from a posted callback, which does nothing once the filter
+// is gone.
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutFailureIsPosted) {
+  filter_config_->on_listener_filter_http_callout_done_ = testOnHttpCalloutDone;
+  g_http_callout_done_calls = 0;
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillRepeatedly(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillRepeatedly(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillRepeatedly(
+          testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                           captured_callback = &cb;
+                         }),
+                         testing::Return(&request)));
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+  for (const bool destroy_filter : {false, true}) {
+    uint64_t callout_id = 0;
+    EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+              envoy_dynamic_module_callback_listener_filter_http_callout(
+                  filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(),
+                  {nullptr, 0}, 5000));
+    ASSERT_NE(nullptr, captured_callback);
+
+    Event::PostCb posted_cb;
+    EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+      posted_cb = std::move(cb);
+    });
+    const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+        ->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    ASSERT_NE(nullptr, posted_cb);
+    if (destroy_filter) {
+      filter_.reset();
+    }
+    EXPECT_EQ(0, g_http_callout_done_calls);
+    posted_cb();
+    EXPECT_EQ(destroy_filter ? 0 : 1, g_http_callout_done_calls);
+    if (!destroy_filter) {
+      EXPECT_EQ(callout_id, g_last_http_callout_id);
+      EXPECT_EQ(envoy_dynamic_module_type_http_callout_result_Reset, g_last_http_callout_result);
+    }
+    g_http_callout_done_calls = 0;
+  }
+}
+
 TEST_F(DynamicModuleListenerFilterHttpCalloutTest,
        SendHttpCalloutFailureExceedResponseBufferLimit) {
   NiceMock<Upstream::MockThreadLocalCluster> cluster;
@@ -3007,6 +3266,68 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
                 static_cast<void*>(filter_config_.get()), name, &out_id));
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, PerFilterStatsOperateOnDefinedMetrics) {
+  void* config = static_cast<void*>(filter_config_.get());
+
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("filter_counter"), 14};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_counter(
+                config, counter_name, &counter_id));
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("filter_gauge"), 12};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_gauge(config, gauge_name,
+                                                                              &gauge_id));
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer histogram_name = {const_cast<char*>("filter_histogram"),
+                                                            16};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+                config, histogram_name, &histogram_id));
+
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_increment_counter(filterPtr(), counter_id, 7));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_set_gauge(filterPtr(), gauge_id, 100));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_increment_gauge(filterPtr(), gauge_id, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_listener_filter_decrement_gauge(filterPtr(), gauge_id, 5));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_record_histogram_value(filterPtr(),
+                                                                                 histogram_id, 42));
+
+  EXPECT_EQ(7, stats_.counterFromString("dynamicmodulescustom.filter_counter").value());
+  EXPECT_EQ(105, stats_
+                     .gaugeFromString("dynamicmodulescustom.filter_gauge",
+                                      Stats::Gauge::ImportMode::Accumulate)
+                     .value());
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       PerFilterStatsReturnMetricNotFoundForUnknownIds) {
+  const size_t unknown_metric_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_counter(filterPtr(),
+                                                                            unknown_metric_id, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_listener_filter_set_gauge(filterPtr(), unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_gauge(filterPtr(),
+                                                                          unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_decrement_gauge(filterPtr(),
+                                                                          unknown_metric_id, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+                filterPtr(), unknown_metric_id, 1));
+}
+
 // Verifies metrics can be operated from the filter config context (outside the connection
 // lifecycle), mirroring the per-filter operate callbacks.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ConfigStatsOperate) {
@@ -3082,7 +3403,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeInt) {
 
   // A request attribute that is not backed by stream info returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
-      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+      filterPtr(), envoy_dynamic_module_type_attribute_id_RequestSize, &result));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeBool) {
@@ -3109,6 +3430,30 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeString) {
   // An int attribute requested as string returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
       filterPtr(), envoy_dynamic_module_type_attribute_id_ResponseFlags, &result));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeXdsListenerValues) {
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, direction())
+      .WillByDefault(testing::Return(envoy::config::core::v3::INBOUND));
+  callbacks_.stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  filter_chain_info->filter_chain_name_ = "listener_filter_chain";
+  callbacks_.stream_info_.downstream_connection_info_provider_->setFilterChainInfo(
+      filter_chain_info);
+
+  uint64_t int_result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
+  EXPECT_EQ(static_cast<uint64_t>(envoy::config::core::v3::INBOUND), int_result);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ("listener_filter_chain", absl::string_view(string_result.ptr, string_result.length));
+  callbacks_.stream_info_.downstream_connection_info_provider_->setFilterChainInfo(nullptr);
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+      filterPtr(), envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ(0, string_result.length);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAttributeNullCallbacks) {

@@ -38,13 +38,13 @@ fi
 export DOCKER_COMMAND="${*:-bash}"
 
 COMPOSE_SERVICE="envoy-build"
-if [[ -n "$MOUNT_GPG_HOME" ]]; then
-    COMPOSE_SERVICE="envoy-build-gpg"
-    ENVOY_BUILD_VARIANT=devtools
-elif [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     ENVOY_BUILD_VARIANT=docker
     COMPOSE_SERVICE="envoy-build-dind"
-elif [[ -n "$ENVOY_DOCKER_CI" ]]; then
+elif [[ -n "$ENVOY_DOCKER_DEVTOOLS" ]]; then
+    ENVOY_BUILD_VARIANT=devtools
+elif [[ -n "$ENVOY_DOCKER_CI" || -n "$GITHUB_ACTIONS" ]]; then
+    # CI uses the minimal image; jobs that need devtools set `ENVOY_DOCKER_DEVTOOLS`.
     ENVOY_BUILD_VARIANT=ci
 else
     ENVOY_BUILD_VARIANT=devtools

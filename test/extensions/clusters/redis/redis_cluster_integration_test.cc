@@ -10,6 +10,7 @@
 
 #include "test/integration/ads_integration.h"
 #include "test/integration/integration.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::Ge;
 using testing::Return;
@@ -455,6 +456,10 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplica) {
 // difference being that it has the primary and replica identified
 // by hostname instead of IP address.
 TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
+  OsSysCallsWithMockedDns mock_os_sys_calls;
+  mock_os_sys_calls.setIpVersion(version_);
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&mock_os_sys_calls};
+
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
@@ -469,6 +474,9 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
 
   // foo hashes to slot 12182 which is in upstream 0
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+
+  // Stop worker threads before os_calls restores the process-wide syscall singleton.
+  test_server_.reset();
 }
 
 // This test sends a simple "get foo" command from a fake

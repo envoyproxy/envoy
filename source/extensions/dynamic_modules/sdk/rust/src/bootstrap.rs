@@ -1,17 +1,46 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
-  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
-  EnvoyHistogramVecId, NewBootstrapExtensionConfigFunction,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NewBootstrapExtensionConfigFunction,
   NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+/// The kind of active resource to enumerate with
+/// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveResourceKind {
+  /// The named filter chains of the active listeners: inline chains, the default filter chain,
+  /// and FCDS chains that an active listener's matcher references and that are committed.
+  FilterChain,
+  /// The names of the active clusters.
+  Cluster,
+  /// The transport socket match names present in every active cluster that has matches. Clusters
+  /// with no matches do not constrain the result.
+  TransportSocketMatch,
+  /// The names of the delivered dynamic (SDS) secrets: TLS certificates, certificate validation
+  /// contexts, session ticket keys and generic secrets.
+  Secret,
+}
+
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyBootstrapExtensionConfig {
   /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
@@ -26,10 +55,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This returns a tuple of (status, callout_id):
   ///   * Success + valid callout_id: The callout was started successfully. The callout ID can be
   ///     used to correlate the response in [`BootstrapExtensionConfig::on_http_callout_done`].
-  ///   * ClusterNotFound: The cluster does not exist.
+  ///   * ClusterNotFound: The cluster does not exist, the server is not initialized yet, or the
+  ///     extension is destroyed.
   ///   * MissingRequiredHeaders: The headers are missing required headers.
   ///   * CannotCreateRequest: The request could not be created, e.g., there's no healthy upstream
-  ///     host in the cluster.
+  ///     host in the cluster, or this was called off the main thread.
   ///
   /// The callout result will be delivered to the [`BootstrapExtensionConfig::on_http_callout_done`]
   /// method.
@@ -54,6 +84,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// unblock Envoy. If the module does not require asynchronous initialization, it should call
   /// this immediately during config creation.
   ///
+  /// When this completes the initialization of Envoy, it can run other hooks and start the workers
+  /// before it returns, and it waits until every worker ran the worker events posted before it. Do
+  /// not hold a lock across this call that those hooks take.
+  ///
   /// This must be called on the main thread. To call from other threads, use the scheduler
   /// mechanism to post an event to the main thread first.
   fn signal_init_complete(&self);
@@ -68,7 +102,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn define_counter_vec<'a>(
     &mut self,
     name: &str,
-    labels: &[&'a str],
+    label_names: &[&'a str],
   ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new gauge scoped to this bootstrap extension config with the given name.
@@ -81,7 +115,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn define_gauge_vec<'a>(
     &mut self,
     name: &str,
-    labels: &[&'a str],
+    label_names: &[&'a str],
   ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new histogram scoped to this bootstrap extension config with the given name.
@@ -94,7 +128,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn define_histogram_vec<'a>(
     &mut self,
     name: &str,
-    labels: &[&'a str],
+    label_names: &[&'a str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
 
   /// Increment the counter with the given id.
@@ -108,7 +142,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn increment_counter_vec<'a>(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -123,7 +157,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn set_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -138,7 +172,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn increase_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -153,7 +187,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn decrease_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -168,7 +202,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn record_histogram_value_vec<'a>(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&'a str],
+    label_values: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
@@ -206,7 +240,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///   [`EnvoyBootstrapExtensionConfig::remove_admin_handler`].
   /// * `mutates_server_state` if true, indicates the handler mutates server state.
   ///
-  /// Returns `true` if the handler was successfully registered, `false` otherwise.
+  /// Returns `true` if the handler was successfully registered, `false` otherwise, for example
+  /// once the extension is destroyed.
   ///
   /// This must be called on the main thread.
   fn register_admin_handler(
@@ -221,7 +256,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// * `path_prefix` is the URL prefix of the handler to remove.
   ///
-  /// Returns `true` if the handler was successfully removed, `false` otherwise.
+  /// Returns `true` if the handler was successfully removed, `false` otherwise, for example once
+  /// the extension is destroyed.
   ///
   /// This must be called on the main thread.
   fn remove_admin_handler(&self, path_prefix: &str) -> bool;
@@ -234,7 +270,9 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread, typically during or after `on_server_initialized`,
   /// since the ClusterManager is not available until that point.
   ///
-  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down and when Envoy runs with
+  /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
 
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
@@ -245,8 +283,87 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread, typically during or after `on_server_initialized`,
   /// since the ListenerManager is not available until that point.
   ///
-  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down and when Envoy runs with
+  /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Returns the names of the currently active resources of the given kind, each at most once. See
+  /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
+  /// returns nothing before the server is initialized and once the extension is destroyed.
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String>;
+
+  /// Run [`BootstrapExtensionConfig::on_worker_event`] on every worker thread, followed by
+  /// [`BootstrapExtensionConfig::on_run_on_all_workers_done`] on the main thread. The main thread
+  /// does not run the worker event.
+  ///
+  /// A worker runs the event after it applied every cluster and host change that Envoy posted to
+  /// it before this call. Host health, weight and metadata changes merged by the
+  /// `update_merge_window` of a cluster may reach the workers later. The workers start only after
+  /// initialization completes, so do not wait for the done hook before calling
+  /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`]. That call can wait for the workers to
+  /// run these events, so do not hold a lock across it that the worker event hook takes.
+  ///
+  /// Returns `false` when called off the main thread, before
+  /// [`BootstrapExtension::on_server_initialized`], or after shutdown began. A call off the main
+  /// thread also reports an Envoy bug.
+  fn run_on_all_workers(&self, event_id: u64) -> bool;
+
+  /// Enable the cluster writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_cluster_writer(&self) -> bool;
+
+  /// Queue a write of a cluster. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_writer`] first.
+  ///
+  /// * `cluster_name` is the name of the cluster. Only write clusters that no other component
+  ///   writes. A write of a cluster that exists and that this extension does not own completes as
+  ///   `Failed`.
+  /// * `cluster` is the serialized `envoy.config.cluster.v3.Cluster`, whose name must equal
+  ///   `cluster_name`.
+  /// * `version_info` is stored with the cluster when the write changes it, and shown in the config
+  ///   dump.
+  ///
+  /// This returns a tuple of (result, update_id). When the result is `Success`, the outcome
+  /// arrives in [`BootstrapExtensionConfig::on_cluster_writer_update_done`] with the same update
+  /// ID. Otherwise the update ID is 0.
+  ///
+  /// Envoy does not wait for written clusters before it finishes initializing. To serve them from
+  /// the first request, call [`EnvoyBootstrapExtensionConfig::signal_init_complete`] only after
+  /// their writes completed as active. While Envoy applies a burst of writes, it holds back the
+  /// EDS, LEDS and SDS requests on the ADS stream and the xDS-TP authority streams, including their
+  /// ACKs, for about one second.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn cluster_writer_add_or_update(
+    &self,
+    cluster_name: &str,
+    cluster: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result,
+    u64,
+  );
+
+  /// Queue the removal of a cluster that this extension owns. A queued write of the cluster
+  /// completes as `Removed`. Returns `NotFound` when the extension neither owns nor has queued a
+  /// cluster with this name. A removal has no outcome of its own, and the workers can use the
+  /// cluster until Envoy applies it and each worker processes the removal.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn cluster_writer_remove(
+    &self,
+    cluster_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -312,7 +429,8 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// This is called when an HTTP callout response is received.
+  /// This is called when an HTTP callout response is received. Envoy reports a failure of a
+  /// callout in flight from a later callback on the main thread.
   ///
   /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
   /// * `callout_id` is the ID of the callout returned by
@@ -435,6 +553,57 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _listener_name: &str,
   ) {
   }
+
+  /// This is called on every worker thread for an event posted with
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`]. The worker threads call it
+  /// concurrently.
+  ///
+  /// Only update metrics or commit events to a scheduler here, and return quickly.
+  ///
+  /// * `envoy_extension_config` can be used to update metrics.
+  /// * `event_id` is the ID passed to [`EnvoyBootstrapExtensionConfig::run_on_all_workers`].
+  fn on_worker_event(
+    &self,
+    _envoy_extension_config: &dyn EnvoyBootstrapExtensionConfig,
+    _event_id: u64,
+  ) {
+  }
+
+  /// This is called on the main thread once every worker thread ran the event posted with
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`]. Events complete in the order they
+  /// were posted, and none completes after shutdown began.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `event_id` is the ID passed to [`EnvoyBootstrapExtensionConfig::run_on_all_workers`].
+  fn on_run_on_all_workers_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _event_id: u64,
+  ) {
+  }
+
+  /// This is called on the main thread with the outcome of a write accepted by
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_add_or_update`]. Envoy calls it at most once
+  /// per update ID, never from inside a call into Envoy, and not after shutdown began. It is called
+  /// exactly once unless shutdown began first, the cluster never finishes warming, or Envoy never
+  /// finishes initializing its clusters. To end a write that stays warming, write the cluster again
+  /// or remove it. Outcomes can arrive out of update ID order.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `update_id` is the ID returned by the write.
+  /// * `cluster_name` is the name of the cluster.
+  /// * `status` is the outcome of the write.
+  /// * `error_details` describes the problem when the status is `Failed` or `OwnershipLost`, and is
+  ///   empty otherwise.
+  fn on_cluster_writer_update_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update_id: u64,
+    _cluster_name: &str,
+    _status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    _error_details: &str,
+  ) {
+  }
 }
 
 /// A completion callback that must be invoked exactly once to signal that an asynchronous
@@ -495,10 +664,9 @@ pub trait BootstrapExtension: Send + Sync {
   /// external services, initializing global state, or registering singleton resources.
   fn on_server_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 
-  /// Called when a worker thread is initialized.
-  ///
-  /// This is called once per worker thread when it starts. You can use this to perform
-  /// per-worker-thread initialization like setting up thread-local storage.
+  /// Called once on the main thread after Envoy creates its workers and before it starts their
+  /// threads. To run code on every worker thread, call
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] after the server is initialized.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 
   /// Called when Envoy begins draining.
@@ -516,6 +684,12 @@ pub trait BootstrapExtension: Send + Sync {
   ///
   /// If the [`CompletionCallback`] is dropped without calling `done`, it will automatically signal
   /// completion to prevent Envoy from hanging.
+  ///
+  /// Shutdown has begun when Envoy calls this, so
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] returns false, the cluster writer calls
+  /// return `NotAllowed`, and Envoy drops the done hooks of pending worker events and the pending
+  /// cluster writer outcomes. A worker can still run the worker event hook of an event posted
+  /// before shutdown began, until the workers stop.
   fn on_shutdown(
     &mut self,
     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
@@ -527,7 +701,7 @@ pub trait BootstrapExtension: Send + Sync {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy bootstrap extension config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyBootstrapExtensionConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
@@ -582,7 +756,7 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 /// lifetime. This allows modules with multiple timers to identify which timer fired in the
 /// [`BootstrapExtensionConfig::on_timer_fired`] callback by comparing the id of the fired timer
 /// reference against the ids of their stored timer handles.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyBootstrapExtensionTimer: Send + Sync {
   /// Returns a unique opaque identifier for this timer. The identifier is stable for the
   /// lifetime of the timer and can be used to distinguish between multiple timers in the
@@ -790,16 +964,16 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn define_counter_vec(
     &mut self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -826,16 +1000,16 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn define_gauge_vec(
     &mut self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -862,16 +1036,16 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn define_histogram_vec(
     &mut self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_names = strs_to_module_buffers(label_names);
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
         self.raw,
         str_to_module_buffer(name),
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_names.as_mut_ptr(),
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -903,17 +1077,17 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn increment_counter_vec(
     &self,
     id: EnvoyCounterVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyCounterVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     };
@@ -949,17 +1123,17 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn set_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     };
@@ -995,17 +1169,17 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn increase_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     };
@@ -1041,17 +1215,17 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn decrease_gauge_vec(
     &self,
     id: EnvoyGaugeVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyGaugeVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     };
@@ -1087,17 +1261,17 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn record_histogram_value_vec(
     &self,
     id: EnvoyHistogramVecId,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyHistogramVecId(id) = id;
-    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut label_values = strs_to_module_buffers(label_values);
     let res = unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
         self.raw,
         id,
-        label_bufs.as_mut_ptr(),
-        label_bufs.len(),
+        label_values.as_mut_ptr(),
+        label_values.len(),
         value,
       )
     };
@@ -1161,6 +1335,90 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn enable_listener_lifecycle(&self) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
+    }
+  }
+
+  fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
+    extern "C" fn name_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      user_data: *mut std::ffi::c_void,
+    ) {
+      let names = unsafe { &mut *(user_data as *mut Vec<String>) };
+      let name_slice =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
+      names.push(std::str::from_utf8(name_slice).unwrap_or("").to_owned());
+    }
+
+    let abi_kind = match kind {
+      ActiveResourceKind::FilterChain => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::FilterChain
+      },
+      ActiveResourceKind::Cluster => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Cluster
+      },
+      ActiveResourceKind::TransportSocketMatch => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::TransportSocketMatch
+      },
+      ActiveResourceKind::Secret => {
+        abi::envoy_dynamic_module_type_bootstrap_active_resource_kind::Secret
+      },
+    };
+
+    let mut names: Vec<String> = Vec::new();
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        self.raw,
+        abi_kind,
+        Some(name_trampoline),
+        &mut names as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+    names
+  }
+
+  fn run_on_all_workers(&self, event_id: u64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(self.raw, event_id)
+    }
+  }
+
+  fn enable_cluster_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(self.raw)
+    }
+  }
+
+  fn cluster_writer_add_or_update(
+    &self,
+    cluster_name: &str,
+    cluster: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result,
+    u64,
+  ) {
+    let mut update_id: u64 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+        bytes_to_module_buffer(cluster),
+        str_to_module_buffer(version_info),
+        &mut update_id,
+      )
+    };
+    (result, update_id)
+  }
+
+  fn cluster_writer_remove(
+    &self,
+    cluster_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+      )
     }
   }
 }
@@ -1247,11 +1505,18 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       let name_slice =
         unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
-      if (wrapper.callback)(name_str, value) {
-        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
-      } else {
-        wrapper.stopped = true;
-        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      // Catch panics so a panicking visitor never unwinds across the C boundary and aborts Envoy.
+      match catch_unwind(AssertUnwindSafe(|| (wrapper.callback)(name_str, value))) {
+        Ok(true) => abi::envoy_dynamic_module_type_stats_iteration_action::Continue,
+        Ok(false) => {
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
+        Err(panic) => {
+          crate::log_ffi_panic("bootstrap_extension_iterate_counters", panic);
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
       }
     }
 
@@ -1287,11 +1552,18 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       let name_slice =
         unsafe { crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length) };
       let name_str = std::str::from_utf8(name_slice).unwrap_or("");
-      if (wrapper.callback)(name_str, value) {
-        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
-      } else {
-        wrapper.stopped = true;
-        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      // Catch panics so a panicking visitor never unwinds across the C boundary and aborts Envoy.
+      match catch_unwind(AssertUnwindSafe(|| (wrapper.callback)(name_str, value))) {
+        Ok(true) => abi::envoy_dynamic_module_type_stats_iteration_action::Continue,
+        Ok(false) => {
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
+        Err(panic) => {
+          crate::log_ffi_panic("bootstrap_extension_iterate_gauges", panic);
+          wrapper.stopped = true;
+          abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+        },
       }
     }
 
@@ -1311,13 +1583,12 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
 
 // Bootstrap Extension Event Hook Implementations
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_new(
-  envoy_extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_config_new(
+    envoy_extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
     let mut envoy_extension_config =
       EnvoyBootstrapExtensionConfigImpl::new(envoy_extension_config_ptr);
     let name_str =
@@ -1333,14 +1604,8 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_new(
         .get()
         .expect("NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_config_new",
-      panic,
-    );
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn init_bootstrap_extension_config(
@@ -1356,46 +1621,35 @@ pub(crate) fn init_bootstrap_extension_config(
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_destroy(
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_config_destroy(
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(extension_config_ptr, BootstrapExtensionConfig);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_new(
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  envoy_extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_new(
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    envoy_extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr {
     let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(envoy_extension_ptr);
     let extension_config = {
       let raw = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
       &**raw
     };
     envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, extension_config)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_bootstrap_extension_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn envoy_dynamic_module_on_bootstrap_extension_new_impl(
@@ -1406,137 +1660,97 @@ pub(crate) fn envoy_dynamic_module_on_bootstrap_extension_new_impl(
   wrap_into_c_void_ptr!(extension)
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_server_initialized(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_server_initialized(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  ) {
     let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
     let extension = unsafe { &mut *extension };
     extension.on_server_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_server_initialized",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  ) {
     let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
     let extension = unsafe { &mut *extension };
     extension.on_worker_thread_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  ) {
     let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
     let extension = unsafe { &mut *extension };
     extension.on_drain_started(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_drain_started",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
-  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
-  completion_callback: abi::envoy_dynamic_module_type_event_cb,
-  completion_context: *mut std::os::raw::c_void,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    completion_callback: abi::envoy_dynamic_module_type_event_cb,
+    completion_context: *mut std::os::raw::c_void,
+  ) {
     let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
     let extension = unsafe { &mut *extension };
     let completion = CompletionCallback::new(completion_callback, completion_context);
     extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_shutdown",
-      panic,
-    );
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
-  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_destroy(
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  ) {
     let _ = unsafe { Box::from_raw(extension_ptr as *mut Box<dyn BootstrapExtension>) };
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_bootstrap_extension_destroy", panic);
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  event_id: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    event_id: u64,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
     extension_config.on_scheduled(
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       event_id,
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_config_scheduled",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when an HTTP callout initiated by a bootstrap extension completes.
-///
-/// # Safety
-/// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
-/// must ensure that all pointers are valid and that the memory they point to remains valid for
-/// the duration of the function call.
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  callout_id: u64,
-  result: abi::envoy_dynamic_module_type_http_callout_result,
-  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
-  headers_size: usize,
-  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
-  body_chunks_size: usize,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when an HTTP callout initiated by a bootstrap extension completes.
+  ///
+  /// # Safety
+  /// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
+  /// must ensure that all pointers are valid and that the memory they point to remains valid for
+  /// the duration of the function call.
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    headers_size: usize,
+    body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+    body_chunks_size: usize,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1568,23 +1782,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callou
       headers,
       body,
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_http_callout_done",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when a timer created by a bootstrap extension fires.
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when a timer created by a bootstrap extension fires.
+  fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1595,24 +1802,17 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       &timer_ref,
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_timer_fired",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when a watched file changes for a bootstrap extension.
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  path: abi::envoy_dynamic_module_type_envoy_buffer,
-  events: u32,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when a watched file changes for a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    path: abi::envoy_dynamic_module_type_envoy_buffer,
+    events: u32,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1624,35 +1824,28 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
       path_str.as_ref(),
       events,
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_file_changed",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when an admin endpoint registered by a bootstrap extension is
-/// requested.
-///
-/// # Safety
-/// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
-/// must ensure that all pointers are valid and that the memory they point to remains valid for
-/// the duration of the function call.
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_request(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  method: abi::envoy_dynamic_module_type_envoy_buffer,
-  path: abi::envoy_dynamic_module_type_envoy_buffer,
-  body: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> u32 {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when an admin endpoint registered by a bootstrap extension is
+  /// requested.
+  ///
+  /// # Safety
+  /// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
+  /// must ensure that all pointers are valid and that the memory they point to remains valid for
+  /// the duration of the function call.
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    method: abi::envoy_dynamic_module_type_envoy_buffer,
+    path: abi::envoy_dynamic_module_type_envoy_buffer,
+    body: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> u32 {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1684,30 +1877,23 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
     }
 
     status_code
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_admin_request",
-      panic,
-    );
-    // Fail-closed: 500 Internal Server Error.
-    500
-  })
+  }
+  // Fail-closed: 500 Internal Server Error.
+  on_panic = 500
 }
 
-/// Event hook called by Envoy when a cluster is added to or updated in the ClusterManager.
-///
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when a cluster is added to or updated in the ClusterManager.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1719,28 +1905,21 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       cluster_name_str.as_ref(),
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when a cluster is removed from the ClusterManager.
-///
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when a cluster is removed from the ClusterManager.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1752,28 +1931,21 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_rem
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       cluster_name_str.as_ref(),
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_cluster_removal",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when a listener is added to or updated in the ListenerManager.
-///
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when a listener is added to or updated in the ListenerManager.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1785,28 +1957,21 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_ad
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update",
-      panic,
-    );
-  });
+  }
 }
 
-/// Event hook called by Envoy when a listener is removed from the ListenerManager.
-///
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_removal(
-  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
-  listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// Event hook called by Envoy when a listener is removed from the ListenerManager.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
     let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
     let extension_config = unsafe { &**extension_config };
 
@@ -1818,11 +1983,66 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_re
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_bootstrap_extension_listener_removal",
-      panic,
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy on every worker thread for an event posted by a bootstrap
+  /// extension with `run_on_all_workers`.
+  fn envoy_dynamic_module_on_bootstrap_extension_worker_event(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    event_id: u64,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+    extension_config.on_worker_event(&EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr), event_id);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy on the main thread once every worker thread ran an event posted
+  /// by a bootstrap extension with `run_on_all_workers`.
+  fn envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    event_id: u64,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+    extension_config.on_run_on_all_workers_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      event_id,
     );
-  });
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy with the outcome of a cluster write by a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    update_id: u64,
+    cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let cluster_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
+    };
+    let error_details_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr as *const u8, error_details.length)
+    };
+
+    extension_config.on_cluster_writer_update_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      update_id,
+      cluster_name_str.as_ref(),
+      status,
+      error_details_str.as_ref(),
+    );
+  }
 }

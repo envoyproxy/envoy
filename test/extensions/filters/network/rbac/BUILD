@@ -32,6 +32,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/rbac:rbac_filter",
@@ -53,6 +54,9 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/common:logger",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/rbac:config",
         "//source/extensions/filters/network/set_filter_state:config",

@@ -13,18 +13,21 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 
+#include "test/common/http/header_formatter_test_utils.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
+using testing::Eq;
 
 namespace Envoy {
 namespace Http {
@@ -747,58 +750,143 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
 
   // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   hcm_value.set_value(false);
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                  .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
   hcm_value.set_value(true);
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .stream_error_on_invalid_http_message_);
 
   http1_options.clear_override_stream_error_on_invalid_http_message();
 
   // fallback to HCM.stream_error
   hcm_value.set_value(true);
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                  .stream_error_on_invalid_http_message_);
 
   // fallback to HCM.stream_error (flip boolean value)
   hcm_value.set_value(false);
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .stream_error_on_invalid_http_message_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .stream_error_on_invalid_http_message_);
+}
+
+// StatefulHeaderKeyFormatterFactoryConfig::createFromProto() was replaced by
+// createFactoryFromProto(), which takes a factory context and returns a status, and the old method
+// is deprecated rather than removed. An extension that only implements the deprecated method -
+// which is what every out-of-tree extension written before the change does - must still be reached
+// when Envoy calls the new one.
+class LegacyOnlyFormatterFactory : public StatefulHeaderKeyFormatterFactory {
+public:
+  StatefulHeaderKeyFormatterPtr create() override { return nullptr; }
+};
+
+class LegacyOnlyFormatterFactoryConfig : public StatefulHeaderKeyFormatterFactoryConfig {
+public:
+  std::string name() const override { return "envoy.test.legacy_only_formatter"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::StringValue>();
+  }
+
+  // Deliberately implements only the deprecated method.
+  StatefulHeaderKeyFormatterFactorySharedPtr createFromProto(const Protobuf::Message&) override {
+    return std::make_shared<LegacyOnlyFormatterFactory>();
+  }
+};
+
+TEST(HttpUtility, StatefulFormatterDeprecatedFactoryOverloadStillReached) {
+  LegacyOnlyFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  auto* stateful_formatter =
+      http1_options.mutable_header_key_format()->mutable_stateful_formatter();
+  stateful_formatter->set_name("envoy.test.legacy_only_formatter");
+  Protobuf::StringValue formatter_config;
+  ASSERT_TRUE(stateful_formatter->mutable_typed_config()->PackFrom(formatter_config));
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings = Http1::parseHttp1Settings(http1_options, context, creation_status);
+
+  EXPECT_THAT(creation_status, IsOk());
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::StatefulFormatter, settings.header_key_format_);
+  EXPECT_NE(nullptr, settings.stateful_header_key_formatter_);
+}
+
+// A formatter that rejects its configuration must have the failure reported through
+// creation_status, and parseHttp1Settings() must return default settings rather than the
+// half-populated ones it had built before it reached the formatter.
+TEST(HttpUtility, StatefulFormatterCreationFailureIsPropagated) {
+  RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  // Set a field that is populated before the formatter is created, so that default settings can be
+  // told apart from partially populated ones.
+  http1_options.set_allow_chunked_length(true);
+  useRejectingStatefulFormatter(http1_options);
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings = Http1::parseHttp1Settings(http1_options, context, creation_status);
+
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         Eq(RejectingStatefulFormatterFactoryConfig::kError)));
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::Default, settings.header_key_format_);
+  EXPECT_EQ(nullptr, settings.stateful_header_key_formatter_);
+  EXPECT_FALSE(settings.allow_chunked_length_);
+}
+
+TEST(HttpUtility, StatefulFormatterCreationFailureIsPropagatedWithHcmOverload) {
+  RejectingStatefulFormatterFactoryConfig factory;
+  Registry::InjectFactory<StatefulHeaderKeyFormatterFactoryConfig> registered(factory);
+
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  http1_options.set_allow_chunked_length(true);
+  useRejectingStatefulFormatter(http1_options);
+
+  Protobuf::BoolValue hcm_value;
+  hcm_value.set_value(true);
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  auto settings =
+      Http1::parseHttp1Settings(http1_options, context, hcm_value, true, creation_status);
+
+  EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                         Eq(RejectingStatefulFormatterFactoryConfig::kError)));
+  EXPECT_EQ(Http1Settings::HeaderKeyFormat::Default, settings.header_key_format_);
+  EXPECT_EQ(nullptr, settings.stateful_header_key_formatter_);
+  EXPECT_FALSE(settings.allow_chunked_length_);
+  EXPECT_FALSE(settings.validate_scheme_);
+  EXPECT_FALSE(settings.stream_error_on_invalid_http_message_);
 }
 
 TEST(HttpUtility, AllowCustomMethods) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
 
   EXPECT_FALSE(http1_options.allow_custom_methods());
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .allow_custom_methods_);
+  EXPECT_FALSE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                   .allow_custom_methods_);
 
   http1_options.set_allow_custom_methods(true);
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .allow_custom_methods_);
+  EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, context, hcm_value, false, creation_status)
+                  .allow_custom_methods_);
 }
 
 TEST(HttpUtility, getLastAddressFromXFF) {
@@ -1069,14 +1157,14 @@ TEST(HttpUtility, SendLocalGrpcReply) {
 
   EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
-      }));
+      });
   sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", std::nullopt, false});
@@ -1088,14 +1176,14 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
 
   EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::InvalidArgument)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
-      }));
+      });
   sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
@@ -1117,14 +1205,14 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusPreserved) {
                                },
                                nullptr};
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::NotFound)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
-      }));
+      });
   Utility::sendLocalReply(
       is_reset, encode_functions,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
@@ -1146,7 +1234,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 
   EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.getGrpcStatusValue(),
@@ -1154,7 +1242,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         const auto& encoded = Utility::PercentEncoding::encode(json);
         EXPECT_EQ(headers.getGrpcMessageValue(), encoded);
-      }));
+      });
   sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::Unauthorized, json, std::nullopt, false});
@@ -1165,21 +1253,21 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
 
   EXPECT_CALL(callbacks, streamInfo()).Times(testing::AnyNumber());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
-      }));
+      });
   sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", std::nullopt, false});
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
-      }));
+      });
   sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
@@ -1193,9 +1281,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   bool is_reset = false;
 
   EXPECT_CALL(callbacks, streamInfo());
-  EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
-    is_reset = true;
-  }));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce([&]() -> void { is_reset = true; });
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
   sendLocalReplyTestHelper(
       is_reset, callbacks,
@@ -1207,9 +1293,9 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
   bool is_reset = false;
   EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
-      }));
+      });
   sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", std::nullopt, true});
@@ -1393,10 +1479,26 @@ num_retries: 10
       Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
                                              "5xx,gateway-error,connect-failure,reset");
   EXPECT_EQ(route_retry_policy.num_retries().value(), 10);
-  EXPECT_EQ(route_retry_policy.per_try_timeout().seconds(), 10);
+  EXPECT_FALSE(route_retry_policy.has_per_try_timeout());
   EXPECT_EQ(route_retry_policy.retry_back_off().base_interval().seconds(), 1);
   EXPECT_EQ(route_retry_policy.retry_back_off().max_interval().seconds(), 10);
   EXPECT_EQ(route_retry_policy.retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  const std::string core_policy_with_per_try_timeout = R"(
+retry_back_off:
+  base_interval: 1s
+  max_interval: 2s
+per_try_timeout: 3s
+num_retries: 10
+)";
+  envoy::config::core::v3::RetryPolicy core_retry_policy_with_per_try_timeout;
+  TestUtility::loadFromYaml(core_policy_with_per_try_timeout,
+                            core_retry_policy_with_per_try_timeout);
+  const envoy::config::route::v3::RetryPolicy route_retry_policy_with_per_try_timeout =
+      Utility::convertCoreToRouteRetryPolicy(core_retry_policy_with_per_try_timeout, "");
+  EXPECT_EQ(route_retry_policy_with_per_try_timeout.retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(route_retry_policy_with_per_try_timeout.retry_back_off().max_interval().seconds(), 2);
+  EXPECT_EQ(route_retry_policy_with_per_try_timeout.per_try_timeout().seconds(), 3);
 
   const std::string core_policy2 = R"(
 retry_back_off:

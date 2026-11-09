@@ -17,6 +17,13 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
     return;
   }
   if (quic_stream_.write_side_closed()) {
+    if (quic_stream_.rst_sent() || quic_stream_.rst_received() ||
+        !quic_session_.connection()->connected()) {
+      // A callback can already be in flight when a reset or connection close tears down
+      // the stream. Drop the data in that case; it can no longer be delivered to the peer.
+      data.drain(data.length());
+      return;
+    }
     IS_ENVOY_BUG(fmt::format("encodeData is called on write-closed stream. {}", quicStreamState()));
     return;
   }
@@ -32,23 +39,16 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
     }
   } else {
 #endif
-    Buffer::RawSliceVector raw_slices = data.getRawSlices();
     absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
-    quic_slices.reserve(raw_slices.size());
-    for (auto& slice : raw_slices) {
-      ASSERT(slice.len_ != 0);
-      // Move each slice into a stand-alone buffer.
-      // TODO(danzh): investigate the cost of allocating one buffer per slice.
-      // If it turns out to be expensive, add a new function to free data in the middle in buffer
-      // interface and re-design QuicheMemSliceImpl.
-      auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
-      single_slice_buffer->move(data, slice.len_);
-      quic_slices.emplace_back(
-          reinterpret_cast<char*>(slice.mem_), slice.len_,
-          [single_slice_buffer = std::move(single_slice_buffer)](absl::string_view) mutable {
-            // Free this memory explicitly when the callback is invoked.
-            single_slice_buffer = nullptr;
-          });
+    quic_slices.reserve(data.sliceCount());
+    while (data.length() != 0) {
+      Buffer::SliceDataPtr slice = data.extractImmutableFrontSlice();
+      absl::Span<const uint8_t> slice_data = slice->getImmutableData();
+      quic_slices.emplace_back(reinterpret_cast<const char*>(slice_data.data()), slice_data.size(),
+                               [slice = std::move(slice)](absl::string_view) mutable {
+                                 // Free this memory explicitly when the callback is invoked.
+                                 slice = nullptr;
+                               });
     }
     quic::QuicConsumedData result{0, false};
     absl::Span<quiche::QuicheMemSlice> span(quic_slices);

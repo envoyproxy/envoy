@@ -23,6 +23,16 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
+          auto* route_config = hcm.mutable_route_config();
+          ASSERT_EQ(1, route_config->virtual_hosts_size());
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          virtual_host->set_name("test_vhost");
+          auto* virtual_cluster = virtual_host->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* header = virtual_cluster->add_headers();
+          header->set_name(":path");
+          header->mutable_string_match()->set_exact("/test");
+
           constexpr auto config = R"EOF(
 name: envoy.access_loggers.dynamic_modules
 typed_config:
@@ -66,8 +76,33 @@ TEST_P(DynamicModulesAccessLogIntegrationTest, BasicLogging) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
-  // The access logger was called. We can't easily verify this from the test since the logger
-  // doesn't modify headers, but the test passing means the logger loaded and ran without crashing.
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_received",
+                               testing::Gt(0));
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_sent",
+                               testing::Gt(0));
+}
+
+TEST_P(DynamicModulesAccessLogIntegrationTest, DownstreamWireBytesForLocalReply) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_direct_response()->set_status(400);
+      });
+  initializeWithAccessLogger();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+
+  // The Rust logger verifies that downstream wire bytes are nonzero while upstream bytes are zero.
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_received",
+                               testing::Gt(0));
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_sent",
+                               testing::Gt(0));
 }
 
 TEST_P(DynamicModulesAccessLogIntegrationTest, MultipleRequests) {

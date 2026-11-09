@@ -31,7 +31,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      bazel-cache: true
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
@@ -40,6 +39,8 @@ jobs:
         ERROR
         error:
         Error:
+        FAILED
+        FAIL:
       rbe: true
       request: ${{ inputs.request }}
       catch-errors: ${{ matrix.catch-errors || false }}
@@ -56,5 +57,8 @@ jobs:
         - target: compile_time_options
           name: Compile time options
           docker-ci: true
+        - target: execution_context
+          name: Execution context
+          skip: ${{ fromJSON(inputs.request).run.check-build-execution-context != true }}
         - target: gcc
           name: GCC

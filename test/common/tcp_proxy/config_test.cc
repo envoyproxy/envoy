@@ -818,11 +818,11 @@ public:
   TcpProxyNonDeprecatedConfigRoutingTest() {
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
             chooseHost(_))
-        .WillByDefault(Invoke([this] {
+        .WillByDefault([this] {
           return Upstream::HostSelectionResponse{
               factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
                   .host_};
-        }));
+        });
   }
 
   void setup() {
@@ -866,10 +866,9 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
       .WillOnce(Return(std::nullopt));
   Upstream::ClusterInfoConstSharedPtr cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
-      .WillOnce(
-          Invoke([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
-            cluster_info = upstream_cluster_info;
-          }));
+      .WillOnce([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
+        cluster_info = upstream_cluster_info;
+      });
   EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
       .WillOnce([&cluster_info]() -> OptRef<const Upstream::ClusterInfo> {
         return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info.get());
@@ -885,11 +884,11 @@ public:
   void setup(const std::string& yaml) {
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
             chooseHost(_))
-        .WillByDefault(Invoke([this] {
+        .WillByDefault([this] {
           return Upstream::HostSelectionResponse{
               factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
                   .host_};
-        }));
+        });
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
@@ -941,18 +940,18 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
     mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
             chooseHost(_))
-        .WillByDefault(Invoke([this] {
+        .WillByDefault([this] {
           return Upstream::HostSelectionResponse{
               factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
                   .host_};
-        }));
+        });
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
-        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                            Upstream::LoadBalancerContext* context) {
+        .WillOnce([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
           return std::nullopt;
-        }));
+        });
     filter_->onNewConnection();
   }
 
@@ -963,11 +962,11 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
         std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
-        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                            Upstream::LoadBalancerContext* context) {
+        .WillOnce([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) {
           EXPECT_TRUE(context->computeHashKey().has_value());
           return std::nullopt;
-        }));
+        });
     filter_->onNewConnection();
   }
 }
@@ -991,11 +990,11 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
     // Expect no hash when filter state is unset.
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
-        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                            Upstream::LoadBalancerContext* context) {
+        .WillOnce([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
           return std::nullopt;
-        }));
+        });
     filter_->onNewConnection();
   }
 
@@ -1006,11 +1005,11 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
                                                     StreamInfo::FilterState::LifeSpan::FilterChain);
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
-        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                            Upstream::LoadBalancerContext* context) {
+        .WillOnce([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                     Upstream::LoadBalancerContext* context) {
           EXPECT_EQ(31337, context->computeHashKey().value());
           return std::nullopt;
-        }));
+        });
     filter_->onNewConnection();
   }
 }

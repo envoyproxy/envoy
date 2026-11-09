@@ -23,14 +23,16 @@ All Python requirements for Envoy tooling  must be pinned with hashes to ensure 
 
 Let's add the `bazel` boilerplate to setup a new `requirements.txt` file. This uses `rules_python`.
 
-Open `bazel/repositories_extra.bzl` with your editor, and find the `_python_deps` function.
+Open `bazel/python_dependencies.bzl` with your editor, and find the `envoy_python_dependencies`
+function.
 
 To this function, add the following bazel target:
 
 ```starlark
-    pip_install(
+    pip_parse(
         name = "sometools_pip3",
-        requirements = "@envoy//tools/sometools:requirements.txt",
+        python_interpreter_target = "@python3_12_host//:python",
+        requirements_lock = "@envoy//tools/sometools:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
 ```

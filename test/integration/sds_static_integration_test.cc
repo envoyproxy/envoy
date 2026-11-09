@@ -71,7 +71,8 @@ public:
 
     registerTestServerPorts({"http"});
 
-    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_,
+                                                            &server_factory_context_.serverScope());
   }
 
   void TearDown() override {
@@ -142,8 +143,8 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_), Http::CodecType::HTTP1,
-                    /*autonomous_upstream=*/false);
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_, false, &upstreamStatsScope()),
+                    Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
   }
 
 private:

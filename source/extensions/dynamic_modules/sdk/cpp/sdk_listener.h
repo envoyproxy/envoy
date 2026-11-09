@@ -148,6 +148,24 @@ public:
   virtual std::optional<double> getDynamicMetadataNumber(std::string_view ns,
                                                          std::string_view key) = 0;
 
+  /**
+   * Merges a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing entries
+   * with the same key are overwritten. An empty struct is a no-op and does not create the
+   * namespace.
+   * @return true if the struct was merged, false if the buffer does not parse as a
+   * google.protobuf.Struct.
+   */
+  virtual bool setDynamicMetadataStruct(std::string_view ns,
+                                        std::string_view serialized_struct) = 0;
+
+  /**
+   * Sets the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any,
+   * replacing an existing entry.
+   * @return true if the entry was set, false if the buffer does not parse as a google.protobuf.Any
+   * with a type URL.
+   */
+  virtual bool setDynamicTypedMetadata(std::string_view ns, std::string_view serialized_any) = 0;
+
   /** Stores a raw bytes filter state value. */
   virtual bool setFilterState(std::string_view key, std::string_view value) = 0;
 
@@ -197,13 +215,14 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 /** Host interface exposed while creating a thread-safe listener filter factory. */
-class ListenerFilterConfigHandle {
+class ListenerFilterConfigHandle : public CommonHandle {
 public:
-  virtual ~ListenerFilterConfigHandle();
+  ~ListenerFilterConfigHandle() override;
 
   /** Defines a histogram metric during config initialization. */
   virtual std::pair<MetricID, MetricsResult> defineHistogram(std::string_view name) = 0;
@@ -224,7 +243,8 @@ public:
   virtual bool logEnabled(LogLevel level) = 0;
 
   /** Logs a message through Envoy's logging subsystem. */
-  virtual void log(LogLevel level, std::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message,
+                   std::source_location location = std::source_location::current()) = 0;
 };
 
 /** Base class for listener filters that operate on newly accepted downstream sockets. */

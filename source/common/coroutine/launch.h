@@ -85,7 +85,10 @@ public:
     // before the frame goes away. suspend_never destroys the frame here, so no
     // external owner ever has to. (Task uses FinalAwaiter instead, to
     // symmetric-transfer back to its awaiting parent.)
-    std::suspend_never final_suspend() noexcept { return {}; }
+    std::suspend_never final_suspend() noexcept {
+      on_coroutine_suspend(*this);
+      return {};
+    }
     void return_void() noexcept {}
   };
 
@@ -134,7 +137,7 @@ inline DetachedHandle startRoot(RootTask root, std::shared_ptr<Executor> exec, S
   root.promise().context_ = std::make_shared<CoroutineContext>(std::move(exec), cancel);
   DetachedHandle handle(std::move(cancel));
   if (mode == StartMode::Inline) {
-    root.release().resume(); // Start on the caller's stack -- no post().
+    resume_handle(root.release()); // Start on the caller's stack -- no post().
   } else {
     executor.schedule(root.release());
   }
@@ -146,8 +149,14 @@ inline DetachedHandle startRoot(RootTask root, std::shared_ptr<Executor> exec, S
 /**
  * Start `task` on `exec` from non-coroutine code. `on_done` is invoked with the
  * task's result when the chain completes (including after a cancellation, which
- * delivers an aborted result). Returns a `DetachedHandle` that owns the frame and
- * can `cancel()` it.
+ * delivers an aborted result). Returns a `DetachedHandle` that can `cancel()` it.
+ *
+ * NOTE: The launched root coroutine is self-owning and manages its own lifetime.
+ * Callers and tasks must be careful when capturing raw pointers, references, or
+ * member methods (`this`): if the object owning those resources is destroyed while
+ * the coroutine is suspended (or before `on_done` runs), accessing them will cause a
+ * use-after-free. Use `std::weak_ptr` / `std::shared_ptr` or ensure strict lifecycle
+ * synchronization via `DetachedHandle::cancel()`.
  *
  * `exec` is taken as a `shared_ptr` so the coroutine context can keep it alive.
  * TODO(penguingao): revert to `Executor&` once the executor is guaranteed to

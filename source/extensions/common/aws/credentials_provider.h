@@ -168,8 +168,11 @@ using CredentialSubscriberCallbacksSharedPtr = std::shared_ptr<CredentialSubscri
 // Subscription model allowing CredentialsProviderChains to be notified of credential provider
 // updates. A credential provider chain will call credential_provider->subscribeToCredentialUpdates
 // to register itself for updates via onCredentialUpdate callback. When a credential provider has
-// successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
-// it will notify all subscribers that credentials have been retrieved.
+// posted new credentials to all threads, via the setCredentialsToAllThreads method it will notify
+// all subscribers that credentials have been retrieved.
+//
+// Notification happens as soon as the update has been posted, not once every thread has applied it,
+// because the main thread may need credentials before worker threads are running at all.
 //
 // Subscription is only relevant for metadata credentials providers, as these are the only
 // credential providers that implement async credential retrieval functionality.

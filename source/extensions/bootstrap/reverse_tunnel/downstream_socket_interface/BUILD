@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["reverse_connection_address.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/network:address_interface",
         "//source/common/network:address_lib",
         "//source/common/network:socket_interface_lib",
@@ -30,6 +31,7 @@ envoy_cc_extension(
         ":reverse_connection_address_lib",
         "//envoy/network:resolver_interface",
         "//envoy/registry",
+        "//source/common/http:header_utility_lib",
     ],
 )
 
@@ -77,7 +79,9 @@ envoy_cc_library(
         ":reverse_tunnel_extension_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/api:io_error_interface",
+        "//envoy/common:base_includes",
         "//envoy/common:random_generator_interface",
+        "//envoy/event:timer_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",
@@ -98,6 +102,7 @@ envoy_cc_library(
         "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
+        "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tls:ssl_handshaker_lib",
         "//source/common/upstream:load_balancer_context_base_lib",

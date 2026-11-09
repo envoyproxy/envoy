@@ -12,8 +12,7 @@
 //! thread) and reports the host's [`HostHealth`] through the [`Reporter`], which is safe to move to
 //! and call from any thread.
 
-use crate::{abi, EnvoyBuffer};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use crate::{abi, ffi_export, EnvoyBuffer};
 
 /// Health status of a host, reported by the module back to Envoy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -203,6 +202,24 @@ impl HealthCheckHost {
     }
   }
 
+  /// Attach a string key/value pair to the in-flight health check result. Envoy forwards the pairs
+  /// to the management server in the HDS `EndpointHealth.health_metadata` field. The pairs
+  /// accumulated during a check replace the host's health check metadata when the check resolves,
+  /// and each check starts empty.
+  ///
+  /// Call this from `on_interval`; the pairs apply to the check it starts, even if that check times
+  /// out. Returns `false` if the key is empty or is the reserved key `http_status_code`, in which
+  /// case nothing is stored.
+  pub fn set_health_metadata(&self, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_health_checker_set_health_metadata(
+        self.session_envoy_ptr,
+        module_buffer(key),
+        module_buffer(value),
+      )
+    }
+  }
+
   /// The host's current health status as known to Envoy.
   pub fn health(&self) -> HostHealth {
     HostHealth::from_abi(unsafe {
@@ -218,17 +235,16 @@ fn module_buffer(s: &str) -> abi::envoy_dynamic_module_type_module_buffer {
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_health_checker_config_module_ptr {
-  let result = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_health_checker_config_new(
+    _config_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_health_checker_config_module_ptr {
     // SAFETY: `name` is a protobuf string (UTF-8 by contract) and `config` is opaque bytes. The
     // helpers tolerate `(nullptr, 0)` and substitute `U+FFFD` for malformed UTF-8.
     let name_str =
@@ -244,113 +260,76 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_new(
       Some(config) => crate::wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
-  }));
-  match result {
-    Ok(ptr) => ptr,
-    Err(panic) => {
-      crate::log_ffi_panic("envoy_dynamic_module_on_health_checker_config_new", panic);
-      std::ptr::null()
-    },
   }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_config_destroy(
-  config_ptr: abi::envoy_dynamic_module_type_health_checker_config_module_ptr,
-) {
-  if let Err(panic) = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_health_checker_config_destroy(
+    config_ptr: abi::envoy_dynamic_module_type_health_checker_config_module_ptr,
+  ) {
     crate::drop_wrapped_c_void_ptr!(config_ptr, HealthCheckerConfig);
-  })) {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_health_checker_config_destroy",
-      panic,
-    );
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_new(
-  config_ptr: abi::envoy_dynamic_module_type_health_checker_config_module_ptr,
-  session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_health_checker_session_module_ptr {
-  let result = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_health_checker_session_new(
+    config_ptr: abi::envoy_dynamic_module_type_health_checker_config_module_ptr,
+    session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_health_checker_session_module_ptr {
     let config = &*(config_ptr as *const Box<dyn HealthCheckerConfig>);
     let host = HealthCheckHost::new(session_envoy_ptr);
     let session: Box<dyn HealthCheckerSession> = config.new_session(&host);
     crate::wrap_into_c_void_ptr!(session)
-  }));
-  match result {
-    Ok(ptr) => ptr,
-    Err(panic) => {
-      crate::log_ffi_panic("envoy_dynamic_module_on_health_checker_session_new", panic);
-      std::ptr::null()
-    },
   }
+  on_panic = std::ptr::null()
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_interval(
-  session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
-  session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
-) {
-  if let Err(panic) = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_health_checker_session_on_interval(
+    session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
+    session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
+  ) {
     let session = &mut *(session_ptr as *mut Box<dyn HealthCheckerSession>);
     let host = HealthCheckHost::new(session_envoy_ptr);
     let reporter = Reporter::new(session_envoy_ptr);
     session.on_interval(&host, reporter);
-  })) {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_health_checker_session_on_interval",
-      panic,
-    );
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_on_timeout(
-  session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
-) {
-  if let Err(panic) = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_health_checker_session_on_timeout(
+    session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
+  ) {
     let session = &mut *(session_ptr as *mut Box<dyn HealthCheckerSession>);
     session.on_timeout();
-  })) {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_health_checker_session_on_timeout",
-      panic,
-    );
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_health_checker_session_destroy(
-  session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
-) {
-  if let Err(panic) = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_health_checker_session_destroy(
+    session_ptr: abi::envoy_dynamic_module_type_health_checker_session_module_ptr,
+  ) {
     crate::drop_wrapped_c_void_ptr!(session_ptr, HealthCheckerSession);
-  })) {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_health_checker_session_destroy",
-      panic,
-    );
   }
 }

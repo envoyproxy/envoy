@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -103,6 +102,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:ads_integration_lib",
         "//test/integration:integration_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -121,9 +121,10 @@ envoy_cc_mock(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "crc16_test",
     srcs = ["crc16_test.cc"],
+    extension_names = ["envoy.clusters.redis"],
     rbe_pool = "linux_x64_small",
     deps = ["//source/extensions/clusters/redis:crc16_lib"],
 )

@@ -434,6 +434,63 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
   EXPECT_TRUE(release_callback_called_);
 }
 
+TEST_F(OwnedImplTest, ExtractImmutableFrontSlice) {
+  // Create a buffer with a zero-length sentinel, an unowned slice and an owned slice.
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(0, buffer.sliceCount());
+  bool sentinel_discarded = false;
+  const Buffer::OwnedBufferFragmentImpl::Releasor sentinel_releasor{
+      [&](const Buffer::OwnedBufferFragmentImpl* sentinel) {
+        sentinel_discarded = true;
+        delete sentinel;
+      }};
+  auto sentinel =
+      Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), sentinel_releasor);
+  buffer.addBufferFragment(*sentinel.release());
+
+  std::string input{"unowned test slice"};
+  auto frag = OwnedBufferFragmentImpl::create(
+      {input.c_str(), input.size()},
+      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+  buffer.addBufferFragment(*frag);
+  uint32_t drain_tracker_calls{0};
+  buffer.addDrainTracker([&] { ++drain_tracker_calls; });
+
+  std::string owned_slice_content{"another slice, but owned"};
+  buffer.add(owned_slice_content);
+  EXPECT_EQ(3, buffer.sliceCount());
+  EXPECT_EQ(2, buffer.getRawSlices().size()); // only returns slices with data
+
+  {
+    // The sentinel is discarded during the extract, while the unowned slice is
+    // handed out without copying and its drain trackers and fragment releasor
+    // are called only when the extracted slice is destroyed.
+    auto slice = buffer.extractImmutableFrontSlice();
+    ASSERT_NE(slice, nullptr);
+    EXPECT_TRUE(sentinel_discarded);
+    EXPECT_EQ(0, drain_tracker_calls);
+    EXPECT_FALSE(release_callback_called_);
+    auto slice_data = slice->getImmutableData();
+    EXPECT_EQ(static_cast<const void*>(frag->data()), static_cast<const void*>(slice_data.data()));
+    EXPECT_EQ(input, absl::string_view(reinterpret_cast<const char*>(slice_data.data()),
+                                       slice_data.size()));
+    EXPECT_DEATH(slice->getMutableData(),
+                 "Not allowed to call getMutableData if slice is immutable");
+  }
+  EXPECT_TRUE(release_callback_called_);
+  EXPECT_EQ(1, drain_tracker_calls);
+  EXPECT_EQ(1, buffer.sliceCount());
+
+  // Extract the remaining owned slice.
+  auto slice = buffer.extractImmutableFrontSlice();
+  ASSERT_NE(slice, nullptr);
+  auto slice_data = slice->getImmutableData();
+  EXPECT_EQ(owned_slice_content,
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_EQ(0, buffer.sliceCount());
+}
+
 TEST_F(OwnedImplTest, ExtractWithDrainTracker) {
   testing::InSequence s;
 

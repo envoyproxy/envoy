@@ -3,6 +3,9 @@
 #############################################################################
 
 
+build:windows --build_tag_filters=-skip_on_windows
+build:windows --test_tag_filters=-skip_on_windows
+
 build:windows --extra_execution_platforms=//bazel/platforms:x64_windows-clang-cl
 build:windows --extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows-clang-cl
 build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_autoconf_toolchain
@@ -44,8 +47,8 @@ build:windows --per_file_copt=source/extensions/http/ext_proc/.*@-Wno-nontrivial
 build:windows --per_file_copt=source/extensions/filters/common/expr/.*@-Wno-nontrivial-memcall
 build:windows --per_file_copt=source/extensions/filters/http/ext_proc/.*@-Wno-nontrivial-memcall
 build:windows --per_file_copt=source/extensions/tracers/opentelemetry/samplers/cel/.*@-Wno-nontrivial-memcall
-build:windows --per_file_copt=external/com_google_cel_cpp/.*@/DWIN32_LEAN_AND_MEAN
-build:windows --per_file_copt=external/com_google_cel_cpp/.*@/DNOUSER
-build:windows --per_file_copt=external/com_google_cel_cpp/.*@/DNOGDI
+build:windows --per_file_copt=external/cel-cpp[+]/.*@/DWIN32_LEAN_AND_MEAN
+build:windows --per_file_copt=external/cel-cpp[+]/.*@/DNOUSER
+build:windows --per_file_copt=external/cel-cpp[+]/.*@/DNOGDI
 build:windows --verbose_failures
 build:windows --curses=no

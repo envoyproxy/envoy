@@ -38,4 +38,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_shed_point_interface",
     hdrs = ["load_shed_point.h"],
+    deps = [
+        "//source/common/singleton:const_singleton",
+    ],
 )

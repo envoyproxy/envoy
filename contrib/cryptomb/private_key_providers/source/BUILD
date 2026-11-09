@@ -25,7 +25,6 @@ envoy_cc_library(
         ],
     }),
     external_deps = ["ssl"],
-    repository = "@envoy",
     deps = select({
         "//bazel:linux_x86_64": [
             "//bazel/deps:ipp-crypto",
@@ -43,7 +42,6 @@ envoy_cc_library(
         "cryptomb_private_key_provider.h",
     ],
     external_deps = ["ssl"],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":cryptomb_stats_lib",

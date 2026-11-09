@@ -186,6 +186,17 @@ type NetworkFilterHandle interface {
 	// metadataNamespace/key, replacing any existing value.
 	SetMetadata(metadataNamespace, key string, value any)
 
+	// SetMetadataStruct merges a serialized google.protobuf.Struct into a dynamic metadata
+	// namespace. Existing entries with the same key are overwritten. An empty struct is a no-op and
+	// does not create the namespace. It returns false if the buffer does not parse as a
+	// google.protobuf.Struct.
+	SetMetadataStruct(metadataNamespace string, serializedStruct []byte) bool
+
+	// SetTypedMetadata sets the typed_filter_metadata entry of a namespace from a serialized
+	// google.protobuf.Any, replacing an existing entry. It returns false if the buffer does not
+	// parse as a google.protobuf.Any with a type URL.
+	SetTypedMetadata(metadataNamespace string, serializedAny []byte) bool
+
 	// SetSocketOptionInt stores an integer socket option to be applied at the specified socket
 	// state.
 	SetSocketOptionInt(level, name int64, state SocketOptionState, value int64)
@@ -293,6 +304,8 @@ type NetworkFilterHandle interface {
 }
 
 type NetworkFilterConfigHandle interface {
+	CommonHandle
+
 	// Log writes a formatted message through Envoy's logging subsystem.
 	Log(level LogLevel, format string, args ...any)
 

@@ -24,17 +24,15 @@ routing PRs, questions, etc. to the right place.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@gmail.com)
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
-  * Overload manager, security, logging, wasm, data plane.
+  * AI protocol manager, MCP, overload manager, security, logging, wasm, data plane, website.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
-  * Dynamic Modules, Reverse Tunnels, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+  * Dynamic Modules, Reverse Tunnels, Performance, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
   * Load balancing, data plane, overload manager.
 
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
-* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
-  * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
   * Data plane, overload management, flow control.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
@@ -106,6 +104,8 @@ without further review.
 * Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
 * Adi (Suissa) Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
 * Ignasi Barrera ([nacx](https://github.com/nacx)) (nacx@apache.org)
+* Carlos Chavez ([charz87](https://github.com/charz87)) (cchavezperez@google.com)
+* Aliaksei Khilko ([alekskhilko](https://github.com/alekskhilko)) (khilko@google.com)
 
 # Emeritus maintainers
 
@@ -131,6 +131,7 @@ without further review.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
 
 # Friends of Envoy
 
@@ -151,5 +152,4 @@ now have left Envoy community or become inactive because of various reasons. Whe
 section, some of code owners have left for a while. So, feel free to ping the maintainers if
 you find any emeritus code owners missing and would like to be added to this list.
 
-* Derek Argueta ([derekargueta](https://github.com/derekargueta))
 * marc-barry ([marc-barry](https://github.com/marc-barry))

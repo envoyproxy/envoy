@@ -31,7 +31,11 @@ public:
 
   Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
-    return cacheable_response_checker_->isCacheableResponse(headers);
+    // Request Cache-Control: no-store forbids storing the response. When
+    // ignore_request_cache_control_header is set, request_cache_control_ is left
+    // default-initialized so this check is skipped.
+    return !request_cache_control_.no_store_ &&
+           cacheable_response_checker_->isCacheableResponse(headers);
   }
   const std::shared_ptr<const CacheableResponseChecker>& cacheableResponseChecker() const {
     return cacheable_response_checker_;

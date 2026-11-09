@@ -1,5 +1,7 @@
 #include "contrib/reverse_tunnel_reporter/source/reporters/event_reporter/reporter.h"
 
+#include <algorithm>
+
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -25,7 +27,8 @@ void EventReporter::onServerInitialized() {
 }
 
 void EventReporter::reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                                          absl::string_view tenant_id, int64_t initiation_time_ms) {
+                                          absl::string_view tenant_id, int64_t initiation_time_ms,
+                                          int fd) {
   // Use the DP-side initiation timestamp when available; fall back to the injected time source
   // for backward compatibility with older DP Envoys that don't send the header.
   //
@@ -45,15 +48,20 @@ void EventReporter::reportConnectionEvent(absl::string_view node_id, absl::strin
       std::string(node_id), std::string(cluster_id), std::string(tenant_id), created_at});
 
   context_.mainThreadDispatcher().post(
-      [this, ptr = std::move(ptr)]() mutable { this->addConnection(std::move(ptr)); });
+      [this, ptr = std::move(ptr), fd]() mutable { this->addConnection(std::move(ptr), fd); });
 }
 
-void EventReporter::reportDisconnectionEvent(absl::string_view node_id, absl::string_view) {
+void EventReporter::reportDisconnectionEvent(absl::string_view node_id, absl::string_view, int fd) {
   std::string name = ReverseTunnelEvent::getName(node_id);
   auto ptr = std::make_shared<ReverseTunnelEvent::Disconnected>(name);
 
   context_.mainThreadDispatcher().post(
-      [this, ptr = std::move(ptr)]() mutable { this->removeConnection(std::move(ptr)); });
+      [this, ptr = std::move(ptr), fd]() mutable { this->removeConnection(std::move(ptr), fd); });
+}
+
+void EventReporter::reportGoAwayEvent(absl::string_view node_id, absl::string_view cluster_id,
+                                      int fd) {
+  reportDisconnectionEvent(node_id, cluster_id, fd);
 }
 
 // This is only served on the main thread so no locks needed.
@@ -85,22 +93,24 @@ void EventReporter::notifyClients(ReverseTunnelEvent::TunnelUpdates&& updates) {
   clients_.back()->receiveEvents(std::move(updates));
 }
 
-void EventReporter::addConnection(std::shared_ptr<ReverseTunnelEvent::Connected>&& connection) {
+void EventReporter::addConnection(std::shared_ptr<ReverseTunnelEvent::Connected>&& connection,
+                                  int fd) {
   ASSERT(context_.mainThreadDispatcher().isThreadSafe());
 
   ENVOY_LOG(info, "Accepted a new connection. Node: {}, Cluster: {}, Tenant: {}",
             connection->node_id, connection->cluster_id, connection->tenant_id);
 
   std::string name = ReverseTunnelEvent::getName(connection->node_id);
-  auto [it, inserted] = connections_.try_emplace(std::move(name), std::move(connection), 1);
+  auto [it, inserted] = connections_.try_emplace(std::move(name), std::move(connection),
+                                                 absl::InlinedVector<int, 1>{fd});
 
   if (inserted) {
     stats_.reverse_tunnel_unique_active_.inc();
     notifyClients(ReverseTunnelEvent::TunnelUpdates{{it->second.connection}, {}});
   } else {
-    // Multiple reverse tunnels can share the same name (same node).
-    // We ref-count them and only notify clients of removal when the last one disconnects.
-    it->second.count++;
+    // Multiple reverse tunnels can share the same node; track each socket by fd and only notify
+    // clients of removal when the last fd is gone.
+    it->second.fds.push_back(fd);
   }
 
   stats_.reverse_tunnel_established_total_.inc();
@@ -108,26 +118,31 @@ void EventReporter::addConnection(std::shared_ptr<ReverseTunnelEvent::Connected>
 }
 
 void EventReporter::removeConnection(
-    std::shared_ptr<ReverseTunnelEvent::Disconnected>&& disconnection) {
+    std::shared_ptr<ReverseTunnelEvent::Disconnected>&& disconnection, int fd) {
   ASSERT(context_.mainThreadDispatcher().isThreadSafe());
 
   const auto& name = disconnection->name;
   auto it = connections_.find(name);
-
-  ENVOY_LOG(info, "Removed connection. Name: {}", name);
 
   if (it == connections_.end()) {
     ENVOY_LOG(warn, "Tried to remove a connection which doesnt exist");
     return;
   }
 
-  // Only notify removal on the last ref — see addConnection for the ref-count rationale.
-  if (it->second.count == 1) {
+  // Only notify removal when the last fd for this node is gone; see addConnection.
+  auto& fds = it->second.fds;
+  auto fd_it = std::find(fds.begin(), fds.end(), fd);
+  if (fd_it == fds.end()) {
+    ENVOY_LOG(debug, "Tried to remove {} from {} but it was not found", fd, name);
+    return;
+  }
+  ENVOY_LOG(info, "Removed connection from {} with fd {}", name, fd);
+  std::swap(fds.back(), *fd_it);
+  fds.pop_back();
+  if (fds.empty()) {
     connections_.erase(it);
     stats_.reverse_tunnel_unique_active_.dec();
     notifyClients(ReverseTunnelEvent::TunnelUpdates{{}, {disconnection}});
-  } else {
-    it->second.count--;
   }
 
   stats_.reverse_tunnel_closed_total_.inc();

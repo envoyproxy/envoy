@@ -67,29 +67,27 @@ CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
       injector_name_(injector_name) {}
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {
-  ON_CALL(client_connection_, write(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-        ENVOY_LOG_MISC(trace, "client write: {}",
-                       Hex::encode(absl::Span<const uint8_t>(
-                           static_cast<uint8_t*>(data.linearize(data.length())), data.length())));
-        data.drain(data.length());
-      }));
+  ON_CALL(client_connection_, write(_, _)).WillByDefault([&](Buffer::Instance& data, bool) -> void {
+    ENVOY_LOG_MISC(trace, "client write: {}",
+                   Hex::encode(absl::Span<const uint8_t>(
+                       static_cast<uint8_t*>(data.linearize(data.length())), data.length())));
+    data.drain(data.length());
+  });
 }
 
 ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("client") {
   EXPECT_CALL(server_callbacks_, newStream(_, _))
-      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillRepeatedly([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         encoder.getStream().addCallbacks(server_stream_callbacks_);
         return request_decoder_;
-      }));
+      });
 
-  ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-        ENVOY_LOG_MISC(trace, "server write: {}",
-                       Hex::encode(absl::Span<const uint8_t>(
-                           static_cast<uint8_t*>(data.linearize(data.length())), data.length())));
-        data.drain(data.length());
-      }));
+  ON_CALL(server_connection_, write(_, _)).WillByDefault([&](Buffer::Instance& data, bool) -> void {
+    ENVOY_LOG_MISC(trace, "server write: {}",
+                   Hex::encode(absl::Span<const uint8_t>(
+                       static_cast<uint8_t*>(data.linearize(data.length())), data.length())));
+    data.drain(data.length());
+  });
 }
 
 Http::Status CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {

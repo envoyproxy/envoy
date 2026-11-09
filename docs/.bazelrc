@@ -1,9 +1,16 @@
 
 try-import ../.bazelrc
+try-import ../ci.bazelrc
+try-import ../user.bazelrc
 
 common --@proxy-wasm-cpp-host//bazel:engine=disabled
 build --@rules_rust//rust/settings:extra_exec_rustc_flags=-Clink-self-contained=no
 
-common --enable_bzlmod
-common --noenable_workspace
-common --@envoy//bazel:enable_bzlmod=True
+common:examples --keep_going
+common:examples --action_env="CARGO_BAZEL_REPIN=true"
+common:examples --host_action_env="CARGO_BAZEL_REPIN=true"
+common:examples --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0"
+common:examples --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0"
+
+# TODO(botengyao): Remove once ai-transcoder is stable
+common --@envoy-examples//:exclude=ai-transcoder

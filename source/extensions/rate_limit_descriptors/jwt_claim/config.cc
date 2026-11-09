@@ -3,6 +3,7 @@
 #include "envoy/extensions/rate_limit_descriptors/jwt_claim/v3/jwt_claim.pb.h"
 #include "envoy/extensions/rate_limit_descriptors/jwt_claim/v3/jwt_claim.pb.validate.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/jwt/jwt.h"
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/protobuf/utility.h"
@@ -30,7 +31,7 @@ std::optional<std::string> claimValueAsString(const Protobuf::Value& value) {
 
 /**
  * Descriptor producer that extracts a named (possibly nested) claim from an
- * unverified JWT found in an HTTP header.
+ * unverified JWT found in an HTTP header or cookie.
  *
  * SECURITY WARNING: this producer does not verify the JWT signature. See the
  * warning in jwt_claim.proto for details.
@@ -40,7 +41,7 @@ public:
   explicit JwtClaimDescriptor(
       const envoy::extensions::rate_limit_descriptors::jwt_claim::v3::Descriptor& config)
       : descriptor_key_(config.descriptor_key()),
-        header_name_(Http::LowerCaseString(config.header_name())),
+        header_name_(Http::LowerCaseString(config.header_name())), cookie_(config.cookie()),
         value_prefix_(config.value_prefix()), claim_name_(config.claim_name()),
         default_value_(config.default_value()), skip_if_absent_(config.skip_if_absent()) {}
 
@@ -61,12 +62,30 @@ public:
   }
 
 private:
-  std::optional<std::string> extractClaimValue(const Http::RequestHeaderMap& headers) const {
+  // Returns the raw (unparsed) JWT string from the configured header or
+  // cookie, whichever was configured. Exactly one of the two is set,
+  // enforced at config validation time.
+  std::optional<std::string> extractRawValue(const Http::RequestHeaderMap& headers) const {
+    if (!cookie_.empty()) {
+      std::string value = Http::Utility::parseCookieValue(headers, cookie_);
+      if (value.empty()) {
+        return std::nullopt;
+      }
+      return value;
+    }
     const auto header_value = headers.get(header_name_);
     if (header_value.empty()) {
       return std::nullopt;
     }
-    absl::string_view value = header_value[0]->value().getStringView();
+    return std::string(header_value[0]->value().getStringView());
+  }
+
+  std::optional<std::string> extractClaimValue(const Http::RequestHeaderMap& headers) const {
+    std::optional<std::string> raw_value = extractRawValue(headers);
+    if (!raw_value.has_value()) {
+      return std::nullopt;
+    }
+    absl::string_view value = *raw_value;
     if (!value_prefix_.empty()) {
       if (!absl::StartsWith(value, value_prefix_)) {
         return std::nullopt;
@@ -89,6 +108,7 @@ private:
 
   const std::string descriptor_key_;
   const Http::LowerCaseString header_name_;
+  const std::string cookie_;
   const std::string value_prefix_;
   const std::string claim_name_;
   const std::string default_value_;
@@ -109,6 +129,10 @@ JwtClaimDescriptorFactory::createDescriptorProducerFromProto(
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::rate_limit_descriptors::jwt_claim::v3::Descriptor&>(
       message, context.messageValidationVisitor());
+  if (config.header_name().empty() == config.cookie().empty()) {
+    return absl::InvalidArgumentError(
+        "jwt_claim descriptor: exactly one of header_name or cookie must be set");
+  }
   return std::make_unique<JwtClaimDescriptor>(config);
 }
 

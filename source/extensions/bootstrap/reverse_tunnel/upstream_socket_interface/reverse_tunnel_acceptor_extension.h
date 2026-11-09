@@ -51,7 +51,7 @@ public:
    * @param extension the upstream extension for stats integration.
    */
   UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
-                            ReverseTunnelAcceptorExtension* extension = nullptr);
+                            ReverseTunnelAcceptorExtension& extension);
 
   /**
    * @return reference to the thread-local dispatcher.
@@ -116,12 +116,17 @@ public:
   /**
    * Called when a worker thread is initialized.
    */
-  void onWorkerThreadInitialized() override {}
+  void onWorkerThreadInitialized() override;
 
   /**
    * @return pointer to the thread-local registry, or nullptr if not available.
    */
   UpstreamSocketThreadLocal* getLocalRegistry() const;
+
+  /**
+   * @return the thread-local socket manager for the upstream acceptor, or nullptr if unavailable.
+   */
+  static UpstreamSocketManager* getThreadLocalSocketManager();
 
   /**
    * @return reference to the stat prefix string.
@@ -229,9 +234,9 @@ public:
    * @param tenant_id tenant identifier supplied by the peer.
    */
   void reportConnection(absl::string_view node_id, absl::string_view cluster_id,
-                        absl::string_view tenant_id, int64_t initiation_time_ms) {
+                        absl::string_view tenant_id, int64_t initiation_time_ms, int fd) {
     if (reporter_ != nullptr) {
-      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms);
+      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms, fd);
     }
   }
 
@@ -241,9 +246,20 @@ public:
    * @param node_id node to which the connection is made.
    * @param cluster_id cluster which the node belongs to.
    */
-  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id) {
+  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id, int fd) {
     if (reporter_ != nullptr) {
-      reporter_->reportDisconnectionEvent(node_id, cluster_id);
+      reporter_->reportDisconnectionEvent(node_id, cluster_id, fd);
+    }
+  }
+
+  /**
+   * Forward a go away event to the configured reporter.
+   * If no reporter is present, the call is ignored.
+   * @param fd the file descriptor of the connection that sent the go away.
+   */
+  void reportGoAway(absl::string_view node_id, absl::string_view cluster_id, int fd) {
+    if (reporter_ != nullptr) {
+      reporter_->reportGoAwayEvent(node_id, cluster_id, fd);
     }
   }
 

@@ -72,18 +72,12 @@ jobs:
     needs:
     - load
     with:
-      dependency-review: ${{ github.event_name == 'pull_request_target' && github.repository == 'envoyproxy/envoy' }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   publish:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-      gcp-key: >-
-        ${{ needs.load.outputs.trusted
-            && fromJSON(needs.load.outputs.trusted)
-            && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
-            || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read

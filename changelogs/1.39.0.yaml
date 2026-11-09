@@ -601,6 +601,13 @@ minor_behavior_changes:
     by setting runtime guard ``envoy.reloadable_features.upstream_wasm_filter_uses_root_scope`` to
     ``false``.
 
+removed_config_or_runtime:
+- area: config
+  change: |
+    Removed the runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` and the
+    ability to look up extensions by name. Extensions are now always looked up by their typed
+    :ref:`type URL <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.typed_config>`.
+
 new_features:
 - area: access_log
   change: |

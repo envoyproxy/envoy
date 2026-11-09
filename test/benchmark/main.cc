@@ -2,6 +2,8 @@
 // This is an Envoy driver for benchmarks.
 #include "test/benchmark/main.h"
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 
@@ -46,13 +48,15 @@ int main(int argc, char** argv) {
   }
 
   TestEnvironment::initializeTestMain(argv[0]);
+  // Record the thread running the benchmarks (the first thread of the process) as the test
+  // thread, for platforms that cannot identify it directly.
+  Thread::TestThread::registerTestThread();
 
   // Suppressing non-error messages in benchmark tests. This hides warning
   // messages that appear when using a runtime feature when there isn't an initialized
   // runtime, and may have non-negligible impact on performance.
   // TODO(adisuissa): This should be configurable, similarly to unit tests.
-  const spdlog::level::level_enum default_log_level = spdlog::level::err;
-  Envoy::Logger::Registry::setLogLevel(default_log_level);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::error);
 
   // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("envoy-benchmark-test", ' ', "0.1");

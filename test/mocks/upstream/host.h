@@ -250,9 +250,16 @@ public:
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
   MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
   MOCK_METHOD(std::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
+  void setHealthCheckMetadata(absl::flat_hash_map<std::string, std::string>&& metadata) override {
+    hc_metadata_ = std::move(metadata);
+  }
+  const absl::flat_hash_map<std::string, std::string>& healthCheckMetadata() const override {
+    return hc_metadata_;
+  }
 
   bool disable_active_health_check_ = false;
   std::string observability_name_;
+  absl::flat_hash_map<std::string, std::string> hc_metadata_;
 };
 
 class MockHost : public MockHostLight {

@@ -7,6 +7,8 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -48,8 +50,8 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.filter_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-    return absl::InvalidArgumentError("Failed to create filter config: " +
-                                      std::string(filter_config.status().message()));
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to create filter config: ", filter_config.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
@@ -61,13 +63,7 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
   }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const std::string& worker_name = callbacks.dispatcher().name();
-    auto pos = worker_name.find_first_of('_');
-    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-    uint32_t worker_index;
-    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-      IS_ENVOY_BUG("failed to parse worker index from name");
-    }
+    const uint32_t worker_index = callbacks.dispatcher().workerId().value_or(0);
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable(), worker_index);
@@ -202,13 +198,13 @@ DynamicModuleConfigFactory::createHttpFilterRouteConfigTyped(
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              filter_name, config, std::move(dynamic_module));
+              filter_name, config, std::move(dynamic_module), context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
-    return absl::InvalidArgumentError("Failed to create pre-route filter config: " +
-                                      std::string(filter_config.status().message()));
+    return absl::InvalidArgumentError(absl::StrCat("Failed to create pre-route filter config: ",
+                                                   filter_config.status().message()));
   }
   return filter_config.value();
 }

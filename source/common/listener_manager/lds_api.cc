@@ -3,8 +3,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -23,11 +21,11 @@ namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        const xds::core::v3::ResourceLocator* lds_resources_locator,
-                       Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
-                       Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
+                       Upstream::ClusterManager& cm, Init::Manager& init_manager,
+                       Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")),
-      resource_type_helper_(validation_visitor, "name"), xds_manager_(xds_manager),
+      resource_type_helper_(validation_visitor, "name"),
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = resource_type_helper_.getResourceName();
   if (lds_resources_locator == nullptr) {
@@ -50,13 +48,6 @@ absl::Status
 LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                            const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                            const std::string& system_version_info) {
-  const std::vector<std::string> paused_xds_types{
-      Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
-      Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
-      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>(),
-      Config::getTypeUrl<envoy::config::listener::v3::FilterChain>()};
-  Config::ScopedResume resume_rds_sds = xds_manager_.pause(paused_xds_types);
-
   bool any_applied = false;
   listener_manager_.beginListenerUpdate();
 

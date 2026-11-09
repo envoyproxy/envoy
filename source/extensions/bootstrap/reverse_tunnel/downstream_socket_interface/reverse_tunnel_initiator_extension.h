@@ -124,6 +124,11 @@ public:
   uint64_t maintainIntervalMs() const { return maintain_interval_ms_; }
 
   /**
+   * @return the handshake response deadline in milliseconds.
+   */
+  uint64_t handshakeTimeoutMs() const { return handshake_timeout_ms_; }
+
+  /**
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
@@ -195,6 +200,10 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  void setTestOnlyAccessLogs(AccessLog::InstanceSharedPtrVector access_logs) {
+    access_logs_ = std::move(access_logs);
+  }
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
@@ -206,11 +215,15 @@ private:
   bool enable_detailed_stats_{false};
   uint64_t max_reconnect_backoff_ms_{};
   uint64_t maintain_interval_ms_{};
+  uint64_t handshake_timeout_ms_{};
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
   HandshakeHeadersConstSharedPtr handshake_headers_;
   AccessLog::InstanceSharedPtrVector access_logs_;
+
+  // Makes a histogram with the given name and stats store.
+  Stats::Histogram& getHistogram(absl::string_view name, Stats::Scope& stats_store);
 
   /**
    * Update per-worker connection stats for debugging purposes.
@@ -223,6 +236,10 @@ private:
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
                                       const std::string& state_suffix, bool increment);
+
+public:
+  // Keep at the end as it depends on stat prefix.
+  Stats::Histogram& tunnel_setup_time_;
 };
 
 /**

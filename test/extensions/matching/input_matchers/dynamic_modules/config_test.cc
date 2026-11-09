@@ -42,6 +42,26 @@ public:
     };
   }
 
+  // Builds the matcher from the matcher_error module, which always reports an evaluation it could
+  // not complete, using the given proto config, and returns the result of a single evaluation. The
+  // caller sets on_error, or leaves it unset to exercise the proto default.
+  ::Envoy::Matcher::MatchResult matchWithErrorModule(
+      envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher&
+          proto_config) {
+    proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+        Extensions::DynamicModules::testSharedObjectPath("matcher_error", "c"));
+    proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
+    proto_config.set_matcher_name("error_matcher");
+
+    auto matcher = factory_.createInputMatcherFactoryCb(proto_config, context_)();
+
+    auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
+    ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
+    match_data->request_headers_ = &request_headers;
+    auto input = ::Envoy::Matcher::DataInputGetResult::CreateCustom(std::move(match_data));
+    return matcher->match(input);
+  }
+
   DynamicModuleInputMatcherFactory factory_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
@@ -300,6 +320,23 @@ matcher_name: test_matcher
   }
 
   EXPECT_EQ(before + 1, destroy_count());
+}
+
+// The MATCH policy is applied when the module cannot complete an evaluation, which is the safe
+// choice for deny-on-match trees where a missed match would let a request bypass the rule.
+TEST_F(DynamicModuleInputMatcherFactoryTest, OnErrorMatchYieldsMatch) {
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher proto;
+  proto.set_on_error(envoy::extensions::matching::input_matchers::dynamic_modules::v3::
+                         DynamicModuleMatcher::MATCH);
+  EXPECT_EQ(matchWithErrorModule(proto), ::Envoy::Matcher::MatchResult::Matched);
+}
+
+// The default NO_MATCH policy is applied when the module cannot complete an evaluation, which is
+// the safe choice for allow-on-match trees.
+TEST_F(DynamicModuleInputMatcherFactoryTest, OnErrorDefaultsToNoMatch) {
+  // Leave on_error unset to exercise the proto default.
+  envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher proto;
+  EXPECT_EQ(matchWithErrorModule(proto), ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 } // namespace

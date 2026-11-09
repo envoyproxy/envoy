@@ -98,6 +98,43 @@ TEST_F(FetchUnitTest, ShouldCleanupAfterTimer) {
   ASSERT_TRUE(testee->finished());
 }
 
+TEST_F(FetchUnitTest, ShouldNotifyFilterWhenFinished) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
+
+  Event::PostCb posted;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&posted](Event::PostCb cb) {
+    posted = std::move(cb);
+  });
+  testee->markFinishedByTimer();
+  EXPECT_CALL(filter_, onRequestReadyForAnswer());
+
+  // when
+  posted();
+
+  // then - filter got notified.
+}
+
+TEST_F(FetchUnitTest, ShouldNotNotifyFilterThatAbandonedRequest) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
+
+  Event::PostCb posted;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&posted](Event::PostCb cb) {
+    posted = std::move(cb);
+  });
+  testee->markFinishedByTimer();
+  testee->abandon();
+  EXPECT_CALL(filter_, onRequestReadyForAnswer()).Times(0);
+
+  // when
+  posted();
+
+  // then - filter did not get notified, as it is no longer interested in this request.
+}
+
 // Helper method to generate records.
 InboundRecordSharedPtr makeRecord() {
   return std::make_shared<InboundRecord>("aaa", 0, 0, std::nullopt, std::nullopt);

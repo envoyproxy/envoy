@@ -1,16 +1,22 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 
+#include "test/config/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,6 +62,9 @@ class DynamicModuleClusterIntegrationTest
 public:
   DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
+  // Sets ClusterConfig.use_persistent_host_partitions on the DEC cluster.
+  bool use_persistent_host_partitions_{};
+
   void configureUpstreamTlsForLogicalHostname() {
     upstream_tls_ = true;
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -76,13 +85,14 @@ public:
   }
 
   void initializeWithDecCluster(const std::string& cluster_name,
-                                const std::string& cluster_config = "") {
+                                const std::string& cluster_config = "",
+                                const std::vector<std::string>& logical_hostnames = {}) {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
 
     // Replace the default cluster_0 with a DEC cluster that uses the Rust module.
-    config_helper_.addConfigModifier([this, cluster_name, cluster_config](
+    config_helper_.addConfigModifier([this, cluster_name, cluster_config, logical_hostnames](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -98,10 +108,21 @@ public:
       envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
       dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
       dec_config.set_cluster_name(cluster_name);
+      if (use_persistent_host_partitions_) {
+        dec_config.mutable_use_persistent_host_partitions()->set_value(true);
+      }
 
       // Pass the upstream address via the cluster config so the Rust module knows
       // where to add hosts.
-      const std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
+      std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
+      if (!logical_hostnames.empty()) {
+        RELEASE_ASSERT(logical_hostnames.size() == fake_upstreams_.size(), "");
+        config_value.clear();
+        for (size_t i = 0; i < logical_hostnames.size(); ++i) {
+          config_value +=
+              logical_hostnames[i] + "," + fake_upstreams_[i]->localAddress()->asString() + "\n";
+        }
+      }
       Protobuf::StringValue config_proto;
       config_proto.set_value(config_value);
       std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
@@ -178,6 +199,120 @@ TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelection) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Exercise asynchronous selection and TLS together using one client context and distinct
+// runtime hosts. Both servers accept the same tickets so server-side key isolation cannot
+// conceal a client that incorrectly offers one hostname's session to another hostname.
+class DynamicModuleAsyncTlsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                             public DynamicModuleClusterIntegrationTest {
+public:
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      auto* common = tls_context.mutable_common_tls_context();
+      common->mutable_tls_params()->set_tls_maximum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+      auto* cert = common->add_tls_certificates();
+      cert->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+      cert->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+      tls_context.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, 'a'));
+      auto config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+          tls_context, factory_context_, {}, false);
+      addFakeUpstream(*Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+                          std::move(config), context_manager_, upstreamStatsScope()),
+                      Http::CodecType::HTTP1, false);
+    }
+  }
+
+  void initializeAsyncTls(const std::vector<std::string>& hostnames) {
+    setUpstreamCount(hostnames.size());
+    configureUpstreamTlsForLogicalHostname();
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* socket =
+          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      RELEASE_ASSERT(socket->typed_config().UnpackTo(&tls_context), "");
+      // TLS 1.2 delivers the ticket during the handshake, avoiding post-handshake ticket timing.
+      tls_context.mutable_common_tls_context()
+          ->mutable_tls_params()
+          ->set_tls_maximum_protocol_version(
+              envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+      tls_context.mutable_max_session_keys()->set_value(4);
+      std::ignore = socket->mutable_typed_config()->PackFrom(tls_context);
+    });
+    initializeWithDecCluster("async_logical_hostnames", "", hostnames);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  }
+
+  struct SessionExpectation {
+    uint64_t upstream_index;
+    uint64_t sessions_reused;
+  };
+
+  void verifySessionSequence(const std::vector<SessionExpectation>& sequence) {
+    const std::vector<std::string> hostnames{"a.lyft.com", "b.lyft.com"};
+    initializeAsyncTls(hostnames);
+    for (size_t i = 0; i < sequence.size(); ++i) {
+      const auto& [upstream_index, sessions_reused] = sequence[i];
+      SCOPED_TRACE(testing::Message() << "request " << i << ", host " << hostnames[upstream_index]);
+      Http::TestRequestHeaderMapImpl headers(default_request_headers_);
+      headers.setHost("downstream.example");
+      headers.addCopy("x-upstream-index", std::to_string(upstream_index));
+      auto response =
+          sendRequestAndWaitForResponse(headers, 0, default_response_headers_, 0, upstream_index);
+      ASSERT_TRUE(response->complete());
+      ASSERT_EQ("200", response->headers().getStatusValue());
+      ASSERT_NE(fake_upstream_connection_, nullptr);
+      ASSERT_NE(fake_upstream_connection_->connection().ssl(), nullptr);
+      EXPECT_EQ(hostnames[upstream_index], fake_upstream_connection_->connection().ssl()->sni());
+      test_server_->waitForCounter("cluster.cluster_0.ssl.handshake", testing::Eq(i + 1));
+      const auto reused = test_server_->counter("cluster.cluster_0.ssl.session_reused");
+      EXPECT_EQ(sessions_reused, reused == nullptr ? 0 : reused->value());
+
+      // Await Envoy observing the close before the next request; otherwise the pool could reuse
+      // this connection and bypass the handshake that the next assertion is intended to exercise.
+      ASSERT_TRUE(fake_upstream_connection_->close());
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+      test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", testing::Eq(i + 1));
+      upstream_request_.reset();
+      fake_upstream_connection_.reset();
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleAsyncTlsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModuleAsyncTlsIntegrationTest, SessionReuseFollowsLogicalHostname) {
+  // A and B each need an initial handshake before their own sessions can be resumed.
+  verifySessionSequence({{0, 0}, {1, 0}, {0, 1}, {1, 2}});
+}
+
+TEST_P(DynamicModuleAsyncTlsIntegrationTest, SessionReuseFollowsLogicalHostnameReverseOrder) {
+  verifySessionSequence({{1, 0}, {0, 0}, {1, 1}, {0, 2}});
+}
+
+TEST_P(DynamicModuleAsyncTlsIntegrationTest, RejectsMismatchedLogicalHostname) {
+  initializeAsyncTls({"outside-san.example"});
+  Http::TestRequestHeaderMapImpl headers(default_request_headers_);
+  headers.addCopy("x-upstream-index", "0");
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  // Keep the decoder alive while closing any unfinished request after an assertion failure.
+  FakeRawConnectionPtr upstream_connection;
+  Cleanup cleanup([this]() { cleanupUpstreamAndDownstream(); });
+  // Consume the connection to enable reads so TLS can progress even when the handshake fails.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection,
+                                                       TestUtility::DefaultTimeout, *dispatcher_));
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.ssl.fail_verify_san", testing::Eq(1));
+  const auto requests = test_server_->counter("cluster.cluster_0.upstream_rq_total");
+  EXPECT_TRUE(requests == nullptr || requests->value() == 0);
+  ASSERT_TRUE(upstream_connection->waitForDisconnect());
+}
+
 // Verifies that a cluster can use the scheduler to add hosts after initialization.
 TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
   initializeWithDecCluster("scheduler_host_update");
@@ -232,6 +367,25 @@ TEST_P(DynamicModuleClusterIntegrationTest, WorkerLocalPrioritySetRebuild) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Selects the persistent cross-priority host map during init and resolves the host on each worker
+// through find_host_by_address, which reads the map published to that worker.
+TEST_P(DynamicModuleClusterIntegrationTest, PersistentHostMap) {
+  concurrency_ = 2;
+  initializeWithDecCluster("persistent_host_map");
+
+  // Each worker increments the counter once it has resolved the host through the map.
+  test_server_->waitForCounter("dynamicmodulescustom.persistent_host_map_hits_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Drives the packed member-update address getter end to end. Each worker load balancer reads the
 // added host's address both as a string and as packed integers and confirms they agree before
 // incrementing the counter, so this runs the real packing under both IPv4 and IPv6 params.
@@ -249,6 +403,180 @@ TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the bulk healthy-host getter end to end. Each worker load balancer rebuilds its routable
+// set from get_healthy_hosts, confirms it agrees with get_healthy_host_count, and routes a request
+// through a host pointer the bulk getter returned.
+TEST_P(DynamicModuleClusterIntegrationTest, HealthyHostsBulkRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("healthy_hosts_rebuild");
+
+  // Each worker increments the counter once its bulk read agrees with the per-host count.
+  test_server_->waitForCounter("dynamicmodulescustom.healthy_hosts_rebuilt_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives adds, a removal and health flips from the module. Each worker counts once its healthy
+// partition holds just the upstream out of two hosts, and requests route only to that upstream.
+TEST_P(DynamicModuleClusterIntegrationTest, HostChurnConverges) {
+  concurrency_ = 2;
+  initializeWithDecCluster("host_churn");
+
+  test_server_->waitForCounter("dynamicmodulescustom.host_churn_converged_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Without persistent host partitions Envoy cannot report which hosts changed health.
+  EXPECT_EQ(0,
+            test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value());
+}
+
+// The module opts the cluster into persistent host partitions during on_cluster_config_new, with
+// the config field unset, so Envoy reports the health flips as it does with the field set.
+TEST_P(DynamicModuleClusterIntegrationTest, HostChurnWithModuleOptIn) {
+  concurrency_ = 2;
+  initializeWithDecCluster("host_churn_module_opt_in");
+
+  test_server_->waitForCounter("dynamicmodulescustom.host_churn_converged_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
+}
+
+// Runs the host update flows with the DEC cluster patching persistent host partitions by delta, on
+// the main thread and on the workers that adopt its snapshots.
+class DynamicModuleClusterPersistentPartitionsIntegrationTest
+    : public DynamicModuleClusterIntegrationTest {
+public:
+  DynamicModuleClusterPersistentPartitionsIntegrationTest() {
+    use_persistent_host_partitions_ = true;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterPersistentPartitionsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, SyncHostSelection) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, WorkerLocalPrioritySetRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("worker_local_rebuild");
+
+  test_server_->waitForCounter("dynamicmodulescustom.membership_hosts_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthyHostsBulkRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("healthy_hosts_rebuild");
+
+  test_server_->waitForCounter("dynamicmodulescustom.healthy_hosts_rebuilt_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HostChurnConverges) {
+  concurrency_ = 2;
+  initializeWithDecCluster("host_churn");
+
+  test_server_->waitForCounter("dynamicmodulescustom.host_churn_converged_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Envoy reports the health flips merged into each worker's later updates.
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
+}
+
+// Two health flips inside one update_merge_window, followed by a removal that cancels the merged
+// update. Each load balancer patches its healthy set only from the reported deltas, so it matches
+// Envoy's healthy hosts only if the removal's update carries both flips.
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthChangesMergedIntoRemoval) {
+  concurrency_ = 2;
+  initializeWithDecCluster("health_patch_removal");
+
+  // Stop here if the load balancers never converge, rather than waiting on a request with no host.
+  ASSERT_NO_FATAL_FAILURE(test_server_->waitForCounter(
+      "dynamicmodulescustom.health_patch_converged_total", testing::Ge(2)));
+  EXPECT_EQ(0, test_server_->counter("dynamicmodulescustom.health_patch_unknown_total")->value());
+  EXPECT_GE(test_server_->counter("cluster_manager.update_merge_cancelled")->value(), 1);
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Three health flips inside one update_merge_window, delivered together when the merge timer fires.
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthChangesMergedByWindow) {
+  concurrency_ = 2;
+  initializeWithDecCluster("health_patch_window");
+
+  // Stop here if the load balancers never converge, rather than waiting on a request with no host.
+  ASSERT_NO_FATAL_FAILURE(test_server_->waitForCounter(
+      "dynamicmodulescustom.health_patch_converged_total", testing::Ge(2)));
+  EXPECT_EQ(0, test_server_->counter("dynamicmodulescustom.health_patch_unknown_total")->value());
+  EXPECT_GE(test_server_->counter("cluster_manager.cluster_updated_via_merge")->value(), 1);
+  EXPECT_EQ(4, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -273,7 +601,8 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
 // from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
 // timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
 // keeps climbing without further requests — proving the timer is created on the worker dispatcher,
-// fires on the worker thread, and re-arms.
+// fires on the worker thread, and re-arms. Each fire also records through a resolved counter handle
+// from the worker thread, exercising the resolve-then-record path end to end.
 TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
   initializeWithDecCluster("worker_timer");
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -290,6 +619,11 @@ TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
 
   // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
   test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+
+  // Each fire also records through a resolved counter handle from the worker thread, so the tagged
+  // child stat climbs alongside timer_fired_total.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_by_outcome.outcome.fired",
+                               testing::Ge(3));
 }
 
 // =============================================================================
@@ -457,9 +791,13 @@ public:
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
 
-    // Log the two dynamic-metadata values the cluster writes during host selection.
+    // Log the dynamic-metadata values the cluster writes during host selection, including the two
+    // strings written by the batch setter and the one merged in by the struct setter.
     useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
-                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)%");
+                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l1_decision)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l2_selector)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:k)%");
 
     // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
     // sets dynamic metadata on the request during host selection.
@@ -507,7 +845,7 @@ TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDu
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_EQ("1234 test_value", log);
+  EXPECT_EQ("1234 test_value resolved dicer v", log);
 }
 
 // =============================================================================
@@ -573,6 +911,162 @@ TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPoli
   // native_lb_requests counter is unincremented (absent or 0).
   auto choose_host = test_server_->counter("dynamicmodulescustom.native_lb_requests");
   EXPECT_TRUE(choose_host == nullptr || choose_host->value() == 0);
+}
+
+// Delivers the DEC cluster over filesystem CDS, so cluster adds, replacements and removals run
+// while the cluster keeps persistent host partitions. The parameter picks how the cluster opts in:
+// the module during on_cluster_config_new, or the ClusterConfig field.
+class DynamicModuleClusterCdsIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterCdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  static std::string
+  paramsToString(const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
+    return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(p.param)),
+                        std::get<1>(p.param) ? "ModuleOptIn" : "ConfigField");
+  }
+
+  // Each generation changes the connect timeout, so every push replaces the cluster.
+  envoy::config::cluster::v3::Cluster decCluster(uint32_t generation) {
+    const bool module_opt_in = std::get<1>(GetParam());
+    envoy::config::cluster::v3::Cluster cluster;
+    cluster.set_name("cluster_0");
+    cluster.mutable_connect_timeout()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(1000 + generation));
+    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+
+    envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+    dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+    dec_config.set_cluster_name(module_opt_in ? "host_churn_module_opt_in" : "host_churn");
+    if (!module_opt_in) {
+      dec_config.mutable_use_persistent_host_partitions()->set_value(true);
+    }
+    Protobuf::StringValue config_proto;
+    config_proto.set_value(fake_upstreams_[0]->localAddress()->asString());
+    std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+    cluster.mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+    std::ignore = cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    return cluster;
+  }
+
+  // Writes the cluster and waits until Envoy has applied this CDS update, without waiting for the
+  // cluster to warm or for its posted host churn to run.
+  void pushCluster(uint32_t generation) {
+    const uint64_t applied = test_server_->counter("cluster_manager.cds.update_success")->value();
+    cds_helper_.setCds({decCluster(generation)});
+    test_server_->waitForCounter("cluster_manager.cds.update_success", testing::Ge(applied + 1));
+  }
+
+  void removeCluster() {
+    const uint64_t applied = test_server_->counter("cluster_manager.cds.update_success")->value();
+    cds_helper_.setCds({});
+    test_server_->waitForCounter("cluster_manager.cds.update_success", testing::Ge(applied + 1));
+  }
+
+  void initializeWithCds() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+    autonomous_upstream_ = true;
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cdsPath());
+      bootstrap.mutable_static_resources()->clear_clusters();
+      // The upstreams exist by now, so the first generation can carry their address.
+      cds_helper_.setCds({decCluster(0)});
+    });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Sends one request and waits for any response, so a request that lands mid-churn may see no
+  // host but must not hang or crash Envoy.
+  std::string sendRequest() {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    if (!response->waitForEndStream()) {
+      ADD_FAILURE() << "request did not end";
+      return "";
+    }
+    return std::string(response->headers().getStatusValue());
+  }
+
+  // The cluster finishes warming before the module adds its hosts, and a replaced cluster shares
+  // the stats of the one it replaces, so wait until the current cluster serves before requiring
+  // that it keeps serving.
+  void expectSettledAndServing() {
+    test_server_->waitForGauge("cluster_manager.warming_clusters", testing::Eq(0));
+    test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(2));
+    test_server_->waitForGauge("cluster.cluster_0.membership_healthy", testing::Eq(1));
+    const auto deadline = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
+    while (sendRequest() != "200") {
+      ASSERT_LT(timeSystem().monotonicTime(), deadline) << "cluster_0 never served";
+      timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
+    }
+    for (int i = 0; i < 3; ++i) {
+      EXPECT_EQ("200", sendRequest());
+    }
+  }
+
+  CdsHelper cds_helper_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndOptIn, DynamicModuleClusterCdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    DynamicModuleClusterCdsIntegrationTest::paramsToString);
+
+// A CDS-delivered cluster keeps persistent host partitions, so workers learn health changes from
+// the reported deltas.
+TEST_P(DynamicModuleClusterCdsIntegrationTest, CdsClusterKeepsPersistentHostPartitions) {
+  concurrency_ = 2;
+  initializeWithCds();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  expectSettledAndServing();
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
+}
+
+// Replaces the cluster back to back, each push applied while the previous cluster's merged health
+// update may still be pending, with requests in between, then removes and re-adds it. Envoy keeps
+// serving and the last cluster settles.
+TEST_P(DynamicModuleClusterCdsIntegrationTest, CdsReplaceAndRemoveWhileInitializing) {
+  concurrency_ = 2;
+  initializeWithCds();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  expectSettledAndServing();
+  const uint64_t modified = test_server_->counter("cluster_manager.cluster_modified")->value();
+
+  constexpr uint32_t kReplacements = 20;
+  for (uint32_t generation = 1; generation <= kReplacements; ++generation) {
+    pushCluster(generation);
+    sendRequest();
+  }
+  EXPECT_EQ(modified + kReplacements,
+            test_server_->counter("cluster_manager.cluster_modified")->value());
+  expectSettledAndServing();
+
+  // Remove the cluster, then re-add it and remove it again before its churn can run.
+  removeCluster();
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
+  EXPECT_EQ("503", sendRequest());
+  pushCluster(kReplacements + 1);
+  removeCluster();
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(2));
+
+  pushCluster(kReplacements + 2);
+  expectSettledAndServing();
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
 }
 
 } // namespace DynamicModules

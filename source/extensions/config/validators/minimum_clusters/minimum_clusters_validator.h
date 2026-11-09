@@ -3,6 +3,8 @@
 #include "envoy/config/config_validator.h"
 #include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Config {
@@ -16,10 +18,13 @@ class MinimumClustersValidator : public Envoy::Config::ConfigValidator {
 public:
   MinimumClustersValidator(
       const envoy::extensions::config::validators::minimum_clusters::v3::MinimumClustersValidator&
-          config)
-      : min_clusters_num_(config.min_clusters_num()) {}
+          config,
+      absl::string_view type_url)
+      : min_clusters_num_(config.min_clusters_num()), type_url_(type_url) {}
 
   // ConfigValidator
+  absl::string_view typeUrl() const override { return type_url_; }
+
   void validate(const Server::Instance& server,
                 const std::vector<Envoy::Config::DecodedResourcePtr>& resources) override;
 
@@ -29,6 +34,7 @@ public:
 
 private:
   const uint64_t min_clusters_num_;
+  const std::string type_url_;
 };
 
 } // namespace Validators

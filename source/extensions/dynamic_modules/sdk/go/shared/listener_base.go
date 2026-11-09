@@ -1,3 +1,4 @@
+//go:generate mockgen -source=listener_base.go -destination=mocks/mock_listener_base.go -package=mocks
 package shared
 
 // ListenerFilterStatus controls whether Envoy continues listener filter iteration.
@@ -110,6 +111,15 @@ type ListenerFilterHandle interface {
 	SetDynamicMetadataNumber(metadataNamespace, key string, value float64)
 	// GetDynamicMetadataNumber returns a numeric dynamic metadata value, if present.
 	GetDynamicMetadataNumber(metadataNamespace, key string) (float64, bool)
+	// SetDynamicMetadataStruct merges a serialized google.protobuf.Struct into a dynamic metadata
+	// namespace. Existing entries with the same key are overwritten. An empty struct is a no-op and
+	// does not create the namespace. It returns false if the buffer does not parse as a
+	// google.protobuf.Struct.
+	SetDynamicMetadataStruct(metadataNamespace string, serializedStruct []byte) bool
+	// SetDynamicTypedMetadata sets the typed_filter_metadata entry of a namespace from a serialized
+	// google.protobuf.Any, replacing an existing entry. It returns false if the buffer does not
+	// parse as a google.protobuf.Any with a type URL.
+	SetDynamicTypedMetadata(metadataNamespace string, serializedAny []byte) bool
 
 	// SetFilterState stores a raw bytes filter state value under key.
 	SetFilterState(key string, value []byte) bool
@@ -149,6 +159,8 @@ type ListenerFilterHandle interface {
 
 // ListenerFilterConfigHandle exposes host services during listener filter config creation.
 type ListenerFilterConfigHandle interface {
+	CommonHandle
+
 	// DefineHistogram defines a histogram metric during config creation.
 	DefineHistogram(name string) (MetricID, MetricsResult)
 	// DefineGauge defines a gauge metric during config creation.

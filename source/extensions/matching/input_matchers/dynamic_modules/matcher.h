@@ -33,6 +33,10 @@ struct MatchContext {
   const ::Envoy::Http::RequestHeaderMap* request_headers{};
   const ::Envoy::Http::ResponseHeaderMap* response_headers{};
   const ::Envoy::Http::ResponseTrailerMap* response_trailers{};
+  // Set through envoy_dynamic_module_callback_matcher_set_error when the module could not complete
+  // the evaluation, for example after a panic caught by the SDK barrier. The matcher then applies
+  // its on_error policy instead of reading the hook return value.
+  bool module_error{false};
 };
 
 /**
@@ -44,7 +48,8 @@ class DynamicModuleInputMatcher : public ::Envoy::Matcher::InputMatcher,
                                   public Logger::Loggable<Logger::Id::matcher> {
 public:
   DynamicModuleInputMatcher(DynamicModuleSharedPtr module, OnMatcherMatchType on_match,
-                            std::shared_ptr<const void> in_module_config);
+                            std::shared_ptr<const void> in_module_config,
+                            ::Envoy::Matcher::MatchResult on_error_result);
 
   ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::DataInputGetResult& input) override;
 
@@ -62,6 +67,9 @@ private:
   // Shared owner of the in-module configuration. The configuration is destroyed exactly once, after
   // the last matcher instance and the factory callback that built it are released.
   std::shared_ptr<const void> in_module_config_;
+  // Result applied for an evaluation the module could not complete, per the configured on_error
+  // policy.
+  const ::Envoy::Matcher::MatchResult on_error_result_;
 };
 
 } // namespace DynamicModules

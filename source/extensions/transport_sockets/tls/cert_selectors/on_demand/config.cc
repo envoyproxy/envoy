@@ -40,9 +40,6 @@ absl::Status AsyncContextConfig::loadCert() {
   return absl::OkStatus();
 }
 
-const Ssl::TlsContext& ServerAsyncContext::tlsContext() const { return tls_contexts_[0]; }
-const Ssl::TlsContext& ClientAsyncContext::tlsContext() const { return tls_contexts_[0]; }
-
 void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cb_);
   bool staple = false;

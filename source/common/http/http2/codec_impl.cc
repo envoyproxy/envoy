@@ -386,9 +386,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  if (parent_.validate_upstream_headers_) {
-    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
-  }
+  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
@@ -464,17 +462,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   parent_.updateActiveStreamsOnEncode(*this);
-  ASSERT(parent_.allow_metadata_);
-  NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
-  auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
-  for (auto& source : sources_vec) {
-    parent_.adapter_->SubmitMetadata(stream_id_, 16 * 1024, std::move(source));
-  }
-
-  if (parent_.sendPendingFramesAndHandleError()) {
-    // Intended to check through coverage that this error case is tested
-    return;
-  }
+  parent_.encodeMetadata(metadata_map_vector, stream_id_);
 }
 
 void ConnectionImpl::StreamImpl::processBufferedData() {
@@ -769,6 +757,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   }
 
   std::vector<http2::adapter::Header> final_headers = buildHeaders(trailers);
+  trailers_submitted_ = true;
   parent_.adapter_->SubmitTrailer(stream_id_, final_headers);
 }
 
@@ -942,13 +931,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
                                               reasonToReset(reason, response_end_stream_sent)));
 }
 
-NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
-  if (metadata_encoder_ == nullptr) {
-    metadata_encoder_ = std::make_unique<NewMetadataEncoder>();
-  }
-  return *metadata_encoder_;
-}
-
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
@@ -997,10 +979,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                               : 0),
       http2_include_cookies_in_limits_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
-#ifndef ENVOY_ENABLE_UHV
-      validate_upstream_headers_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")),
-#endif
+      reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
+      trailers_after_exhausted_window_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_trailers_after_exhausted_window")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1057,6 +1039,25 @@ void ConnectionImpl::sendKeepalive() {
     return;
   }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+}
+
+void ConnectionImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector,
+                                    int32_t stream_id) {
+  if (!allow_metadata_) {
+    stats_.metadata_dropped_.inc();
+    ENVOY_CONN_LOG(debug, "metadata not allowed on this connection, dropping", connection_);
+    return;
+  }
+  NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
+  auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
+  for (auto& source : sources_vec) {
+    adapter_->SubmitMetadata(stream_id, 16 * 1024, std::move(source));
+  }
+
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::onKeepaliveResponse() {
@@ -1267,6 +1268,10 @@ Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t fla
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received DATA frame on a half-closed (remote) stream");
+  }
+
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   stream->decodeData();
   return okStatus();
@@ -1292,6 +1297,17 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   // Track bytes received.
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
+
+  // RFC 9113 Section 5.1: a peer that receives any frame other than PRIORITY, WINDOW_UPDATE or
+  // RST_STREAM for a stream in the "half-closed (remote)" state must treat it as an error. This is
+  // enforced here rather than in the codec adapter because the decoder that the frame would
+  // otherwise be dispatched to may already have been destroyed: for a client connection the
+  // CodecClient deletes the ActiveRequest (which owns the ResponseDecoder) as soon as the response
+  // completes, while oghttp2 keeps the stream alive until it is also half-closed locally. nghttp2
+  // already rejects these frames, so this only changes behavior for oghttp2.
+  if (reject_frames_after_end_stream_ && stream->remote_end_stream_) {
+    return codecProtocolError("Received HEADERS frame on a half-closed (remote) stream");
+  }
 
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   recordHistogramsForStream(*stream);
@@ -1630,6 +1646,11 @@ Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
+  if (!stream_id) {
+    bool success = getMetadataDecoder().receiveMetadata(data, len);
+    return success ? 0 : ERR_CALLBACK_FAILURE;
+  }
+
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
     if (!stream) {
@@ -1646,6 +1667,11 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
 int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata) {
   ENVOY_CONN_LOG(trace, "recv METADATA frame on stream {}, end_metadata: {}", connection_,
                  stream_id, end_metadata);
+
+  if (!stream_id) {
+    bool success = getMetadataDecoder().onMetadataFrameComplete(end_metadata);
+    return success ? 0 : ERR_CALLBACK_FAILURE;
+  }
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
@@ -1882,14 +1908,23 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  // Notify the streams based on least recently encoding to the connection.
-  // NOLINTNEXTLINE(modernize-loop-convert)
+  // Snapshot the streams in least-recently-encoded order before invoking callbacks. A callback may
+  // encode on its stream and reorder active_streams_, invalidating the traversal. Stream deletion
+  // is deferred, so the pointers remain valid for the duration of this synchronous callback fanout.
+  std::vector<StreamImpl*> streams;
+  streams.reserve(active_streams_.size());
   for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-    (*it)->runLowWatermarkCallbacks();
+    streams.push_back(it->get());
+  }
+
+  for (StreamImpl* stream : streams) {
+    stream->runLowWatermarkCallbacks();
   }
 }
 
-ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {}
+ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection)
+    : connection_(connection), mask_continuation_flags_(Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.http2_mask_continuation_flags")) {}
 
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
   return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()),
@@ -1915,7 +1950,10 @@ ConnectionImpl::Http2Visitor::OnReadyToSendDataForStream(Http2StreamId stream_id
     if (stream->pending_trailers_to_encode_) {
       stream->submitTrailers(*stream->pending_trailers_to_encode_);
       stream->pending_trailers_to_encode_.reset();
-    } else {
+    } else if (!stream->trailers_submitted_ || !connection_->trailers_after_exhausted_window_) {
+      // The adapter may already hold trailers submitted while the body was drained but still
+      // open, e.g. when the last DATA frame exactly exhausted the flow-control window. Ending
+      // the stream here would make the adapter drop those trailers.
       end_stream = true;
     }
   }
@@ -1958,7 +1996,14 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
       return false;
     }
     current_frame_.length += length;
-    current_frame_.flags |= flags;
+    if (mask_continuation_flags_) {
+      // Retain only known flags per RFC 9113 §6.10 (only END_HEADERS is defined; all other flags
+      // are reserved and must be ignored per §4.1).
+      static constexpr uint8_t CONTINUATION_END_HEADERS_FLAG = 0x04;
+      current_frame_.flags |= (flags & CONTINUATION_END_HEADERS_FLAG);
+    } else {
+      current_frame_.flags |= flags;
+    }
   } else {
     current_frame_ = {stream_id, length, type, flags};
     padding_length_ = 0;
@@ -1976,6 +2021,9 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
+  if (connection_->getStreamUnchecked(stream_id) == nullptr) {
+    return OnHeaderResult::HEADER_RST_STREAM;
+  }
   // We use reference counting to avoid copying well-known header names.
   // For common HTTP/2 headers (e.g., :method, :path, :status), we reference Envoy's
   // static LowerCaseString objects instead of allocating and copying the name string.
@@ -2152,6 +2200,11 @@ ConnectionImpl::Http2Options::Http2Options(
       !PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, disallow_obs_text, false);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
     og_options_.enforce_max_header_list_bytes = true;
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_oghttp2_cap_data_frame_payload")) {
+    // Use the same value as nghttp2 to avoid window update frame flooding.
+    og_options_.max_outbound_data_frame_payload = 16u * 1024u;
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
@@ -2390,10 +2443,12 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (!use_oghttp2_library_) {
 #ifdef ENVOY_NGHTTP2
     adapter_ = http2_session_factory.create(base(), client_http2_options.options());
+    stats_.nghttp2_upstream_connections_.inc();
 #endif
   }
   if (!adapter_) {
     adapter_ = http2_session_factory.create(base(), client_http2_options.ogOptions());
+    stats_.oghttp2_upstream_connections_.inc();
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
@@ -2444,6 +2499,31 @@ StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
   return StreamResetReason::ProtocolError;
 }
 
+void ConnectionImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", connection_);
+    return stats_.metadata_empty_frames_.inc();
+  }
+  callbacks().onMetadata(std::move(metadata_map_ptr));
+}
+
+NewMetadataEncoder& ConnectionImpl::getMetadataEncoder() {
+  if (metadata_encoder_ == nullptr) {
+    metadata_encoder_ = std::make_unique<NewMetadataEncoder>();
+  }
+  return *metadata_encoder_;
+}
+
+MetadataDecoder& ConnectionImpl::getMetadataDecoder() {
+  if (metadata_decoder_ == nullptr) {
+    auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
+      this->onMetadataDecoded(std::move(metadata_map_ptr));
+    };
+    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb, max_metadata_size_);
+  }
+  return *metadata_decoder_;
+}
+
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
     Random::RandomGenerator& random_generator,
@@ -2460,13 +2540,19 @@ ServerConnectionImpl::ServerConnectionImpl(
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
       should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)) {
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)),
+      should_reset_stream_on_begin_headers_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerResetStreamOnBeginHeaders)) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
   ENVOY_LOG_ONCE_IF(
       trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_reset_stream_on_begin_headers_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_reset_stream_on_begin_headers is not "
       "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
@@ -2477,6 +2563,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
     visitor_ = std::move(direct_visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    stats_.oghttp2_downstream_connections_.inc();
 #ifdef ENVOY_NGHTTP2
   } else {
     auto adapter =
@@ -2487,6 +2574,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     direct_visitor->setStreamCloseListener(std::move(stream_close_listener));
     visitor_ = std::move(direct_visitor);
     adapter_ = std::move(adapter);
+    stats_.nghttp2_downstream_connections_.inc();
   }
 #endif
   sendSettings(http2_options, false);
@@ -2501,6 +2589,12 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
   StreamImpl* stream_ptr = getStream(stream_id);
   if (stream_ptr != nullptr) {
     return stream_ptr->onBeginHeaders();
+  }
+  if (should_reset_stream_on_begin_headers_ != nullptr &&
+      should_reset_stream_on_begin_headers_->shouldShedLoad()) {
+    stats_.stream_refused_errors_.inc();
+    adapter_->SubmitRst(stream_id, http2::adapter::Http2ErrorCode::REFUSED_STREAM);
+    return okStatus();
   }
   ServerStreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
   if (connection_.aboveHighWatermark()) {

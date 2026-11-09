@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/version/version_string.h"
@@ -18,7 +20,6 @@
 using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -262,20 +263,20 @@ class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   // Log level is above debug, so we shouldn't get any logs.
   ENVOY_LOG_EVENT(debug, "test_event", "not logged");
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Levels::debug);
 
   EXPECT_CALL(sink, log(_, _));
   EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
   ENVOY_LOG_EVENT(debug, "test_event", "test {} {}", "log", 1);
 
   // Verify that ENVOY_LOG_EVENT_TO_LOGGER does the right thing.
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto log, const auto&) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto log, const auto&) {
     EXPECT_TRUE(log.find("[misc]"));
-  }));
+  });
   EXPECT_CALL(sink, logWithStableName("misc_event", "debug", "misc", "log"));
   ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
 }
@@ -283,14 +284,14 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
 TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  Registry::setLogLevel(spdlog::level::info);
+  Registry::setLogLevel(Levels::info);
 
   // Enable fine grain logging.
   Context::enableFineGrainLogger();
   EXPECT_TRUE(Context::useFineGrainLogger());
 
   // Set fine grain level to DEBUG.
-  Context::changeAllLogLevels(spdlog::level::debug);
+  Context::changeAllLogLevels(Levels::debug);
 
   EXPECT_CALL(sink, log(_, _));
   EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
@@ -302,13 +303,13 @@ TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
 TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  Registry::setLogLevel(spdlog::level::info);
+  Registry::setLogLevel(Levels::info);
 
   // Enable fine grain logging.
   Context::enableFineGrainLogger();
 
   // Set fine grain level to DEBUG.
-  Context::changeAllLogLevels(spdlog::level::debug);
+  Context::changeAllLogLevels(Levels::debug);
 
   EXPECT_CALL(sink, log(_, _));
   ENVOY_TAGGED_LOG(debug, (std::map<std::string, std::string>{{"key", "val"}}), "test log");
@@ -317,16 +318,16 @@ TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
 }
 
 TEST(LoggerTest, LogWithLogDetails) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[info]"));
     EXPECT_THAT(msg, HasSubstr("hello"));
 
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
   ENVOY_LOG_MISC(info, "hello");
 }
 
@@ -343,7 +344,7 @@ TEST(LoggerTest, TestJsonFormatError) {
 }
 
 TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
 
   {
     Protobuf::Struct log_struct;
@@ -370,15 +371,15 @@ TEST(LoggerTest, TestJsonFormatNonEscapedThrows) {
 
 TEST(LoggerTest, TestJsonFormatEmptyStruct) {
   Protobuf::Struct log_struct;
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("{}"));
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "hello");
 }
@@ -388,17 +389,17 @@ TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
   (*log_struct.mutable_fields())["NullField"].set_null_value(Protobuf::NULL_VALUE);
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto&) {
     EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
     EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
     EXPECT_THAT(msg, HasSubstr("\"NullField\":null"));
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "hello");
 }
@@ -407,30 +408,30 @@ TEST(LoggerTest, TestJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto& log) {
+      .WillOnce([](auto msg, auto& log) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
         EXPECT_EQ(log.logger_name, "misc");
-      }))
-      .WillOnce(Invoke([](auto msg, auto& log) {
+      })
+      .WillOnce([](auto msg, auto& log) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\nlo\""));
         EXPECT_EQ(log.logger_name, "misc");
-      }))
-      .WillOnce(Invoke([](auto msg, auto& log) {
+      })
+      .WillOnce([](auto msg, auto& log) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\\"lo\""));
         EXPECT_EQ(log.logger_name, "misc");
-      }));
+      });
 
   ENVOY_LOG_MISC(info, "hello");
   ENVOY_LOG_MISC(info, "hel\nlo");
@@ -442,18 +443,18 @@ TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
   (*log_struct.mutable_fields())["FixedValue"].set_string_value("Fixed");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
     EXPECT_THAT(msg, HasSubstr("\"Message\":\"{\\\"nested_message\\\":\\\"hello\\\"}\""));
     EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "{\"nested_message\":\"hello\"}");
 }
@@ -545,20 +546,20 @@ TEST(TaggedLogTest, TestTaggedLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"key\":\"val\"] fake message val"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"key_inline\":\"val\"] fake message val"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg,
                     HasSubstr("[Tags: \"ke\"y\":\"v\"al\",\"key\":\"val\"] fake me\"ssage val"));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logTaggedMessageWithPreCreatedTags();
@@ -570,24 +571,24 @@ TEST(TaggedLogTest, TestTaggedConnLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"200\"] fake message"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg,
                     HasSubstr("[Tags: \"ConnectionId\":\"200\",\"key\":\"val\"] fake message"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"105\"] fake message"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(
             msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"key_inline\":\"val\"] fake message"));
-      }));
+      });
 
   std::map<std::string, std::string> empty_tags;
   std::map<std::string, std::string> tags{{"key", "val"}};
@@ -604,13 +605,13 @@ TEST(TaggedLogTest, TestConnLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"200\"] fake message val"));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logMessageWithConnection();
@@ -620,13 +621,13 @@ TEST(TaggedLogTest, TestConnEventLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(msg, HasSubstr("[Tags: \"ConnectionId\":\"200\"] fake message val"));
-      }));
+      });
 
   EXPECT_CALL(sink, logWithStableName("test_event", "info", "filter",
                                       "[Tags: \"ConnectionId\":\"200\"] fake message val"));
@@ -638,22 +639,22 @@ TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }));
+      });
 
   EXPECT_CALL(sink, logWithStableName("test_event", "info", "filter",
                                       "[Tags: \"ConnectionId\":\"200\"] fake message val"));
@@ -665,29 +666,29 @@ TEST(TaggedLogTest, TestTaggedStreamLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(
             msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\"] fake message"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(
             msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\",\"key\":\"val\"] "
                            "fake message"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(
             msg, HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"405\"] fake message"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(
             msg, HasSubstr(
                      "[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\",\"key_inline\":\"val\"] "
                      "fake message"));
-      }));
+      });
 
   std::map<std::string, std::string> empty_tags;
   std::map<std::string, std::string> tags{{"key", "val"}};
@@ -704,15 +705,15 @@ TEST(TaggedLogTest, TestStreamLog) {
   Envoy::Logger::Registry::setLogFormat("%v");
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_THAT(
             msg,
             HasSubstr("[Tags: \"ConnectionId\":\"200\",\"StreamId\":\"300\"] fake message val"));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logMessageWithStream();
@@ -722,29 +723,29 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake me\\\"ssage val\""));
         EXPECT_THAT(msg, HasSubstr("\"ke\\\"y\":\"v\\\"al\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logTaggedMessageWithPreCreatedTags();
@@ -755,36 +756,36 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }));
+      });
 
   std::map<std::string, std::string> empty_tags;
   std::map<std::string, std::string> tags{{"key", "val"}};
@@ -799,22 +800,22 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logMessageWithConnection();
@@ -824,39 +825,39 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }));
+      });
 
   std::map<std::string, std::string> empty_tags;
   std::map<std::string, std::string> tags{{"key", "val"}};
@@ -871,23 +872,23 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
   Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logMessageWithStream();
@@ -898,23 +899,23 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
   (*log_struct.mutable_fields())["Level"].set_string_value("%l");
   (*log_struct.mutable_fields())["Message1"].set_string_value("%j");
   (*log_struct.mutable_fields())["Message2"].set_string_value("%j");
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Levels::info);
   EXPECT_OK(Envoy::Logger::Registry::setJsonLogFormat(log_struct));
   EXPECT_TRUE(Envoy::Logger::Registry::jsonLogFormatSet());
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      .WillOnce([](auto msg, auto&) {
         // Using the mock connection write a log, skipping it.
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
-      }))
-      .WillOnce(Invoke([](auto msg, auto&) {
+      })
+      .WillOnce([](auto msg, auto&) {
         EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message1\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"Message2\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
-      }));
+      });
 
   ClassForTaggedLog object;
   object.logTaggedMessageWithPreCreatedTags();

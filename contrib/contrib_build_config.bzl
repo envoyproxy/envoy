@@ -11,6 +11,7 @@ CONTRIB_EXTENSIONS = {
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
+    "envoy.filters.http.client_cert":                           "//contrib/client_cert/filters/http/source:config",
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
@@ -25,14 +26,26 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":                    "//contrib/client_ssl_auth/filters/network/source:config",
+    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
     "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source/broker:config_lib",
     "envoy.filters.network.kafka_mesh":                         "//contrib/kafka/filters/network/source/mesh:config_lib",
+    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
     "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
-    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
-    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
-    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
+
+    #
+    # Transport sockets
+    #
+
+    "envoy.transport_sockets.istio_hbone":                      "//contrib/istio/filters/network/hbone/source:upstream_config",
+
+    #
+    # Upstreams
+    #
+
+    "envoy.upstreams.istio_hbone":                              "//contrib/istio/filters/network/hbone/source:pool_config",
 
     #
     # Listener filters
@@ -95,6 +108,7 @@ CONTRIB_EXTENSIONS = {
     # Load balancing policies
     #
     "envoy.load_balancing_policies.peak_ewma":      "//contrib/peak_ewma/load_balancing_policies/source:config",
+    "envoy.load_balancing_policies.per_worker_subset": "//contrib/per_worker_subset/load_balancing_policies/source:config",
 
     #
     # xDS delegates

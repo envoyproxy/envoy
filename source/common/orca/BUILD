@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib_header",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@fmt",

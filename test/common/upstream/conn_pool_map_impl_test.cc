@@ -15,7 +15,6 @@
 #include "gtest/gtest.h"
 
 using testing::AtLeast;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -416,7 +415,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryClearTripsAssert) {
 
   test_map->getPool(1, getBasicFactory());
   ON_CALL(*mock_pools_[0], addIdleCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
+      .WillByDefault([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); });
 
   EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->clear(); }),
                ".*Details: A resource should only be entered once");
@@ -427,7 +426,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryGetPoolTripsAssert) {
 
   test_map->getPool(1, getBasicFactory());
   ON_CALL(*mock_pools_[0], addIdleCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
+      .WillByDefault([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); });
 
   EXPECT_DEATH(
       test_map->addIdleCallback([&test_map, this]() { test_map->getPool(2, getBasicFactory()); }),
@@ -439,7 +438,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryDrainConnectionsTripsAssert) {
 
   test_map->getPool(1, getBasicFactory());
   ON_CALL(*mock_pools_[0], addIdleCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
+      .WillByDefault([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); });
 
   EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->clear(); }),
                ".*Details: A resource should only be entered once");
@@ -450,7 +449,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
 
   test_map->getPool(1, getBasicFactory());
   ON_CALL(*mock_pools_[0], addIdleCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
+      .WillByDefault([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); });
 
   EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->addIdleCallback([]() {}); }),
                ".*Details: A resource should only be entered once");

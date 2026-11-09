@@ -273,6 +273,98 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(JwtClaimDescriptorTest, ExtractsClaimFromCookie) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      cookie: auth_token
+      claim_name: sub
+)EOF");
+  setupTest(yaml);
+  const std::string jwt = makeJwt(R"({"sub":"user-123"})");
+  Http::TestRequestHeaderMapImpl header{
+      {"cookie", absl::StrCat("other=1; auth_token=", jwt, "; more=2")}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "user-123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(JwtClaimDescriptorTest, ExtractsClaimFromCookieWithValuePrefix) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      cookie: auth_token
+      value_prefix: "Bearer "
+      claim_name: sub
+)EOF");
+  setupTest(yaml);
+  const std::string jwt = makeJwt(R"({"sub":"user-123"})");
+  Http::TestRequestHeaderMapImpl header{{"cookie", absl::StrCat("auth_token=Bearer ", jwt)}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "user-123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(JwtClaimDescriptorTest, MissingCookieNoDefaultAbortsDescriptor) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      cookie: auth_token
+      claim_name: sub
+)EOF");
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"cookie", "other=1"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(JwtClaimDescriptorTest, RejectsConfigWithBothHeaderAndCookie) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      header_name: authorization
+      cookie: auth_token
+      claim_name: sub
+)EOF");
+  EXPECT_THROW_WITH_MESSAGE(
+      setupTest(yaml), EnvoyException,
+      "jwt_claim descriptor: exactly one of header_name or cookie must be set");
+}
+
+TEST_F(JwtClaimDescriptorTest, RejectsConfigWithNeitherHeaderNorCookie) {
+  const std::string yaml = absl::StrCat(R"EOF(
+actions:
+- extension:
+    name: jwt_claim_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.jwt_claim.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      claim_name: sub
+)EOF");
+  EXPECT_THROW_WITH_MESSAGE(
+      setupTest(yaml), EnvoyException,
+      "jwt_claim descriptor: exactly one of header_name or cookie must be set");
+}
+
 TEST_F(JwtClaimDescriptorTest, ForgedJwtStillExtractsUnverifiedClaim) {
   // Demonstrates that this extension does not verify the JWT signature: an
   // arbitrary, unsigned token with a made-up claim value is still accepted.

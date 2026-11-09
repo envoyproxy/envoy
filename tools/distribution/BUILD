@@ -12,13 +12,6 @@ py_console_script_binary(
 )
 
 py_console_script_binary(
-    name = "sign",
-    pkg = "@base_pip3//envoy_gpg_sign",
-    script = "envoy.gpg.sign",
-    visibility = ["//visibility:public"],
-)
-
-py_console_script_binary(
     name = "verify",
     pkg = "@base_pip3//envoy_distribution_verify",
     script = "envoy.distribution.verify",

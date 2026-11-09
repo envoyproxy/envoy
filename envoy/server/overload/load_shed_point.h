@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "source/common/singleton/const_singleton.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -32,6 +34,11 @@ public:
   const std::string H2ServerGoAwayAndCloseOnDispatch =
       "envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch";
 
+  // Envoy will reject new HTTP2 streams at the codec level on OnBeginHeaders by sending a
+  // RST_STREAM(REFUSED_STREAM) before allocating stream or header objects.
+  const std::string H2ServerResetStreamOnBeginHeaders =
+      "envoy.load_shed_points.http2_server_reset_stream_on_begin_headers";
+
   // Envoy will close the connections before creating codec if Envoy is under pressure,
   // typically memory. This happens once getting data from the connection.
   const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
@@ -55,6 +62,13 @@ public:
   // which will eventually drain the HTTP/3 connection.
   const std::string H3ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http3_server_go_away_on_dispatch";
+
+  // Envoy will close the TCP proxy downstream connection upon receiving
+  // data if under memory pressure.
+  const std::string TcpProxyOnData = "envoy.load_shed_points.tcp_proxy_on_data";
+
+  // Envoy will stop establishing TCP proxy upstream connections when under resource pressure.
+  const std::string TcpProxyUpstreamConnect = "envoy.load_shed_points.tcp_proxy_upstream_connect";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;

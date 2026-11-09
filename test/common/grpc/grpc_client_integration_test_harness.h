@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/client_ssl_socket.h"
@@ -32,6 +33,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
+#include "test/integration/server.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -48,8 +50,6 @@ using testing::_;
 using testing::AtLeast;
 using testing::AtMost;
 using testing::Eq;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::IsEmpty;
 using testing::NiceMock;
 using testing::Not;
@@ -69,8 +69,7 @@ using TestMetadata = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 // Use in EXPECT_CALL(foo, bar(_)).WillExitIfNeeded() to exit dispatcher loop if
 // there are no longer any pending events in DispatcherHelper.
-#define WillExitIfNeeded()                                                                         \
-  WillOnce(InvokeWithoutArgs([this] { dispatcher_helper_.exitDispatcherIfNeeded(); }))
+#define WillExitIfNeeded() WillOnce([this] { dispatcher_helper_.exitDispatcherIfNeeded(); })
 
 // Utility to assist with keeping track of pending gmock expected events when
 // deferring execution to the dispatcher. The dispatcher can be run using this
@@ -136,26 +135,25 @@ public:
   void expectInitialMetadata(const TestMetadata& metadata,
                              std::optional<TestMetadata> encoded_metadata = std::nullopt) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
-        .WillOnce(Invoke([this, metadata,
-                          encoded_metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce([this, metadata, encoded_metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseHeaderMapImpl stream_headers(received_headers);
           for (const auto& value : encoded_metadata.has_value() ? *encoded_metadata : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
-        }));
+        });
     dispatcher_helper_.setStreamEventPending();
   }
 
   void expectTrailingMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveTrailingMetadata_(_))
-        .WillOnce(Invoke([this, metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce([this, metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseTrailerMapImpl stream_headers(received_headers);
           for (auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
-        }));
+        });
     dispatcher_helper_.setStreamEventPending();
   }
 
@@ -177,7 +175,7 @@ public:
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
     EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY)))
-        .WillOnce(Invoke([this, check_response_size](const helloworld::HelloReply& reply_msg) {
+        .WillOnce([this, check_response_size](const helloworld::HelloReply& reply_msg) {
           if (check_response_size) {
             auto recv_buf = Common::serializeMessage(reply_msg);
             // gRPC message in Envoy gRPC mode is prepended with a frame header.
@@ -197,7 +195,7 @@ public:
           }
           response_received_ = true;
           dispatcher_helper_.exitDispatcherIfNeeded();
-        }));
+        });
     dispatcher_helper_.setStreamEventPending();
     fake_stream_->sendGrpcMessage<helloworld::HelloReply>(reply);
   }
@@ -325,7 +323,11 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(stats_store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {}
+        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_, serverScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  }
 
   virtual Network::Address::IpVersion getIpVersion() const PURE;
   virtual ClientType getClientType() const PURE;
@@ -394,14 +396,19 @@ public:
     http_conn_pool_ = Http::Http2::allocateConnPool(
         *dispatcher_, api_->randomGenerator(), host_ptr_, Upstream::ResourcePriority::Default,
         nullptr, nullptr, state_, server_factory_context_.overloadManager());
-    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly(Invoke([this] {
+    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly([this] {
       return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
-    }));
+    });
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
+    router_config_ = std::make_shared<Router::FilterConfig>(
+        server_factory_context_, *stats_store_.rootScope(), http_context_.asyncClientStatPrefix(),
+        *stats_store_.rootScope(), cm_, server_factory_context_.runtime(), api_->randomGenerator(),
+        std::move(shadow_writer_ptr_), true, false, false, false, false, false, false,
+        Protobuf::RepeatedPtrField<std::string>{}, dispatcher_->timeSource(), http_context_,
+        router_context_);
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
-        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, *dispatcher_, router_config_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
@@ -412,6 +419,13 @@ public:
     }
 
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
+    if (retry_policy_.has_value()) {
+      *config.mutable_retry_policy() = *retry_policy_;
+    }
+    if (per_stream_buffer_limit_bytes_ != 0) {
+      config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(
+          per_stream_buffer_limit_bytes_);
+    }
 
     fillServiceWideInitialMetadata(config);
     return *AsyncClientImpl::create(config, server_factory_context_);
@@ -480,11 +494,11 @@ public:
                                      bool expect_upstream_request = true) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
-        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
+        .WillOnce([&initial_metadata](Http::HeaderMap& headers) {
           for (const auto& value : initial_metadata) {
             headers.addReference(value.first, value.second);
           }
-        }));
+        });
     helloworld::HelloRequest request_msg;
     request_msg.set_name(HELLO_REQUEST);
 
@@ -534,11 +548,11 @@ public:
                                    std::optional<TestMetadata> encoded_metadata = std::nullopt) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
-        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
+        .WillOnce([&initial_metadata](Http::HeaderMap& headers) {
           for (const auto& value : initial_metadata) {
             headers.addReference(value.first, value.second);
           }
-        }));
+        });
 
     auto options = Http::AsyncClient::StreamOptions();
     envoy::config::core::v3::Metadata m;
@@ -546,6 +560,7 @@ public:
     options.setMetadata(m);
     options.setSendInternal(send_internal_header_stream_option_);
     options.setSendXff(send_xff_header_stream_option_);
+    options.setBufferBodyForRetry(buffer_body_for_retry_stream_option_);
     if (watermark_callbacks_ != nullptr) {
       options.setSidestreamWatermarkCallbacks(watermark_callbacks_);
     }
@@ -593,8 +608,10 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl stats_store_{*symbol_table_};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  // Serialize stats access while keeping the mock store as the single source of truth.
+  // This lets tests continue to inspect server_factory_context_.store_.
+  Stats::TestIsolatedStoreImpl stats_store_{server_factory_context_.store_};
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
@@ -613,13 +630,13 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
   Upstream::MockClusterManager& cm_{server_factory_context_.cluster_manager_};
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
+  Router::FilterConfigSharedPtr router_config_;
   envoy::config::core::v3::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
@@ -630,8 +647,12 @@ public:
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
   bool skip_envoy_headers_{false};
+  std::optional<envoy::config::core::v3::RetryPolicy> retry_policy_;
+  // Envoy gRPC per-stream buffer limit, 0 means the field is not set.
+  uint32_t per_stream_buffer_limit_bytes_{0};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
+  bool buffer_body_for_retry_stream_option_{false};
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};
@@ -670,7 +691,11 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, serverFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(factory_context_, serverScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
@@ -714,7 +739,7 @@ public:
 
     mock_host_description_->socket_factory_ =
         *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-            std::move(cfg), context_manager_, *stats_store_.rootScope());
+            std::move(cfg), context_manager_, server_factory_context_.serverScope());
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
     FakeUpstreamConfig config(time_system_);
@@ -751,9 +776,8 @@ public:
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
 
-    static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+        std::move(cfg), context_manager_, server_factory_context_.serverScope());
   }
 
   bool use_client_cert_{};

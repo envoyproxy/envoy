@@ -94,6 +94,7 @@ private:
   TokenProviderStats stats_;
   // retry interval for fetching the token
   const std::chrono::seconds retry_interval_{2};
+  const OAuth2::AuthType auth_type_;
 };
 
 } // namespace OAuth2

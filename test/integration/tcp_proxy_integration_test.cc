@@ -18,6 +18,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
@@ -28,6 +29,8 @@
 #include "test/test_common/test_random_generator.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -1800,9 +1803,10 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
   // The second access log is when the connection closes, so the handshake is complete and
   // a valid peer cert is now available.
   log_result = waitForAccessLog(access_log_path, 1, false);
-  EXPECT_EQ(log_result,
-            "san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
-            "fingerprint=c07e14fc43b9c7b3d92f1004f91d3a9e071d9c93a58afc76b4c14303ae3a0f34");
+  EXPECT_EQ(log_result, absl::StrCat("san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
+                                     "fingerprint=",
+                                     absl::AsciiStrToLower(
+                                         absl::StrReplaceAll(TEST_CLIENT_CERT_HASH, {{":", ""}}))));
 }
 
 // Test that Envoy does not crash when a downstream TLS connection is rejected
@@ -2652,17 +2656,16 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(
-          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            client_write_buffer = new NiceMock<MockWatermarkBuffer>(
-                std::move(below_low), std::move(above_high), std::move(above_overflow));
-            ON_CALL(*client_write_buffer, move(_))
-                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
-            ON_CALL(*client_write_buffer, drain(_))
-                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
-            return client_write_buffer;
-          }));
+      .WillOnce([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer = new NiceMock<MockWatermarkBuffer>(
+            std::move(below_low), std::move(above_high), std::move(above_overflow));
+        ON_CALL(*client_write_buffer, move(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer, drain(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer;
+      });
 
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =

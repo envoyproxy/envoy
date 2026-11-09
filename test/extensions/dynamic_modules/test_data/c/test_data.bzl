@@ -26,6 +26,19 @@ def test_program(name):
         # All programs here are C, not C++, so we don't need to apply clang-tidy.
         tags = ["notidy"],
         linkstatic = False,
+        # On Windows, a DLL only exports symbols listed in its module definition file. This
+        # generates one with every symbol defined by this library so that the module's event hooks
+        # can be resolved with GetProcAddress. It is a no-op on other platforms.
+        features = ["windows_export_all_symbols"],
+    )
+
+    # The module definition file generated for the library above, passed to cc_shared_library
+    # which otherwise links the DLL with an empty one.
+    native.filegroup(
+        name = _name + "_def_file",
+        srcs = [":" + _name],
+        output_group = "def_file",
+        tags = ["notidy"],
     )
 
     # Use cc_shared_library to create a shared library in a consistent naming across
@@ -34,6 +47,10 @@ def test_program(name):
         name = name,
         shared_lib_name = "lib{}.so".format(name),
         deps = [_name],
+        win_def_file = select({
+            "@platforms//os:windows": ":" + _name + "_def_file",
+            "//conditions:default": None,
+        }),
     )
 
     # Build static library with symbol prefixing for static linking into Envoy binary.

@@ -60,7 +60,7 @@ bool envoy_dynamic_module_callback_formatter_get_attribute_int(
     envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
   auto* ctx = static_cast<FormatterContext*>(formatter_context_envoy_ptr);
-  return ContextAccessor::getAttributeInt(*ctx->stream_info, attribute_id, result);
+  return ContextAccessor::getAttributeInt(*ctx->stream_info, *ctx->context, attribute_id, result);
 }
 
 bool envoy_dynamic_module_callback_formatter_get_attribute_bool(

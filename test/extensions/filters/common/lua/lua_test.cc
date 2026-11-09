@@ -1,17 +1,21 @@
 #include <memory>
+#include <vector>
 
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "gmock/gmock.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::InSequence;
 using testing::NiceMock;
 
@@ -47,11 +51,28 @@ public:
           return absl::OkStatus();
         }) {}
 
-  void setup(const std::string& code) {
+  void setup(const std::string& code, const PackagePaths& package_paths = {}) {
     absl::Status creation_status = absl::OkStatus();
-    state_ = std::make_unique<ThreadLocalState>(code, tls_, creation_status);
+    state_ = std::make_unique<ThreadLocalState>(code, package_paths, tls_, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     state_->registerType<TestObject>();
+  }
+
+  // Runs a one-argument body on a fresh coroutine, expects it to complete, and returns the thread
+  // it used. The returned pointer is for identity comparison only -- the coroutine is destroyed on
+  // the way out, so the thread is back in the pool by the time the caller sees it.
+  //
+  // TestObject is a strict mock, so the object handed to the script gets an onDestroy() expectation
+  // with no count: when the collector takes it is not the point of any of these tests.
+  lua_State* expectCompletes(int function_ref) {
+    CoroutinePtr cr(state_->createCoroutine());
+    lua_State* thread = cr->luaState();
+    TestObject* object = TestObject::create(thread).first;
+    EXPECT_CALL(*object, onDestroy()).Times(AnyNumber());
+    EXPECT_CALL(*object, doTestCall(_));
+    EXPECT_TRUE(cr->start(function_ref, 1, yield_callback_).ok());
+    EXPECT_EQ(cr->state(), Coroutine::State::Finished);
+    return thread;
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -60,6 +81,79 @@ public:
   ReadyWatcher on_yield_;
   InitializerList initializers_;
 };
+
+// Writes a module for a script to require, and returns the search pattern that finds it.
+std::string writeTestModule() {
+  TestEnvironment::writeStringToFileForTest("lua_test_module.lua", R"EOF(
+    local m = {}
+    function m.greeting()
+      return "hello from the module"
+    end
+    return m
+  )EOF");
+  return TestEnvironment::temporaryPath("?.lua");
+}
+
+// A configured package path is in place before the code runs, so a top-level require() of a module
+// found there resolves. The script errors rather than returning a value, so a failure surfaces as
+// a load error out of the constructor.
+TEST_F(LuaTest, PackagePathResolvesRequire) {
+  const std::string SCRIPT{R"EOF(
+    local m = require("lua_test_module")
+    if m.greeting() ~= "hello from the module" then
+      error("unexpected module contents")
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{writeTestModule(), ""});
+}
+
+// Without the package path the same require() fails, and it fails at construction rather than per
+// request, because the code is run once to validate it.
+TEST_F(LuaTest, PackagePathAbsentFailsToLoad) {
+  writeTestModule();
+  const std::string SCRIPT{R"EOF(
+    local m = require("lua_test_module")
+  )EOF"};
+
+  absl::Status creation_status = absl::OkStatus();
+  ThreadLocalState state(SCRIPT, PackagePaths{}, tls_, creation_status);
+  EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(testing::AllOf(
+                                   testing::HasSubstr("script load error"),
+                                   testing::HasSubstr("module 'lua_test_module' not found"))));
+}
+
+// Configured patterns keep the order they were given in, come ahead of the interpreter's own
+// search path, and do not replace it.
+TEST_F(LuaTest, PackagePathIsPrependedInOrder) {
+  const std::string SCRIPT{R"EOF(
+    local expected = "/first/?.lua;/second/?.lua;/second/?/init.lua"
+    if package.path:sub(1, #expected) ~= expected then
+      error("configured patterns are not first: " .. package.path)
+    end
+    if package.path:sub(#expected + 1, #expected + 1) ~= ";" then
+      error("built-in package.path was not kept: " .. package.path)
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{"/first/?.lua;/second/?.lua;/second/?/init.lua", ""});
+}
+
+// `cpath` is prepended the same way. Loading a real C module is out of scope here, so the script
+// checks the search path itself.
+TEST_F(LuaTest, PackageCpathIsPrepended) {
+  const std::string SCRIPT{R"EOF(
+    local expected = "/does/not/exist/?.so"
+    if package.cpath:sub(1, #expected) ~= expected then
+      error("configured pattern is not first: " .. package.cpath)
+    end
+    if package.cpath:sub(#expected + 1, #expected + 1) ~= ";" then
+      error("built-in package.cpath was not kept: " .. package.cpath)
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{"", "/does/not/exist/?.so"});
+}
 
 // Basic ref counting between coroutines.
 TEST_F(LuaTest, CoroutineRefCounting) {
@@ -110,6 +204,143 @@ TEST_F(LuaTest, EmptyError) {
   CoroutinePtr cr1(state_->createCoroutine());
   EXPECT_THAT(cr1->start(callMeRef, 0, yield_callback_),
               StatusHelpers::HasStatusMessage("unspecified lua error"));
+}
+
+// A coroutine that finished is reused for the next one. Without this test a pool that never hits
+// looks exactly like no pool at all, since the only observable difference is speed.
+TEST_F(LuaTest, FinishedCoroutineThreadIsReused) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:testCall()
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+  const int call_me_ref = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+  EXPECT_NE(LUA_REFNIL, call_me_ref);
+
+  EXPECT_EQ(expectCompletes(call_me_ref), expectCompletes(call_me_ref));
+}
+
+// Two coroutines alive at once get two threads, and both come back once they are done: the pool
+// has to be a pool rather than one cached thread.
+TEST_F(LuaTest, ConcurrentCoroutinesGetDistinctThreads) {
+  const std::string SCRIPT{R"EOF(
+    function callMe()
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+  const int call_me_ref = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+
+  std::vector<lua_State*> first_round;
+  {
+    CoroutinePtr a(state_->createCoroutine());
+    CoroutinePtr b(state_->createCoroutine());
+    EXPECT_NE(a->luaState(), b->luaState());
+    first_round = {a->luaState(), b->luaState()};
+    for (Coroutine* cr : {a.get(), b.get()}) {
+      EXPECT_TRUE(cr->start(call_me_ref, 0, yield_callback_).ok());
+    }
+  }
+
+  CoroutinePtr a(state_->createCoroutine());
+  CoroutinePtr b(state_->createCoroutine());
+  EXPECT_THAT(first_round, testing::UnorderedElementsAre(a->luaState(), b->luaState()));
+}
+
+// A coroutine whose body raised is not resumable, so it must not come back from the pool. Asserted
+// through behaviour rather than pointer identity, because a released thread's address can
+// legitimately be handed out again by the allocator.
+TEST_F(LuaTest, CoroutineAfterAnErrorStartsCleanly) {
+  const std::string SCRIPT{R"EOF(
+    function raises(object)
+      error("boom")
+    end
+    function callMe(object)
+      object:testCall()
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+  const int raises_ref = state_->getGlobalRef(state_->registerGlobal("raises", initializers_));
+  const int call_me_ref = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+
+  {
+    CoroutinePtr cr(state_->createCoroutine());
+    TestObject* object = TestObject::create(cr->luaState()).first;
+    EXPECT_CALL(*object, onDestroy()).Times(AnyNumber());
+    EXPECT_FALSE(cr->start(raises_ref, 1, yield_callback_).ok());
+  }
+
+  expectCompletes(call_me_ref);
+}
+
+// A coroutine abandoned mid-yield must not come back either: resuming it would continue the body
+// it was suspended in rather than start the new one.
+TEST_F(LuaTest, CoroutineAfterAnAbandonedYieldStartsCleanly) {
+  const std::string SCRIPT{R"EOF(
+    function yields(object)
+      coroutine.yield()
+      object:testCall()
+    end
+    function callMe(object)
+      object:testCall()
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+  const int yields_ref = state_->getGlobalRef(state_->registerGlobal("yields", initializers_));
+  const int call_me_ref = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+
+  {
+    CoroutinePtr cr(state_->createCoroutine());
+    TestObject* object = TestObject::create(cr->luaState()).first;
+    EXPECT_CALL(*object, onDestroy()).Times(AnyNumber());
+    EXPECT_CALL(on_yield_, ready());
+    EXPECT_TRUE(cr->start(yields_ref, 1, yield_callback_).ok());
+    EXPECT_EQ(cr->state(), Coroutine::State::Yielded);
+  }
+
+  expectCompletes(call_me_ref);
+}
+
+// Retention is capped, so a burst of concurrent streams does not pin a stack each for the life of
+// the worker. Two rounds of more coroutines than the cap: at least MaxSize of the second round's
+// threads have to come from the first. That is the direction the allocator cannot fake -- a
+// released thread's address can legitimately be handed out again, so asserting the 8 released ones
+// are *absent* would be flaky.
+TEST_F(LuaTest, PooledThreadsAreCapped) {
+  const std::string SCRIPT{R"EOF(
+    function callMe()
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+  const int call_me_ref = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+
+  const size_t burst = Coroutine::Pool::MaxSize + 8;
+  absl::flat_hash_set<lua_State*> first_round;
+  {
+    std::vector<CoroutinePtr> live;
+    for (size_t i = 0; i < burst; i++) {
+      live.push_back(state_->createCoroutine());
+      EXPECT_TRUE(live.back()->start(call_me_ref, 0, yield_callback_).ok());
+      first_round.insert(live.back()->luaState());
+    }
+    // All of them are alive at once, so all of them are distinct.
+    EXPECT_EQ(burst, first_round.size());
+  }
+
+  size_t reused = 0;
+  std::vector<CoroutinePtr> live;
+  for (size_t i = 0; i < burst; i++) {
+    live.push_back(state_->createCoroutine());
+    if (first_round.contains(live.back()->luaState())) {
+      reused++;
+    }
+  }
+  EXPECT_GE(reused, Coroutine::Pool::MaxSize);
 }
 
 // Basic yield/resume functionality.
@@ -174,7 +405,7 @@ TEST_F(LuaTest, MarkDead) {
   EXPECT_THAT(
       cr2->start(state_->getGlobalRef(1), 0, yield_callback_),
       StatusHelpers::HasStatusMessage("[string \"...\"]:10: object used outside of proper scope"));
-  EXPECT_EQ(cr2->state(), Coroutine::State::Finished);
+  EXPECT_EQ(cr2->state(), Coroutine::State::Errored);
 
   ref.markLive();
   EXPECT_CALL(*ref.get(), doTestCall(_));
@@ -217,7 +448,7 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
   // Some callback functions waiting to be executed will be added to the dispatcher of the Worker
   // thread. The callback functions in the main thread will be executed directly.
   absl::Status creation_status = absl::OkStatus();
-  state_ = std::make_unique<ThreadLocalState>(SCRIPT, tls_, creation_status);
+  state_ = std::make_unique<ThreadLocalState>(SCRIPT, PackagePaths{}, tls_, creation_status);
   THROW_IF_NOT_OK_REF(creation_status);
   state_->registerType<TestObject>();
 

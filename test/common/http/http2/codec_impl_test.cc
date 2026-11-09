@@ -44,8 +44,6 @@ using testing::Eq;
 using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -263,14 +261,14 @@ public:
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillRepeatedly([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           encoder.getStream().registerCodecEventCallbacks(&server_codec_event_callbacks_);
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
           request_decoder_.setResponseEncoder(response_encoder_);
           return request_decoder_;
-        }));
+        });
     EXPECT_CALL(server_codec_event_callbacks_, onCodecEncodeComplete())
         .Times(::testing::AnyNumber());
 
@@ -279,25 +277,24 @@ public:
   }
 
   void setupRequestDecoderMock(MockRequestDecoder& request_decoder) {
-    EXPECT_CALL(request_decoder, getRequestDecoderHandle())
-        .WillRepeatedly(Invoke([&request_decoder]() {
-          auto handle = std::make_unique<NiceMock<MockRequestDecoderHandle>>();
-          ON_CALL(*handle, get()).WillByDefault(Return(OptRef<RequestDecoder>(request_decoder)));
-          return handle;
-        }));
+    EXPECT_CALL(request_decoder, getRequestDecoderHandle()).WillRepeatedly([&request_decoder]() {
+      auto handle = std::make_unique<NiceMock<MockRequestDecoderHandle>>();
+      ON_CALL(*handle, get()).WillByDefault(Return(OptRef<RequestDecoder>(request_decoder)));
+      return handle;
+    });
   }
 
   void setupDefaultMocks() {
     ON_CALL(client_connection_, write(_, _))
-        .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
+        .WillByDefault([&](Buffer::Instance& data, bool) -> void {
           if (corrupt_metadata_frame_) {
             corruptMetadataFramePayload(data);
           }
           server_wrapper_->buffer_.add(data);
-        }));
+        });
     ON_CALL(server_connection_, write(_, _))
-        .WillByDefault(Invoke(
-            [&](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); }));
+        .WillByDefault(
+            [&](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); });
     // Set to the small read size (reads are suggested to be 16k aligned).
     ON_CALL(server_connection_, bufferLimit()).WillByDefault(Return(16 * 1024));
     setupRequestDecoderMock(request_decoder_);
@@ -1369,9 +1366,9 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce([&]() -> void {
     response_encoder_->encodeMetadata(metadata_map_vector);
-  }));
+  });
   EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
   driveToCompletion();
@@ -1398,6 +1395,145 @@ TEST_P(Http2CodecImplTest, NoMetadataEndStreamTest) {
   EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
   request_encoder_->encodeMetadata(metadata_map_vector);
   driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataIsSentToServer) {
+  allow_metadata_ = true;
+  initialize();
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", "value"}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(1)
+      .WillOnce([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), "value");
+      });
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataInterleavedWithStreamData) {
+  allow_metadata_ = true;
+  initialize();
+
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", "value"}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce([&]() {
+    server_->encodeMetadata(metadata_vector);
+  });
+  EXPECT_CALL(client_callbacks_, onMetadata(_))
+      .Times(1)
+      .WillOnce([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), "value");
+      });
+
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(1)
+      .WillOnce([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), "value");
+      });
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataExceedsMax) {
+  allow_metadata_ = true;
+  server_http2_options_.mutable_max_metadata_size()->set_value(10);
+  expect_buffered_data_on_teardown_ = true;
+  initialize();
+
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", std::string(100, 'a')}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_)).Times(0);
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+
+  EXPECT_TRUE(isCodecProtocolError(server_wrapper_->status_));
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataMultipleMaps) {
+  allow_metadata_ = true;
+  initialize();
+
+  size_t sz{5};
+  MetadataMapVector metadata_vector;
+  for (size_t i = 0; i < sz; i++) {
+    MetadataMap metadata_map = {{"key", std::to_string(i)}};
+    metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+  }
+
+  size_t cur{0};
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(sz)
+      .WillRepeatedly([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), std::to_string(cur++));
+      });
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataLargeVec) {
+  allow_metadata_ = true;
+  initialize();
+
+  size_t sz{10};
+  MetadataMapVector metadata_vector;
+  for (size_t i = 0; i < sz; i++) {
+    MetadataMap metadata_map = {{"key", std::string(50 * 1024, 'a')}};
+    metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+  }
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(sz)
+      .WillRepeatedly([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), std::string(50 * 1024, 'a'));
+      });
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataIsDroppedWhenNotAllowed) {
+  allow_metadata_ = false;
+  initialize();
+
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", "value"}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_LOG_CONTAINS("debug", "metadata not allowed on this connection",
+                      client_->encodeMetadata(metadata_vector));
+  driveToCompletion();
+  EXPECT_EQ(client_stats_store_.counter("http2.metadata_dropped").value(), 1);
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataEmptyMapIsIgnored) {
+  allow_metadata_ = true;
+  initialize();
+
+  const Http::MetadataMap empty_metadata_map;
+  const Http2Frame empty_metadata_frame = Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, empty_metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  Buffer::OwnedImpl buffer(std::string(empty_metadata_frame.begin(), empty_metadata_frame.end()));
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_)).Times(0);
+  client_connection_.write(buffer, false);
+  driveToCompletion();
+  EXPECT_EQ(server_stats_store_.counter("http2.metadata_empty_frames").value(), 1);
 }
 
 // Validate the keepalive PINGs are sent and received correctly.
@@ -1485,13 +1621,13 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   std::chrono::milliseconds min_observed(5000);
   std::chrono::milliseconds max_observed(0);
   EXPECT_CALL(*send_timer, enableTimer(_, _))
-      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
+      .WillRepeatedly([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
         send_timer->enabled_ = true;
         EXPECT_GE(ms, std::chrono::milliseconds(1000));
         EXPECT_LE(ms, std::chrono::milliseconds(1100));
         max_observed = std::max(max_observed, ms);
         min_observed = std::min(min_observed, ms);
-      }));
+      });
   initialize();
   ASSERT_TRUE(send_timer->enabled());
 
@@ -1665,13 +1801,13 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
   driveToCompletion();
 
   // Send data payload, dump buffer as decoding data
-  EXPECT_CALL(request_decoder_, decodeData(_, false)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).WillOnce([&](Buffer::Instance&, bool) {
     // dumpState here while we had a current slice of data. No Memory should be
     // allocated.
     Memory::TestUtil::MemoryTest memory_test;
     server_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
-  }));
+  });
   Buffer::OwnedImpl hello("hello envoy");
   request_encoder_->encodeData(hello, false);
   driveToCompletion();
@@ -1709,14 +1845,14 @@ TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithout
   // Prepare for state dump.
   EXPECT_CALL(upstream_to_downstream, dumpState(_, _));
 
-  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, false)).WillOnce([&]() {
     // dumpState here while decodingHeaders in the client. This means we're
     // working on a particular stream, whose corresponding request, we'll dump.
     // No Memory should be allocated.
     Memory::TestUtil::MemoryTest memory_test;
     client_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
-  }));
+  });
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
@@ -1760,13 +1896,12 @@ TEST_P(Http2CodecImplTest, ShouldRestoreCrashDumpInfoWhenHandlingDeferredProcess
   EXPECT_TRUE(process_buffered_data_callback->enabled_);
 
   EXPECT_CALL(server_connection_.dispatcher_, pushTrackedObject(_))
-      .WillOnce(Invoke([&](const ScopeTrackedObject* tracked_object) {
-        EXPECT_CALL(server_connection_, dumpState(_, _))
-            .WillOnce(Invoke([&](std::ostream& os, int) {
-              os << "Network Connection info would be dumped...\n";
-            }));
+      .WillOnce([&](const ScopeTrackedObject* tracked_object) {
+        EXPECT_CALL(server_connection_, dumpState(_, _)).WillOnce([&](std::ostream& os, int) {
+          os << "Network Connection info would be dumped...\n";
+        });
         tracked_object->dumpState(ostream, 1);
-      }));
+      });
   EXPECT_CALL(request_decoder_, decodeData(_, true));
 
   process_buffered_data_callback->invokeCallback();
@@ -1806,18 +1941,18 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetForClientStreams) {
   driveClient();
 
   // Dispatch server. We expect to see some data.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce([&]() -> void {
     TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     response_encoder_->encodeHeaders(response_headers, false);
-  }));
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).WillOnce(InvokeWithoutArgs([&]() -> void {
+  });
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).WillOnce([&]() -> void {
     Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
     EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
     request_encoder_->encodeData(body, true);
     EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
     request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-  }));
+  });
 
   EXPECT_NE(0, server_wrapper_->buffer_.length());
   driveToCompletion();
@@ -1832,7 +1967,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce([&]() {
     // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
     // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
     // delayed sendPendingFrames processing allows us to verify that resetStream calls go down the
@@ -1844,17 +1979,17 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
     auto flush_timer = new Event::MockTimer();
     EXPECT_CALL(server_connection_.dispatcher_,
                 createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
           flush_timer->callback_ = cb;
           return flush_timer;
-        }));
+        });
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     EXPECT_CALL(*flush_timer, disableTimer());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-  }));
+  });
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
   // Drive the client once to send the headers to the server, and drive the server once to encode
   // the HEADERS, DATA, and RST_STREAM as described above.
@@ -1878,7 +2013,7 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce([&]() {
     // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
     // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
     // delayed sendPendingFrames processing allows us to verify that resetStream calls go down the
@@ -1890,17 +2025,17 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
     auto flush_timer = new Event::MockTimer();
     EXPECT_CALL(server_connection_.dispatcher_,
                 createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
           flush_timer->callback_ = cb;
           return flush_timer;
-        }));
+        });
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     EXPECT_CALL(*flush_timer, disableTimer());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-  }));
+  });
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
   // Drive the client once to send the headers to the server, and drive the server once to encode
   // the HEADERS, DATA, and RST_STREAM as described above.
@@ -1923,7 +2058,7 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalE
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce([&]() {
     // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
     // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
     // call to resetStream goes down the regular reset path since local end_stream is not set; the
@@ -1936,7 +2071,7 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalE
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-  }));
+  });
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
   // Drive the client once to send the headers to the server, and drive the server once to encode
   // the HEADERS, DATA, and RST_STREAM as described above.
@@ -2028,11 +2163,11 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         return request_decoder2;
-      }));
+      });
   EXPECT_CALL(request_decoder2, decodeHeaders_(_, false));
   EXPECT_OK(request_encoder2->encodeHeaders(request_headers, false));
   driveToCompletion();
@@ -2057,9 +2192,9 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   process_buffered_data_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
 
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce([&]() -> void {
     request_encoder_->getStream().removeCallbacks(callbacks2);
-  }));
+  });
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
 
@@ -2133,7 +2268,7 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset, _))
-      .WillOnce(Invoke([&](StreamResetReason, absl::string_view) -> void {
+      .WillOnce([&](StreamResetReason, absl::string_view) -> void {
         // Test the case where the reset callbacks cause the socket to fill up,
         // causing the underlying connection to back up. Given the stream is
         // being destroyed the watermark callbacks should not fire (mocks for Times(0)
@@ -2142,7 +2277,7 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
         client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
         server_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
         server_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
-      }));
+      });
 
   EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
@@ -2292,10 +2427,10 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   auto flush_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(server_connection_.dispatcher_,
               createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+      .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
         flush_timer->callback_ = cb;
         return flush_timer;
-      }));
+      });
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 
@@ -2309,6 +2444,41 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   driveToCompletion();
   EXPECT_OK(server_wrapper_->status_);
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
+// Verify that trailers are sent when the body exactly exhausts the stream window, leaving
+// nothing pending in the codec when the trailers are encoded.
+// See https://github.com/envoyproxy/envoy/issues/40821.
+TEST_P(Http2CodecImplFlowControlTest, TrailersAfterBodyFillingStreamWindow) {
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  // The client does not read the body yet, so it sends no WINDOW_UPDATE.
+  const uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
+  ASSERT_EQ(65535, initial_stream_window);
+  Buffer::OwnedImpl body(std::string(initial_stream_window, 'a'));
+  response_encoder_->encodeData(body, false);
+  EXPECT_EQ(0, getStreamSendWindowSize(server_, 1));
+  EXPECT_EQ(0, server_->getStream(1)->pending_send_data_->length());
+
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
+
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  driveToCompletion();
+  EXPECT_OK(server_wrapper_->status_);
+  EXPECT_OK(client_wrapper_->status_);
 }
 
 // Verify that we create and handle the stream flush timeout when trailers follow a stream that
@@ -2334,10 +2504,10 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   auto flush_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(server_connection_.dispatcher_,
               createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+      .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
         flush_timer->callback_ = cb;
         return flush_timer;
-      }));
+      });
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
@@ -2382,10 +2552,10 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   auto flush_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(server_connection_.dispatcher_,
               createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+      .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
         flush_timer->callback_ = cb;
         return flush_timer;
-      }));
+      });
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
@@ -2429,10 +2599,10 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   auto flush_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(server_connection_.dispatcher_,
               createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+      .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
         flush_timer->callback_ = cb;
         return flush_timer;
-      }));
+      });
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
@@ -2469,10 +2639,10 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   // Force the server stream to be read disabled. This will cause it to stop sending window
   // updates to the client.
@@ -2545,10 +2715,10 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -2569,10 +2739,10 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   auto flush_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(server_connection_.dispatcher_,
               createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
-      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+      .WillOnce([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
         flush_timer->callback_ = cb;
         return flush_timer;
-      }));
+      });
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl large_body(std::string(6 * 1024, '1'));
   response_encoder_->encodeData(large_body, true);
@@ -2614,12 +2784,12 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(request_decoder_, decodeData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
+  EXPECT_CALL(request_decoder_, decodeData(_, true)).WillOnce([&]() -> void {
     client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
     client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
     server_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
     server_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
-  }));
+  });
   Buffer::OwnedImpl hello("hello");
   request_encoder_->encodeData(hello, true);
   driveToCompletion();
@@ -2632,12 +2802,12 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), true))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
+      .WillOnce([&]() -> void {
         client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
         client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
         server_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
         server_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
-      }));
+      });
   response_encoder_->encodeHeaders(response_headers, true);
   driveToCompletion();
 }
@@ -2666,11 +2836,11 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
-        }));
+        });
 
     TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers);
@@ -3456,10 +3626,10 @@ TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
 
   std::string buffer_without_huffman;
   ON_CALL(client_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer_without_huffman, this](Buffer::Instance& data, bool) -> void {
+      .WillByDefault([&buffer_without_huffman, this](Buffer::Instance& data, bool) -> void {
         buffer_without_huffman.append(data.toString());
         server_wrapper_->buffer_.add(data);
-      }));
+      });
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
@@ -3489,11 +3659,11 @@ TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
 
   // Setup connection mocks for the second connection
   ON_CALL(server_connection2, write(_, _))
-      .WillByDefault(Invoke(
-          [this](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); }));
+      .WillByDefault(
+          [this](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); });
   ON_CALL(client_connection2, write(_, _))
-      .WillByDefault(Invoke(
-          [this](Buffer::Instance& data, bool) -> void { server_wrapper_->buffer_.add(data); }));
+      .WillByDefault(
+          [this](Buffer::Instance& data, bool) -> void { server_wrapper_->buffer_.add(data); });
 
   driveToCompletion();
 
@@ -3507,21 +3677,21 @@ TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
   setupRequestDecoderMock(request_decoder2);
 
   EXPECT_CALL(server_callbacks2, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         encoder.getStream().registerCodecEventCallbacks(&server_codec_event_callbacks2);
         encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
         return request_decoder2;
-      }));
+      });
 
   // Capture the header frame encoded.
   std::string buffer_with_huffman;
   ON_CALL(client_connection2, write(_, _))
-      .WillByDefault(Invoke([this, &buffer_with_huffman](Buffer::Instance& data, bool) -> void {
+      .WillByDefault([this, &buffer_with_huffman](Buffer::Instance& data, bool) -> void {
         server_wrapper_->buffer_.add(data);
         buffer_with_huffman.append(data.toString());
-      }));
+      });
 
   // Encode headers with Huffman encoding
   EXPECT_CALL(request_decoder2, decodeHeaders_(_, true));
@@ -3558,10 +3728,10 @@ TEST_P(Http2CodecImplTest, PingFlood) {
   int ack_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &ack_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &ack_count](Buffer::Instance& frame, bool) {
         ++ack_count;
         buffer.move(frame);
-      }));
+      });
 
   driveToCompletion();
   // The PING flood is detected by the server codec.
@@ -3615,10 +3785,10 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   int ack_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &ack_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &ack_count](Buffer::Instance& frame, bool) {
         ++ack_count;
         buffer.move(frame);
-      }));
+      });
 
   // We should be 1 frame under the control frame flood mitigation threshold.
   EXPECT_NO_THROW(driveToCompletion());
@@ -3658,10 +3828,10 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -3692,10 +3862,10 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -3763,10 +3933,10 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
@@ -3808,10 +3978,10 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
@@ -3844,10 +4014,10 @@ TEST_P(Http2CodecImplTest, ResponseTrailersFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -3887,10 +4057,10 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -4004,10 +4174,10 @@ TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -4047,10 +4217,10 @@ TEST_P(Http2CodecImplTest, ShutdownNoticeCausesOutboundFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -4103,10 +4273,10 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -4147,10 +4317,10 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
   int frame_count = 0;
   Buffer::OwnedImpl buffer;
   ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+      .WillByDefault([&buffer, &frame_count](Buffer::Instance& frame, bool) {
         ++frame_count;
         buffer.move(frame);
-      }));
+      });
 
   auto* violation_callback =
       new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
@@ -4556,6 +4726,61 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
+// Regression test for reentrant encoding during connection-level watermark callbacks. The callback
+// fanout must tolerate an encode operation reordering active_streams_ while still notifying every
+// stream exactly once in the original order.
+TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
+  initialize();
+
+  RequestEncoder* request_encoder1 = request_encoder_;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder1->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder3 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder3->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(5, 3, 1));
+
+  MockStreamCallbacks callbacks1;
+  MockStreamCallbacks callbacks2;
+  MockStreamCallbacks callbacks3;
+  request_encoder1->getStream().addCallbacks(callbacks1);
+  request_encoder2->getStream().addCallbacks(callbacks2);
+  request_encoder3->getStream().addCallbacks(callbacks3);
+
+  Buffer::OwnedImpl high_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks1, onAboveWriteBufferHighWatermark()).WillOnce([&]() {
+    request_encoder1->encodeData(high_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 5, 3));
+  driveToCompletion();
+
+  Buffer::OwnedImpl low_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).WillOnce([&]() {
+    request_encoder2->encodeData(low_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks1, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
+  client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1, 5));
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   server_settings_.emplace(smallWindowHttp2Settings());
   // We must initialize before dtor, otherwise we'll touch uninitialized
@@ -4606,9 +4831,9 @@ TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
     for (int i = 0; i < num_iterations_to_drain_data - 1; ++i) {
       // Check chunking, should not send the end stream.
       EXPECT_CALL(request_decoder_, decodeData(_, false))
-          .WillRepeatedly(Invoke([chunk_size](Buffer::Instance& buffer, bool) {
+          .WillRepeatedly([chunk_size](Buffer::Instance& buffer, bool) {
             EXPECT_EQ(buffer.length(), chunk_size);
-          }));
+          });
       process_buffered_data_callback->invokeCallback();
       // Should schedule another call since we still have data to drain.
       EXPECT_TRUE(process_buffered_data_callback->enabled_);
@@ -4661,10 +4886,10 @@ TEST_P(Http2CodecImplTest, ChunkingCanOccurFromFdEvent) {
     data_to_drain += 10000;
     // Check chunking, should not send the end stream.
     EXPECT_CALL(request_decoder_, decodeData(_, false))
-        .WillRepeatedly(Invoke([chunk_size, &data_to_drain](Buffer::Instance& buffer, bool) {
+        .WillRepeatedly([chunk_size, &data_to_drain](Buffer::Instance& buffer, bool) {
           EXPECT_EQ(buffer.length(), chunk_size);
           data_to_drain -= buffer.length();
-        }));
+        });
     request_encoder_->encodeData(body, true);
     driveToCompletion();
 
@@ -4728,10 +4953,10 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
     InSequence seq;
     // Check chunking, should not send the end stream.
     EXPECT_CALL(request_decoder_, decodeData(_, false))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) {
+        .WillOnce([&](Buffer::Instance& buffer, bool) {
           EXPECT_EQ(buffer.length(), chunk_size);
           server_->getStream(1)->readDisable(true);
-        }));
+        });
     process_buffered_data_callback->invokeCallback();
 
     // Should not have schedule another call since we read disabled during
@@ -4794,16 +5019,16 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDi
 
   int times_shed_load_goaway_invoked = 0;
   EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad())
-      .WillRepeatedly(Invoke([&times_shed_load_goaway_invoked]() {
+      .WillRepeatedly([&times_shed_load_goaway_invoked]() {
         ++times_shed_load_goaway_invoked;
         return false;
-      }));
+      });
   int times_shed_load_goaway_and_close_invoked = 0;
   EXPECT_CALL(server_->server_go_away_and_close_on_dispatch, shouldShedLoad())
-      .WillRepeatedly(Invoke([&times_shed_load_goaway_and_close_invoked]() {
+      .WillRepeatedly([&times_shed_load_goaway_and_close_invoked]() {
         ++times_shed_load_goaway_and_close_invoked;
         return false;
-      }));
+      });
 
   // Drive new streams to be created within a single server dispatch.
   const int num_streams_to_create = 20;
@@ -4817,11 +5042,11 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDi
   for (int i = 0; i < num_streams_to_create; ++i) {
     request_encoders.push_back(&client_->newStream(response_decoder_));
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillRepeatedly([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoders.push_back(&encoder);
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
-        }));
+        });
 
     EXPECT_OK(request_encoders[i]->encodeHeaders(request_headers, true));
   }
@@ -4832,6 +5057,52 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDi
   EXPECT_EQ(1, times_shed_load_goaway_invoked);
   EXPECT_EQ(1, times_shed_load_goaway_and_close_invoked);
   EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ServerBeginHeadersLoadShedPointResetsStream) {
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+
+  EXPECT_CALL(server_->server_reset_stream_on_begin_headers, shouldShedLoad())
+      .WillOnce(Return(true));
+  EXPECT_CALL(client_stream_callbacks,
+              onResetStream(StreamResetReason::RemoteRefusedStreamReset, _));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.stream_refused_errors").value());
+
+  // Verify that the connection remains alive and a subsequent request is admitted when
+  // shouldShedLoad() returns false.
+  MockResponseDecoder response_decoder2;
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder2);
+  MockStreamCallbacks client_stream_callbacks2;
+  request_encoder2->getStream().addCallbacks(client_stream_callbacks2);
+
+  EXPECT_CALL(server_->server_reset_stream_on_begin_headers, shouldShedLoad())
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks_);
+        return request_decoder_;
+      });
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce([&]() -> void {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, true);
+  });
+  EXPECT_CALL(response_decoder2, decodeHeaders_(_, true));
+
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.stream_refused_errors").value());
 }
 
 TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
@@ -4856,11 +5127,11 @@ TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
 
   setupRequestDecoderMock(request_decoder);
   EXPECT_CALL(server_callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks);
         return request_decoder;
-      }));
+      });
 
   // Codec should accept request with padded header value
   EXPECT_CALL(request_decoder, decodeHeaders_(_, true));
@@ -4939,17 +5210,22 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
       1 /* 0xfc */, 1 /* 0xfd */, 1 /* 0xfe */, 1 /* 0xff */
   };
 
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
 
   setupRequestDecoderMock(request_decoder_);
   initialize();
 
 #ifdef ENVOY_ENABLE_UHV
+  // With UHV the client codec does not validate the headers it encodes (UHV does it before
+  // encoding), so the invalid values reach the server codec, which rejects them.
+  constexpr bool kClientValidatesEncodedHeaders = false;
   // UHV does not appear to reject some header value chars.
   if (http2_implementation_ == Http2Impl::Oghttp2) {
     GTEST_SKIP();
   }
+#else
+  // The client codec rejects invalid header keys and values in encodeHeaders().
+  constexpr bool kClientValidatesEncodedHeaders = true;
 #endif
 
   // Change one character in the header value and verify that codec correctly
@@ -4977,13 +5253,22 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
     MockStreamCallbacks server_stream_callbacks;
     MockRequestDecoder request_decoder;
 
+    if (!ValidHeaderValueChars[i] && kClientValidatesEncodedHeaders) {
+      // The client codec rejects the invalid header value in encodeHeaders(), so nothing is
+      // written and the server never sees a new stream.
+      EXPECT_THAT(request_encoder->encodeHeaders(request_headers, true),
+                  HasStatusMessage(testing::HasSubstr("invalid header value for: foo")));
+      driveToCompletion();
+      continue;
+    }
+
     setupRequestDecoderMock(request_decoder);
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks);
           return request_decoder;
-        }));
+        });
 
     // Codec should reject request with invalid header value and not call decodeHeaders
     // on the receiving side.
@@ -5021,10 +5306,10 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the CodecClient after header map is fully parsed.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
+      .WillOnce([this](ResponseHeaderMapPtr& headers, bool) -> void {
         auto result = header_validator_->validateResponseHeaders(*headers);
         ASSERT_FALSE(result.ok());
-      }));
+      });
 #else
   // The decodeHeaders on the client side will not be called due to protocol error
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
@@ -5115,10 +5400,6 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   MetadataMap metadata_map = {{"key", "value"}};
   MetadataMapVector metadata_vector;
   metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
-  // Validate both the ID = 0 special case and a non-zero ID not already bound to a stream (any ID >
-  // 0 for this test).
-  EXPECT_TRUE(client_->submitMetadata(metadata_vector, 0));
-  driveToCompletion();
   EXPECT_TRUE(client_->submitMetadata(metadata_vector, 1000));
   driveToCompletion();
 }
@@ -5373,6 +5654,26 @@ TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
     }
     driveToCompletion();
   }
+}
+
+TEST_P(Http2CodecImplTest, TrackCodecConnections) {
+  initialize();
+
+  std::string active_impl = (http2_implementation_ == Http2Impl::Oghttp2) ? "oghttp2" : "nghttp2";
+  std::string inactive_impl = (http2_implementation_ == Http2Impl::Oghttp2) ? "nghttp2" : "oghttp2";
+
+  // Client stats store: Envoy acts as client, so only upstream should have counts for active_impl.
+  EXPECT_EQ(1,
+            client_stats_store_.counter("http2." + active_impl + "_upstream_connections").value());
+  EXPECT_EQ(
+      0, client_stats_store_.counter("http2." + inactive_impl + "_upstream_connections").value());
+
+  // Server stats store: Envoy acts as server, so only downstream should have counts for
+  // active_impl.
+  EXPECT_EQ(
+      1, server_stats_store_.counter("http2." + active_impl + "_downstream_connections").value());
+  EXPECT_EQ(
+      0, server_stats_store_.counter("http2." + inactive_impl + "_downstream_connections").value());
 }
 
 } // namespace Http2

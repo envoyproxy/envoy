@@ -11,7 +11,7 @@ load(
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
-load("//bazel:repositories.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -117,6 +117,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
@@ -319,6 +320,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:non_copyable",
+        "//source/common/coroutine:backtrace_lib",
         "//source/server:backtrace_lib",
     ],
 )

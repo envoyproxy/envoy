@@ -77,7 +77,6 @@ using testing::ContainsRegex;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -162,6 +161,8 @@ public:
 
 namespace {
 
+using TlsParameters = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+
 /**
  * A base class to hold the options for testUtil() and testUtilV2().
  */
@@ -182,6 +183,15 @@ public:
   const std::string& expectedServerStats() const { return expected_server_stats_; }
   bool expectSuccess() const { return expect_success_; }
   Network::Address::IpVersion version() const { return version_; }
+  const std::optional<TlsParameters::TlsProtocol>& clientTlsVersion() const {
+    return client_tls_version_;
+  }
+  // On failure, whether the client completes its handshake before the connection is closed. Failure
+  // tests only limit the client to TLS 1.3 when the server rejects the client certificate, and with
+  // TLS 1.3 the client completes its handshake before the server validates the client certificate.
+  bool expectClientConnectedBeforeFailure() const {
+    return client_tls_version_ == TlsParameters::TLSv1_3;
+  }
 
 protected:
   TestUtilOptionsBase(bool expect_success, Network::Address::IpVersion version)
@@ -208,6 +218,11 @@ protected:
     expected_server_stats_ = expected_server_stats;
   }
 
+  // Limits the client to a single TLS version.
+  void setClientTlsVersion(TlsParameters::TlsProtocol tls_version) {
+    client_tls_version_ = tls_version;
+  }
+
 private:
   const bool expect_success_;
   const Network::Address::IpVersion version_;
@@ -217,7 +232,19 @@ private:
   std::vector<std::string> expected_client_cert_ip_sans_;
   std::vector<std::string> expected_client_cert_email_sans_;
   std::vector<std::string> expected_client_cert_othername_sans_;
+  std::optional<TlsParameters::TlsProtocol> client_tls_version_;
 };
+
+// Applies the TLS version from TestUtilOptionsBase::clientTlsVersion(), if any, to the client.
+void applyClientTlsVersion(
+    const TestUtilOptionsBase& options,
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_tls_context) {
+  if (options.clientTlsVersion().has_value()) {
+    auto* tls_params = client_tls_context.mutable_common_tls_context()->mutable_tls_params();
+    tls_params->set_tls_minimum_protocol_version(*options.clientTlsVersion());
+    tls_params->set_tls_maximum_protocol_version(*options.clientTlsVersion());
+  }
+}
 
 /**
  * A class to hold the options for testUtil().
@@ -240,6 +267,11 @@ public:
 
   TestUtilOptions& setExpectedServerStats(const std::string& expected_server_stats) {
     TestUtilOptionsBase::setExpectedServerStats(expected_server_stats);
+    return *this;
+  }
+
+  TestUtilOptions& setClientTlsVersion(TlsParameters::TlsProtocol tls_version) {
+    TestUtilOptionsBase::setClientTlsVersion(tls_version);
     return *this;
   }
 
@@ -618,6 +650,7 @@ void testUtil(const TestUtilOptions& options) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
                             client_tls_context);
+  applyClientTlsVersion(options, client_tls_context);
 
   Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
@@ -634,16 +667,15 @@ void testUtil(const TestUtilOptions& options) {
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
-        // configureInitialCongestionWindow is an unimplemented empty function, this is just to
-        // increase code coverage.
-        ssl_socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
-        server_connection = dispatcher->createServerConnection(std::move(socket),
-                                                               std::move(ssl_socket), stream_info);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
+    // configureInitialCongestionWindow is an unimplemented empty function, this is just to
+    // increase code coverage.
+    ssl_socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
+    server_connection =
+        dispatcher->createServerConnection(std::move(socket), std::move(ssl_socket), stream_info);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   if (options.ocspStaplingEnabled()) {
@@ -895,10 +927,17 @@ void testUtil(const TestUtilOptions& options) {
       std::string ocsp_response{reinterpret_cast<const char*>(response_head), response_len};
       EXPECT_EQ(options.expectedOcspResponse(), ocsp_response);
 
-      // By default, the session is not created with session resumption. The
-      // client should see a session ID but the server should not.
-      EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
-      EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+      // By default, the session is not created with session resumption. With TLS 1.2, the client
+      // sees a session ID but the server doesn't. TLS 1.3 has no session ID on the client. A
+      // TLS 1.3 server has no session ID with BoringSSL, but OpenSSL creates one when it sends a
+      // ticket.
+      if (client_connection->ssl()->tlsVersion() == "TLSv1.3") {
+        EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->sessionId());
+        EXPECT_EQ(SSL_SELECT(true, false), server_connection->ssl()->sessionId().empty());
+      } else {
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+        EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+      }
 
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -915,16 +954,19 @@ void testUtil(const TestUtilOptions& options) {
 
   if (options.expectSuccess()) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
+    if (options.expectClientConnectedBeforeFailure()) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    }
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
     EXPECT_CALL(server_connection_callbacks, onEvent(options.expectedServerCloseEvent()))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
   }
 
   if (options.expectedVerifyErrorCode() != -1) {
@@ -950,6 +992,14 @@ void testUtil(const TestUtilOptions& options) {
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
   }
+}
+
+// Runs testUtil() for a server that rejects the client certificate, once with TLS 1.2 and once with
+// TLS 1.3. With TLS 1.3, the client completes its handshake before the server validates the client
+// certificate, so the client sees Connected before the server closes the connection.
+void testUtilClientCertRejected(TestUtilOptions& options) {
+  testUtil(options.setClientTlsVersion(TlsParameters::TLSv1_2));
+  testUtil(options.setClientTlsVersion(TlsParameters::TLSv1_3));
 }
 
 /**
@@ -1085,7 +1135,24 @@ public:
   }
 
   const std::string& expectedTransportFailureReasonContains() const {
+    if (clientTlsVersion() == TlsParameters::TLSv1_3 &&
+        !expected_tls13_transport_failure_reason_contains_.empty()) {
+      return expected_tls13_transport_failure_reason_contains_;
+    }
     return expected_transport_failure_reason_contains_;
+  }
+
+  // Overrides setExpectedTransportFailureReasonContains() when the client is limited to TLS 1.3,
+  // for failures where the server sends a different alert with TLS 1.3.
+  TestUtilOptionsV2& setExpectedTls13TransportFailureReasonContains(
+      const std::string& expected_transport_failure_reason_contains) {
+    expected_tls13_transport_failure_reason_contains_ = expected_transport_failure_reason_contains;
+    return *this;
+  }
+
+  TestUtilOptionsV2& setClientTlsVersion(TlsParameters::TlsProtocol tls_version) {
+    TestUtilOptionsBase::setClientTlsVersion(tls_version);
+    return *this;
   }
 
 private:
@@ -1103,6 +1170,7 @@ private:
   std::string expected_alpn_protocol_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::string expected_transport_failure_reason_contains_;
+  std::string expected_tls13_transport_failure_reason_contains_;
 };
 
 void testUtilV2(const TestUtilOptionsV2& options) {
@@ -1153,8 +1221,10 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       client_factory_context;
   ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
 
-  auto client_cfg =
-      *ClientContextConfigImpl::create(options.clientCtxProto(), client_factory_context);
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context =
+      options.clientCtxProto();
+  applyClientTlsVersion(options, client_tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, client_factory_context);
   auto client_factory_or_error = ClientSslSocketFactory::create(std::move(client_cfg), manager,
                                                                 *client_stats_store.rootScope());
   THROW_IF_NOT_OK_REF(client_factory_or_error.status());
@@ -1180,20 +1250,19 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        std::string sni = options.transportSocketOptions() != nullptr &&
-                                  options.transportSocketOptions()->serverNameOverride().has_value()
-                              ? options.transportSocketOptions()->serverNameOverride().value()
-                              : options.clientCtxProto().sni();
-        socket->setRequestedServerName(sni);
-        Network::TransportSocketPtr transport_socket =
-            server_ssl_socket_factory->createDownstreamTransportSocket();
-        EXPECT_FALSE(transport_socket->startSecureTransport());
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), std::move(transport_socket), stream_info);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    std::string sni = options.transportSocketOptions() != nullptr &&
+                              options.transportSocketOptions()->serverNameOverride().has_value()
+                          ? options.transportSocketOptions()->serverNameOverride().value()
+                          : options.clientCtxProto().sni();
+    socket->setRequestedServerName(sni);
+    Network::TransportSocketPtr transport_socket =
+        server_ssl_socket_factory->createDownstreamTransportSocket();
+    EXPECT_FALSE(transport_socket->startSecureTransport());
+    server_connection = dispatcher->createServerConnection(
+        std::move(socket), std::move(transport_socket), stream_info);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -1291,20 +1360,23 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   if (options.expectSuccess()) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        .WillOnce([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ(options.expectedRequestedServerName(),
                     server_connection->requestedServerName());
           connect_second_time();
-        }));
+        });
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   } else {
+    if (options.expectClientConnectedBeforeFailure()) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    }
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
   }
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
@@ -1315,7 +1387,14 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   }
 
   if (!options.expectedClientStats().empty()) {
-    EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
+    // When the client's handshake completes before the server rejects it, closing the socket calls
+    // SSL_shutdown(). OpenSSL fails that call after the fatal alert, counting a second error.
+    const uint64_t expected_client_count =
+        !options.expectSuccess() && options.expectClientConnectedBeforeFailure()
+            ? SSL_SELECT(1UL, 2UL)
+            : 1UL;
+    EXPECT_EQ(expected_client_count,
+              client_stats_store.counter(options.expectedClientStats()).value());
   }
 
   if (options.expectSuccess()) {
@@ -1328,6 +1407,14 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       EXPECT_NE("", server_connection->transportFailureReason());
     }
   }
+}
+
+// Runs testUtilV2() for a server that rejects the client certificate, once with TLS 1.2 and once
+// with TLS 1.3. With TLS 1.3, the client completes its handshake before the server validates the
+// client certificate, so the client sees Connected before the server closes the connection.
+void testUtilV2ClientCertRejected(TestUtilOptionsV2& options) {
+  testUtilV2(options.setClientTlsVersion(TlsParameters::TLSv1_2));
+  testUtilV2(options.setClientTlsVersion(TlsParameters::TLSv1_3));
 }
 
 void updateFilterChain(
@@ -2514,6 +2601,607 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
   testUtil(test_options.setExpectedSni("nomatch.example.com"));
 }
 
+// No certificate-level tls_params: context-level tls_params still apply. Context restricts to
+// AES128; client offers both AES128 and AES256 — AES128 is negotiated via context-level params.
+TEST_P(SslSocketTest, ContextLevelTlsParamsInheritedWhenNoCertLevelParams) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES256-GCM-SHA384
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options);
+}
+
+// Certificate-level tls_params applied: cert restricts to AES128 only. Client offering only AES256
+// fails to connect, proving certificate-level tls_params are enforced (not just the context-level
+// defaults).
+TEST_P(SslSocketTest, PerCertTlsParamsApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES256-GCM-SHA384
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+)EOF";
+
+  // Client offers only AES256, cert's tls_params restricts to AES128 — no common cipher.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Per-cert tls_params: cert restricts signature algorithms to a set the client does not support.
+// No common signature algorithm causes the handshake to fail.
+TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        signature_algorithms:
+        - rsa_pss_rsae_sha256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+        signature_algorithms:
+        - rsa_pss_rsae_sha384
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Per-cert tls_params: cert sets compliance_policies. Client cipher incompatible with FIPS policy
+// causes connection failure, covering the compliance policy branch in applyTlsParamsToSsl.
+TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-CHACHA20-POLY1305
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-CHACHA20-POLY1305
+        ecdh_curves:
+        - P-256
+        compliance_policies:
+        - FIPS_202205
+)EOF";
+
+  // FIPS policy disallows CHACHA20-POLY1305 — no common cipher, handshake fails.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.connection_error"));
+}
+
+// Per-cert tls_params: cert sets max=TLSv1_2. Client requires TLSv1.3 — version mismatch,
+// handshake fails. Proves max_protocol_version TLSv1_2 on the cert is enforced.
+TEST_P(SslSocketTest, PerCertTlsParamsMaxVersionApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_3
+        tls_maximum_protocol_version: TLSv1_3
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+)EOF";
+
+  // Context allows TLSv1.3 by default, but cert's tls_params cap it at TLSv1.2 — mismatch.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
+}
+
+// Per-cert tls_params: cert restricts ecdh_curves to P-384. Client only supports P-256 — no
+// common curve, handshake fails. Exercises the ecdh_curves branch in applyTlsParamsToSsl.
+TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+        ecdh_curves:
+        - P-384
+)EOF";
+
+  // Client only supports P-256 but cert's tls_params restricts to P-384 — no common curve.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params with a TLS 1.3 handshake: cert restricts to TLSv1_3 only, client max
+// is 1.3. Confirms that certificate-level tls_params are applied correctly and a TLS 1.3 connection
+// succeeds.
+TEST_P(SslSocketTest, PerCertTlsParamsTls13Succeeds) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  // Context allows TLSv1_2-TLSv1_3; cert's tls_params restrict to TLSv1_3 only.
+  tls_context.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  tls_context.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  testUtilV2(test_options.setExpectedProtocolVersion("TLSv1.3")
+                 .setExpectedServerStats("ssl.versions.TLSv1.3")
+                 .setExpectedClientStats("ssl.versions.TLSv1.3")
+                 .setExpectedRequestedServerName("server1.example.com"));
+}
+
+// Certificate-level tls_params: cert sets min=TLSv1_3 while the context allows TLSv1_2 and up. A
+// client that only offers TLSv1_2 cannot negotiate, proving the certificate-level min is enforced.
+TEST_P(SslSocketTest, PerCertTlsParamsMinVersionApplied) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_3
+)EOF";
+
+  // Context floor is TLSv1_2, but cert's tls_params raise it to TLSv1_3 — client offering only
+  // TLSv1_2 cannot negotiate.
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  testUtil(test_options.setExpectedServerStats("").setExpectedTransportFailureReasonContains(
+      SSL_SELECT("TLSV1_ALERT_PROTOCOL_VERSION", "tlsv1 alert protocol version")));
+}
+
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts to one signature
+// algorithm; client offers a different one — no common algorithm, handshake fails.
+// Exercises the signature_algorithms branch in applyTlsParamsToSsl at TLS 1.3.
+TEST_P(SslSocketTest, PerCertTlsParamsSigAlgsTls13Fails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  server_cert->mutable_tls_params()->add_signature_algorithms("rsa_pss_rsae_sha384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_signature_algorithms(
+      "rsa_pss_rsae_sha256");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params under a TLS 1.3 handshake: cert restricts ecdh_curves to P-521.
+// Client supports only X25519 and P-256 — no common group, handshake fails.
+// Exercises the ecdh_curves branch in applyTlsParamsToSsl at TLS 1.3 (key_share/supported_groups).
+TEST_P(SslSocketTest, PerCertTlsParamsEcdhCurvesTls13Fails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  server_cert->mutable_tls_params()->add_ecdh_curves("P-521");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("P-256");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params under a TLS 1.3 handshake: cert sets compliance_policies:
+// FIPS_202205. FIPS_202205 at TLS 1.3 restricts permitted groups to P-256/P-384; a client
+// restricted to X25519 only finds no common group, handshake fails. Exercises compliance_policy
+// application in applyTlsParamsToSsl at TLS 1.3.
+TEST_P(SslSocketTest, PerCertTlsParamsCompliancePolicyTls13Fails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* server_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  server_cert->mutable_tls_params()->add_compliance_policies(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::FIPS_202205);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  // X25519 is not permitted under FIPS_202205; no common group, handshake fails.
+  client_ctx.mutable_common_tls_context()->mutable_tls_params()->add_ecdh_curves("X25519");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate selection does not consider certificate-level tls_params, which are applied to the
+// per-connection SSL object only after a certificate has been chosen. So a certificate whose params
+// contradict the reason it was selected fails the handshake rather than falling back to another
+// certificate. Here the ECDSA cert is preferred because the client is ECDSA-capable, but its own
+// cipher_suites permit only RSA authentication, so no cipher is usable and the unrestricted RSA
+// cert is never tried.
+TEST_P(SslSocketTest, PerCertCipherOverrideContradictingSelectionFails) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  auto* ecdsa_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  ecdsa_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"));
+  ecdsa_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"));
+  ecdsa_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+
+  auto* rsa_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  rsa_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  rsa_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
+  auto* client_params = client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->add_cipher_suites("ECDHE-ECDSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_ctx.set_sni("server1.example.com");
+
+  TestUtilOptionsV2 test_options(listener, client_ctx, false, version_);
+  testUtilV2(test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
+}
+
+// Certificate-level tls_params are overrides, not additional constraints, so a certificate can
+// lower the context floor. The context permits TLSv1.3 only, the certificate lowers its minimum to
+// TLSv1_2 and leaves the maximum inherited, and a TLSv1.2-only client negotiates successfully. This
+// is the weakening the API documentation warns about.
+TEST_P(SslSocketTest, PerCertTlsParamsLowerMinVersionBelowContextFloor) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  server_cert->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  testUtilV2(createProtocolTestOptions(listener, client_ctx, version_, "TLSv1.2"));
+}
+
+// A certificate-level maximum above the context ceiling raises it. The context permits TLSv1.2
+// only, the certificate raises its maximum to TLSv1_3 and leaves the minimum inherited, and a
+// TLSv1.3-only client negotiates successfully.
+TEST_P(SslSocketTest, PerCertTlsParamsRaiseMaxVersionAboveContextCeiling) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_cert->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  testUtilV2(createProtocolTestOptions(listener, client_ctx, version_, "TLSv1.3"));
+}
+
+// A certificate-level cipher suite that the context-level list excludes is still usable: the
+// certificate's list replaces the context's rather than intersecting with it. The client offers
+// only the certificate-level suite, which the context alone would have rejected.
+TEST_P(SslSocketTest, PerCertTlsParamsAddCipherExcludedByContext) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  const std::string stats = "ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384";
+  testUtilV2(test_options.setExpectedCiphersuite("ECDHE-RSA-AES256-GCM-SHA384")
+                 .setExpectedServerStats(stats)
+                 .setExpectedClientStats(stats));
+}
+
+// A certificate that sets only cipher_suites keeps the context-level values for every other field.
+// The context restricts curves to P-384 and pins TLSv1.2, and the certificate narrows the ciphers
+// to AES256 only. The negotiated suite proves the certificate-level field was applied, while the
+// negotiated group and version prove the unset fields were inherited: the client offers X25519
+// first, which the default curve list would have permitted had the context value been dropped.
+TEST_P(SslSocketTest, PerCertTlsParamsPartialOverrideInheritsUnsetFields) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  server_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  server_params->add_ecdh_curves("P-384");
+  server_cert->mutable_tls_params()->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
+  client_ctx.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash(TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client_ctx.mutable_common_tls_context()->mutable_tls_params();
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  // AES128 is offered first, so the certificate-level list is what forces AES256.
+  client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  client_params->add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  client_params->add_ecdh_curves("X25519");
+  client_params->add_ecdh_curves("P-256");
+  client_params->add_ecdh_curves("P-384");
+  TestUtilOptionsV2 test_options(listener, client_ctx, true, version_);
+  testUtilV2(test_options.setExpectedCiphersuite("ECDHE-RSA-AES256-GCM-SHA384")
+                 .setExpectedTlsGroup("P-384")
+                 .setExpectedProtocolVersion("TLSv1.2"));
+}
+
 // EC cert is selected for a no-EC-capable client.
 TEST_P(SslSocketTest, CertWithNotECCapable) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
@@ -2859,7 +3547,7 @@ TEST_P(SslSocketTest, NoCertUntrustedNotPermitted) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
 }
 
 TEST_P(SslSocketTest, NoCertUntrustedPermitted) {
@@ -2943,7 +3631,7 @@ TEST_P(SslSocketTest, GetValidatedPeerCertChainWithIntermediate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
@@ -3008,7 +3696,7 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerificationNoClientCert) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
@@ -3034,9 +3722,10 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(SSL_SELECT(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY,
-                                                      X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)));
+  testUtilClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(SSL_SELECT(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY,
+                                                 X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -3061,7 +3750,7 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
@@ -3091,7 +3780,7 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_san"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_san"));
 }
 
 TEST_P(SslSocketTest, X509ExtensionsCertificateSerialNumber) {
@@ -3129,9 +3818,10 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
   configureServerAndExpiredClientCertificate(listener, client, /*server_config=*/{});
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+          .setExpectedTransportFailureReasonContains(
+              SSL_SELECT("SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -3145,9 +3835,10 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
   configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+          .setExpectedTransportFailureReasonContains(
+              SSL_SELECT("SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
@@ -3175,9 +3866,10 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
   configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-                 .setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+          .setExpectedClientCertUri("spiffe://lyft.com/test-team")
+          .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 }
 
 // Allow expired certificates, but use the wrong CA so it should fail still.
@@ -3193,8 +3885,9 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
   configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("TLSV1_ALERT_UNKNOWN_CA"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+          .setExpectedTransportFailureReasonContains("TLSV1_ALERT_UNKNOWN_CA"));
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
@@ -3342,7 +4035,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate
                                                    TEST_SAN_URI_CERT_256_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertificate) {
@@ -3362,7 +4055,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertifi
                                                    TEST_SAN_URI_CERT_256_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_no_cert"));
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertificate) {
@@ -3389,7 +4082,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertific
                                                    TEST_SAN_URI_CERT_256_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash"));
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCertificate) {
@@ -3414,7 +4107,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCert
                                                    TEST_SAN_URI_CERT_256_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash"));
+  testUtilClientCertRejected(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash"));
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
@@ -3441,8 +4134,9 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
                                                    TEST_SAN_URI_CERT_256_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY));
+  testUtilClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY));
 }
 
 TEST_P(SslSocketTest, CertificatesWithPassword) {
@@ -3663,13 +4357,16 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
+          .setExpectedTransportFailureReasonContains(
+              SSL_SELECT("SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure"))
+          .setExpectedTls13TransportFailureReasonContains(
+              SSL_SELECT("TLSV1_ALERT_CERTIFICATE_REQUIRED", "tlsv13 alert certificate required")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertificate) {
@@ -3692,13 +4389,16 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
+          .setExpectedTransportFailureReasonContains(
+              SSL_SELECT("SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure"))
+          .setExpectedTls13TransportFailureReasonContains(
+              SSL_SELECT("TLSV1_ALERT_CERTIFICATE_REQUIRED", "tlsv13 alert certificate required")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertificate) {
@@ -3729,12 +4429,13 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+          .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCertificate) {
@@ -3763,12 +4464,13 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+          .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
@@ -3799,11 +4501,12 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedTransportFailureReasonContains("TLSV1_ALERT_UNKNOWN_CA"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedTransportFailureReasonContains("TLSV1_ALERT_UNKNOWN_CA"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
@@ -3903,13 +4606,16 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
+          .setExpectedTransportFailureReasonContains(
+              SSL_SELECT("SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure"))
+          .setExpectedTls13TransportFailureReasonContains(
+              SSL_SELECT("TLSV1_ALERT_CERTIFICATE_REQUIRED", "tlsv13 alert certificate required")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClientCertificate) {
@@ -3933,13 +4639,16 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
+          .setExpectedTransportFailureReasonContains(
+              SSL_SELECT("SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure"))
+          .setExpectedTls13TransportFailureReasonContains(
+              SSL_SELECT("TLSV1_ALERT_CERTIFICATE_REQUIRED", "tlsv13 alert certificate required")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientCertificate) {
@@ -3971,12 +4680,13 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+          .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongClientCertificate) {
@@ -4006,12 +4716,13 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
-                 .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
+          .setExpectedTransportFailureReasonContains("TLSV1.*_BAD_CERTIFICATE_HASH_VALUE"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
@@ -4043,11 +4754,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"));
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
-  testUtilV2(test_options.setExpectedTransportFailureReasonContains("TLSV1_ALERT_UNKNOWN_CA"));
+  testUtilV2ClientCertRejected(
+      test_options.setExpectedTransportFailureReasonContains("TLSV1_ALERT_UNKNOWN_CA"));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
+  testUtilV2ClientCertRejected(test_options);
 }
 
 // Make sure that we do not flush code and do an immediate close if we have not completed the
@@ -4091,22 +4803,21 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-        Buffer::OwnedImpl data("hello");
-        server_connection->write(data, false);
-        server_connection->close(Network::ConnectionCloseType::FlushWrite);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher_->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info_);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+    Buffer::OwnedImpl data("hello");
+    server_connection->write(data, false);
+    server_connection->close(Network::ConnectionCloseType::FlushWrite);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -4167,7 +4878,7 @@ TEST_P(SslSocketTest, HalfClose) {
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
             stream_info_);
@@ -4176,7 +4887,7 @@ TEST_P(SslSocketTest, HalfClose) {
         server_connection->addConnectionCallbacks(server_connection_callbacks);
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, true);
-      }));
+      });
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(*server_read_filter, onNewConnection())
@@ -4185,16 +4896,21 @@ TEST_P(SslSocketTest, HalfClose) {
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  // With TLS 1.3, the client completes its handshake first, so it can read the data before the
+  // close_notify alert arrives.
+  EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), false))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), true))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> Network::FilterStatus {
         Buffer::OwnedImpl buffer("world");
         client_connection->write(buffer, true);
         return Network::FilterStatus::Continue;
-      }));
+      });
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(*server_read_filter, onData(BufferString("world"), true));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -4254,40 +4970,45 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
             stream_info_);
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+      });
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   EXPECT_CALL(*server_read_filter, onNewConnection());
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, true);
         EXPECT_EQ(data.length(), 0);
-      }));
+      });
 
   EXPECT_CALL(*client_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  // With TLS 1.3, the client completes its handshake first, so it can read the data before the
+  // close_notify alert arrives.
+  EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), false))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), true))
-      .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
+      .WillOnce([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
         read_buffer.drain(read_buffer.length());
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         return Network::FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(*server_read_filter, onData(_, true));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -4347,30 +5068,30 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
             stream_info_);
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+      });
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
         EXPECT_EQ(data.length(), 0);
         // Calling close(FlushWrite) in onEvent() callback results in PostIoAction::Close,
         // after which the connection is closed without write ready event being delivered,
         // and with all outstanding data (here, "hello") being lost.
-      }));
+      });
 
   EXPECT_CALL(*client_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), false))
-      .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
+      .WillOnce([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
         read_buffer.drain(read_buffer.length());
         // Close without sending close_notify alert.
         const SslHandshakerImpl* ssl_socket =
@@ -4379,12 +5100,12 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         SSL_set_quiet_shutdown(ssl_socket->ssl(), 1);
         client_connection->close(Network::ConnectionCloseType::FlushWrite);
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_CALL(*server_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*server_read_filter, onData(BufferString(""), true))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> Network::FilterStatus {
         // Close without sending close_notify alert.
         const SslHandshakerImpl* ssl_socket =
             dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
@@ -4392,11 +5113,11 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         SSL_set_quiet_shutdown(ssl_socket->ssl(), 1);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -4468,21 +5189,20 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher_->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info_);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -4583,20 +5303,20 @@ void testSuppressClientCaListOnTheWire(
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& accepted) -> void {
         server_connection = dispatcher.createServerConnection(
             std::move(accepted), server_ssl_socket_factory->createDownstreamTransportSocket(),
             stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+      });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
-      }));
+      });
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -4642,13 +5362,12 @@ TEST_P(SslSocketTest, SuppressClientCaListOnTheWireDisabled) {
 namespace {
 
 // Test connecting with a client to server1, then trying to reuse the session on server2
-void testTicketSessionResumption(const std::string& server_ctx_yaml1,
-                                 const std::vector<std::string>& server_names1,
-                                 const std::string& server_ctx_yaml2,
-                                 const std::vector<std::string>& server_names2,
-                                 const std::string& client_ctx_yaml, bool expect_reuse,
-                                 const Network::Address::IpVersion ip_version,
-                                 const uint32_t expected_lifetime_hint = 0) {
+void testTicketSessionResumptionWithTlsVersion(
+    const std::string& server_ctx_yaml1, const std::vector<std::string>& server_names1,
+    const std::string& server_ctx_yaml2, const std::vector<std::string>& server_names2,
+    const std::string& client_ctx_yaml, bool expect_reuse,
+    const Network::Address::IpVersion ip_version, const uint32_t expected_lifetime_hint,
+    const std::string& expected_sni, TlsParameters::TlsProtocol client_tls_version) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       transport_socket_factory_context;
@@ -4692,6 +5411,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto* client_tls_params = client_tls_context.mutable_common_tls_context()->mutable_tls_params();
+  client_tls_params->set_tls_minimum_protocol_version(client_tls_version);
+  client_tls_params->set_tls_maximum_protocol_version(client_tls_version);
 
   Stats::TestUtil::TestStore client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
@@ -4712,37 +5434,73 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
+  NiceMock<Network::MockConnectionCallbacks> first_server_connection_callbacks;
   StreamInfo::StreamInfoImpl stream_info(time_system, nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        Network::DownstreamTransportSocketFactory& tsf =
-            socket->connectionInfoProvider().localAddress() ==
-                    socket1->connectionInfoProvider().localAddress()
-                ? *server_ssl_socket_factory1
-                : *server_ssl_socket_factory2;
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createDownstreamTransportSocket(), stream_info);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    Network::DownstreamTransportSocketFactory& tsf =
+        socket->connectionInfoProvider().localAddress() ==
+                socket1->connectionInfoProvider().localAddress()
+            ? *server_ssl_socket_factory1
+            : *server_ssl_socket_factory2;
+    server_connection = dispatcher->createServerConnection(
+        std::move(socket), tsf.createDownstreamTransportSocket(), stream_info);
+    server_connection->addConnectionCallbacks(first_server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslHandshakerImpl* ssl_socket =
-            dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->ssl());
-        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
-        if (expected_lifetime_hint) {
-          auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
-          EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
-        }
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
-        server_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher->exit();
-      }));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  auto check_session = [&]() {
+    ASSERT_NE(nullptr, ssl_session);
+    EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+    if (expected_lifetime_hint) {
+      auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
+      EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
+    }
+  };
+
+  size_t first_connect_count = 0;
+  auto close_from_server = [&]() {
+    if (++first_connect_count == 2) {
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+    }
+  };
+
+  if (client_tls_version == TlsParameters::TLSv1_3) {
+    // With TLS 1.3, the server sends session tickets after the handshake, and the client stores
+    // them in its session cache. Close the connection from the server once both sides are
+    // connected, so that the client reads the tickets before it sees the close.
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce([&](Network::ConnectionEvent) -> void { close_from_server(); });
+    EXPECT_CALL(first_server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce([&](Network::ConnectionEvent) -> void { close_from_server(); });
+    EXPECT_CALL(first_server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce([&](Network::ConnectionEvent) -> void {
+          ssl_session = ClientContextImplPeer::cachedSession(
+              *ClientContextImplPeer::getClientContextImpl(*ssl_socket_factory),
+              client_tls_context.sni());
+          if (ssl_session != nullptr) {
+            SSL_SESSION_up_ref(ssl_session);
+          }
+          check_session();
+          dispatcher->exit();
+        });
+  } else {
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce([&](Network::ConnectionEvent) -> void {
+          const SslHandshakerImpl* ssl_socket =
+              dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+          ssl_session = SSL_get1_session(ssl_socket->ssl());
+          check_session();
+          client_connection->close(Network::ConnectionCloseType::NoFlush);
+          server_connection->close(Network::ConnectionCloseType::NoFlush);
+          dispatcher->exit();
+        });
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  }
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
+  ASSERT_NE(nullptr, ssl_session);
 
   EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
@@ -4761,31 +5519,40 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Network::MockConnectionCallbacks server_connection_callbacks;
   StreamInfo::StreamInfoImpl stream_info2(time_system, nullptr,
                                           StreamInfo::FilterState::LifeSpan::Connection);
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        Network::DownstreamTransportSocketFactory& tsf =
-            socket->connectionInfoProvider().localAddress() ==
-                    socket1->connectionInfoProvider().localAddress()
-                ? *server_ssl_socket_factory1
-                : *server_ssl_socket_factory2;
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createDownstreamTransportSocket(), stream_info2);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    Network::DownstreamTransportSocketFactory& tsf =
+        socket->connectionInfoProvider().localAddress() ==
+                socket1->connectionInfoProvider().localAddress()
+            ? *server_ssl_socket_factory1
+            : *server_ssl_socket_factory2;
+    server_connection = dispatcher->createServerConnection(
+        std::move(socket), tsf.createDownstreamTransportSocket(), stream_info2);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   // Different tests have different order of whether client or server gets Connected event
   // first, so always wait until both have happened.
   size_t connect_count = 0;
   auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              expect_reuse]() {
+                              expect_reuse, &expected_sni, client_tls_version]() {
     connect_count++;
     if (connect_count == 2) {
-      if (expect_reuse) {
+      if (client_tls_version == TlsParameters::TLSv1_3) {
+        // TLS 1.3 has no session ID with BoringSSL, even when the session is resumed. OpenSSL
+        // creates one for the server's session when it sends a ticket.
+        EXPECT_EQ(SSL_SELECT(true, false), server_connection->ssl()->sessionId().empty());
+      } else if (expect_reuse) {
         EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
       } else {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+      }
+      // On a resumed connection the server must still be able to retrieve the SNI from the
+      // ClientHello. This depends on `SSL_get_servername()` returning the requested name for
+      // resumed sessions (see https://github.com/envoyproxy/envoy/pull/47297).
+      if (expect_reuse && !expected_sni.empty()) {
+        EXPECT_EQ(expected_sni, server_connection->ssl()->sni());
       }
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -4794,9 +5561,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   };
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
@@ -4804,6 +5571,38 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
+}
+
+// Runs testTicketSessionResumptionWithTlsVersion() with TLS 1.2, and also with TLS 1.3 when both
+// servers support it.
+void testTicketSessionResumption(const std::string& server_ctx_yaml1,
+                                 const std::vector<std::string>& server_names1,
+                                 const std::string& server_ctx_yaml2,
+                                 const std::vector<std::string>& server_names2,
+                                 const std::string& client_ctx_yaml, bool expect_reuse,
+                                 const Network::Address::IpVersion ip_version,
+                                 const uint32_t expected_lifetime_hint = 0,
+                                 const std::string& expected_sni = "") {
+  bool servers_support_tls13 = true;
+  for (const std::string& server_ctx_yaml : {server_ctx_yaml1, server_ctx_yaml2}) {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+    const auto max_version =
+        server_tls_context.common_tls_context().tls_params().tls_maximum_protocol_version();
+    if (max_version != TlsParameters::TLS_AUTO && max_version != TlsParameters::TLSv1_3) {
+      servers_support_tls13 = false;
+    }
+  }
+
+  for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+    if (tls_version == TlsParameters::TLSv1_3 && !servers_support_tls13) {
+      continue;
+    }
+    SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+    testTicketSessionResumptionWithTlsVersion(
+        server_ctx_yaml1, server_names1, server_ctx_yaml2, server_names2, client_ctx_yaml,
+        expect_reuse, ip_version, expected_lifetime_hint, expected_sni, tls_version);
+  }
 }
 
 void testSupportForSessionResumption(const std::string& server_ctx_yaml,
@@ -4816,7 +5615,7 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
 
-  Stats::IsolatedStoreImpl server_stats_store;
+  Stats::IsolatedStoreImpl server_stats_store(server_factory_context.serverScope().symbolTable());
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   NiceMock<Runtime::MockLoader> runtime;
   ON_CALL(transport_socket_factory_context.server_context_, api())
@@ -4842,7 +5641,7 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
-  Stats::IsolatedStoreImpl client_stats_store;
+  Stats::IsolatedStoreImpl client_stats_store(server_factory_context.serverScope().symbolTable());
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       client_factory_context;
@@ -4863,36 +5662,35 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   StreamInfo::StreamInfoImpl stream_info(time_system, nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
   Network::ConnectionPtr server_connection;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info);
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info);
 
-        const SslHandshakerImpl* ssl_socket =
-            dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
-        SSL* server_ssl_socket = ssl_socket->ssl();
-        SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
-        if (expect_stateless) {
-          EXPECT_EQ(0, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
-        } else {
-          EXPECT_EQ(SSL_OP_NO_TICKET, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
-        }
-        if (expect_stateful) {
-          EXPECT_EQ(SSL_SESS_CACHE_SERVER,
-                    (SSL_CTX_get_session_cache_mode(server_ssl_context) & SSL_SESS_CACHE_SERVER));
-        } else {
-          EXPECT_EQ(SSL_SESS_CACHE_OFF, SSL_CTX_get_session_cache_mode(server_ssl_context));
-        }
-      }));
+    const SslHandshakerImpl* ssl_socket =
+        dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
+    SSL* server_ssl_socket = ssl_socket->ssl();
+    SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
+    if (expect_stateless) {
+      EXPECT_EQ(0, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
+    } else {
+      EXPECT_EQ(SSL_OP_NO_TICKET, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
+    }
+    if (expect_stateful) {
+      EXPECT_EQ(SSL_SESS_CACHE_SERVER,
+                (SSL_CTX_get_session_cache_mode(server_ssl_context) & SSL_SESS_CACHE_SERVER));
+    } else {
+      EXPECT_EQ(SSL_SESS_CACHE_OFF, SSL_CTX_get_session_cache_mode(server_ssl_context));
+    }
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher->exit();
-      }));
+      });
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   dispatcher->run(Event::Dispatcher::RunType::Block);
@@ -4919,6 +5717,34 @@ TEST_P(SslSocketTest, TicketSessionResumption) {
 
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               version_);
+}
+
+// Validates that when a session is resumed, the server can still read the SNI from the
+// connection. Retrieving the SNI relies on `SSL_get_servername()` returning the requested
+// server name for resumed sessions, which must hold for both BoringSSL and the OpenSSL
+// compatibility layer (see https://github.com/envoyproxy/envoy/pull/47297).
+TEST_P(SslSocketTest, TicketSessionResumptionWithSni) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::vector<std::string> server_names = {"server1.example.com"};
+
+  const std::string client_ctx_yaml = R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_yaml, server_names, server_ctx_yaml, server_names,
+                              client_ctx_yaml, true, version_, 0, "server1.example.com");
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionCustomTimeout) {
@@ -5342,6 +6168,69 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
                               version_);
 }
 
+// Returns the config of a server that issues session tickets with ticket_key_a, with the
+// certificate and the key of the given name in the test data.
+std::string sessionTicketServerCtxYaml(absl::string_view certificate_name) {
+  return fmt::format(R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/{0}_cert.pem"
+      private_key:
+        filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/{0}_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/ticket_key_a"
+)EOF",
+                     certificate_name);
+}
+
+// Runs testTicketSessionResumption() for two servers whose names differ but concatenate to the
+// same bytes. Sessions resume across them only when the runtime guard is disabled, which leaves
+// the type and the length of each name out of the session context ID.
+void testTicketSessionResumptionAcrossConcatenatedNames(
+    const std::string& server_ctx_yaml1, const std::vector<std::string>& server_names1,
+    const std::string& server_ctx_yaml2, const std::vector<std::string>& server_names2,
+    const Network::Address::IpVersion ip_version) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.unambiguous_tls_session_context_id", "false"}});
+    testTicketSessionResumption(server_ctx_yaml1, server_names1, server_ctx_yaml2, server_names2,
+                                client_ctx_yaml, /*expect_reuse=*/true, ip_version);
+  }
+  testTicketSessionResumption(server_ctx_yaml1, server_names1, server_ctx_yaml2, server_names2,
+                              client_ctx_yaml, /*expect_reuse=*/false, ip_version);
+}
+
+// Sessions cannot be resumed because the SANs of the server certificates are different, even
+// though the two SANs of one certificate concatenate to the SAN of the other.
+TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertConcatenatedSans) {
+  testTicketSessionResumptionAcrossConcatenatedNames(
+      sessionTicketServerCtxYaml("san_multiple_dns"), {},
+      sessionTicketServerCtxYaml("san_concatenated_dns"), {}, version_);
+}
+
+// Sessions cannot be resumed because the SAN of one server certificate is a DNS SAN, while the SAN
+// of the other is a URI SAN with the same name.
+TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertSanType) {
+  testTicketSessionResumptionAcrossConcatenatedNames(
+      sessionTicketServerCtxYaml("san_dns"), {},
+      sessionTicketServerCtxYaml("san_uri_with_dns_name"), {}, version_);
+}
+
+// Sessions cannot be resumed because the server names are different, even though the two server
+// names of one server concatenate to the server name of the other.
+TEST_P(SslSocketTest, TicketSessionResumptionConcatenatedServerNames) {
+  const std::string server_ctx_yaml = sessionTicketServerCtxYaml("san_dns");
+  testTicketSessionResumptionAcrossConcatenatedNames(
+      server_ctx_yaml, {"server1.example.com", "server2.example.com"}, server_ctx_yaml,
+      {"server1.example.comserver2.example.com"}, version_);
+}
+
 TEST_P(SslSocketTest, SessionResumptionDisabled) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -5465,31 +6354,6 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
 )EOF";
 
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context1;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, {}, false);
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context2;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
-  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, {}, false);
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  ContextManagerImpl manager(server_factory_context);
-  Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
-                                                                   *server_stats_store.rootScope());
-  auto server2_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server2_cfg), manager, *server_stats_store.rootScope());
-
-  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
-      Network::Test::getCanonicalLoopbackAddress(version_));
-  auto socket2 = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
-      Network::Test::getCanonicalLoopbackAddress(version_));
-  Network::MockTcpListenerCallbacks callbacks;
-  NiceMock<Network::MockListenerConfig> listener_config;
-  Server::ThreadLocalOverloadStateOptRef overload_state;
-  Network::ListenerPtr listener =
-      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
-  Network::ListenerPtr listener2 =
-      createListener(socket2, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -5499,88 +6363,162 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
 )EOF";
 
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+    SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context1;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
+    auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, {}, false);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context2;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
+    auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, {}, false);
+    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+    ContextManagerImpl manager(server_factory_context);
+    Stats::TestUtil::TestStore server_stats_store;
+    auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
+        std::move(server_cfg), manager, *server_stats_store.rootScope());
+    auto server2_ssl_socket_factory = *ServerSslSocketFactory::create(
+        std::move(server2_cfg), manager, *server_stats_store.rootScope());
 
-  auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::TestUtil::TestStore client_stats_store;
-  auto ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
-                                                            *client_stats_store.rootScope());
-  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version_));
+    auto socket2 = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version_));
+    Network::MockTcpListenerCallbacks callbacks;
+    NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Network::ListenerPtr listener =
+        createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
+    Network::ListenerPtr listener2 =
+        createListener(socket2, callbacks, runtime_, listener_config, overload_state, *dispatcher_);
 
-  Network::MockConnectionCallbacks client_connection_callbacks;
-  client_connection->addConnectionCallbacks(client_connection_callbacks);
-  client_connection->connect();
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+    tls_context.mutable_common_tls_context()
+        ->mutable_tls_params()
+        ->set_tls_minimum_protocol_version(tls_version);
+    tls_context.mutable_common_tls_context()
+        ->mutable_tls_params()
+        ->set_tls_maximum_protocol_version(tls_version);
 
-  SSL_SESSION* ssl_session = nullptr;
-  Network::ConnectionPtr server_connection;
-  Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
-        Network::DownstreamTransportSocketFactory& tsf =
-            accepted_socket->connectionInfoProvider().localAddress() ==
-                    socket->connectionInfoProvider().localAddress()
-                ? *server_ssl_socket_factory
-                : *server2_ssl_socket_factory;
-        server_connection = dispatcher_->createServerConnection(
-            std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
-  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+    auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+    Stats::TestUtil::TestStore client_stats_store;
+    auto ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                              *client_stats_store.rootScope());
+    Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+        socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+        ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
 
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslHandshakerImpl* ssl_socket =
-            dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->ssl());
-        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+    Network::MockConnectionCallbacks client_connection_callbacks;
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    SSL_SESSION* ssl_session = nullptr;
+    Network::ConnectionPtr server_connection;
+    Network::MockConnectionCallbacks server_connection_callbacks;
+    EXPECT_CALL(callbacks, onAccept_(_))
+        .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+          Network::DownstreamTransportSocketFactory& tsf =
+              accepted_socket->connectionInfoProvider().localAddress() ==
+                      socket->connectionInfoProvider().localAddress()
+                  ? *server_ssl_socket_factory
+                  : *server2_ssl_socket_factory;
+          server_connection = dispatcher_->createServerConnection(
+              std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        });
+    EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+    size_t connect_count = 0;
+    auto close_from_server = [&]() {
+      if (++connect_count == 2) {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher_->exit();
-      }));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      }
+    };
 
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+    if (tls_version == TlsParameters::TLSv1_3) {
+      // With TLS 1.3, the server sends session tickets after the handshake, and the client stores
+      // them in its session cache. Close the connection from the server once both sides are
+      // connected, so that the client reads the tickets before it sees the close.
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce([&](Network::ConnectionEvent) -> void { close_from_server(); });
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce([&](Network::ConnectionEvent) -> void { close_from_server(); });
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+          .WillOnce([&](Network::ConnectionEvent) -> void {
+            ssl_session = ClientContextImplPeer::cachedSession(
+                *ClientContextImplPeer::getClientContextImpl(*ssl_socket_factory),
+                tls_context.sni());
+            if (ssl_session != nullptr) {
+              SSL_SESSION_up_ref(ssl_session);
+              EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+            }
+            dispatcher_->exit();
+          });
+    } else {
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce([&](Network::ConnectionEvent) -> void {
+            const SslHandshakerImpl* ssl_socket =
+                dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+            ssl_session = SSL_get1_session(ssl_socket->ssl());
+            EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+            server_connection->close(Network::ConnectionCloseType::NoFlush);
+            client_connection->close(Network::ConnectionCloseType::NoFlush);
+            dispatcher_->exit();
+          });
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+    }
 
-  EXPECT_EQ(1UL, server_stats_store.counter("ssl.handshake").value());
-  EXPECT_EQ(1UL, client_stats_store.counter("ssl.handshake").value());
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    ASSERT_NE(nullptr, ssl_session);
 
-  client_connection = dispatcher_->createClientConnection(
-      socket2->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
-  client_connection->addConnectionCallbacks(client_connection_callbacks);
-  const SslHandshakerImpl* ssl_socket =
-      dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
-  SSL_set_session(ssl_socket->ssl(), ssl_session);
-  SSL_SESSION_free(ssl_session);
+    EXPECT_EQ(1UL, server_stats_store.counter("ssl.handshake").value());
+    EXPECT_EQ(1UL, client_stats_store.counter("ssl.handshake").value());
 
-  client_connection->connect();
+    client_connection = dispatcher_->createClientConnection(
+        socket2->connectionInfoProvider().localAddress(),
+        Network::Address::InstanceConstSharedPtr(),
+        ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    const SslHandshakerImpl* ssl_socket =
+        dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
+    SSL_set_session(ssl_socket->ssl(), ssl_session);
+    SSL_SESSION_free(ssl_session);
 
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
-        Network::DownstreamTransportSocketFactory& tsf =
-            accepted_socket->connectionInfoProvider().localAddress() ==
-                    socket->connectionInfoProvider().localAddress()
-                ? *server_ssl_socket_factory
-                : *server2_ssl_socket_factory;
-        server_connection = dispatcher_->createServerConnection(
-            std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
-  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+    client_connection->connect();
 
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_CALL(callbacks, onAccept_(_))
+        .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+          Network::DownstreamTransportSocketFactory& tsf =
+              accepted_socket->connectionInfoProvider().localAddress() ==
+                      socket->connectionInfoProvider().localAddress()
+                  ? *server_ssl_socket_factory
+                  : *server2_ssl_socket_factory;
+          server_connection = dispatcher_->createServerConnection(
+              std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        });
+    EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+    // The second server doesn't resume the session and rejects the client certificate. With TLS
+    // 1.3, the client completes its handshake before the server validates the client certificate.
+    if (tls_version == TlsParameters::TLSv1_3) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+    }
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
-  EXPECT_EQ(1UL, client_stats_store.counter("ssl.connection_error").value());
-  EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
-  EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    // With TLS 1.3, closing the connected client calls SSL_shutdown(). OpenSSL fails that call
+    // after the fatal alert, counting a second error.
+    EXPECT_EQ(tls_version == TlsParameters::TLSv1_3 ? SSL_SELECT(1UL, 2UL) : 1UL,
+              client_stats_store.counter("ssl.connection_error").value());
+    EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
+    EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
+  }
 }
 
 void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_yaml,
@@ -5654,37 +6592,42 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   };
 
   // WillRepeatedly doesn't work with InSequence.
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info_);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
+  // Both the client and the server default to a maximum version of TLS 1.3.
+  const auto max_version = [](TlsParameters::TlsProtocol version) {
+    return version == TlsParameters::TLS_AUTO ? TlsParameters::TLSv1_3 : version;
+  };
   const bool expect_tls13 =
-      client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
-          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3 &&
-      server_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
-          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3;
+      max_version(
+          client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version()) ==
+          TlsParameters::TLSv1_3 &&
+      max_version(
+          server_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version()) ==
+          TlsParameters::TLSv1_3;
 
   // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older).
   if (expect_tls13) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
   } else {
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
   }
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
 
@@ -5701,32 +6644,31 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   client_connection->connect();
 
   // WillRepeatedly doesn't work with InSequence.
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info_);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older),
   // and whether or not the session was successfully resumed.
   if (expect_tls13 || expect_reuse) {
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
   } else {
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
   }
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
 
@@ -5800,27 +6742,29 @@ void SslSocketTest::testClientSessionResumptionSniSequence(
       if (++connect_count == 2) {
         EXPECT_EQ(expected_reuse_count, server_stats_store.counter("ssl.session_reused").value());
         EXPECT_EQ(expected_reuse_count, client_stats_store.counter("ssl.session_reused").value());
+        // With TLS 1.3, the server sends session tickets after the handshake. Close the connection
+        // from the server, so that the client reads the tickets before it sees the close.
         server_connection->close(Network::ConnectionCloseType::NoFlush);
-        client_connection->close(Network::ConnectionCloseType::NoFlush);
-        dispatcher->exit();
       }
     };
 
     EXPECT_CALL(callbacks, onAccept_(_))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection = dispatcher->createServerConnection(
               std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
               stream_info_);
           server_connection->addConnectionCallbacks(server_connection_callbacks);
-        }));
+        });
     EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
     EXPECT_CALL(server_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
     EXPECT_CALL(client_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
     EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher->exit(); });
 
     dispatcher->run(Event::Dispatcher::RunType::Block);
   };
@@ -6077,6 +7021,72 @@ TEST_P(SslSocketTest, ClientSessionCacheReusesAcrossSniWhenSniScopeDisabled) {
   testClientSessionResumptionSniSequence(server_ctx_yaml, client_ctx_yaml, {0, 1, 2}, version_);
 }
 
+// With TLS 1.3, the client caches the session tickets that the server sends after the handshake,
+// and uses each one once.
+TEST_P(SslSocketTest, ClientSessionCacheDoesNotReuseAcrossSniHandshakeTls13) {
+  // Some CI/build hosts do not have IPv6 loopback enabled.
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  // The server sends two session tickets per TLS 1.3 connection, so cache enough sessions to keep
+  // A's tickets when B's are added.
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+  max_session_keys: 4
+)EOF";
+
+  testClientSessionResumptionSniSequence(server_ctx_yaml, client_ctx_yaml, {0, 0, 1}, version_);
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheReusesAcrossSniWhenSniScopeDisabledTls13) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.scope_upstream_tls_session_cache_by_sni", "false"}});
+
+  // Some CI/build hosts do not have IPv6 loopback enabled.
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+  max_session_keys: 2
+)EOF";
+
+  testClientSessionResumptionSniSequence(server_ctx_yaml, client_ctx_yaml, {0, 1, 2}, version_);
+}
+
 // Test client session resumption using default settings (should be enabled).
 TEST_P(SslSocketTest, ClientSessionResumptionDefault) {
   const std::string server_ctx_yaml = R"EOF(
@@ -6231,20 +7241,19 @@ TEST_P(SslSocketTest, SslError) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher_->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info_);
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -6274,16 +7283,19 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
   updateFilterChain(tls_context, *filter_chain);
 
-  // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
-  TestUtilOptionsV2 tls_v1_2_test_options =
-      createProtocolTestOptions(listener, client, version_, "TLSv1.2");
-  testUtilV2(tls_v1_2_test_options);
+  // Connection using defaults (client & server) succeeds, negotiating TLSv1.3.
+  TestUtilOptionsV2 tls_v1_3_test_options =
+      createProtocolTestOptions(listener, client, version_, "TLSv1.3");
+  testUtilV2(tls_v1_3_test_options);
 
-  // Connection using defaults (client & server) succeeds, negotiating TLSv1.2,
+  // Connection using defaults (client & server) succeeds, negotiating TLSv1.3,
   // even with client renegotiation.
   client.set_allow_renegotiation(true);
-  testUtilV2(tls_v1_2_test_options);
+  testUtilV2(tls_v1_3_test_options);
   client.set_allow_renegotiation(false);
+
+  TestUtilOptionsV2 tls_v1_2_test_options =
+      createProtocolTestOptions(listener, client, version_, "TLSv1.2");
 
   TestUtilOptionsV2 error_test_options(listener, client, false, version_);
   error_test_options.setExpectedServerStats("ssl.connection_error")
@@ -6321,8 +7333,6 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   client_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  TestUtilOptionsV2 tls_v1_3_test_options =
-      createProtocolTestOptions(listener, client, version_, "TLSv1.3");
   testUtilV2(tls_v1_3_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -6370,17 +7380,22 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  TestUtilOptionsV2 unsupported_protocol_test_options(listener, client, false, version_);
-  unsupported_protocol_test_options.setExpectedServerStats("ssl.connection_error")
-      .setExpectedTransportFailureReasonContains("UNSUPPORTED_PROTOCOL");
-
   // Connection using defaults (client) and TLSv1.0 (server) fails.
   server_params->set_tls_minimum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   updateFilterChain(tls_context, *filter_chain);
+  testUtilV2(error_test_options);
+
+  // Connection using TLSv1.2 (client) and TLSv1.0 (server) fails.
+  TestUtilOptionsV2 unsupported_protocol_test_options(listener, client, false, version_);
+  unsupported_protocol_test_options.setExpectedServerStats("ssl.connection_error")
+      .setExpectedTransportFailureReasonContains("UNSUPPORTED_PROTOCOL");
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   testUtilV2(unsupported_protocol_test_options);
+  client_params->clear_tls_maximum_protocol_version();
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
@@ -6390,7 +7405,7 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1);
   updateFilterChain(tls_context, *filter_chain);
-  testUtilV2(unsupported_protocol_test_options);
+  testUtilV2(error_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
@@ -6404,13 +7419,13 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.3 (server) fails.
+  // Connection using defaults (client) and TLSv1.3 (server) succeeds.
   server_params->set_tls_minimum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   updateFilterChain(tls_context, *filter_chain);
-  testUtilV2(error_test_options);
+  testUtilV2(tls_v1_3_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
@@ -6420,7 +7435,7 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   updateFilterChain(tls_context, *filter_chain);
-  testUtilV2(tls_v1_2_test_options);
+  testUtilV2(tls_v1_3_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
@@ -6455,6 +7470,53 @@ BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_maximum_protocol_version();
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
+}
+
+// The client defaults to a maximum version of TLS 1.3, which lets it use the default post-quantum
+// key exchange. Disabling envoy.reloadable_features.default_client_tls_max_version_is_1_3 restores
+// the previous client default of TLS 1.2.
+BORINGSSL_TEST_P(SslSocketTest, DefaultClientMaxProtocolVersion) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+
+  // Connection using defaults (client & server) negotiates TLSv1.3 with post-quantum key exchange.
+  TestUtilOptionsV2 tls_v1_3_test_options =
+      createProtocolTestOptions(listener, client, version_, "TLSv1.3");
+  testUtilV2(tls_v1_3_test_options.setExpectedTlsGroup("X25519MLKEM768"));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.default_client_tls_max_version_is_1_3", "false"}});
+
+  // Connection using defaults (client & server) negotiates TLSv1.2, which doesn't support
+  // post-quantum key exchange.
+  TestUtilOptionsV2 tls_v1_2_test_options =
+      createProtocolTestOptions(listener, client, version_, "TLSv1.2");
+  testUtilV2(tls_v1_2_test_options.setExpectedTlsGroup(FIPS_mode() ? "P-256" : "X25519"));
+
+  // Connection using defaults (client) and TLSv1.3 (server) fails.
+  server_params->set_tls_minimum_protocol_version(TlsParameters::TLSv1_3);
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 error_test_options(listener, client, false, version_);
+  testUtilV2(error_test_options.setExpectedServerStats("ssl.connection_error")
+                 .setExpectedTransportFailureReasonContains("TLSV1_ALERT_PROTOCOL_VERSION"));
+
+  // Connection using TLSv1.3 (client) and TLSv1.3 (server) succeeds.
+  client.mutable_common_tls_context()->mutable_tls_params()->set_tls_maximum_protocol_version(
+      TlsParameters::TLSv1_3);
+  testUtilV2(tls_v1_3_test_options);
 }
 
 TEST_P(SslSocketTest, ALPN) {
@@ -6550,6 +7612,8 @@ TEST_P(SslSocketTest, CipherSuites) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
       client.mutable_common_tls_context()->mutable_tls_params();
+  // cipher_suites only applies to TLS 1.2.
+  client_params->set_tls_maximum_protocol_version(TlsParameters::TLSv1_2);
 
   // Connection using defaults (client & server) succeeds.
   TestUtilOptionsV2 test_options(listener, client, true, version_);
@@ -6630,6 +7694,9 @@ TEST_P(SslSocketTest, CipherSuitesWithPolicy) {
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
       tls_context.mutable_common_tls_context()->mutable_tls_params();
 
+  // cipher_suites only applies to TLS 1.2.
+  client_params->set_tls_maximum_protocol_version(TlsParameters::TLSv1_2);
+
   // Connection using a common cipher (client & server) succeeds.
   client_params->clear_cipher_suites();
   client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
@@ -6667,6 +7734,9 @@ BORINGSSL_TEST_P(SslSocketTest, CipherSuitesWithCNSA2Policy) {
       client.mutable_common_tls_context()->mutable_tls_params();
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
       tls_context.mutable_common_tls_context()->mutable_tls_params();
+
+  // cipher_suites only applies to TLS 1.2.
+  client_params->set_tls_maximum_protocol_version(TlsParameters::TLSv1_2);
 
   // Connection using a common cipher (client & server) succeeds.
   client_params->clear_cipher_suites();
@@ -6706,6 +7776,9 @@ BORINGSSL_TEST_P(SslSocketTest, CipherSuitesWithCNSA1Policy) {
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
       tls_context.mutable_common_tls_context()->mutable_tls_params();
 
+  // cipher_suites only applies to TLS 1.2.
+  client_params->set_tls_maximum_protocol_version(TlsParameters::TLSv1_2);
+
   // Connection using a common cipher (client & server) succeeds.
   client_params->clear_cipher_suites();
   client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
@@ -6743,54 +7816,61 @@ TEST_P(SslSocketTest, EcdhCurves) {
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
       client.mutable_common_tls_context()->mutable_tls_params();
 
-  // Connection using defaults (client & server) succeeds.
-  TestUtilOptionsV2 test_options(listener, client, true, version_);
-  testUtilV2(test_options);
+  for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+    SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+    client_params->set_tls_minimum_protocol_version(tls_version);
+    client_params->set_tls_maximum_protocol_version(tls_version);
+    updateFilterChain(tls_context, *filter_chain);
 
-  // Connection using defaults (client & server) succeeds, even with client renegotiation.
-  client.set_allow_renegotiation(true);
-  testUtilV2(test_options);
-  client.set_allow_renegotiation(false);
+    // Connection using defaults (client & server) succeeds.
+    TestUtilOptionsV2 test_options(listener, client, true, version_);
+    testUtilV2(test_options);
 
-  // Client connects with one of the supported ECDH curves, connection succeeds.
-  client_params->add_ecdh_curves("X25519");
-  server_params->add_ecdh_curves("X25519");
-  server_params->add_ecdh_curves("P-256");
-  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(tls_context, *filter_chain);
-  TestUtilOptionsV2 ecdh_curves_test_options(listener, client, true, version_);
-  std::string stats = "ssl.curves.X25519";
-  ecdh_curves_test_options.setExpectedServerStats(stats).setExpectedClientStats(stats);
-  ecdh_curves_test_options.setExpectedTlsGroup("X25519");
-  testUtilV2(ecdh_curves_test_options);
-  client_params->clear_ecdh_curves();
-  server_params->clear_ecdh_curves();
-  server_params->clear_cipher_suites();
+    // Connection using defaults (client & server) succeeds, even with client renegotiation.
+    client.set_allow_renegotiation(true);
+    testUtilV2(test_options);
+    client.set_allow_renegotiation(false);
 
-  // Client connects with unsupported ECDH curve, connection fails.
-  client_params->add_ecdh_curves("X25519");
-  server_params->add_ecdh_curves("P-256");
-  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(tls_context, *filter_chain);
-  TestUtilOptionsV2 error_test_options(listener, client, false, version_);
-  error_test_options.setExpectedServerStats("ssl.connection_error");
-  testUtilV2(error_test_options);
-
-  client_params->clear_ecdh_curves();
-  server_params->clear_ecdh_curves();
-  server_params->clear_cipher_suites();
-
-  // Verify that X25519 is not offered by default in FIPS builds.
-  client_params->add_ecdh_curves("X25519");
-  server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(tls_context, *filter_chain);
-  if (FIPS_mode()) {
-    testUtilV2(error_test_options);
-  } else {
+    // Client connects with one of the supported ECDH curves, connection succeeds.
+    client_params->add_ecdh_curves("X25519");
+    server_params->add_ecdh_curves("X25519");
+    server_params->add_ecdh_curves("P-256");
+    server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    updateFilterChain(tls_context, *filter_chain);
+    TestUtilOptionsV2 ecdh_curves_test_options(listener, client, true, version_);
+    std::string stats = "ssl.curves.X25519";
+    ecdh_curves_test_options.setExpectedServerStats(stats).setExpectedClientStats(stats);
+    ecdh_curves_test_options.setExpectedTlsGroup("X25519");
     testUtilV2(ecdh_curves_test_options);
+    client_params->clear_ecdh_curves();
+    server_params->clear_ecdh_curves();
+    server_params->clear_cipher_suites();
+
+    // Client connects with unsupported ECDH curve, connection fails.
+    client_params->add_ecdh_curves("X25519");
+    server_params->add_ecdh_curves("P-256");
+    server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    updateFilterChain(tls_context, *filter_chain);
+    TestUtilOptionsV2 error_test_options(listener, client, false, version_);
+    error_test_options.setExpectedServerStats("ssl.connection_error");
+    testUtilV2(error_test_options);
+
+    client_params->clear_ecdh_curves();
+    server_params->clear_ecdh_curves();
+    server_params->clear_cipher_suites();
+
+    // Verify that X25519 is not offered by default in FIPS builds.
+    client_params->add_ecdh_curves("X25519");
+    server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+    updateFilterChain(tls_context, *filter_chain);
+    if (FIPS_mode()) {
+      testUtilV2(error_test_options);
+    } else {
+      testUtilV2(ecdh_curves_test_options);
+    }
+    client_params->clear_ecdh_curves();
+    server_params->clear_cipher_suites();
   }
-  client_params->clear_ecdh_curves();
-  server_params->clear_cipher_suites();
 }
 
 TEST_P(SslSocketTest, SignatureAlgorithms) {
@@ -6823,17 +7903,21 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
   client_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"));
 
-  // Connection using defaults (client & server) succeeds.
-  TestUtilOptionsV2 algorithm_test_options(listener, client, true, version_);
-  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-      .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
-      .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
-  testUtilV2(algorithm_test_options);
+  for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+    SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+    // Connection using defaults (client & server) succeeds.
+    TestUtilOptionsV2 algorithm_test_options(listener, client, true, version_);
+    algorithm_test_options.setClientTlsVersion(tls_version)
+        .setExpectedClientCertUri("spiffe://lyft.com/test-team")
+        .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
+        .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
+    testUtilV2(algorithm_test_options);
 
-  // Connection using defaults (client & server) succeeds, even with client renegotiation.
-  client.set_allow_renegotiation(true);
-  testUtilV2(algorithm_test_options);
-  client.set_allow_renegotiation(false);
+    // Connection using defaults (client & server) succeeds, even with client renegotiation.
+    client.set_allow_renegotiation(true);
+    testUtilV2(algorithm_test_options);
+    client.set_allow_renegotiation(false);
+  }
 }
 
 TEST_P(SslSocketTest, SetSignatureAlgorithms) {
@@ -6913,38 +7997,37 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
+  EXPECT_CALL(callbacks, onAccept_(_)).WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+    server_connection = dispatcher_->createServerConnection(
+        std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+        stream_info_);
 
-        // Verify that client sent configured signature algorithms.
-        const SslHandshakerImpl* server_socket =
-            dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
-        SSL_set_cert_cb(
-            server_socket->ssl(),
-            [](SSL* ssl, void*) -> int {
-              const uint16_t* peer_sigalgs;
-              size_t num_peer_sigalgs = SSL_get0_peer_verify_algorithms(ssl, &peer_sigalgs);
-              EXPECT_EQ(3, num_peer_sigalgs);
-              EXPECT_EQ(SSL_SIGN_RSA_PKCS1_SHA256, peer_sigalgs[0]);
-              EXPECT_EQ(SSL_SIGN_RSA_PSS_RSAE_SHA256, peer_sigalgs[1]);
-              EXPECT_EQ(SSL_SIGN_ECDSA_SECP256R1_SHA256, peer_sigalgs[2]);
-              return 1;
-            },
-            nullptr);
+    // Verify that client sent configured signature algorithms.
+    const SslHandshakerImpl* server_socket =
+        dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
+    SSL_set_cert_cb(
+        server_socket->ssl(),
+        [](SSL* ssl, void*) -> int {
+          const uint16_t* peer_sigalgs;
+          size_t num_peer_sigalgs = SSL_get0_peer_verify_algorithms(ssl, &peer_sigalgs);
+          EXPECT_EQ(3, num_peer_sigalgs);
+          EXPECT_EQ(SSL_SIGN_RSA_PKCS1_SHA256, peer_sigalgs[0]);
+          EXPECT_EQ(SSL_SIGN_RSA_PSS_RSAE_SHA256, peer_sigalgs[1]);
+          EXPECT_EQ(SSL_SIGN_ECDSA_SECP256R1_SHA256, peer_sigalgs[2]);
+          return 1;
+        },
+        nullptr);
 
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+    server_connection->addConnectionCallbacks(server_connection_callbacks);
+  });
   EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -7004,8 +8087,8 @@ TEST_P(SslSocketTest, RevokedCertificate) {
 )EOF";
 
   TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+                                 .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // This should succeed, since the cert isn't revoked.
   const std::string successful_client_ctx_yaml = R"EOF(
@@ -7047,8 +8130,8 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
 )EOF";
 
   TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml, false, version_);
-  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+                                 .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // This should succeed, since the cert isn't revoked.
   const std::string successful_client_ctx_yaml = R"EOF(
@@ -7071,6 +8154,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
   //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - End-entity certificate (i.e. san_dns*_cert.pem)
   //
   // Certificate revocation list contains:
   //  - Root authority certificate revocation list (i.e., ca_cert.crl)
@@ -7084,7 +8168,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.crl"
 )EOF";
@@ -7094,6 +8178,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
   //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - End-entity certificate (i.e. san_dns*_cert.pem)
   //
   // Certificate revocation list contains:
   //  - Root authority certificate revocation list (i.e., ca_cert.crl)
@@ -7109,7 +8194,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"
 )EOF";
@@ -7119,7 +8204,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
@@ -7129,7 +8214,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -7137,27 +8222,28 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Ensure that incomplete crl chains fail with revoked certificates.
   TestUtilOptions incomplete_revoked_test_options(revoked_client_ctx_yaml,
                                                   incomplete_server_ctx_yaml, false, version_);
-  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(
+      incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // Ensure that incomplete crl chains fail with unrevoked certificates.
   TestUtilOptions incomplete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                     incomplete_server_ctx_yaml, false, version_);
-  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_CRL));
+  testUtilClientCertRejected(
+      incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_CRL));
 
   // Ensure that complete crl chains fail with revoked certificates.
   TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, complete_server_ctx_yaml,
                                                 false, version_);
-  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(
+      complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-// Ensure that complete crl chains succeed with unrevoked certificates.
-#ifndef ENVOY_SSL_OPENSSL
+  // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-#endif
 }
 
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
@@ -7178,7 +8264,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_both_crls.pem"
 )EOF";
 
   // This should fail, since the crl chain is incomplete.
@@ -7199,7 +8285,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
 )EOF";
 
   // This should fail, since the certificate has been revoked.
@@ -7207,7 +8293,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
@@ -7217,7 +8303,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -7225,27 +8311,28 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   // Ensure that incomplete crl chains fail with revoked certificates.
   TestUtilOptions incomplete_revoked_test_options(revoked_client_ctx_yaml,
                                                   incomplete_server_ctx_yaml, false, version_);
-  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(
+      incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // Ensure that incomplete crl chains fail with unrevoked certificates.
   TestUtilOptions incomplete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                     incomplete_server_ctx_yaml, false, version_);
-  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_CRL));
+  testUtilClientCertRejected(
+      incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_CRL));
 
   // Ensure that complete crl chains fail with revoked certificates.
   TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, complete_server_ctx_yaml,
                                                 false, version_);
-  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(
+      complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-// Ensure that complete crl chains succeed with unrevoked certificates.
-#ifndef ENVOY_SSL_OPENSSL
+  // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-#endif
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
@@ -7268,7 +8355,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
       only_verify_leaf_cert_crl: true
 )EOF";
 
@@ -7277,7 +8364,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns4_key.pem"
 )EOF";
@@ -7307,7 +8394,7 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_intermediate_crl.pem"
       only_verify_leaf_cert_crl: true
 )EOF";
 
@@ -7316,15 +8403,16 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
 
   TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, incomplete_server_ctx_yaml,
                                                 false, version_);
-  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(
+      complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+          .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {
@@ -7558,6 +8646,37 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
   EXPECT_EQ(ssl_socket->transportSocketCallbacks(), &callbacks);
 }
 
+TEST_P(SslSocketTest, AsyncCertSelectionCallbackWhenNotBlocked) {
+  // Make MockTransportSocketCallbacks.
+  Network::MockIoHandle io_handle;
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+  ON_CALL(callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle));
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  // Make SslSocket.
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  ON_CALL(factory_context_.server_context_, localInfo()).WillByDefault(ReturnRef(local_info));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  ContextManagerImpl manager(factory_context_.serverFactoryContext());
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
+      std::move(client_cfg), manager, *factory_context_.store_.rootScope());
+
+  Network::TransportSocketPtr transport_socket =
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr);
+
+  SslSocket* ssl_socket = dynamic_cast<SslSocket*>(transport_socket.get());
+  ssl_socket->setTransportSocketCallbacks(callbacks);
+
+  // Call onAsynchronousCertificateSelectionComplete() when the handshake is NOT in
+  // HandshakeBlockedOnAsyncOperation state. This test prevents a regression where
+  // an ENVOY_BUG is thrown.
+  ssl_socket->onAsynchronousCertificateSelectionComplete();
+}
+
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
   void initialize() {
@@ -7596,7 +8715,7 @@ protected:
     initialize();
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
               stream_info_);
@@ -7605,18 +8724,18 @@ protected:
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
-        }));
+        });
     EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     uint32_t filter_seen = 0;
 
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
-        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        .WillRepeatedly([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
           EXPECT_GE(expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
@@ -7624,13 +8743,13 @@ protected:
             server_connection_->close(Network::ConnectionCloseType::FlushWrite);
           }
           return Network::FilterStatus::StopIteration;
-        }));
+        });
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        .WillOnce([&](Network::ConnectionEvent) -> void {
           EXPECT_EQ((write_size * num_writes), filter_seen);
           dispatcher_->exit();
-        }));
+        });
 
     for (uint32_t i = 0; i < num_writes; i++) {
       Buffer::OwnedImpl data(std::string(write_size, 'a'));
@@ -7657,27 +8776,26 @@ protected:
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, createBuffer_(_, _, _))
         .Times(4)
-        .WillOnce(Invoke([&](absl::AnyInvocable<void()> below_low,
-                             absl::AnyInvocable<void()> above_high,
-                             absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        .WillOnce([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
           client_write_buffer = new MockWatermarkBuffer(std::move(below_low), std::move(above_high),
                                                         std::move(above_overflow));
           return client_write_buffer;
-        }))
-        .WillRepeatedly(
-            Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-              return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
-                                                 std::move(above_overflow));
-            }));
+        })
+        .WillRepeatedly([](absl::AnyInvocable<void()> below_low,
+                           absl::AnyInvocable<void()> above_high,
+                           absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+          return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                             std::move(above_overflow));
+        });
 
     initialize();
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
               stream_info_);
@@ -7686,7 +8804,7 @@ protected:
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
-        }));
+        });
     EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -7698,10 +8816,10 @@ protected:
     // close below would never be observed and disconnect() would block forever.
     EXPECT_CALL(*read_filter_, onData(_, _))
         .Times(testing::AnyNumber())
-        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        .WillRepeatedly([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
           data.drain(data.length());
           return Network::FilterStatus::StopIteration;
-        }));
+        });
 
     std::string data_to_write(bytes_to_write, 'a');
     Buffer::OwnedImpl buffer_to_write(data_to_write);
@@ -7715,11 +8833,11 @@ protected:
     // loop exit while no loop is running, which then terminates disconnect()'s run before the
     // server connection has observed the close.
     EXPECT_CALL(*client_write_buffer, drain(_))
-        .WillOnce(Invoke([&](uint64_t n) -> void {
+        .WillOnce([&](uint64_t n) -> void {
           client_write_buffer->baseDrain(n);
           dispatcher_->exit();
-        }))
-        .WillOnce(Invoke([&](uint64_t n) -> void { client_write_buffer->baseDrain(n); }));
+        })
+        .WillOnce([&](uint64_t n) -> void { client_write_buffer->baseDrain(n); });
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);
@@ -7728,9 +8846,13 @@ protected:
   }
 
   void disconnect() {
+    // With TLS 1.3, the client completes its handshake first, so the server may complete its
+    // handshake while the client disconnects.
+    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+        .Times(testing::AtMost(1));
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     client_connection_->close(Network::ConnectionCloseType::NoFlush);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -7814,18 +8936,18 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   initialize();
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
             stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
-      }));
+      });
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(address_string,
@@ -7846,7 +8968,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
   initialize();
 
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
             stream_info_);
@@ -7855,18 +8977,18 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
         EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
-      }));
+      });
   EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   uint32_t filter_seen = 0;
 
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
         EXPECT_GE(expected_chunk_size, data.length());
         EXPECT_EQ(1, data.getRawSlices().size());
         filter_seen += data.length();
@@ -7875,13 +8997,13 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
           server_connection_->close(Network::ConnectionCloseType::FlushWrite);
         }
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         EXPECT_EQ((write_size * num_writes), filter_seen);
         dispatcher_->exit();
-      }));
+      });
 
   for (uint32_t i = 0; i < num_writes; i++) {
     Buffer::OwnedImpl data(std::string(write_size, 'a'));
@@ -7950,9 +9072,11 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
 )EOF";
+  // RSA key exchange doesn't exist in TLS 1.3.
   const std::string successful_client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
+      tls_maximum_protocol_version: TLSv1_2
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
@@ -8021,9 +9145,11 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
 )EOF";
+  // RSA key exchange doesn't exist in TLS 1.3.
   const std::string successful_client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
+      tls_maximum_protocol_version: TLSv1_2
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
@@ -8062,9 +9188,11 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
 )EOF";
+  // RSA key exchange doesn't exist in TLS 1.3.
   const std::string successful_client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
+      tls_maximum_protocol_version: TLSv1_2
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
@@ -8203,9 +9331,11 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
 )EOF";
+  // RSA key exchange doesn't exist in TLS 1.3.
   const std::string failing_client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
+      tls_maximum_protocol_version: TLSv1_2
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
@@ -8275,9 +9405,11 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure
       crl:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
 )EOF";
+  // RSA key exchange doesn't exist in TLS 1.3.
   const std::string failing_client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
+      tls_maximum_protocol_version: TLSv1_2
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
@@ -8901,8 +10033,8 @@ BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
 
   TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml, false, version_);
   revoked_test_options.setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose);
-  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+  testUtilClientCertRejected(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+                                 .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
 // Test that TLS handshakes succeed when certificate compression is enabled via runtime flag.
@@ -9054,12 +10186,12 @@ TEST_P(SslSocketTest, TlsConnectionResetDetection) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(accepted_socket),
             server_ssl_socket_factory->createDownstreamTransportSocket(), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+      });
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -9074,17 +10206,17 @@ TEST_P(SslSocketTest, TlsConnectionResetDetection) {
   };
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(InvokeWithoutArgs(on_connected));
+      .WillOnce(on_connected);
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(InvokeWithoutArgs(on_connected));
+      .WillOnce(on_connected);
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
+      .WillOnce([&]() -> void {
         EXPECT_EQ(client_connection->detectedCloseType(),
                   StreamInfo::DetectedCloseType::RemoteReset);
         dispatcher_->exit();
-      }));
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -9166,12 +10298,12 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(accepted_socket),
             server_ssl_socket_factory->createDownstreamTransportSocket(), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
+      });
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -9186,18 +10318,18 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
   };
 
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(InvokeWithoutArgs(on_connected));
+      .WillOnce(on_connected);
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(InvokeWithoutArgs(on_connected));
+      .WillOnce(on_connected);
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(InvokeWithoutArgs([&]() -> void {
+      .WillOnce([&]() -> void {
         // With the runtime feature disabled, reset detection should not be reported.
         EXPECT_NE(client_connection->detectedCloseType(),
                   StreamInfo::DetectedCloseType::RemoteReset);
         dispatcher_->exit();
-      }));
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -9207,7 +10339,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
 // ECONNRESET pushed by io_handle_bio's SO_ERROR probe, drainErrorQueue must surface the
 // TLS protocol error as the root cause and must NOT set detected_io_error_ to
 // ConnectionReset. Otherwise the user-visible failure cause (the cert verify error in
-// transport_failure_reason) gets clobbered by the symptomatic peer RST.
+// transport_failure_reason) gets overwritten by the symptomatic peer RST.
 TEST_P(SslSocketTest, DrainErrorQueuePrefersCertVerifyOverEconnreset) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:

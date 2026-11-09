@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 
+#include "source/common/common/assert.h"
+#include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
@@ -49,8 +51,7 @@ protected:
   }
 
   void setupThreadLocalSlot() {
-    thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
     tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
     thread_local_.setDispatcher(&dispatcher_);
     tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
@@ -60,7 +61,17 @@ protected:
 
   void setupAnotherThreadLocalSlot() {
     another_thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(another_dispatcher_, extension_.get());
+        std::make_shared<UpstreamSocketThreadLocal>(another_dispatcher_, *extension_);
+  }
+
+  ReverseTunnelAcceptor& globalAcceptor() {
+    auto* socket_if =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    RELEASE_ASSERT(socket_if, "");
+    auto* acceptor =
+        dynamic_cast<ReverseTunnelAcceptor*>(const_cast<Network::SocketInterface*>(socket_if));
+    RELEASE_ASSERT(acceptor, "");
+    return *acceptor;
   }
 
   void TearDown() override {
@@ -99,6 +110,7 @@ protected:
 
   NiceMock<Event::MockDispatcher> another_dispatcher_{"worker_1"};
   std::shared_ptr<UpstreamSocketThreadLocal> another_thread_local_registry_;
+  ReverseTunnelAcceptorExtension* saved_global_extension_{nullptr};
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -124,6 +136,21 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetStatsScope) {
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, OnWorkerThreadInitialized) {
   extension_->onWorkerThreadInitialized();
+  auto* registry = extension_->getLocalRegistry();
+  EXPECT_NE(registry, nullptr);
+
+  extension_->onServerInitialized(server_);
+  EXPECT_EQ(extension_->getLocalRegistry(), registry);
+  EXPECT_EQ(socket_interface_->getExtension(), extension_.get());
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, DestructorClearsSocketInterfaceExtension) {
+  auto socket_interface = std::make_unique<ReverseTunnelAcceptor>(context_);
+  auto extension =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface, context_, config_);
+  EXPECT_EQ(socket_interface->getExtension(), extension.get());
+  extension.reset();
+  EXPECT_EQ(socket_interface->getExtension(), nullptr);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, OnServerInitializedSetsExtensionReference) {
@@ -208,7 +235,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
 
   // Set up thread local slot so aggregate metrics can be initialized.
   auto no_stats_registry =
-      std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, no_stats_extension.get());
+      std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *no_stats_extension);
   auto no_stats_tls_slot =
       ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
   thread_local_.setDispatcher(&dispatcher_);
@@ -518,10 +545,10 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   NiceMock<Network::MockIoHandle> mock_read_handle;
   EXPECT_CALL(mock_read_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
   EXPECT_CALL(mock_read_handle, read(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add("XXXXX"); // 5 bytes, not RPING
         return Api::IoCallUint64Result{5, Api::IoError::none()};
-      }));
+      });
 
   socket_manager->onPingResponse(mock_read_handle);
 
@@ -581,11 +608,11 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithReporterConfig) {
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([]() {
     auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, onServerInitialized());
     return reporter;
-  }));
+  });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
@@ -616,18 +643,19 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
 
   EXPECT_CALL(reporter_factory, createReporter())
       .Times(1)
-      .WillOnce(Invoke([&node_id, &cluster_id, &tenant_id]() {
+      .WillOnce([&node_id, &cluster_id, &tenant_id]() {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
-        EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                     testing::Eq(tenant_id), testing::_));
+        EXPECT_CALL(*reporter,
+                    reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                          testing::Eq(tenant_id), testing::_, testing::Eq(200)));
 
         return reporter;
-      }));
+      });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportConnection(node_id, cluster_id, tenant_id, 0);
+  extension_->reportConnection(node_id, cluster_id, tenant_id, 0, 200);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
@@ -643,20 +671,51 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter())
-      .Times(1)
-      .WillOnce(Invoke([&node_id, &cluster_id]() {
-        auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&node_id, &cluster_id]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
-        EXPECT_CALL(*reporter,
-                    reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+    EXPECT_CALL(*reporter, reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                    testing::Eq(123)));
 
-        return reporter;
-      }));
+    return reporter;
+  });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->reportDisconnection(node_id, cluster_id);
+  extension_->reportDisconnection(node_id, cluster_id, 123);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateGoAwayReporting) {
+  auto config = getConfigWithReporter();
+
+  std::string node_id = "node";
+  std::string cluster_id = "cluster";
+
+  NiceMock<MockReporterFactory> reporter_factory;
+
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&node_id, &cluster_id]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+
+    EXPECT_CALL(*reporter,
+                reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id), testing::Eq(123)));
+
+    return reporter;
+  });
+
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
+  extension_->reportGoAway(node_id, cluster_id, 123);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ReportGoAwayWithoutReporter) {
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
+  extension_->reportGoAway("node", "cluster", 123);
 }
 
 // Helper function to get aggregate metric values from stats store.
@@ -818,7 +877,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToS
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
 
-  extension_->onServerInitialized(server_);
+  extension_->onWorkerThreadInitialized();
 
   auto* registry = extension_->getLocalRegistry();
   ASSERT_NE(registry, nullptr);
@@ -942,6 +1001,81 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateMethodsNoOpWithoutTLS) {
 
   extension_->updateUpgradeTime(start, end);
   extension_->updateIdleExpireTime(start, end);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, GetThreadLocalSocketManagerReturnsNullWithoutTls) {
+  EXPECT_EQ(nullptr, ReverseTunnelAcceptorExtension::getThreadLocalSocketManager());
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, GetThreadLocalSocketManagerReturnsNullWithoutExtension) {
+  saved_global_extension_ = globalAcceptor().extension_;
+  globalAcceptor().extension_ = nullptr;
+  EXPECT_EQ(nullptr, ReverseTunnelAcceptorExtension::getThreadLocalSocketManager());
+  globalAcceptor().extension_ = saved_global_extension_;
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, GetThreadLocalSocketManagerReturnsManagerWhenWired) {
+  saved_global_extension_ = globalAcceptor().extension_;
+  globalAcceptor().extension_ = extension_.get();
+  setupThreadLocalSlot();
+  EXPECT_EQ(thread_local_registry_->socketManager(),
+            ReverseTunnelAcceptorExtension::getThreadLocalSocketManager());
+  globalAcceptor().extension_ = saved_global_extension_;
+}
+
+namespace {
+
+constexpr absl::string_view kUpstreamSocketInterfaceName =
+    "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
+
+class NonSocketInterfaceFactory : public Server::Configuration::BootstrapExtensionFactory {
+public:
+  std::string name() const override { return std::string(kUpstreamSocketInterfaceName); }
+  Server::BootstrapExtensionCreationResult
+  createBootstrapExtension(const Protobuf::Message&,
+                           Server::Configuration::ServerFactoryContext&) override {
+    return nullptr;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+};
+
+class NonAcceptorSocketInterface : public Network::SocketInterfaceBase {
+public:
+  std::string name() const override { return std::string(kUpstreamSocketInterfaceName); }
+  Network::IoHandlePtr socket(Network::Socket::Type, Network::Address::Type,
+                              Network::Address::IpVersion, bool,
+                              const Network::SocketCreationOptions&) const override {
+    return nullptr;
+  }
+  Network::IoHandlePtr socket(Network::Socket::Type, const Network::Address::InstanceConstSharedPtr,
+                              const Network::SocketCreationOptions&) const override {
+    return nullptr;
+  }
+  bool ipFamilySupported(int) override { return false; }
+  Server::BootstrapExtensionCreationResult
+  createBootstrapExtension(const Protobuf::Message&,
+                           Server::Configuration::ServerFactoryContext&) override {
+    return nullptr;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+};
+
+} // namespace
+
+TEST(GetThreadLocalSocketManager, ReturnsNullWhenInterfaceMissing) {
+  NonSocketInterfaceFactory factory;
+  Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory> inject(factory);
+  EXPECT_EQ(nullptr, ReverseTunnelAcceptorExtension::getThreadLocalSocketManager());
+}
+
+TEST(GetThreadLocalSocketManager, ReturnsNullWhenFactoryIsNotAcceptor) {
+  NonAcceptorSocketInterface factory;
+  Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory> inject(factory);
+  EXPECT_EQ(nullptr, ReverseTunnelAcceptorExtension::getThreadLocalSocketManager());
 }
 
 } // namespace ReverseConnection

@@ -152,9 +152,7 @@ TEST_F(DynamicModuleAccessLogTest, DynamicModuleAccessLogCreation) {
   tls.setDispatcher(&dispatcher);
 
   // Use allocateSlotMock to get a properly functioning slot.
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Invoke([&tls]() {
-    return tls.allocateSlotMock();
-  }));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce([&tls]() { return tls.allocateSlotMock(); });
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Server::MockOptions> options;
@@ -326,6 +324,12 @@ TEST_F(DynamicModuleAccessLogTest, MetricsInvalidId) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_set_gauge(static_cast<void*>(config_.get()),
                                                                   999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_increment_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_decrement_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_record_histogram_value(
                 static_cast<void*>(config_.get()), 999, 1));

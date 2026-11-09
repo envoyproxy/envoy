@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],
 )
@@ -66,6 +67,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/stats:utility_lib",
         "//source/extensions/filters/http/geoip:config",
         "//source/extensions/filters/http/geoip:geoip_filter_lib",
         "//source/extensions/geoip_providers/maxmind:config",

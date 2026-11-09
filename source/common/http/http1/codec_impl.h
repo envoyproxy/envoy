@@ -257,11 +257,6 @@ public:
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
   virtual bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
-#ifndef ENVOY_ENABLE_UHV
-  // Latched value of the `validate_upstream_headers` runtime feature, read once per connection
-  // instead of on every encoded request.
-  bool shouldValidateUpstreamHeaders() const { return validate_upstream_headers_; }
-#endif
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
   }
@@ -328,9 +323,6 @@ protected:
   StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
-#ifndef ENVOY_ENABLE_UHV
-  const bool validate_upstream_headers_ = false;
-#endif
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -617,7 +609,7 @@ private:
   Status onStatusBase(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
-  void onEncodeComplete() override { encode_complete_ = true; }
+  void onEncodeComplete() override {}
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (pending_response_.has_value()) {
       return *(pending_response_->encoder_.getStream().bytesMeter());
@@ -685,9 +677,6 @@ private:
   // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
   // plaintext HTTP should be sent with fully qualified URLs.
   bool passing_through_proxy_ = false;
-
-  const bool force_reset_on_premature_upstream_half_close_{};
-  bool encode_complete_{false};
 };
 
 } // namespace Http1

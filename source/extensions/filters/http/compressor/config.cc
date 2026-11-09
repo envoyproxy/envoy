@@ -34,7 +34,7 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
       config_factory->createCompressorFactoryFromProto(*message, context);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
       proto_config, stats_prefix, context.scope(), context.serverFactoryContext().runtime(),
-      std::move(compressor_factory));
+      std::move(compressor_factory), context.serverFactoryContext());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CompressorFilter>(config));
   };
@@ -46,8 +46,9 @@ CompressorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   Server::GenericFactoryContextImpl generic_context(
-      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
-  return createFilterFactory(proto_config, extra_context.stats_prefix, generic_context);
+      context, extra_context.statsPrefixScopeOr(context), extra_context.visitor,
+      extra_context.init_manager);
+  return createFilterFactory(proto_config, extra_context.statsPrefixOr(), generic_context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

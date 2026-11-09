@@ -74,12 +74,11 @@ createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
 
 static void bmCaresSingleQueryLatency(::benchmark::State& state) {
   ensureLibeventInitialized();
-  Network::Test::FakeUdpDnsServer dns_server;
-  dns_server.setDefaultAResponse("1.2.3.4");
-  dns_server.start();
-
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("cares_bench");
+  Network::Test::FakeUdpDnsServer dns_server(*dispatcher);
+  dns_server.setDefaultAResponse("1.2.3.4");
+
   auto typed_config = createCaresTypedConfig(dns_server.address(), dns_server.port());
   auto resolver = createDnsResolver(*dispatcher, *api, typed_config);
 
@@ -96,8 +95,6 @@ static void bmCaresSingleQueryLatency(::benchmark::State& state) {
     dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
     RELEASE_ASSERT(resolved, "c-ares DNS resolution did not complete.");
   }
-
-  dns_server.stop();
 }
 
 static void bmHickorySingleQueryLatency(::benchmark::State& state) {
@@ -107,12 +104,11 @@ static void bmHickorySingleQueryLatency(::benchmark::State& state) {
   }
 
   ensureLibeventInitialized();
-  Network::Test::FakeUdpDnsServer dns_server;
-  dns_server.setDefaultAResponse("1.2.3.4");
-  dns_server.start();
-
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("hickory_bench");
+  Network::Test::FakeUdpDnsServer dns_server(*dispatcher);
+  dns_server.setDefaultAResponse("1.2.3.4");
+
   auto typed_config = createHickoryTypedConfig(dns_server.address(), dns_server.port());
   auto resolver = createDnsResolver(*dispatcher, *api, typed_config);
 
@@ -129,8 +125,6 @@ static void bmHickorySingleQueryLatency(::benchmark::State& state) {
     dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
     RELEASE_ASSERT(resolved, "Hickory DNS resolution did not complete.");
   }
-
-  dns_server.stop();
 }
 
 // ---------------------------------------------------------------------------
@@ -148,12 +142,11 @@ static void bmCaresConcurrentQueries(::benchmark::State& state) {
   }
 
   ensureLibeventInitialized();
-  Network::Test::FakeUdpDnsServer dns_server;
-  dns_server.setDefaultAResponse("1.2.3.4");
-  dns_server.start();
-
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("cares_bench");
+  Network::Test::FakeUdpDnsServer dns_server(*dispatcher);
+  dns_server.setDefaultAResponse("1.2.3.4");
+
   auto typed_config = createCaresTypedConfig(dns_server.address(), dns_server.port());
   auto resolver = createDnsResolver(*dispatcher, *api, typed_config);
 
@@ -174,8 +167,6 @@ static void bmCaresConcurrentQueries(::benchmark::State& state) {
     RELEASE_ASSERT(completed == concurrent, "Not all c-ares concurrent queries completed.");
   }
   state.SetItemsProcessed(static_cast<int64_t>(state.iterations()) * concurrent);
-
-  dns_server.stop();
 }
 
 static void bmHickoryConcurrentQueries(::benchmark::State& state) {
@@ -187,12 +178,11 @@ static void bmHickoryConcurrentQueries(::benchmark::State& state) {
   }
 
   ensureLibeventInitialized();
-  Network::Test::FakeUdpDnsServer dns_server;
-  dns_server.setDefaultAResponse("1.2.3.4");
-  dns_server.start();
-
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("hickory_bench");
+  Network::Test::FakeUdpDnsServer dns_server(*dispatcher);
+  dns_server.setDefaultAResponse("1.2.3.4");
+
   auto typed_config = createHickoryTypedConfig(dns_server.address(), dns_server.port());
   auto resolver = createDnsResolver(*dispatcher, *api, typed_config);
 
@@ -213,8 +203,6 @@ static void bmHickoryConcurrentQueries(::benchmark::State& state) {
     RELEASE_ASSERT(completed == concurrent, "Not all Hickory concurrent queries completed.");
   }
   state.SetItemsProcessed(static_cast<int64_t>(state.iterations()) * concurrent);
-
-  dns_server.stop();
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 
 #include "envoy/common/matchers.h"
@@ -55,6 +56,9 @@ public:
 
     const std::string& backingString() const { return result_backing_string_; }
 
+    // Moves the backing string out. result() must not be used afterwards.
+    std::string releaseBackingString() && { return std::move(result_backing_string_); }
+
   private:
     std::optional<absl::string_view> result_;
     // Valid only if result_ relies on memory allocation that must live beyond the call. See above.
@@ -82,11 +86,8 @@ public:
           present_(explicit_present) {}
 
     bool matchesHeaders(const HeaderMap& request_headers) const override {
-      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
-
-      // If treat_missing_as_empty is false, and the header_value is empty,
-      // return true iff invert_match is the same as present_.
-      if (!header_value.result().has_value() && !treat_missing_as_empty_) {
+      // Missing-as-empty makes presence independent of the actual header entries.
+      if (!treat_missing_as_empty_ && request_headers.get(name_).empty()) {
         return invert_match_ == present_;
       }
 
@@ -444,8 +445,7 @@ public:
    * @param headers to validate
    * @return details of the error if an error is present, otherwise std::nullopt
    */
-  static std::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const RequestHeaderMap& headers);
+  static OptRef<const absl::string_view> requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol
@@ -506,13 +506,20 @@ public:
   /* Does a common header check ensuring that header keys and values are valid and do not contain
    * forbidden characters (e.g. valid HTTP header keys/values should never contain embedded NULLs
    * or new lines.)
-   * Callers are expected to gate this check behind the
-   * `envoy.reloadable_features.validate_upstream_headers` runtime feature, latched at codec
-   * connection construction; the check itself runs unconditionally.
    * @return Status containing the result. If failed, message includes details on which header key
    * or value was invalid.
    */
   static Http::Status checkValidRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * When set, checkValidRequestHeaders() accepts every header name and value. This lets
+   * integration tests drive Envoy's own codecs to send deliberately malformed requests at
+   * Envoy's server codecs. Never set this outside of tests.
+   *
+   * Atomic because tests clear it while Envoy's worker threads are still running, and those
+   * threads read it whenever they encode an upstream request.
+   */
+  static std::atomic<bool> disable_request_header_validation_for_tests_;
 
   /**
    * Returns true if a header may be safely removed without causing additional
