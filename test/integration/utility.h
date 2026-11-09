@@ -184,6 +184,11 @@ private:
  */
 class IntegrationUtil {
 public:
+  // Wait using a real-time bound while allowing registered simulated-time I/O to make progress.
+  static bool runDispatcherUntil(Event::Dispatcher& dispatcher,
+                                 const std::function<bool()>& condition,
+                                 std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
    * @param addr supplies the address to connect to.

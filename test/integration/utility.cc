@@ -13,6 +13,7 @@
 #include "source/common/api/api_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
@@ -73,6 +74,19 @@ RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data)
 
 } // namespace
 
+bool IntegrationUtil::runDispatcherUntil(Event::Dispatcher& dispatcher,
+                                         const std::function<bool()>& condition,
+                                         std::chrono::milliseconds timeout) {
+  Event::GlobalTimeSystem time_system;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (!condition() && (timeout == std::chrono::milliseconds::zero() || bound.withinBound())) {
+    time_system.advanceTimeForIo();
+    dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    std::this_thread::yield();
+  }
+  return condition();
+}
+
 void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
@@ -120,9 +134,11 @@ public:
       connected_ = true;
       dispatcher_.exit();
     } else if (event == Network::ConnectionEvent::RemoteClose) {
+      closed_ = true;
       // If the peer closes the connection, no need to wait anymore.
       dispatcher_.exit();
     } else {
+      closed_ = true;
       if (!connected_) {
         // Before handshake gets established, any connection failure should exit the loop. I.e. a
         // QUIC connection may fail of INVALID_VERSION if both this client doesn't support any of
@@ -135,10 +151,13 @@ public:
 
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  bool connected() const { return connected_; }
+  bool closed() const { return closed_; }
 
 private:
   Event::Dispatcher& dispatcher_;
   bool connected_{false};
+  bool closed_{false};
 };
 
 Network::UpstreamTransportSocketFactoryPtr
@@ -210,7 +229,13 @@ sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& 
     encoder.encodeData(body_buffer, true);
   }
 
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  Event::GlobalTimeSystem time_system;
+  if (time_system.ioDispatcher() != nullptr) {
+    EXPECT_TRUE(IntegrationUtil::runDispatcherUntil(dispatcher,
+                                                    [&response] { return response->complete(); }));
+  } else {
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
   return response;
 }
 
@@ -251,6 +276,15 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   }
 
 #ifdef ENVOY_ENABLE_QUIC
+  const bool register_dispatcher = time_system.ioDispatcher() == nullptr;
+  if (register_dispatcher) {
+    time_system.setIoDispatcher(dispatcher.get());
+  }
+  Cleanup unregister_dispatcher([&] {
+    if (register_dispatcher) {
+      time_system.setIoDispatcher(nullptr);
+    }
+  });
   testing::NiceMock<ThreadLocal::MockInstance> threadlocal;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   Extensions::TransportSockets::Tls::ContextManagerImpl manager(server_factory_context);
@@ -281,7 +315,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
                                options);
   // Quic connection needs to finish handshake.
-  dispatcher->run(Event::Dispatcher::RunType::Block);
+  if (time_system.ioDispatcher() != nullptr) {
+    EXPECT_TRUE(runDispatcherUntil(*dispatcher, [&connection_callbacks] {
+      return connection_callbacks.connected() || connection_callbacks.closed();
+    }));
+  } else {
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  }
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");

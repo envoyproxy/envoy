@@ -10,6 +10,7 @@
 #include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #ifdef ENVOY_ENABLE_QUIC
 #include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
@@ -446,7 +447,8 @@ protected:
   }
 };
 
-class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
+class OverloadScaledTimerIntegrationTest : public Event::TestUsingSimulatedTime,
+                                           public OverloadIntegrationTest {
 protected:
   void initializeOverloadManager(
       const envoy::config::overload::v3::ScaleTimersOverloadActionConfig& config) {
@@ -532,6 +534,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
     if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
@@ -604,6 +607,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, MaxConnectionDuration) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
@@ -678,6 +682,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
@@ -721,6 +726,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
+  test_server_->waitForCounter("http.config_test.downstream_cx_total", Ge(1));
 
   // Advancing past the minimum time shouldn't close the connection.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
@@ -738,6 +744,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
+  test_server_->waitForCounter("http.config_test.downstream_cx_total", Ge(2));
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Ge(2));
@@ -792,6 +799,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
+  test_server_->waitForCounter("http.config_test.downstream_cx_total", Ge(1));
 
   // Advancing past the minimum time shouldn't close the connection.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
@@ -809,6 +817,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
+  test_server_->waitForCounter("http.config_test.downstream_cx_total", Ge(2));
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(2));
@@ -972,6 +981,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
 
   // At this point, the connection should be idle but the SSL handshake isn't done.
   EXPECT_FALSE(connect_callbacks.connected());
+  test_server_->waitForGauge(listenerStatPrefix("downstream_cx_active"), Eq(1));
 
   // Set the load so the timer is reduced but not to the minimum value.
   updateResource(0.8);
@@ -992,6 +1002,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
 
   // The bad client will continue attempting to read, eventually noticing the remote close and
   // closing the connection.
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_destroy"), Ge(1));
   while (!connect_callbacks.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -1001,7 +1012,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
-class MultipleReduceTimeoutsActionsIntegrationTest : public OverloadIntegrationTest {
+class MultipleReduceTimeoutsActionsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                     public OverloadIntegrationTest {
 protected:
   MultipleReduceTimeoutsActionsIntegrationTest() {
     second_factory_ = std::make_unique<FakeResourceMonitorFactory2>();

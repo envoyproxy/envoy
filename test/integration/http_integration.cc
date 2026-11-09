@@ -100,7 +100,15 @@ IntegrationCodecClient::IntegrationCodecClient(
   setCodecConnectionCallbacks(codec_callbacks_);
   setCodecClientCallbacks(codec_client_callbacks_);
   if (wait_till_connected) {
-    dispatcher.run(Event::Dispatcher::RunType::Block);
+    Event::GlobalTimeSystem time_system;
+    if (time_system.ioDispatcher() != nullptr) {
+      RELEASE_ASSERT(IntegrationUtil::runDispatcherUntil(
+                         dispatcher, [this] { return connected_ || disconnected_; },
+                         TestUtility::DefaultTimeout),
+                     "Timed out waiting for connection");
+    } else {
+      dispatcher.run(Event::Dispatcher::RunType::Block);
+    }
   }
 }
 
@@ -191,6 +199,14 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
   if (disconnected_) {
     return AssertionSuccess();
+  }
+  Event::GlobalTimeSystem time_system;
+  if (time_system.ioDispatcher() != nullptr) {
+    if (IntegrationUtil::runDispatcherUntil(
+            dispatcher_, [this] { return disconnected_; }, time_to_wait)) {
+      return AssertionSuccess();
+    }
+    return AssertionFailure() << "Timed out waiting for disconnect";
   }
   Event::TimerPtr wait_timer;
   bool wait_timer_triggered = false;
@@ -389,6 +405,7 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  timeSystem().setIoDispatcher(nullptr);
   // Reset last, once the connections are torn down. The server's workers outlive this destructor
   // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
   // that reason.
@@ -397,6 +414,10 @@ HttpIntegrationTest::~HttpIntegrationTest() {
 }
 
 void HttpIntegrationTest::initialize() {
+  if (downstream_protocol_ == Http::CodecType::HTTP3 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    timeSystem().setIoDispatcher(dispatcher_.get());
+  }
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
     return BaseIntegrationTest::initialize();
   }

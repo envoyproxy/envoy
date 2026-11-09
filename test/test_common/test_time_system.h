@@ -46,6 +46,19 @@ public:
     const MonotonicTime end_time_;
   };
 
+  // Integration tests with timer-driven I/O can register their test-thread dispatcher. Other
+  // dispatchers run on background threads. Unregister before destroying the dispatcher.
+  // Real time systems do not need this registration.
+  virtual void setIoDispatcher(Dispatcher*) {}
+  virtual Dispatcher* ioDispatcher() { return nullptr; }
+
+  // Advance a small step during I/O waits to drive alarms such as QUIC pacing and delayed ACKs.
+  void advanceTimeForIo() {
+    if (ioDispatcher() != nullptr) {
+      advanceTimeAsyncImpl(std::chrono::milliseconds(1));
+    }
+  }
+
   /**
    * Advances time forward by the specified duration, running any timers
    * scheduled to fire, and blocking until the timer callbacks are complete.
@@ -161,6 +174,10 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
+  void setIoDispatcher(Dispatcher* dispatcher) override {
+    timeSystem().setIoDispatcher(dispatcher);
+  }
+  Dispatcher* ioDispatcher() override { return timeSystem().ioDispatcher(); }
   void advanceTimeAsyncImpl(const Duration& duration) override {
     timeSystem().advanceTimeAsyncImpl(duration);
   }

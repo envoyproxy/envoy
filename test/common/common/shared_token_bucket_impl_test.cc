@@ -39,7 +39,7 @@ TEST_F(SharedTokenBucketImplTest, MaxBucketSize) {
   SharedTokenBucketImpl token_bucket{3, time_system_, 1};
 
   EXPECT_EQ(3, token_bucket.consume(3, false, time_to_next_token));
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_EQ(0, token_bucket.consume(4, false, time_to_next_token));
   EXPECT_EQ(3, token_bucket.consume(3, false, time_to_next_token));
 }
@@ -53,13 +53,13 @@ TEST_F(SharedTokenBucketImplTest, Consume) {
 
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(5000));
   EXPECT_EQ(0, token_bucket.consume(6, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   EXPECT_EQ(6, token_bucket.consume(6, false, time_to_next_token));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
 }
@@ -69,11 +69,11 @@ TEST_F(SharedTokenBucketImplTest, Refill) {
   SharedTokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(500));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1500));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
   EXPECT_EQ(0, token_bucket.consume(1, false, time_to_next_token));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(2000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
 }
 

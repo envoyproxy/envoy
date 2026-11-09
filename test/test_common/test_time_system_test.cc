@@ -14,6 +14,37 @@ class TestTimeSystemTest : public testing::Test {
 protected:
 };
 
+TEST_F(TestTimeSystemTest, NonzeroMonotonicEpoch) {
+  SimulatedTimeSystem time_system;
+  EXPECT_GT(time_system.monotonicTime(), MonotonicTime{});
+}
+
+TEST_F(TestTimeSystemTest, IoDispatcher) {
+  SimulatedTimeSystem time_system;
+  GlobalTimeSystem global_time_system;
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  auto dispatcher = api->allocateDispatcher("test_thread");
+  const MonotonicTime start = time_system.monotonicTime();
+  global_time_system.advanceTimeForIo();
+  EXPECT_EQ(start, time_system.monotonicTime());
+
+  global_time_system.setIoDispatcher(dispatcher.get());
+  EXPECT_EQ(dispatcher.get(), time_system.ioDispatcher());
+  bool fired = false;
+  auto timer = dispatcher->createTimer([&fired] { fired = true; });
+  timer->enableTimer(std::chrono::milliseconds(5));
+  global_time_system.advanceTimeWait(std::chrono::milliseconds(4));
+  EXPECT_FALSE(fired);
+  global_time_system.advanceTimeForIo();
+  global_time_system.advanceTimeWait(std::chrono::milliseconds(0));
+  EXPECT_TRUE(fired);
+  EXPECT_EQ(start + std::chrono::milliseconds(5), time_system.monotonicTime());
+
+  time_system.setIoDispatcher(nullptr);
+  global_time_system.advanceTimeForIo();
+  EXPECT_EQ(start + std::chrono::milliseconds(5), time_system.monotonicTime());
+}
+
 TEST_F(TestTimeSystemTest, TwoSimsSameReference) {
   SimulatedTimeSystem t1, t2;
   EXPECT_EQ(&t1.timeSystem(), &t2.timeSystem());

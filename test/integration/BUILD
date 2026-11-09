@@ -1410,6 +1410,7 @@ envoy_cc_test_library(
         "//envoy/http:metadata_interface",
         "//source/common/common:dump_state_utils",
         "//source/common/http:response_decoder_impl_base",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -1610,6 +1611,7 @@ envoy_cc_test_library(
         "//envoy/stats:stats_interface",
         "//source/common/api:api_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:random_generator_lib",
@@ -2016,6 +2018,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration/filters:block_filter_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",

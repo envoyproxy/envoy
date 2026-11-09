@@ -27,7 +27,7 @@ TEST_F(TokenBucketImplTest, MaxBucketSize) {
   TokenBucketImpl token_bucket{3, time_system_, 1};
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_EQ(0, token_bucket.consume(4, false));
   EXPECT_EQ(3, token_bucket.consume(3, false));
 }
@@ -41,13 +41,13 @@ TEST_F(TokenBucketImplTest, Consume) {
 
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(5000));
   EXPECT_EQ(0, token_bucket.consume(6, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   EXPECT_EQ(6, token_bucket.consume(6, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 }
@@ -57,11 +57,11 @@ TEST_F(TokenBucketImplTest, Refill) {
   TokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(500));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1500));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(2000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
@@ -121,9 +121,9 @@ TEST_F(TokenBucketImplTest, YearlyMinRefillRate) {
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
   // Less than a year should still have no tokens.
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year - 1));
+  time_system_.advanceTimeWait(std::chrono::seconds(seconds_per_year - 1));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
@@ -154,7 +154,7 @@ TEST_F(AtomicTokenBucketImplTest, MaxBucketSize) {
   EXPECT_EQ(3, token_bucket.remainingTokens());
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_EQ(0, token_bucket.consume(4, false));
   EXPECT_EQ(3, token_bucket.consume(3, false));
 }
@@ -169,13 +169,13 @@ TEST_F(AtomicTokenBucketImplTest, Consume) {
   // consume() == consume(1, false)
   EXPECT_EQ(true, token_bucket.consume());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(5000));
   EXPECT_EQ(0, token_bucket.consume(6, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(6000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   EXPECT_EQ(6, token_bucket.consume(6, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 }
@@ -185,21 +185,21 @@ TEST_F(AtomicTokenBucketImplTest, Refill) {
   AtomicTokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(500));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1500));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(2000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
 TEST_F(AtomicTokenBucketImplTest, NextTokenAvailable) {
-  AtomicTokenBucketImpl token_bucket{10, time_system_, 5};
+  AtomicTokenBucketImpl token_bucket{10, time_system_, 4};
   EXPECT_EQ(9, token_bucket.consume(9, false));
   EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
   EXPECT_EQ(1, token_bucket.consume(1, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  EXPECT_EQ(std::chrono::milliseconds(200), token_bucket.nextTokenAvailable());
+  EXPECT_EQ(std::chrono::milliseconds(250), token_bucket.nextTokenAvailable());
 }
 
 // Test partial consumption of tokens.
@@ -222,9 +222,9 @@ TEST_F(AtomicTokenBucketImplTest, YearlyMinRefillRate) {
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
   // Less than a year should still have no tokens.
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year - 1));
+  time_system_.advanceTimeWait(std::chrono::seconds(seconds_per_year - 1));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 

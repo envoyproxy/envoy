@@ -74,6 +74,19 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTime
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, SingleRequest) { testRouterNotFound(); }
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, Http3UpstreamRequestAndResponseWithBody) {
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  testRouterRequestAndResponseWithBody(128 * 1024, 128 * 1024, false, false);
+}
+#endif
+
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
 }

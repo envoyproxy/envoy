@@ -41,6 +41,7 @@ envoy_extension_cc_test(
         "//source/extensions/load_balancing_policies/load_aware_locality:load_aware_locality_lb_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

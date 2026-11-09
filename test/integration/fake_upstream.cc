@@ -288,6 +288,9 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
     }
 
     // Run the client dispatcher since we may need to process window updates, etc.
+    lock.Unlock();
+    time_system.advanceTimeForIo();
+    lock.Lock();
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
   }
   return false;
