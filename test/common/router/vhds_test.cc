@@ -4,6 +4,8 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -847,6 +849,80 @@ TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailureResolvesWarming) {
 
   EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
   EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+}
+
+class WarmingPerRouteFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks&) {};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createHttpFilterRouteConfig(const Protobuf::Message&,
+                              Server::Configuration::ServerFactoryContext&,
+                              Server::Configuration::ExtraFactoryContext& extra_context) override {
+    if (init_target_ != nullptr) {
+      extra_context.init_manager->add(*init_target_);
+    }
+    return std::make_shared<Router::RouteSpecificFilterConfig>();
+  }
+
+  std::string name() const override { return "envoy.filters.http.warming_test"; }
+
+  static inline Init::TargetImpl* init_target_{nullptr};
+};
+
+REGISTER_FACTORY(WarmingPerRouteFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailurePreservesWarmingRdsVersionInfo) {
+  Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
+  WarmingPerRouteFilterFactory::init_target_ = &filter_init_target;
+
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+typed_per_filter_config:
+  envoy.filters.http.warming_test:
+    "@type": type.googleapis.com/google.protobuf.Struct
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "rds_v1"));
+
+  // The RDS update is still warming (waiting on the per-route filter's init target), so
+  // configInfo() is not populated yet and the version ("rds_v1") lives in warming_state_.
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->configInfo().has_value());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+
+  // The initial VHDS fetch fails while the RDS update is still warming, and the per-route filter
+  // then finishes warming.
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
+  filter_init_target.ready();
+  WarmingPerRouteFilterFactory::init_target_ = nullptr;
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(config_update_info->configWarming());
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("rds_v1", config_update_info->configInfo()->version_);
 }
 
 } // namespace

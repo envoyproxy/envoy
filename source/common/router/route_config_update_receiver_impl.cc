@@ -247,25 +247,11 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 
 void RouteConfigUpdateReceiverImpl::onVhdsFailure() {
   if (awaiting_initial_vhds_update_) {
-    auto route_config_after_this_update =
-        std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-    const Protobuf::Any& latest_route_config_any = latestRouteConfigurationAny();
-    RELEASE_ASSERT(
-        MessageUtil::unpackTo(latest_route_config_any, *route_config_after_this_update).ok(),
-        "Failed to unpack RouteConfiguration from Any");
-    if (rds_virtual_hosts_ == nullptr) {
-      rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
-    }
-    VirtualHostMap vhds_vhosts;
-    if (vhds_virtual_hosts_ != nullptr) {
-      vhds_vhosts = *vhds_virtual_hosts_;
-    }
-    rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, vhds_vhosts,
-                                   *route_config_after_this_update);
-    std::string version_info = base_.configInfo().has_value() ? base_.configInfo()->version_ : "";
-    base_.updateConfig(*route_config_after_this_update, std::nullopt, version_info);
-    awaiting_initial_vhds_update_ = false;
-    base_.startWarming();
+    const std::string version_info =
+        base_.warming_state_.route_config_any_.has_value()
+            ? base_.warming_state_.version_info_
+            : (base_.configInfo().has_value() ? base_.configInfo()->version_ : "");
+    onVhdsUpdate({}, {}, {}, version_info);
   }
 }
 
@@ -345,9 +331,7 @@ void RouteConfigUpdateReceiverImpl::requestVirtualHostsUpdate(
       notifyCallback(*config, alias, thread_local_dispatcher, route_config_updated_cb);
       return;
     }
-    if (!warming_blocks_unmatched_requests_) {
-      updateOnDemand(alias);
-    }
+    updateOnDemand(alias);
     config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
   });
 }
