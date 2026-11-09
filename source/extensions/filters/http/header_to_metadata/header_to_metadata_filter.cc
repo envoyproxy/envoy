@@ -1,15 +1,20 @@
 #include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
+#include <bit>
+
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/regex.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "absl/base/attributes.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
@@ -147,7 +152,7 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
 }
 
 absl::StatusOr<bool> Config::configToVector(const ProtobufRepeatedRule& proto_rules,
-                                            HeaderToMetadataRules& vector,
+                                            HeaderToMetadataRules& rules,
                                             Regex::Engine& regex_engine) {
   if (proto_rules.empty()) {
     ENVOY_LOG(debug, "no rules provided");
@@ -157,7 +162,20 @@ absl::StatusOr<bool> Config::configToVector(const ProtobufRepeatedRule& proto_ru
   for (const auto& entry : proto_rules) {
     auto rule = Rule::create(entry, regex_engine);
     RETURN_IF_NOT_OK_REF(rule.status());
-    vector.emplace_back(std::move(rule.value()));
+    rules.rules_.emplace_back(std::move(rule.value()));
+  }
+
+  rules.always_run_rules_.resize((rules.rules_.size() + 63) / 64);
+  for (size_t i = 0; i < rules.rules_.size(); i++) {
+    const ProtoRule& entry = rules.rules_[i].rule();
+    const Http::LowerCaseString header(entry.header());
+    // A request header map keeps host under :authority, so a rule on host is not indexed.
+    if (!header.get().empty() && !entry.has_on_header_missing() &&
+        header != Http::Headers::get().HostLegacy) {
+      rules.header_rule_positions_[header.get()].push_back(i);
+    } else {
+      rules.always_run_rules_[i / 64] |= uint64_t{1} << (i % 64);
+    }
   }
 
   return true;
@@ -169,7 +187,7 @@ HeaderToMetadataFilterStats Config::generateStats(const std::string& stat_prefix
   return {ALL_HEADER_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-void Config::chargeStat(StatsEvent event, HeaderDirection direction) const {
+void Config::chargeStat(StatsEvent event, HeaderDirection direction, uint64_t count) const {
   if (!stats_.has_value()) {
     return;
   }
@@ -177,33 +195,33 @@ void Config::chargeStat(StatsEvent event, HeaderDirection direction) const {
   switch (event) {
   case StatsEvent::RulesProcessed:
     if (direction == HeaderDirection::Request) {
-      stats_->request_rules_processed_.inc();
+      stats_->request_rules_processed_.add(count);
     } else {
-      stats_->response_rules_processed_.inc();
+      stats_->response_rules_processed_.add(count);
     }
     break;
   case StatsEvent::MetadataAdded:
     if (direction == HeaderDirection::Request) {
-      stats_->request_metadata_added_.inc();
+      stats_->request_metadata_added_.add(count);
     } else {
-      stats_->response_metadata_added_.inc();
+      stats_->response_metadata_added_.add(count);
     }
     break;
   case StatsEvent::HeaderNotFound:
     if (direction == HeaderDirection::Request) {
-      stats_->request_header_not_found_.inc();
+      stats_->request_header_not_found_.add(count);
     } else {
-      stats_->response_header_not_found_.inc();
+      stats_->response_header_not_found_.add(count);
     }
     break;
   case StatsEvent::Base64DecodeFailed:
-    stats_->base64_decode_failed_.inc();
+    stats_->base64_decode_failed_.add(count);
     break;
   case StatsEvent::HeaderValueTooLong:
-    stats_->header_value_too_long_.inc();
+    stats_->header_value_too_long_.add(count);
     break;
   case StatsEvent::RegexSubstitutionFailed:
-    stats_->regex_substitution_failed_.inc();
+    stats_->regex_substitution_failed_.add(count);
     break;
   }
 }
@@ -339,12 +357,14 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   StructMap structs_by_namespace;
   const auto* config = getConfig();
 
-  for (const auto& rule : rules) {
+  // Increment rules_processed stat by every rule if stats are enabled, including the rules skipped
+  // below.
+  config->chargeStat(StatsEvent::RulesProcessed, direction, rules.rules_.size());
+
+  // Inlined into both loops, since the loop over every rule is the common path.
+  const auto apply_rule = [&](const Rule& rule) ABSL_ATTRIBUTE_ALWAYS_INLINE {
     const auto& proto_rule = rule.rule();
     std::optional<std::string> value = rule.selector_->extract(headers);
-
-    // Increment rules_processed stat if stats are enabled.
-    config->chargeStat(StatsEvent::RulesProcessed, direction);
 
     if (value && proto_rule.has_on_header_present()) {
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(),
@@ -355,7 +375,36 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(),
                     structs_by_namespace, direction);
     }
+  };
+
+  // With fewer headers than half the indexed header names, walking the headers costs less than
+  // looking up every rule's header, even when every header has a rule. Rules only remove headers,
+  // so a rule whose header is absent here would find no value.
+  if (2 * headers.size() < rules.header_rule_positions_.size()) {
+    // One bit per rule to apply.
+    absl::InlinedVector<uint64_t, 4> selected(rules.always_run_rules_.begin(),
+                                              rules.always_run_rules_.end());
+    headers.iterate([&](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      const auto it = rules.header_rule_positions_.find(header.key().getStringView());
+      if (it != rules.header_rule_positions_.end()) {
+        for (const size_t position : it->second) {
+          selected[position / 64] |= uint64_t{1} << (position % 64);
+        }
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    // Apply the rules in configured order, which decides removals and which value wins a key.
+    for (size_t word = 0; word < selected.size(); word++) {
+      for (uint64_t bits = selected[word]; bits != 0; bits &= bits - 1) {
+        apply_rule(rules.rules_[word * 64 + std::countr_zero(bits)]);
+      }
+    }
+  } else {
+    for (const auto& rule : rules.rules_) {
+      apply_rule(rule);
+    }
   }
+
   // Any matching rules?
   if (!structs_by_namespace.empty()) {
     for (auto const& entry : structs_by_namespace) {

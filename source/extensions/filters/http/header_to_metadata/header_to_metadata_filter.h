@@ -12,6 +12,8 @@
 #include "source/common/common/matchers.h"
 #include "source/common/matcher/regex_replace.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -122,7 +124,18 @@ private:
   std::optional<Matcher::RegexReplace> regex_replace_;
 };
 
-using HeaderToMetadataRules = std::vector<Rule>;
+/**
+ * The rules of one direction. A header rule without on_header_missing does nothing when its header
+ * is absent, so such rules are also indexed by header.
+ */
+struct HeaderToMetadataRules {
+  std::vector<Rule> rules_;
+  // Positions in rules_ of the header rules without on_header_missing, keyed by header. Rules on
+  // host are not indexed.
+  absl::flat_hash_map<std::string, absl::InlinedVector<size_t, 1>> header_rule_positions_;
+  // One bit per rule in rules_, set for the rules that are not indexed, which always run.
+  std::vector<uint64_t> always_run_rules_;
+};
 
 // TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
 const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
@@ -145,10 +158,10 @@ public:
   const std::optional<HeaderToMetadataFilterStats>& stats() const { return stats_; }
 
   /**
-   * Increment the appropriate statistic for the given event and traffic direction.
+   * Increment the appropriate statistic for the given event and traffic direction by count.
    * No-op if statistics were not configured.
    */
-  void chargeStat(StatsEvent event, HeaderDirection direction) const;
+  void chargeStat(StatsEvent event, HeaderDirection direction, uint64_t count = 1) const;
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
@@ -163,8 +176,8 @@ private:
    *
    *  @param config A protobuf repeated field of metadata that specifies what headers to convert to
    *         metadata
-   *  @param vector A vector that will be populated with the configuration data from config
-   *  @return true if any configuration data was added to the vector, false otherwise. Can be used
+   *  @param rules The rules that will be populated with the configuration data from config
+   *  @return true if any configuration data was added to the rules, false otherwise. Can be used
    *          to validate whether the configuration was empty. If the configuration is invalid, an
    *          error status will be returned.
    */
