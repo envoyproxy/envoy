@@ -22,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "mcp_json_rest_bridge_filter_test",
     srcs = ["mcp_json_rest_bridge_filter_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
