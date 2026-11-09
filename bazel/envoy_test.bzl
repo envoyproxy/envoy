@@ -21,6 +21,9 @@ load(
 )
 load(":envoy_library.bzl", "tcmalloc_external_deps")
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":envoy_rbe.bzl", _envoy_exec_properties = "envoy_exec_properties")
+
+envoy_exec_properties = _envoy_exec_properties
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
 # relied on by envoy_cc_test_library) should use this function.
@@ -90,10 +93,8 @@ def envoy_cc_fuzz_test(
         deps = [],
         tags = [],
         **kwargs):
-    exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    lib_exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus_files"
         native.filegroup(
@@ -106,7 +107,7 @@ def envoy_cc_fuzz_test(
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        exec_properties = exec_properties,
+        exec_properties = lib_exec_properties,
         deps = deps + envoy_stdlib_deps() + [
             repository + "//test/fuzz:fuzz_runner_lib",
             repository + "//test/test_common:test_version_linkstamp",
@@ -178,10 +179,7 @@ def envoy_cc_test(
         exec_properties = {},
         target_compatible_with = []):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
-    exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     cc_test(
         name = name,
         srcs = srcs,
@@ -234,10 +232,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
     disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
@@ -304,10 +299,7 @@ def envoy_benchmark_test(
         tags = [],
         repository = "",
         **kargs):
-    exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     sh_test(
         name = name,
         srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
