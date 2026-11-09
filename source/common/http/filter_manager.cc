@@ -638,11 +638,23 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     if (state_.decoder_filter_chain_aborted_) {
-      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
                        "decodeHeaders filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
+      // Finish this filter's bookkeeping, including decodeComplete(), before running the prepared
+      // local reply. Running the local reply encodes the response and may complete or reset the
+      // stream synchronously, destroying the filters.
       status = FilterHeadersStatus::StopIteration;
+      (*entry)->processed_headers_ = true;
+      (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+      if ((*entry)->end_stream_ && !state_.destroyed_) {
+        (*entry)->handle_->decodeComplete();
+      }
+      executeLocalReplyIfPrepared();
+      if (!state_.destroyed_) {
+        maybeContinueDecoding(continue_data_entry);
+      }
+      return;
     }
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
@@ -909,11 +921,13 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
-      executeLocalReplyIfPrepared();
+      status = FilterTrailersStatus::StopIteration;
       ENVOY_STREAM_LOG(trace,
                        "decodeTrailers filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
-      status = FilterTrailersStatus::StopIteration;
+      (*entry)->commonHandleAfterTrailersCallback(status);
+      executeLocalReplyIfPrepared();
+      return;
     }
 
     processNewlyAddedMetadata();

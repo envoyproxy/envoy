@@ -2019,6 +2019,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   });
 
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
+  // decodeComplete() runs before the local reply is encoded, which ends and destroys the stream.
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce([&](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_EQ("11", headers.getContentLengthValue());
@@ -2030,7 +2032,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
       });
   expectOnDestroy();
-  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol(Envoy::Http::Protocol::Http11));

@@ -1198,6 +1198,163 @@ TEST_F(FilterManagerTest, DecodeDataFrameNotLostAfterContinueWithAddDecodedData)
   runAddDecodedDataOnContinueTest(/*forward_data=*/true);
 }
 
+TEST_F(FilterManagerTest, TerminalDecoderFilterLocalReplyInDecodeHeadersSkipsAddedMetadata) {
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+  std::shared_ptr<MockStreamFilter> filter_2(new NiceMock<MockStreamFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createStreamFilterFactoryCb(filter_1);
+        callbacks.setFilterConfigName("configName1");
+        factory(callbacks);
+        factory = createStreamFilterFactoryCb(filter_2);
+        callbacks.setFilterConfigName("configName2");
+        factory(callbacks);
+        return true;
+      });
+  filter_manager_->createDownstreamFilterChain();
+
+  RequestHeaderMapPtr basic_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*basic_headers)));
+  filter_manager_->requestHeadersInitialized();
+
+  EXPECT_CALL(*filter_1, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2, decodeHeaders(_, true))
+      .WillOnce([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        MetadataMap metadata_map = {{"a", "b"}};
+        filter_2->decoder_callbacks_->addDecodedMetadata().emplace_back(
+            std::make_unique<MetadataMap>(metadata_map));
+        filter_2->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "bad_headers",
+                                                     nullptr, std::nullopt, "bad_headers");
+        return FilterHeadersStatus::StopIteration;
+      });
+
+  // Added metadata must not be decoded when the terminal filter aborts with a local reply.
+  EXPECT_CALL(*filter_1, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*filter_2, decodeMetadata(_)).Times(0);
+  // Request timeout is disarmed only once (during encodeHeaders of the local reply), not a second
+  // time at the end of decodeHeaders.
+  EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout());
+  EXPECT_CALL(*filter_2, encodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_1, encodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+
+  filter_manager_->decodeHeaders(*basic_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, TerminalDecoderFilterLocalReplyInDecodeTrailersSkipsAddedMetadata) {
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+  std::shared_ptr<MockStreamFilter> filter_2(new NiceMock<MockStreamFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createStreamFilterFactoryCb(filter_1);
+        callbacks.setFilterConfigName("configName1");
+        factory(callbacks);
+        factory = createStreamFilterFactoryCb(filter_2);
+        callbacks.setFilterConfigName("configName2");
+        factory(callbacks);
+        return true;
+      });
+  filter_manager_->createDownstreamFilterChain();
+
+  RequestHeaderMapPtr basic_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*basic_headers)));
+  filter_manager_->requestHeadersInitialized();
+
+  EXPECT_CALL(*filter_1, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  filter_manager_->decodeHeaders(*basic_headers, false);
+
+  RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"trailer", "value"}}};
+  ON_CALL(filter_manager_callbacks_, requestTrailers())
+      .WillByDefault(Return(makeOptRef(*trailers)));
+
+  EXPECT_CALL(*filter_1, decodeTrailers(_)).WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*filter_2, decodeTrailers(_))
+      .WillOnce([&](RequestTrailerMap&) -> FilterTrailersStatus {
+        MetadataMap metadata_map = {{"a", "b"}};
+        filter_2->decoder_callbacks_->addDecodedMetadata().emplace_back(
+            std::make_unique<MetadataMap>(metadata_map));
+        filter_2->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "bad_trailers",
+                                                     nullptr, std::nullopt, "bad_trailers");
+        return FilterTrailersStatus::StopIteration;
+      });
+
+  EXPECT_CALL(*filter_1, decodeMetadata(_)).Times(0);
+  EXPECT_CALL(*filter_2, decodeMetadata(_)).Times(0);
+  // Request timeout is disarmed only once (during encodeHeaders of the local reply), not a second
+  // time at the end of decodeTrailers.
+  EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout());
+  EXPECT_CALL(*filter_2, encodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_1, encodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+
+  filter_manager_->decodeTrailers(*trailers);
+  filter_manager_->destroyFilters();
+}
+
+// A terminal decoder filter local reply on a downstream stream with independent half-close enabled
+// returns from decodeHeaders() right after the local reply, like a non-terminal filter does. The
+// request timeout is still disarmed by the local reply's encodeHeaders(), and the stream is closed
+// once encoding finishes because the decoder filter chain was aborted.
+TEST_F(FilterManagerTest, TerminalDecoderFilterLocalReplyWithHalfCloseEnabledClosesStream) {
+  initialize();
+  ON_CALL(filter_manager_callbacks_, isHalfCloseEnabled()).WillByDefault(Return(true));
+
+  std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+  std::shared_ptr<MockStreamDecoderFilter> filter_2(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory_1 = createStreamFilterFactoryCb(filter_1);
+        callbacks.setFilterConfigName("configName1");
+        factory_1(callbacks);
+        auto factory_2 = createDecoderFilterFactoryCb(filter_2);
+        callbacks.setFilterConfigName("configName2");
+        factory_2(callbacks);
+        return true;
+      });
+  filter_manager_->createDownstreamFilterChain();
+
+  RequestHeaderMapPtr basic_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*basic_headers)));
+  ON_CALL(filter_manager_callbacks_, responseHeaders())
+      .WillByDefault([this]() -> ResponseHeaderMapOptRef {
+        return makeOptRefFromPtr(filter_manager_callbacks_.response_headers_.get());
+      });
+  filter_manager_->requestHeadersInitialized();
+
+  // The terminal filter's decodeComplete() must run before the prepared local reply is encoded,
+  // since encoding the reply ends the stream and destroys the filters, as the HCM does.
+  InSequence s;
+  EXPECT_CALL(*filter_1, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2, decodeHeaders(_, true))
+      .WillOnce([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        filter_2->callbacks_->sendLocalReply(Code::ServiceUnavailable, "no healthy upstream",
+                                             nullptr, std::nullopt, "no_healthy_upstream");
+        return FilterHeadersStatus::StopIteration;
+      });
+  EXPECT_CALL(*filter_2, decodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout());
+  EXPECT_CALL(*filter_1, encodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false));
+  EXPECT_CALL(*filter_1, encodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true));
+  EXPECT_CALL(filter_manager_callbacks_, endStream()).WillOnce([this]() {
+    filter_manager_->destroyFilters();
+  });
+  EXPECT_CALL(*filter_2, onDestroy());
+
+  filter_manager_->decodeHeaders(*basic_headers, true);
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
