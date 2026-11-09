@@ -171,7 +171,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "wasm_filter_integration_test",
-    size = "enormous",
     srcs = ["wasm_filter_integration_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:body_cpp.wasm",
@@ -181,7 +180,6 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = "4core",
-    shard_count = 16,
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
