@@ -23,6 +23,9 @@ use std::sync::OnceLock;
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
+// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
+// `__darwin_pthread_handler_rec` on macOS.
+#[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
