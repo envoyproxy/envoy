@@ -472,7 +472,6 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "drain_close_integration_test",
-    size = "large",
     srcs = envoy_select_admin_functionality([
         "drain_close_integration_test.cc",
     ]),
@@ -486,6 +485,7 @@ envoy_cc_test(
         "//envoy/server:instance_interface",
         "//envoy/server:listener_manager_interface",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -1143,7 +1143,6 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "protocol_integration_test",
-    size = "enormous",
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],

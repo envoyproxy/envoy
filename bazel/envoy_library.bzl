@@ -16,6 +16,7 @@ load(
 )
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":envoy_rbe.bzl", "envoy_exec_properties")
 load(":envoy_select.bzl", "deprecate_repository")
 load(":sanitizers.bzl", "sanitizer_deps")
 
@@ -23,7 +24,6 @@ _CHECK_REMOVED_FIPS_DEFINE = Label("//bazel:check_removed_fips_define")
 _CHECK_REMOVED_WASM_DEFINES = Label("//bazel:check_removed_wasm_defines")
 _COMMON_PCH = Label("//source/common/common:common_pch")
 _DISABLE_LIBRARY_AUTOLINK = Label("//bazel:disable_library_autolink")
-_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
 _LINUX = Label("//bazel:linux")
 _WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
@@ -100,10 +100,7 @@ def envoy_cc_library(
     # Deprecated: keep accepting `repository` for compatibility with downstream callers.
     if tcmalloc_dep:
         deps += tcmalloc_external_deps()
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.

@@ -1,8 +1,49 @@
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:toolchains.bzl", "LIBCLANG_CPP", "LIBLLVM")
-load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
+load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "openssl_include_dir", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
+
+# Must match the major version of the @openssl module, as ossl_dlopen() loads
+# libcrypto.so.<major> and libssl.so.<major>.
+OPENSSL_SOVERSION = "3"
+
+# OpenSSL shared libraries, built from the @openssl module's static libraries.
+# They are only loaded at runtime with dlopen() (see source/ossl_dlutil.c), so
+# they are a *data* dependency of :bssl-compat, never a link dependency.
+cc_shared_library(
+    name = "libcrypto",
+    shared_lib_name = "libcrypto.so." + OPENSSL_SOVERSION,
+    user_link_flags = ["-Wl,-soname,libcrypto.so." + OPENSSL_SOVERSION],
+    visibility = ["//visibility:private"],
+    deps = ["@openssl//:crypto"],
+)
+
+cc_shared_library(
+    name = "libssl",
+    dynamic_deps = [":libcrypto"],
+    shared_lib_name = "libssl.so." + OPENSSL_SOVERSION,
+    user_link_flags = ["-Wl,-soname,libssl.so." + OPENSSL_SOVERSION],
+    visibility = ["//visibility:private"],
+    deps = ["@openssl//:ssl"],
+)
+
+filegroup(
+    name = "openssl_libs",
+    srcs = [
+        ":libcrypto",
+        ":libssl",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+# Directory containing OpenSSL's public headers as openssl/*.h, for the prefixer.
+openssl_include_dir(
+    name = "openssl_include",
+    lib = "@openssl//:ssl",
+    visibility = ["//visibility:private"],
+)
 
 # This genrule runs the prefixer tool to process OpenSSL headers.
 # It generates:
@@ -12,7 +53,7 @@ licenses(["notice"])  # Apache 2
 genrule(
     name = "prefixed_ossl_source",
     srcs = [
-        "@openssl//:include",
+        ":openssl_include",
         "@llvm_toolchain_llvm//:include",
     ],
     outs = [
@@ -180,7 +221,7 @@ genrule(
 
         # Run the prefixer with absolute source path and relative output path
         $(location //compat/openssl/prefixer:prefixer) \
-            --src-path "$(location @openssl//:include)" \
+            --src-path "$(location :openssl_include)" \
             --src-incl "openssl/*.h" \
             --src-skip "openssl/asn1_mac.h" \
             --src-skip "openssl/opensslconf-*.h" \
@@ -946,13 +987,16 @@ cc_library(
     # Add the OpenSSL shared libraries as a *data* dependency, so they get
     # propagated to dependant targets, and made available in their runfiles
     # directory when they run, so libbssl-compat.a can dlopen() them.
-    data = ["@openssl//:libs"],
+    data = [":openssl_libs"],
     includes = [
         ".",
         "include",
         "source",
     ],
     linkopts = ["-ldl"],
+    local_defines = [
+        'OSSL_RUNFILES_LIB_DIR=\\"%s/%s\\"' % (repo_name() or "_main", package_name()),
+    ],
     linkstatic = True,
     copts = ["-fvisibility=hidden"],
     visibility = ["//visibility:public"],
