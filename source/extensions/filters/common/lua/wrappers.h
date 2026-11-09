@@ -57,11 +57,14 @@ struct MetadataMapHelper {
   static void setValue(lua_State* state, const Protobuf::Value& value);
   static void createTable(lua_State* state,
                           const Protobuf::Map<std::string, Protobuf::Value>& fields);
-  static Protobuf::Value loadValue(lua_State* state);
+  // The load*() helpers hold partially built protobuf messages while they walk the Lua stack, so
+  // they report conversion failures as a status instead of raising the Lua error themselves. The
+  // caller raises it once those messages have been destroyed. See DECLARE_LUA_FUNCTION_EX().
+  static absl::StatusOr<Protobuf::Value> loadValue(lua_State* state);
 
 private:
-  static Protobuf::Struct loadStruct(lua_State* state);
-  static Protobuf::ListValue loadList(lua_State* state, int length);
+  static absl::StatusOr<Protobuf::Struct> loadStruct(lua_State* state);
+  static absl::StatusOr<Protobuf::ListValue> loadList(lua_State* state, int length);
   static int tableLength(lua_State* state);
 };
 
