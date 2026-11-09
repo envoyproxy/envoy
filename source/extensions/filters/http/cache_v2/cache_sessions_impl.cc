@@ -712,6 +712,20 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
     return Http::HeaderMap::Iterate::Continue;
   });
 
+  if (!lookup_subscribers_.front().context_->lookup().isCacheableResponse(*headers) ||
+      VaryHeaderUtils::hasVary(*headers)) {
+    // A 304 can make a previously cacheable response private or otherwise uncacheable.
+    // Evict before publishing the merged headers to any subscribers. Since a 304 has no
+    // body, fetch a full response and apply the usual insertion/cacheability checks.
+    if (auto cache_sessions = cache_sessions_.lock()) {
+      cache_sessions->cache().evict(lookup_subscribers_.front().dispatcher(), key_);
+    }
+    state_ = State::Pending;
+    body_length_available_ = 0;
+    entry_ = {};
+    return performUpstreamRequest();
+  }
+
   entry_.response_headers_ = std::move(headers);
   state_ = State::Exists;
   if (auto cache_sessions = cache_sessions_.lock()) {
