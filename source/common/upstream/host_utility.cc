@@ -252,5 +252,23 @@ void HostUtility::forEachOrcaLoadReportRecipient(
   }
 }
 
+// The host stat is updated first and the cluster's update counter second, see
+// ClusterLoadReportStats::upstream_host_load_updates_.
+void HostUtility::chargeRequestIssued(const HostDescription& host) {
+  host.stats().rq_total_.inc();
+  host.stats().rq_active_.inc();
+  host.cluster().loadReportStats().upstream_host_load_updates_.inc();
+}
+
+void HostUtility::chargeRequestSuccess(const HostDescription& host) {
+  host.stats().rq_success_.inc();
+  host.cluster().loadReportStats().upstream_host_load_updates_.inc();
+}
+
+void HostUtility::chargeRequestError(const HostDescription& host) {
+  host.stats().rq_error_.inc();
+  host.cluster().loadReportStats().upstream_host_load_updates_.inc();
+}
+
 } // namespace Upstream
 } // namespace Envoy

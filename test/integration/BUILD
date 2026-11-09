@@ -1909,9 +1909,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
+    # 16 tests x (IP versions x gRPC client types x skipping idle clusters or not), ~2.5s each.
+    shard_count = 4,
     deps = [
         ":http_integration_lib",
+        "//envoy/network:address_interface",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:utility_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",

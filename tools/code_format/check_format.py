@@ -405,6 +405,9 @@ class FormatChecker:
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in self.config.paths["grpc_init"]["include"]
 
+    def allow_listed_for_host_load_update(self, file_path):
+        return file_path in self.config.paths["host_load_update"]["include"]
+
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
@@ -772,6 +775,17 @@ class FormatChecker:
                 '->histogramFromString(' in line or '->textReadoutFromString(' in line):
             report_error(
                 "Don't lookup stats by name at runtime; use StatName saved during construction")
+
+        # The per-host load report stats must be updated through HostUtility, which also counts a
+        # host load update on the cluster. The LRS client relies on that counter to skip the hosts
+        # of clusters without load to report, so a direct update may not be reported in time.
+        if self.is_in_subdir(file_path, 'source', 'contrib') and \
+            not self.allow_listed_for_host_load_update(file_path) and \
+            self.config.re["host_load_stats_update"].search(line):
+            report_error(
+                "Don't update HostStats::rq_total_, rq_success_ or rq_error_ directly; use "
+                "HostUtility::chargeRequestIssued/Success/Error(), which also count a host load "
+                "update on the cluster (see ClusterLoadReportStats::upstream_host_load_updates_)")
 
         if self.config.re["mangled_protobuf_name"].search(line):
             report_error("Don't use mangled Protobuf names for enum constants")

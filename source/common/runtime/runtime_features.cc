@@ -335,6 +335,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_least_request_lb_count_pending_requests);
+// Skip visiting the hosts of clusters without load to report in the LRS client. The cluster
+// bookkeeping of the LRS client is not guarded; only the per-cluster skip decision is.
+// TODO(pradeepcrao): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_lrs_skip_idle_clusters);
 // When enabled, dynamic modules metrics will be registered as custom stat namespaces, causing
 // the namespace prefix to be stripped from prometheus output and no envoy_ prefix added.
 // This is the legacy behavior. When disabled which is the default, metrics appear with the

@@ -423,7 +423,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
       cluster_->loadReportStats().upstream_rq_dropped_.inc();
     }
     if (upstream_host && Http::CodeUtility::is5xx(response_status_code)) {
-      upstream_host->stats().rq_error_.inc();
+      Upstream::HostUtility::chargeRequestError(*upstream_host);
     }
   }
 }
@@ -1607,7 +1607,7 @@ void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
 void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request) {
   if (downstream_response_started_) {
     if (upstream_request.grpcRqSuccessDeferred()) {
-      upstream_request.upstreamHost()->stats().rq_error_.inc();
+      Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
       stats_.rq_reset_after_downstream_response_started_.inc();
     }
   } else {
@@ -1619,7 +1619,7 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
     // timeout_response_code_ is used for code above, where this member can
     // assume values such as 204 (NoContent).
     if (upstream_host.has_value() && !Http::CodeUtility::is5xx(enumToInt(code))) {
-      upstream_host->stats().rq_error_.inc();
+      Upstream::HostUtility::chargeRequestError(*upstream_host);
     }
   }
 }
@@ -1709,7 +1709,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     pending_retries_++;
 
     if (upstream_request.upstreamHost()) {
-      upstream_request.upstreamHost()->stats().rq_error_.inc();
+      Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
     }
 
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
@@ -1877,15 +1877,15 @@ void Filter::handleNon5xxResponseHeaders(std::optional<Grpc::Status::GrpcStatus>
   if (grpc_request_) {
     if (end_stream) {
       if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
-        upstream_request.upstreamHost()->stats().rq_success_.inc();
+        Upstream::HostUtility::chargeRequestSuccess(*upstream_request.upstreamHost());
       } else {
-        upstream_request.upstreamHost()->stats().rq_error_.inc();
+        Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
       }
     } else {
       upstream_request.grpcRqSuccessDeferred(true);
     }
   } else {
-    upstream_request.upstreamHost()->stats().rq_success_.inc();
+    Upstream::HostUtility::chargeRequestSuccess(*upstream_request.upstreamHost());
   }
 }
 
@@ -2038,7 +2038,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
         pending_retries_++;
-        upstream_request.upstreamHost()->stats().rq_error_.inc();
+        Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
         Http::CodeStats& code_stats = httpContext().codeStats();
         code_stats.chargeBasicResponseStat(cluster_->statsScope(), stats_.stat_names_.retry_,
                                            static_cast<Http::Code>(response_code),
@@ -2074,7 +2074,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // flight awaiting headers or scheduled retries. If so, exit to give them a
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
-    upstream_request.upstreamHost()->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
 
     // Reset the stream because there are other in-flight requests that we'll
     // wait around for and we're not interested in consuming any body/trailers.
@@ -2167,7 +2167,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   if (end_stream) {
     // gRPC request termination without trailers is an error.
     if (upstream_request.grpcRqSuccessDeferred()) {
-      upstream_request.upstreamHost()->stats().rq_error_.inc();
+      Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
     }
     onUpstreamComplete(upstream_request);
   }
@@ -2193,9 +2193,9 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     std::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
-      upstream_request.upstreamHost()->stats().rq_success_.inc();
+      Upstream::HostUtility::chargeRequestSuccess(*upstream_request.upstreamHost());
     } else {
-      upstream_request.upstreamHost()->stats().rq_error_.inc();
+      Upstream::HostUtility::chargeRequestError(*upstream_request.upstreamHost());
     }
   }
 

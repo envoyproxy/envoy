@@ -9,6 +9,7 @@
 #include "source/common/queue_policy/fifo_queue_policy.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -339,8 +340,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   // Track the new active stream.
   cluster_connectivity_state_.incrActiveStreams(1);
   num_active_streams_++;
-  host_->stats().rq_total_.inc();
-  host_->stats().rq_active_.inc();
+  Upstream::HostUtility::chargeRequestIssued(*host_);
   traffic_stats.upstream_rq_total_.inc();
   traffic_stats.upstream_rq_active_.inc();
   host_->cluster().resourceManager(priority_).requests().inc();

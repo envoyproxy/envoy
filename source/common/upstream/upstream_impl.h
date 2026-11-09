@@ -120,12 +120,20 @@ public:
  */
 class LoadMetricStatsImpl : public LoadMetricStats {
 public:
+  LoadMetricStatsImpl() = default;
+  /**
+   * @param update_counter counter incremented after every add(), see
+   *        ClusterLoadReportStats::upstream_host_load_updates_.
+   */
+  explicit LoadMetricStatsImpl(Stats::Counter& update_counter) : update_counter_(&update_counter) {}
+
   void add(const absl::string_view key, double value) override;
   StatMapPtr latch() override;
 
 private:
   absl::Mutex mu_;
   StatMapPtr map_ ABSL_GUARDED_BY(mu_);
+  Stats::Counter* const update_counter_{nullptr};
 };
 
 /**

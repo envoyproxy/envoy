@@ -7,6 +7,8 @@
 
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -97,6 +99,17 @@ AssertionResult RouterTestBase::verifyHostUpstreamStats(uint64_t success, uint64
     return AssertionFailure() << fmt::format(
                "rq_error {} does not match expected {}",
                cm_.thread_local_cluster_.conn_pool_.host_->stats_.rq_error_.value(), error);
+  }
+  // Every success or error charged to the host must also be counted as a host load update of its
+  // cluster (see ClusterLoadReportStats::upstream_host_load_updates_). Nothing else counts host
+  // load updates in these tests: the connection pool is mocked and the mock host's load metric
+  // stats are not attached to the cluster.
+  const uint64_t host_load_updates = cm_.thread_local_cluster_.conn_pool_.host_->cluster_
+                                         .load_report_stats_.upstream_host_load_updates_.value();
+  if (success + error != host_load_updates) {
+    return AssertionFailure() << fmt::format(
+               "upstream_host_load_updates {} does not match expected {}", host_load_updates,
+               success + error);
   }
   return AssertionSuccess();
 }
