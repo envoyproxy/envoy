@@ -11,6 +11,7 @@ load(
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
+load(":envoy_rbe.bzl", "envoy_exec_properties")
 
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(
@@ -30,10 +31,7 @@ def envoy_cc_binary(
         tags = [],
         features = [],
         linkstatic = True):
-    exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
     linker_inputs = envoy_exported_symbols_input()
 
     if not linkopts:

@@ -17,6 +17,7 @@ load(
 )
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":envoy_rbe.bzl", "envoy_exec_properties")
 load(":sanitizers.bzl", "sanitizer_deps")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -104,10 +105,7 @@ def envoy_cc_library(
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
-    exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
