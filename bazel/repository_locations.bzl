@@ -46,10 +46,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.13.post0",
-        sha256 = "0485886f4d2aa3b666540e752d7a2e8eed9b79f6840f8f1cfad3b41f135cdb76",
-        strip_prefix = "toolshed-bazel-v{version}",
-        urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
+        version = "0.4.13.post3",
+        sha256 = "b502cb9a88cba42be907b98c6d8068e348225aaebbf59363ffefd0b505db461d",
+        strip_prefix = "toolshed-bazel-v{version}/bazel",
+        urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
     ),
     rules_fuzzing = dict(
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
