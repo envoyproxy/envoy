@@ -147,14 +147,26 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
   ENVOY_LOG(debug, "Updated filter config {} accepted, posting to workers", filter_config_name_);
   // Update the latest subscription config first, to prevent a race with new
   // providers missing the latest config.
+  const ConfigVersionConstSharedPtr previous = last_;
   last_ = std::move(next);
-  RETURN_IF_NOT_OK(Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
-      filter_config_providers_,
-      [last = last_](DynamicFilterConfigProviderImplBase* provider,
-                     std::shared_ptr<Cleanup> cleanup) {
-        return provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {});
-      },
-      [me = shared_from_this()]() { me->updateComplete(); }));
+  absl::Status apply_status = absl::OkStatus();
+  TRY_ASSERT_MAIN_THREAD {
+    apply_status = Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
+        filter_config_providers_,
+        [last = last_](DynamicFilterConfigProviderImplBase* provider,
+                       std::shared_ptr<Cleanup> cleanup) {
+          return provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {});
+        },
+        [me = shared_from_this()]() { me->updateComplete(); });
+  }
+  END_TRY
+  CATCH(const EnvoyException& e, { apply_status = absl::InvalidArgumentError(e.what()); });
+  if (!apply_status.ok()) {
+    last_ = previous;
+    ENVOY_LOG(debug, "Updated filter config {} rejected, rolling back the cached config: {}",
+              filter_config_name_, apply_status.message());
+    return apply_status;
+  }
   // The filter configs are created and published to worker queues at this point, so it
   // is safe to mark the subscription as ready and publish the warmed parent resources.
   ENVOY_LOG(debug, "Updated filter config {} created, warming done", filter_config_name_);
