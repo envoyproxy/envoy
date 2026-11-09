@@ -168,21 +168,21 @@ single_version_override(
 # TESTING: envoyproxy/toolshed#5580 (per-test lcov stripping). Do not merge.
 git_override(
     module_name = "envoy_toolshed",
-    commit = "835e3e0e18a24543549e4ad5b7a34e6b00b642fa",
+    commit = "11e1a632ef35d2ee6bed7589f4debc8cd153e49d",
     remote = "https://github.com/phlax/toolshed",
     strip_prefix = "bazel",
 )
 
 git_override(
     module_name = "envoy_toolshed_jq",
-    commit = "835e3e0e18a24543549e4ad5b7a34e6b00b642fa",
+    commit = "11e1a632ef35d2ee6bed7589f4debc8cd153e49d",
     remote = "https://github.com/phlax/toolshed",
     strip_prefix = "jq",
 )
 
 git_override(
     module_name = "rules_jq",
-    commit = "835e3e0e18a24543549e4ad5b7a34e6b00b642fa",
+    commit = "11e1a632ef35d2ee6bed7589f4debc8cd153e49d",
     remote = "https://github.com/phlax/toolshed",
     strip_prefix = "rules_jq",
 )
