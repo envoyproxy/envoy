@@ -130,6 +130,8 @@ public:
                                               const Http::ResponseHeaderMap* response_headers) PURE;
   };
 
+  using CallbacksPtr = std::unique_ptr<Callbacks>;
+
   /**
    * Notifies caller of async HTTP stream status.
    * Note the HTTP stream is full-duplex, even if the local to remote stream has been ended
@@ -495,6 +497,19 @@ public:
                         const RequestOptions& options) PURE;
 
   /**
+   * Send an HTTP request asynchronously. The client owns the callbacks and destroys them with the
+   * request, after their last call, including when the request is cancelled.
+   * @param request the request to send.
+   * @param callbacks the callbacks to be notified of request status.
+   * @param options the data struct to control the request sending.
+   * @return a request handle or nullptr if no request could be created. NOTE: In this case
+   *         onSuccess() or onFailure() has already been called inline, including when the request
+   *         could not be initialized, and the callbacks have already been destroyed.
+   */
+  virtual Request* send(RequestMessagePtr&& request, CallbacksPtr&& callbacks,
+                        const RequestOptions& options) PURE;
+
+  /**
    * Starts a new OngoingRequest asynchronously with the given headers.
    *
    * @param request_headers headers to send.
@@ -505,6 +520,18 @@ public:
    * should be called instead.
    */
   virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
+                                       const RequestOptions& options) PURE;
+
+  /**
+   * Starts a new OngoingRequest asynchronously with the given headers. The client owns the
+   * callbacks, see the `send` overload taking CallbacksPtr.
+   * @param request_headers headers to send.
+   * @param callbacks the callbacks to be notified of request status.
+   * @param options the data struct to control the request sending.
+   * @return a request handle or nullptr if no request could be created.
+   */
+  virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers,
+                                       CallbacksPtr&& callbacks,
                                        const RequestOptions& options) PURE;
 
   /**

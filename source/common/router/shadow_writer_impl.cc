@@ -1,6 +1,7 @@
 #include "source/common/router/shadow_writer_impl.h"
 
 #include <chrono>
+#include <memory>
 #include <string>
 
 #include "envoy/router/router.h"
@@ -50,10 +51,7 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
     return;
   }
   stats->rq_started_.inc();
-  auto* callbacks = new ShadowRequestCallbacks(stats, async_client.dispatcher());
-  if (async_client.send(std::move(request), *callbacks, options) == nullptr) {
-    callbacks->onStartFailed();
-  }
+  async_client.send(std::move(request), std::make_unique<ShadowRequestCallbacks>(stats), options);
 }
 
 Http::AsyncClient::OngoingRequest*
@@ -73,13 +71,8 @@ ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeade
     return async_client.startRequest(std::move(headers), *this, options);
   }
   stats->rq_started_.inc();
-  auto* callbacks = new ShadowRequestCallbacks(stats, async_client.dispatcher());
-  Http::AsyncClient::OngoingRequest* request =
-      async_client.startRequest(std::move(headers), *callbacks, options);
-  if (request == nullptr) {
-    callbacks->onStartFailed();
-  }
-  return request;
+  return async_client.startRequest(std::move(headers),
+                                   std::make_unique<ShadowRequestCallbacks>(stats), options);
 }
 
 Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAndOptions(
@@ -124,23 +117,6 @@ void ShadowRequestCallbacks::onFailure(const Http::AsyncClient::Request&,
                                        Http::AsyncClient::FailureReason) {
   outcome_recorded_ = true;
   stats_->rq_failure_.inc();
-}
-
-void ShadowRequestCallbacks::onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
-                                                          const Http::ResponseHeaderMap*) {
-  if (!finalized_) {
-    finalized_ = true;
-    dispatcher_.deferredDelete(Event::DeferredDeletablePtr{this});
-  }
-}
-
-void ShadowRequestCallbacks::onStartFailed() {
-  if (finalized_) {
-    return;
-  }
-  outcome_recorded_ = true;
-  stats_->rq_failure_.inc();
-  delete this;
 }
 
 } // namespace Router

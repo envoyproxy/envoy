@@ -1,5 +1,6 @@
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
@@ -71,11 +72,8 @@ public:
     return response;
   }
 
-  // Ends the request the way the async client does: the span is finalized first, then the
-  // completion callback runs, and the deferred delete list is cleared on the next loop iteration.
-  void finalize() { callback_->onBeforeFinalizeUpstreamSpan(span_, nullptr); }
-  void clearDeferredDeleteList() {
-    cm_.thread_local_cluster_.async_client_.dispatcher_.to_delete_.clear();
+  std::vector<Http::AsyncClient::CallbacksPtr>& ownedCallbacks() {
+    return cm_.thread_local_cluster_.async_client_.owned_callbacks_;
   }
 
   Stats::IsolatedStoreImpl store_;
@@ -90,6 +88,8 @@ TEST_F(ShadowWriterImplTest, Success) {
   InSequence s;
 
   expectShadowWriter("cluster1", "cluster1-shadow", false);
+  EXPECT_EQ(callback_, &writer_);
+  EXPECT_TRUE(ownedCallbacks().empty());
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl());
   callback_->onSuccess(request_, std::move(response));
 }
@@ -134,10 +134,11 @@ TEST_F(ShadowWriterImplTest, StatsNoCluster) {
 
 TEST_F(ShadowWriterImplTest, StatsSuccess) {
   expectShadowWriter("cluster1", "cluster1-shadow", false, makeStats());
-  EXPECT_NE(callback_, &writer_);
-  finalize();
+  ASSERT_EQ(1U, ownedCallbacks().size());
+  EXPECT_EQ(callback_, ownedCallbacks()[0].get());
+  callback_->onBeforeFinalizeUpstreamSpan(span_, nullptr);
   callback_->onSuccess(request_, response(200));
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
   EXPECT_EQ(1, counter("rq_started"));
   EXPECT_EQ(1, counter("rq_success"));
@@ -147,9 +148,8 @@ TEST_F(ShadowWriterImplTest, StatsSuccess) {
 
 TEST_F(ShadowWriterImplTest, StatsNon2xxResponseIsFailure) {
   expectShadowWriter("cluster1", "cluster1-shadow", false, makeStats());
-  finalize();
   callback_->onSuccess(request_, response(503));
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
   EXPECT_EQ(0, counter("rq_success"));
   EXPECT_EQ(1, counter("rq_failure"));
@@ -158,9 +158,8 @@ TEST_F(ShadowWriterImplTest, StatsNon2xxResponseIsFailure) {
 
 TEST_F(ShadowWriterImplTest, StatsResponseWithoutStatusIsFailure) {
   expectShadowWriter("cluster1", "cluster1-shadow", false, makeStats());
-  finalize();
   callback_->onSuccess(request_, std::make_unique<Http::ResponseMessageImpl>());
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
   EXPECT_EQ(0, counter("rq_success"));
   EXPECT_EQ(1, counter("rq_failure"));
@@ -168,20 +167,19 @@ TEST_F(ShadowWriterImplTest, StatsResponseWithoutStatusIsFailure) {
 
 TEST_F(ShadowWriterImplTest, StatsReset) {
   expectShadowWriter("cluster1", "cluster1-shadow", false, makeStats());
-  finalize();
   callback_->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
   EXPECT_EQ(1, counter("rq_failure"));
   EXPECT_EQ(0, counter("rq_cancelled"));
 }
 
+// A cancelled request is destroyed without calling onSuccess() or onFailure().
 TEST_F(ShadowWriterImplTest, StatsCancelled) {
   expectShadowWriter("cluster1", "cluster1-shadow", false, makeStats());
-  // A cancelled request finalizes its span but calls neither onSuccess() nor onFailure().
-  finalize();
+  callback_->onBeforeFinalizeUpstreamSpan(span_, nullptr);
   EXPECT_EQ(0, counter("rq_cancelled"));
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
   EXPECT_EQ(1, counter("rq_started"));
   EXPECT_EQ(0, counter("rq_success"));
@@ -189,48 +187,23 @@ TEST_F(ShadowWriterImplTest, StatsCancelled) {
   EXPECT_EQ(1, counter("rq_cancelled"));
 }
 
-TEST_F(ShadowWriterImplTest, StatsFinalizedOnce) {
-  expectShadowWriter("cluster1", "cluster1-shadow", false, makeStats());
-  finalize();
-  finalize();
-  callback_->onSuccess(request_, response(200));
-  EXPECT_EQ(1, cm_.thread_local_cluster_.async_client_.dispatcher_.to_delete_.size());
-  clearDeferredDeleteList();
-
-  EXPECT_EQ(1, counter("rq_success"));
-}
-
-// The request cannot be created, so the async client never calls the callbacks.
-TEST_F(ShadowWriterImplTest, StatsSendNotStarted) {
-  const ShadowPolicyStatsSharedPtr stats = makeStats();
-  expectCluster();
-  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).WillOnce(Return(nullptr));
-  Http::RequestMessagePtr message(new Http::RequestMessageImpl());
-  message->headers().setHost("cluster1");
-  writer_.shadow("foo", std::move(message), Http::AsyncClient::RequestOptions(), stats);
-
-  EXPECT_EQ(1, counter("rq_started"));
-  EXPECT_EQ(1, counter("rq_failure"));
-  EXPECT_TRUE(cm_.thread_local_cluster_.async_client_.dispatcher_.to_delete_.empty());
-}
-
-// The request fails while it is being started: the callbacks run inline and the async client
-// returns nullptr. The failure is counted once.
-TEST_F(ShadowWriterImplTest, StatsSendImmediateFailure) {
+// The request fails while it is being started: the async client reports the failure inline,
+// destroys the callbacks and returns nullptr.
+TEST_F(ShadowWriterImplTest, StatsSendFailedToStart) {
   const ShadowPolicyStatsSharedPtr stats = makeStats();
   expectCluster();
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        callbacks.onBeforeFinalizeUpstreamSpan(span_, nullptr);
         callbacks.onFailure(request_, Http::AsyncClient::FailureReason::Reset);
         return nullptr;
       });
   Http::RequestMessagePtr message(new Http::RequestMessageImpl());
   message->headers().setHost("cluster1");
   writer_.shadow("foo", std::move(message), Http::AsyncClient::RequestOptions(), stats);
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
+  EXPECT_EQ(1, counter("rq_started"));
   EXPECT_EQ(1, counter("rq_failure"));
   EXPECT_EQ(0, counter("rq_cancelled"));
 }
@@ -248,6 +221,7 @@ TEST_F(ShadowWriterImplTest, StreamingNoStats) {
   headers->setHost("cluster1");
   EXPECT_EQ(&stream, writer_.streamingShadow("foo", std::move(headers),
                                              Http::AsyncClient::RequestOptions(), nullptr));
+  EXPECT_TRUE(ownedCallbacks().empty());
 }
 
 TEST_F(ShadowWriterImplTest, StreamingStatsSuccess) {
@@ -264,26 +238,51 @@ TEST_F(ShadowWriterImplTest, StreamingStatsSuccess) {
   headers->setHost("cluster1");
   EXPECT_EQ(&stream, writer_.streamingShadow("foo", std::move(headers),
                                              Http::AsyncClient::RequestOptions(), stats));
-  finalize();
+  ASSERT_EQ(1U, ownedCallbacks().size());
+  EXPECT_EQ(callback_, ownedCallbacks()[0].get());
   callback_->onSuccess(stream, response(204));
-  clearDeferredDeleteList();
+  ownedCallbacks().clear();
 
   EXPECT_EQ(1, counter("rq_started"));
   EXPECT_EQ(1, counter("rq_success"));
 }
 
-TEST_F(ShadowWriterImplTest, StreamingStatsNotStarted) {
+TEST_F(ShadowWriterImplTest, StreamingStatsCancelled) {
+  const ShadowPolicyStatsSharedPtr stats = makeStats();
+  expectCluster();
+  Http::MockAsyncClientOngoingRequest stream(&cm_.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, startRequest_(_, _, _))
+      .WillOnce(Return(&stream));
+  auto headers = Http::RequestHeaderMapImpl::create();
+  headers->setHost("cluster1");
+  EXPECT_EQ(&stream, writer_.streamingShadow("foo", std::move(headers),
+                                             Http::AsyncClient::RequestOptions(), stats));
+  ownedCallbacks().clear();
+
+  EXPECT_EQ(1, counter("rq_started"));
+  EXPECT_EQ(0, counter("rq_failure"));
+  EXPECT_EQ(1, counter("rq_cancelled"));
+}
+
+TEST_F(ShadowWriterImplTest, StreamingStatsFailedToStart) {
   const ShadowPolicyStatsSharedPtr stats = makeStats();
   expectCluster();
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, startRequest_(_, _, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(
+          [&](Http::RequestHeaderMapPtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::OngoingRequest* {
+            callbacks.onFailure(request_, Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          });
   auto headers = Http::RequestHeaderMapImpl::create();
   headers->setHost("cluster1");
   EXPECT_EQ(nullptr, writer_.streamingShadow("foo", std::move(headers),
                                              Http::AsyncClient::RequestOptions(), stats));
+  ownedCallbacks().clear();
 
   EXPECT_EQ(1, counter("rq_started"));
   EXPECT_EQ(1, counter("rq_failure"));
+  EXPECT_EQ(0, counter("rq_cancelled"));
 }
 
 TEST_F(ShadowWriterImplTest, StreamingStatsNoCluster) {

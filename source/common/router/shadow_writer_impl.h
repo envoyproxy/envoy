@@ -3,8 +3,6 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/event/deferred_deletable.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -45,38 +43,24 @@ private:
   Upstream::ClusterManager& cm_;
 };
 
-// TODO(wdauchy): the self-deletion relies on the async client calling
-// onBeforeFinalizeUpstreamSpan() exactly once per request, so a change in that behavior could leak
-// this object. Let the async client own the callbacks (e.g. via RequestOptions), or support
-// multiple destructor callbacks on Request, then remove the self-deletion.
 /**
  * Async client callbacks of one mirror request of a policy with stats. They record how the mirror
- * ended. The async client always calls onBeforeFinalizeUpstreamSpan() once when the request ends,
- * before onSuccess() or onFailure() and also when the request is cancelled, so it schedules the
- * deletion of this object. A request deleted without onSuccess() or onFailure() was cancelled.
+ * ended. The async client owns them and destroys them with the request, so a request destroyed
+ * without onSuccess() or onFailure() was cancelled.
  */
-class ShadowRequestCallbacks : public Http::AsyncClient::Callbacks,
-                               public Event::DeferredDeletable {
+class ShadowRequestCallbacks : public Http::AsyncClient::Callbacks {
 public:
-  ShadowRequestCallbacks(ShadowPolicyStatsSharedPtr stats, Event::Dispatcher& dispatcher)
-      : stats_(std::move(stats)), dispatcher_(dispatcher) {}
+  explicit ShadowRequestCallbacks(ShadowPolicyStatsSharedPtr stats) : stats_(std::move(stats)) {}
   ~ShadowRequestCallbacks() override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
-  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&, const Http::ResponseHeaderMap*) override;
-
-  /**
-   * Records a failure and deletes the callbacks if the async client did not take ownership of
-   * the request, which happens when the request cannot be created.
-   */
-  void onStartFailed();
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
 private:
   const ShadowPolicyStatsSharedPtr stats_;
-  Event::Dispatcher& dispatcher_;
-  bool finalized_{};
   bool outcome_recorded_{};
 };
 

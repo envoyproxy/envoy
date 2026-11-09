@@ -37,8 +37,10 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
+using testing::InSequence;
 using testing::NiceMock;
 using ::testing::Not;
+using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
@@ -2001,6 +2003,162 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
   EXPECT_EQ(
       1UL,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+}
+
+class MockOwnedAsyncClientCallbacks : public MockAsyncClientCallbacks {
+public:
+  ~MockOwnedAsyncClientCallbacks() override { onDestroy(); }
+  MOCK_METHOD(void, onDestroy, ());
+};
+
+// A retry back off whose base interval is above its max interval fails the request creation.
+AsyncClient::RequestOptions invalidRequestOptions() {
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  TestUtility::loadFromYaml(R"EOF(
+retry_back_off:
+  base_interval: 10s
+  max_interval: 3s
+)EOF",
+                            retry_policy);
+  return AsyncClient::RequestOptions().setRetryPolicy(retry_policy);
+}
+
+TEST_F(AsyncClientImplTest, OwnedCallbacksSuccess) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+
+  auto owned_callbacks = std::make_unique<StrictMock<MockOwnedAsyncClientCallbacks>>();
+  auto& callbacks = *owned_callbacks;
+  AsyncClient::Request* request =
+      client_.send(std::move(message_), std::move(owned_callbacks), AsyncClient::RequestOptions());
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks, onSuccess_(Ref(*request), _));
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), true);
+
+  // The callbacks are destroyed with the request, which is deferred deleted.
+  EXPECT_CALL(callbacks, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, OwnedCallbacksCancel) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  auto owned_callbacks = std::make_unique<StrictMock<MockOwnedAsyncClientCallbacks>>();
+  auto& callbacks = *owned_callbacks;
+  AsyncClient::Request* request =
+      client_.send(std::move(message_), std::move(owned_callbacks), AsyncClient::RequestOptions());
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  request->cancel();
+
+  EXPECT_CALL(callbacks, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, OwnedCallbacksImmediateFailure) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow,
+                                    absl::string_view(), nullptr);
+            return nullptr;
+          });
+
+  auto owned_callbacks = std::make_unique<StrictMock<MockOwnedAsyncClientCallbacks>>();
+  auto& callbacks = *owned_callbacks;
+  {
+    InSequence s;
+    EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+    EXPECT_CALL(callbacks, onSuccess_(_, _))
+        .WillOnce([](const AsyncClient::Request&, ResponseMessage* response) {
+          EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
+        });
+    EXPECT_CALL(callbacks, onDestroy());
+  }
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), std::move(owned_callbacks),
+                                  AsyncClient::RequestOptions()));
+}
+
+TEST_F(AsyncClientImplTest, OwnedCallbacksCreationFailure) {
+  auto owned_callbacks = std::make_unique<StrictMock<MockOwnedAsyncClientCallbacks>>();
+  auto& callbacks = *owned_callbacks;
+  {
+    InSequence s;
+    EXPECT_CALL(callbacks, onFailure(_, AsyncClient::FailureReason::Reset));
+    EXPECT_CALL(callbacks, onDestroy());
+  }
+  EXPECT_EQ(nullptr,
+            client_.send(std::move(message_), std::move(owned_callbacks), invalidRequestOptions()));
+}
+
+// Callbacks that are not owned are not called when the request cannot be created.
+TEST_F(AsyncClientImplTest, CreationFailure) {
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks, invalidRequestOptions()));
+}
+
+TEST_F(AsyncClientImplTest, OwnedCallbacksOngoingRequestReset) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  auto owned_callbacks = std::make_unique<StrictMock<MockOwnedAsyncClientCallbacks>>();
+  auto& callbacks = *owned_callbacks;
+  AsyncClient::OngoingRequest* request = client_.startRequest(
+      std::move(headers), std::move(owned_callbacks), AsyncClient::RequestOptions());
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks, onFailure(Ref(*request), AsyncClient::FailureReason::Reset));
+  request->reset();
+
+  EXPECT_CALL(callbacks, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, OwnedCallbacksOngoingRequestCreationFailure) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  auto owned_callbacks = std::make_unique<StrictMock<MockOwnedAsyncClientCallbacks>>();
+  auto& callbacks = *owned_callbacks;
+  {
+    InSequence s;
+    EXPECT_CALL(callbacks, onFailure(_, AsyncClient::FailureReason::Reset));
+    EXPECT_CALL(callbacks, onDestroy());
+  }
+  EXPECT_EQ(nullptr, client_.startRequest(std::move(headers), std::move(owned_callbacks),
+                                          invalidRequestOptions()));
 }
 
 TEST_F(AsyncClientImplTest, StreamTimeout) {
