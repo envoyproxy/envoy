@@ -1073,7 +1073,6 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "protocol_integration_test",
-    size = "enormous",
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
