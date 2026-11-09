@@ -904,10 +904,6 @@ void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   ASSERT(!client.hasHandshakeCompleted() && client.readyForStream());
   while (hasPendingStreams() && client.readyForStream() && client.currentUnusedCapacity() > 0) {
-    if (maybeDropPendingStream()) {
-      continue;
-    }
-
     // Find the next eligible stream without mutating the queue during traversal. Repeating this
     // scan can be O(n^2) with mixed eligibility, but the expected queue size should be small. If
     // this becomes a problem, we could split the pending stream queue into 2 queues.
@@ -921,6 +917,12 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
     });
     if (stream == nullptr) {
       break;
+    }
+
+    // Only check for drops when a request can use the available capacity. A drop callback may
+    // cancel the selected stream, so restart selection after shedding.
+    if (maybeDropPendingStream()) {
+      continue;
     }
 
     ENVOY_CONN_LOG(debug, "creating stream for early data.", client);

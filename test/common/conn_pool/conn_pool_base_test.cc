@@ -389,6 +389,26 @@ TEST_F(ConnPoolImplCodelDropTest, DropsEarlyDataPendingStreamAndUpdatesCounts) {
   pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
+TEST_F(ConnPoolImplCodelDropTest, DoesNotDropWithoutAnEarlyDataEligibleStream) {
+  supports_early_data_ = true;
+  factory_.queue_->drop_on_dequeue_ = true;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  auto* pending = pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  ASSERT_NE(pending, nullptr);
+  EXPECT_CALL(pool_, onPoolReady).Times(0);
+  EXPECT_CALL(pool_, onPoolFailure).Times(0);
+  client_->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  pool_.onUpstreamReadyForEarlyData(*client_);
+
+  EXPECT_EQ(state_.pending_streams_, 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 0);
+  if (state_.pending_streams_ > 0) {
+    pending->cancel(ConnectionPool::CancelPolicy::Default);
+  }
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
 TEST_F(ConnPoolImplCodelDropTest, RechecksDropsAfterEachEarlyDataDispatch) {
   supports_early_data_ = true;
   concurrent_streams_ = 3;
