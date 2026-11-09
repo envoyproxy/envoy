@@ -15,11 +15,9 @@ namespace PostgresProxy {
 
 constexpr absl::string_view FRONTEND = "Frontend";
 constexpr absl::string_view BACKEND = "Backend";
-
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ =
-      MessageProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {&DecoderImpl::onStartup}};
+  first_ = MessageProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {}};
 
   // Frontend messages.
   FE_messages_.direction_ = FRONTEND;
@@ -206,8 +204,9 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
    If the initial message has the correct syntax and  indicates that session should be in
    clear-text, the decoder will move to InSyncState. If the initial message has the correct syntax
    and indicates that session should be encrypted, the decoder stays in InitState, because the
-   initial message will be received again after transport socket negotiates SSL. If the message
-   syntax is incorrect, the decoder will move to OutOfSyncState, in which messages are not parsed.
+   initial message will be received again after transport socket negotiates SSL. Malformed messages
+   normally move the decoder to OutOfSyncState, in which messages are not parsed. With RBAC enabled,
+   oversized packets or failed body validation instead reject the connection.
 */
 Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   ASSERT(state_ == State::InitState);
@@ -216,7 +215,7 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   if (data.length() < 4) {
     // Not enough data in the buffer. Stop to avoid forwarding partial
     // initial message to the next filter.
-    return Decoder::Result::Stopped;
+    return Decoder::Result::NeedMoreStartupData;
   }
 
   // Validate the message before processing.
@@ -225,38 +224,64 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   // Run the validation.
   message_len_ = data.peekBEInt<uint32_t>(0);
   if (message_len_ > Postgres::Protocol::MAX_STARTUP_PACKET_LENGTH) {
-    // Message does not conform to the expected format. Move to out-of-sync state.
     data.drain(data.length());
+    if (callbacks_->authorizationEnabled()) {
+      state_ = State::RejectedState;
+      callbacks_->rejectStartup("");
+      return Decoder::Result::Stopped;
+    }
     state_ = State::OutOfSyncState;
     return Decoder::Result::ReadyForNext;
   }
 
-  Message::ValidationResult validationResult = msgParser->validate(data, 4, message_len_ - 4);
+  const bool cancel_request =
+      data.length() >= Postgres::Protocol::STARTUP_HEADER_SIZE &&
+      data.peekBEInt<uint32_t>(4) == Postgres::Protocol::CANCEL_REQUEST_CODE;
+  Message::ValidationResult validationResult;
+  if (cancel_request) {
+    // CancelRequest contains binary PID and secret key fields, not startup attributes.
+    validationResult = message_len_ != Postgres::Protocol::CANCEL_REQUEST_MESSAGE_SIZE
+                           ? Message::ValidationFailed
+                           : (data.length() < message_len_ ? Message::ValidationNeedMoreData
+                                                           : Message::ValidationOK);
+  } else {
+    validationResult = msgParser->validate(data, 4, message_len_ - 4);
+  }
 
   if (validationResult == Message::ValidationNeedMoreData) {
     // Incomplete message. Stop to avoid forwarding partial initial message
     // to the next filter.
-    return Decoder::Result::Stopped;
+    return Decoder::Result::NeedMoreStartupData;
   }
 
   if (validationResult == Message::ValidationFailed) {
     // Message does not conform to the expected format. Move to out-of-sync state.
     data.drain(data.length());
+    if (callbacks_->authorizationEnabled()) {
+      state_ = State::RejectedState;
+      callbacks_->rejectStartup("");
+      return Decoder::Result::Stopped;
+    }
     state_ = State::OutOfSyncState;
     return Decoder::Result::ReadyForNext;
   }
 
   Decoder::Result result = Decoder::Result::ReadyForNext;
   uint32_t code = data.peekBEInt<uint32_t>(4);
-  // Populate basic attributes and perform rbac
+  if (code < Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE) {
+    if (!callbacks_->verifyDownstreamSSL()) {
+      data.drain(data.length());
+      state_ = State::RejectedState;
+      return Decoder::Result::Stopped;
+    }
+    message_.resize(message_len_ - 4);
+    data.copyOut(4, message_.size(), message_.data());
+    onStartup();
+    message_.clear();
+  }
+
   if (callbacks_->authorizationEnabled()) {
     bool ssl_request = code == Postgres::Protocol::SSL_REQUEST_CODE;
-    if (!ssl_request) {
-      message_.resize(message_len_ - 4);
-      data.copyOut(4, message_.size(), message_.data());
-      onStartup();
-      message_.clear();
-    }
 
     // perform rbac on StartupMessage and SSL passthrough connections
     if ((!ssl_request || callbacks_->shouldPassthroughSSL()) && !callbacks_->authorizeStartup()) {
@@ -266,12 +291,27 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
     }
   }
 
+  if (cancel_request) {
+    callbacks_->incMessagesFrontend();
+    // The server processes cancellation and closes this separate connection without a reply.
+    state_ = State::OutOfSyncState;
+    data.drain(message_len_);
+    return Decoder::Result::ReadyForNext;
+  }
+
   // Startup message with 1234 in the most significant 16 bits indicate request to encrypt.
   if (code >= Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE) {
     encrypted_ = true;
     // Handler for SSLRequest.
     // See details in https://www.postgresql.org/docs/current/protocol-message-formats.html.
     if (code == Postgres::Protocol::SSL_REQUEST_CODE) {
+      // Reject if plaintext StartupMessage is pipelined after the SSLRequest
+      if (!callbacks_->shouldPassthroughSSL() && data.length() > message_len_) {
+        callbacks_->rejectSSLRequest();
+        data.drain(data.length());
+        state_ = State::RejectedState;
+        return Decoder::Result::Stopped;
+      }
       // Notify the filter that `SSLRequest` message was decoded.
       // If the filter returns true, it means to pass the message upstream
       // to the server. If it returns false it means, that filter will try
@@ -291,8 +331,6 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
       // Stay in InitState. After switch to SSL, another init packet will be sent.
     }
   } else {
-    callbacks_->verifyDownstreamSSL();
-
     ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
     if (callbacks_->shouldEncryptUpstream()) {
       // Copy the received initial request.
@@ -312,7 +350,10 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   data.drain(4);
 
   processMessageBody(data, FRONTEND, message_len_ - 4, first_, msgParser);
-  data.drain(message_len_);
+  if (result == Decoder::Result::Stopped) {
+    // Any remaining bytes belong to the locally consumed or retained initial exchange.
+    data.drain(data.length());
+  }
   return result;
 }
 
@@ -575,6 +616,20 @@ void DecoderImpl::onStartup() {
   if (callbacks_->authorizationEnabled()) {
     // keep key/value pair for empty values
     attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'));
+    // Match the effective names used by PostgreSQL: default the database when it is empty.
+    if (attributes_.contains("user") &&
+        (!attributes_.contains("database") || attributes_.at("database").empty())) {
+      // Copy before insertion, which may invalidate references into the attribute map.
+      const std::string database = attributes_.at("user");
+      attributes_["database"] = database;
+    }
+    for (const auto* name : {"user", "database"}) {
+      const auto attribute = attributes_.find(name);
+      if (attribute != attributes_.end() &&
+          attribute->second.size() > Postgres::Protocol::MAX_NAME_LENGTH) {
+        attribute->second.resize(Postgres::Protocol::MAX_NAME_LENGTH);
+      }
+    }
   } else {
     // First 4 bytes of startup message contains version code.
     // It is skipped. After that message contains attributes.

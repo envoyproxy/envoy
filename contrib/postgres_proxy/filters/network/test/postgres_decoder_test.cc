@@ -30,11 +30,12 @@ public:
   MOCK_METHOD(bool, authorizationEnabled, (), (const, override));
   MOCK_METHOD(bool, authorizeStartup, (), (override));
   MOCK_METHOD(void, rejectStartup, (absl::string_view policy_id), (override));
+  MOCK_METHOD(void, rejectSSLRequest, (), (override));
   MOCK_METHOD(bool, onSSLRequest, (), (override));
   MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
   MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
   MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&));
-  MOCK_METHOD(void, verifyDownstreamSSL, (), (override));
+  MOCK_METHOD(bool, verifyDownstreamSSL, (), (override));
   MOCK_METHOD(bool, shouldPassthroughSSL, (), (const, override));
 };
 
@@ -42,6 +43,7 @@ public:
 class PostgresProxyDecoderTestBase {
 public:
   PostgresProxyDecoderTestBase() {
+    ON_CALL(callbacks_, verifyDownstreamSSL()).WillByDefault(testing::Return(true));
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
     decoder_->initialize();
     decoder_->state(DecoderImpl::State::InSyncState);
@@ -113,9 +115,9 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   // Some other attribute
   data_.add("attribute"); // 9 bytes
   data_.add(buf_, 1);
-  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreStartupData);
   data_.add("blah"); // 4 bytes
-  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreStartupData);
   data_.add(buf_, 1);
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);
@@ -136,6 +138,7 @@ TEST_F(PostgresProxyDecoderTest, AuthorizesBeforeUpstreamSSL) {
   data_.writeBEInt<uint32_t>(0x00030000);
   data_.add(attributes);
   testing::InSequence s;
+  EXPECT_CALL(callbacks_, verifyDownstreamSSL()).WillOnce(testing::Return(true));
   EXPECT_CALL(callbacks_, authorizeStartup()).WillOnce(testing::Invoke([this]() {
     EXPECT_THAT(decoder_->getAttributes().at("user"), "postgres");
     EXPECT_THAT(decoder_->getAttributes().at("database"), "testdb");
@@ -145,6 +148,22 @@ TEST_F(PostgresProxyDecoderTest, AuthorizesBeforeUpstreamSSL) {
   EXPECT_CALL(callbacks_, sendUpstream(testing::_));
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::NegotiatingUpstreamSSL);
+  EXPECT_EQ(decoder_->getAttributes().at("user"), "postgres");
+  EXPECT_EQ(decoder_->getAttributes().at("database"), "testdb");
+}
+
+TEST_F(PostgresProxyDecoderTest, StartupPreservesFollowingMessage) {
+  decoder_->state(DecoderImpl::State::InitState);
+  createInitialPostgresRequest(data_);
+  Buffer::OwnedImpl query;
+  createPostgresMsg(query, "Q", "SELECT 1");
+  data_.add(query);
+
+  ASSERT_EQ(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  EXPECT_EQ(data_.toString(), query.toString());
+  EXPECT_CALL(callbacks_, processQuery(testing::_));
+  ASSERT_EQ(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  EXPECT_EQ(data_.length(), 0);
 }
 
 TEST_F(PostgresProxyDecoderTest, RejectedStartupStopDecoding) {
@@ -160,7 +179,7 @@ TEST_F(PostgresProxyDecoderTest, RejectedStartupStopDecoding) {
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::RejectedState);
   data_.add("more data");
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
-  ASSERT_THAT(0, data_.length());
+  ASSERT_THAT(data_.length(), 0);
 }
 
 // Test verifies that when Startup message does not carry
@@ -179,6 +198,21 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   ASSERT_THAT(decoder_->getAttributes().at("database"), "postgres");
   // This attribute should not be found
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
+}
+
+TEST_F(PostgresProxyDecoderTest, PreservesStartupNamesWithoutRbac) {
+  decoder_->state(DecoderImpl::State::InitState);
+  const std::string user(64, 'u');
+  const std::string database(64, 'd');
+  const std::string attributes = "user\0"s + user + "\0database\0"s + database + "\0\0"s;
+  data_.writeBEInt<uint32_t>(8 + attributes.size());
+  data_.writeBEInt<uint32_t>(Postgres::Protocol::POSTGRES_PROTOCOL_VERSION_30);
+  data_.add(attributes);
+
+  EXPECT_CALL(callbacks_, authorizeStartup()).Times(0);
+  EXPECT_EQ(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  EXPECT_EQ(decoder_->getAttributes().at("user"), user);
+  EXPECT_EQ(decoder_->getAttributes().at("database"), database);
 }
 
 TEST_F(PostgresProxyDecoderTest, InvalidStartupMessage) {
@@ -658,7 +692,7 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
 
   // Indicate that decoder should not continue with processing the message
   // because filter will try to terminate SSL session.
-  EXPECT_CALL(callbacks_, onSSLRequest).WillOnce(testing::Return(false));
+  EXPECT_CALL(callbacks_, onSSLRequest()).WillOnce(testing::Return(false));
 
   // Send initial message requesting SSL.
   data_.writeBEInt<uint32_t>(8);
@@ -670,6 +704,21 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
 
   // Decoder should interpret the session as clear-text stream.
   ASSERT_FALSE(decoder_->encrypted());
+}
+
+TEST_F(PostgresProxyDecoderTest, RejectsPipelinedDataAfterTerminatingSSLRequest) {
+  decoder_->state(DecoderImpl::State::InitState);
+  ON_CALL(callbacks_, shouldPassthroughSSL()).WillByDefault(testing::Return(false));
+  EXPECT_CALL(callbacks_, rejectSSLRequest());
+  EXPECT_CALL(callbacks_, onSSLRequest()).Times(0);
+
+  data_.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE);
+  data_.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
+  data_.add("plaintext startup data");
+
+  EXPECT_EQ(decoder_->onData(data_, true), Decoder::Result::Stopped);
+  EXPECT_EQ(decoder_->state(), DecoderImpl::State::RejectedState);
+  EXPECT_EQ(data_.length(), 0);
 }
 
 // Test verifyDownstreamSSL callback.

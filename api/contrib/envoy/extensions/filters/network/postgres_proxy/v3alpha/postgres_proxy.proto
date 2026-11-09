@@ -83,11 +83,12 @@ message PostgresProxy {
   // Defaults to ``DISABLE``.
   SSLMode downstream_ssl = 5;
 
-  // The connection is evaluated against these RBAC rules when a StartupMessage is decoded.
+  // These RBAC rules are evaluated when a StartupMessage or CancelRequest is decoded.
   // Startup attributes, such as user and database, are exposed as dynamic metadata under
   // envoy.filters.network.postgres_proxy. Rules can also match TCP connection properties
   // and SSL peer identity when Envoy terminates downstream TLS.
-  // For SSL passthrough, rules are evaluated when the SSLRequest is received using only
-  // available connection properties.
+  // For SSL passthrough, rules are evaluated when the SSLRequest is received; SSLRequest and
+  // CancelRequest evaluations use only available connection properties.
+  // Enabling RBAC preserves empty startup attribute values so key/value pairs are parsed correctly.
   config.rbac.v3.RBAC rules = 6;
 }

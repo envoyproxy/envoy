@@ -95,12 +95,21 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   notices_debug, Counter, Number of NOTICE messages with DEBUG severity
   notices_info, Counter, Number of NOTICE messages with INFO severity
   notices_unknown, Counter, Number of NOTICE messages which could not be recognized
+  authorization_allowed, Counter, Number of initial protocol messages allowed by configured RBAC rules
+  authorization_denied, Counter, Number of RBAC-denied initial messages and startup packets rejected during validation
 
 
 .. _config_network_filters_postgres_proxy_dynamic_metadata:
 
 Dynamic Metadata
 ----------------
+
+When RBAC rules are configured, startup key/value pairs are exposed as string-valued dynamic metadata
+under the ``envoy.filters.network.postgres_proxy`` namespace. All attributes present in the
+StartupMessage are included, including attributes other than ``user`` and ``database``. Empty values
+are preserved. The effective ``database`` value defaults to ``user`` when omitted or empty, and
+``user`` and ``database`` values are truncated to PostgreSQL's 63-byte name limit for authorization.
+Startup attributes are unavailable for CancelRequest and SSL passthrough checks.
 
 The Postgres filter emits Dynamic Metadata based on SQL statements carried in ``Query`` and ``Parse`` messages. ``statements_parsed`` statistics Counter tracks how many times
 SQL statement was parsed successfully and metadata was created. The metadata is emitted in the following format:

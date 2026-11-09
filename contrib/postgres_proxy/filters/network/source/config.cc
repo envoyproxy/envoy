@@ -2,7 +2,10 @@
 
 #include <format>
 
+#include "envoy/common/exception.h"
+
 #include "source/extensions/filters/common/rbac/engine_impl.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,6 +36,7 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   PostgresFilterConfigSharedPtr filter_config(
       std::make_shared<PostgresFilterConfig>(config_options, context.scope()));
   if (proto_config.has_rules()) {
+    THROW_IF_NOT_OK(Filters::Common::RBAC::validateRbacRules(proto_config.rules()));
     filter_config->engine_ =
         std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
             proto_config.rules(), context.messageValidationVisitor(),

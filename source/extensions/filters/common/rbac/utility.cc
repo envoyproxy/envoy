@@ -10,6 +10,64 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+static absl::Status validateFail(const std::string& header) {
+  return absl::InvalidArgumentError(fmt::format("Found header({}) rule,"
+                                                "not supported by RBAC network filter",
+                                                header));
+}
+
+static absl::Status validatePermission(const envoy::config::rbac::v3::Permission& permission) {
+  if (permission.has_header()) {
+    return validateFail(permission.header().DebugString());
+  }
+  if (permission.has_and_rules()) {
+    for (const auto& r : permission.and_rules().rules()) {
+      RETURN_IF_NOT_OK(validatePermission(r));
+    }
+  }
+  if (permission.has_or_rules()) {
+    for (const auto& r : permission.or_rules().rules()) {
+      RETURN_IF_NOT_OK(validatePermission(r));
+    }
+  }
+  if (permission.has_not_rule()) {
+    RETURN_IF_NOT_OK(validatePermission(permission.not_rule()));
+  }
+  return absl::OkStatus();
+}
+
+static absl::Status validatePrincipal(const envoy::config::rbac::v3::Principal& principal) {
+  if (principal.has_header()) {
+    return validateFail(principal.header().DebugString());
+  }
+  if (principal.has_and_ids()) {
+    for (const auto& r : principal.and_ids().ids()) {
+      RETURN_IF_NOT_OK(validatePrincipal(r));
+    }
+  }
+  if (principal.has_or_ids()) {
+    for (const auto& r : principal.or_ids().ids()) {
+      RETURN_IF_NOT_OK(validatePrincipal(r));
+    }
+  }
+  if (principal.has_not_id()) {
+    RETURN_IF_NOT_OK(validatePrincipal(principal.not_id()));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status validateRbacRules(const envoy::config::rbac::v3::RBAC& rules) {
+  for (const auto& policy : rules.policies()) {
+    for (const auto& permission : policy.second.permissions()) {
+      RETURN_IF_NOT_OK(validatePermission(permission));
+    }
+    for (const auto& principal : policy.second.principals()) {
+      RETURN_IF_NOT_OK(validatePrincipal(principal));
+    }
+  }
+  return absl::OkStatus();
+}
+
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
                                                 const std::string& rules_prefix,
                                                 const std::string& shadow_rules_prefix,

@@ -39,6 +39,7 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/network:well_known_names",
@@ -54,6 +55,7 @@ envoy_cc_contrib_extension(
     deps = [
         ":filter",
         "//source/extensions/filters/common/rbac:engine_lib",
+        "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
