@@ -976,12 +976,7 @@ def _toolchains_llvm():
 def _wasmtime():
     external_http_archive(
         name = "wasmtime",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
-        patches = [
-            "@proxy_wasm_cpp_host//:bazel/external/prefixed_wasmtime.patch",
-        ],
-        patch_args = ["-p1"],
+        build_file = "@envoy//bazel/external:wasmtime.BUILD",
     )
 
 def _dlb():
