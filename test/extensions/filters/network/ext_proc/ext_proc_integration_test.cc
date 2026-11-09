@@ -671,8 +671,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
   test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.streams_grpc_error", 1);
-  ASSERT_FALSE(tcp_client->write("", true));
-  tcp_client->waitForDisconnect();
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 
   // Verify failure counters
   verifyCounters({{"streams_started", 1},
@@ -1077,8 +1077,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusCloseHandling) {
   verifyCounters({{"connections_closed", 1}});
 
   // Connection should be closed
-  ASSERT_FALSE(tcp_client->write("", true));
-  tcp_client->waitForDisconnect();
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 }
 
 // Test connection status CLOSE_RST handling in responses
@@ -1109,7 +1109,6 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   verifyCounters({{"connections_closed", 1}, {"connections_reset", 1}});
 
   // Connection should be closed
-  ASSERT_FALSE(tcp_client->write("", true));
   tcp_client->waitForDisconnect();
 }
 
