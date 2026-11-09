@@ -204,7 +204,10 @@ build:coverage --strategy=TestRunner=remote,sandboxed,local
 build:coverage --strategy=CoverageReport=local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
-build:coverage --experimental_split_coverage_postprocessing
+# TESTING: no split postprocessing: the per-test lcov is produced inside the test action, so
+# the raw profile (141MB per test, 89% a copy of the binary's symbol table) never leaves the
+# worker.
+build:coverage --noexperimental_split_coverage_postprocessing
 build:coverage --experimental_fetch_all_coverage_outputs
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
