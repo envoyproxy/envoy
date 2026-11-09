@@ -38,8 +38,6 @@ HdsDelegate::HdsDelegate(Server::Configuration::ServerFactoryContext& server_con
       ssl_context_manager_(ssl_context_manager),
       info_factory_(std::make_unique<ProdClusterInfoFactory>()),
       tls_(server_context_.threadLocal()) {
-  health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
-      server_context.localInfo().node());
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
       RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds,
       server_context_.api().randomGenerator());
@@ -70,6 +68,10 @@ void HdsDelegate::setHdsStreamResponseTimer() {
 
 void HdsDelegate::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
+  // The local node can change after startup (e.g. dynamic context params), so send its current state
+  // rather than a copy from when the delegate was constructed.
+  health_check_request_.mutable_health_check_request()->mutable_node()->CopyFrom(
+      server_context_.localInfo().node());
   stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
