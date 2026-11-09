@@ -1,4 +1,4 @@
-name: Dependency/Fetch CVE data
+name: Dependency/Scan dependencies for CVEs
 
 permissions:
   contents: read
@@ -37,9 +37,9 @@ jobs:
         mkdir -p ${{ steps.vars.outputs.cve-data-path }}
     - name: Download (sync) from GCS bucket
       run: |
-        gsutil -mq rsync \
+        gsutil -mq rsync -r \
           "gs://${{ vars.GCS_CVE_BUCKET }}" \
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE dependency scanner
       run: |
-        bazel test --config=ci --config=cves //tools/dependency:cve_test
+        bazel test --config=ci --config=cves //tools/dependency:cves.test
