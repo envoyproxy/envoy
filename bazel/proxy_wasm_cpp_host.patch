@@ -28,40 +28,6 @@
  )
  
 
---- a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
-+++ b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
-@@ -68,7 +68,6 @@
-         "@cu__log-0.4.29//:log",
-         "@cu__tracing-0.1.44//:tracing",
-         "@cu__wasmtime-45.0.2//:wasmtime",
--        "@cu__wasmtime-c-api-impl-45.0.2//:build_script_build",
-     ],
- )
- 
-
-
---- a/bazel/external/wasmtime.BUILD
-+++ b/bazel/external/wasmtime.BUILD
-@@ -49,10 +49,16 @@
-         "prefixed_wasmtime_c_api.a",
-     ],
-     cmd = """
--        for symbol in $$(nm -P $(<) 2>/dev/null | grep -E ^_?wasm_ | cut -d" " -f1); do
-+        # Use the toolchain nm (like OBJCOPY below): the system one is not on PATH on RBE, and
-+        # with its errors hidden the symbol map was silently empty.
-+        for symbol in $$($(NM) -P $(<) | grep -E ^_?wasm_ | cut -d" " -f1); do
-             echo $$symbol | perl -p -e 's!^(_?)(wasm_[a-z_0-9.:-]+)$$!\\1\\2 \\1wasmtime_\\2!' >>prefixed
-         done
--        $(OBJCOPY) --redefine-syms=prefixed $(<) $@ 
-+        if [[ ! -s prefixed ]]; then
-+            echo "No wasm_* symbols found in $(<)" >&2
-+            exit 1
-+        fi
-+        $(OBJCOPY) --redefine-syms=prefixed $(<) $@
-         """,
-     toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
- )
-
 diff --git a/src/wasmtime/wasmtime.cc b/src/wasmtime/wasmtime.cc
 --- a/src/wasmtime/wasmtime.cc
 +++ b/src/wasmtime/wasmtime.cc
