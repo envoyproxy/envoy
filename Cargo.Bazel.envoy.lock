@@ -1,5 +1,5 @@
 {
-  "checksum": "57f80681498aa30b6c87c6e650813ecf6121189e0575f5be0d5bfdb1a2cb17d0",
+  "checksum": "2c8af5bd2e761046c32ca13a01d2fb20c7b5dd3e26b12383c83234028c6fdade",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -1298,11 +1298,21 @@
           {
             "id": "smallvec 1.16.3",
             "target": "smallvec"
+          },
+          {
+            "id": "strum 0.26.3",
+            "target": "strum"
           }
         ],
         "edition": "2021",
         "extra_deps": [
           ":build_script_build"
+        ],
+        "proc_macro_deps": [
+          {
+            "id": "strum_macros 0.26.4",
+            "target": "strum_macros"
+          }
         ]
       },
       "library_target_name": "envoy_proxy_dynamic_modules_rust_sdk",
@@ -6300,6 +6310,90 @@
       ],
       "version": "1.2.1"
     },
+    "strum 0.26.3": {
+      "common_attrs": {
+        "crate_features": [
+          "default",
+          "std"
+        ],
+        "edition": "2018"
+      },
+      "library_target_name": "strum",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "license_ids": [
+        "MIT"
+      ],
+      "name": "strum",
+      "package_url": "https://github.com/Peternator7/strum",
+      "repository": {
+        "Http": {
+          "sha256": "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06",
+          "url": "https://static.crates.io/crates/strum/0.26.3/download"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "strum",
+            "crate_root": "src/lib.rs"
+          }
+        }
+      ],
+      "version": "0.26.3"
+    },
+    "strum_macros 0.26.4": {
+      "common_attrs": {
+        "deps": [
+          {
+            "id": "heck 0.5.0",
+            "target": "heck"
+          },
+          {
+            "id": "proc-macro2 1.0.106",
+            "target": "proc_macro2"
+          },
+          {
+            "id": "quote 1.0.45",
+            "target": "quote"
+          },
+          {
+            "id": "syn 2.0.117",
+            "target": "syn"
+          }
+        ],
+        "edition": "2018",
+        "proc_macro_deps": [
+          {
+            "id": "rustversion 1.0.22",
+            "target": "rustversion"
+          }
+        ]
+      },
+      "library_target_name": "strum_macros",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "license_ids": [
+        "MIT"
+      ],
+      "name": "strum_macros",
+      "package_url": "https://github.com/Peternator7/strum",
+      "repository": {
+        "Http": {
+          "sha256": "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be",
+          "url": "https://static.crates.io/crates/strum_macros/0.26.4/download"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "strum_macros",
+            "crate_root": "src/lib.rs"
+          }
+        }
+      ],
+      "version": "0.26.4"
+    },
     "subtle 2.6.1": {
       "common_attrs": {
         "edition": "2018"
@@ -9526,6 +9620,8 @@
     "serde 1.0.228",
     "serde_json 1.0.149",
     "smallvec 1.16.3",
+    "strum 0.26.3",
+    "strum_macros 0.26.4",
     "time 0.3.47",
     "tokio 1.50.0",
     "url 2.5.8"
