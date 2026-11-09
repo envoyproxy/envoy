@@ -84,10 +84,10 @@ struct Watch {
 //
 // For SDS only, the WatchMap also keeps the last resource delivered for every explicitly
 // watched name while at least one watch is interested in it. When a watch that has never been
-// notified joins a name that is already subscribed (so no new request is sent and a conformant
-// server will not resend an unchanged resource), the cached resource is replayed to that watch
-// on the next dispatcher iteration through its regular onConfigUpdate(). Wildcard and glob
-// interest is never cached. See RESOURCE_REPLAY_DESIGN.md.
+// notified joins a name that is already subscribed (so no new request is sent and the server
+// will not resend an unchanged resource), the cached resource is replayed to that watch on the
+// next dispatcher iteration through its regular onConfigUpdate(). Wildcard and glob interest is
+// never cached.
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const std::string& type_url, CustomConfigValidators* config_validators,
