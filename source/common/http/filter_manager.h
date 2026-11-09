@@ -1194,7 +1194,13 @@ private:
   };
 
   // Indicates which filter to start the iteration with.
-  enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+  enum class FilterIterationStartState {
+    AlwaysStartFromNext,
+    // Starts from the current filter if it is resuming from stopping all iteration.
+    CanStartFromCurrent,
+    // Starts from the current filter, e.g. one that trailers are held at but have not reached.
+    AlwaysStartFromCurrent,
+  };
 
   UpgradeResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
                                          FilterChainFactoryCallbacksImpl& callbacks);

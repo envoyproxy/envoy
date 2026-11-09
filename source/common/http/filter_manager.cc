@@ -1096,10 +1096,10 @@ void FilterManager::forwardHeldRequestTrailers() {
     return;
   }
   if (!held_request_trailers_.processed_) {
-    // Parked before a filter that stopped all iteration: only reached while it resumes, so this
-    // starts from it.
+    // Parked at a filter that stopped all iteration and has not seen them yet. If it is still
+    // stopped, this parks them there again.
     decodeTrailers(holder, *filter_manager_callbacks_.requestTrailers(),
-                   FilterIterationStartState::CanStartFromCurrent);
+                   FilterIterationStartState::AlwaysStartFromCurrent);
   } else if (holder->canIterate()) {
     decodeTrailers(holder, *filter_manager_callbacks_.requestTrailers(),
                    FilterIterationStartState::AlwaysStartFromNext);
@@ -1193,8 +1193,9 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
     return encoder_filters_.begin();
   }
 
-  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
-      (*(filter->entry()))->iterate_from_current_filter_) {
+  if (filter_iteration_start_state == FilterIterationStartState::AlwaysStartFromCurrent ||
+      (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
+       (*(filter->entry()))->iterate_from_current_filter_)) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's encoding callback has not be called. Call it now.
     return filter->entry();
@@ -1208,8 +1209,9 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   if (!filter) {
     return decoder_filters_.begin();
   }
-  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
-      (*(filter->entry()))->iterate_from_current_filter_) {
+  if (filter_iteration_start_state == FilterIterationStartState::AlwaysStartFromCurrent ||
+      (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
+       (*(filter->entry()))->iterate_from_current_filter_)) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's callback function has not been called. Call it now.
     return filter->entry();
@@ -1881,7 +1883,7 @@ void FilterManager::forwardHeldResponseTrailers() {
   }
   if (!held_response_trailers_.processed_) {
     encodeTrailers(holder, *filter_manager_callbacks_.responseTrailers(),
-                   FilterIterationStartState::CanStartFromCurrent);
+                   FilterIterationStartState::AlwaysStartFromCurrent);
   } else if (holder->canIterate()) {
     encodeTrailers(holder, *filter_manager_callbacks_.responseTrailers(),
                    FilterIterationStartState::AlwaysStartFromNext);
