@@ -13,6 +13,7 @@
 #include "source/extensions/http/ai_filters/model_router/local_quota.h"
 #include "source/extensions/http/ai_filters/model_router/quota_interface.h"
 #include "source/extensions/http/ai_filters/model_router/redis_quota.h"
+#include "source/extensions/http/ai_filters/model_router/rls_quota.h"
 
 #include "absl/status/status.h"
 #include "absl/status/status_macros.h"
@@ -28,6 +29,7 @@ using LocalQuotaConfigProto =
 using ModelRouterProto = envoy::extensions::http::ai_filters::model_router::v3::ModelRouter;
 using RedisQuotaConfigProto =
     envoy::extensions::http::ai_filters::model_router::v3::RedisQuotaConfig;
+using RlsQuotaConfigProto = envoy::extensions::http::ai_filters::model_router::v3::RlsQuotaConfig;
 
 absl::StatusOr<HttpFilters::AiProtocolManager::AiFilterFactoryCb>
 ModelRouterFilterConfigFactory::createAiFilterFactory(
@@ -64,6 +66,23 @@ ModelRouterFilterConfigFactory::createAiFilterFactory(
       tl_quota->set([proto, redis_config, &time_source = context.timeSource()](
                         Event::Dispatcher& dispatcher) -> std::shared_ptr<QuotaInterface> {
         return std::make_shared<RedisQuota>(proto, redis_config, dispatcher, time_source);
+      });
+    } else if (type == RlsQuotaConfigProto::default_instance().GetTypeName()) {
+      RlsQuotaConfigProto rls_config;
+      RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+          typed_config, context.messageValidationVisitor(), rls_config));
+      MessageUtil::validate(rls_config, context.messageValidationVisitor());
+      Grpc::AsyncClientFactoryPtr factory;
+      ABSL_ASSIGN_OR_RETURN(factory,
+                            context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+                                rls_config.grpc_service(), scope, true));
+      std::shared_ptr<Grpc::AsyncClientFactory> shared_factory = std::move(factory);
+      tl_quota->set([proto, rls_config,
+                     shared_factory](Event::Dispatcher&) -> std::shared_ptr<QuotaInterface> {
+        absl::StatusOr<Grpc::RawAsyncClientPtr> raw_client =
+            shared_factory->createUncachedRawAsyncClient();
+        Grpc::RawAsyncClientSharedPtr client = raw_client.ok() ? std::move(*raw_client) : nullptr;
+        return std::make_shared<RlsQuota>(proto, rls_config, std::move(client));
       });
     } else {
       return absl::InvalidArgumentError(absl::StrCat("Unknown quota_config type: ", type));

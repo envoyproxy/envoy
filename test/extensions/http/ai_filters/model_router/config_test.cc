@@ -10,6 +10,7 @@
 #include "source/extensions/http/ai_filters/model_router/config.h"
 #include "source/extensions/http/ai_filters/model_router/filter.h"
 
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -519,6 +520,24 @@ quota_config:
     timeout: 0s
 )EOF",
        "RedisQuotaConfigValidationError\\.Timeout"},
+      {R"EOF(
+quota_config:
+  name: rls
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RlsQuotaConfig
+)EOF",
+       "RlsQuotaConfigValidationError\\.GrpcService"},
+      {R"EOF(
+quota_config:
+  name: rls
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RlsQuotaConfig
+    grpc_service:
+      envoy_grpc:
+        cluster_name: rls_cluster
+    timeout: 0s
+)EOF",
+       "RlsQuotaConfigValidationError\\.Timeout"},
   };
 
   for (const auto& c : cases) {
@@ -567,10 +586,38 @@ quota_config:
     port: 6379
     timeout: 2s
 )EOF",
+           R"EOF(
+quota_config:
+  name: rls
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RlsQuotaConfig
+    grpc_service:
+      envoy_grpc:
+        cluster_name: rls_cluster
+    domain: custom_domain
+    timeout: 2s
+)EOF",
        }) {
     const auto factory_cb = createFactoryFromYaml(yaml);
     ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
   }
+}
+
+TEST_F(ModelRouterConfigTest, PropagatesGrpcFactoryErrorForRlsConfig) {
+  EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, true))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("invalid grpc service")));
+
+  const auto factory_cb = createFactoryFromYaml(R"EOF(
+quota_config:
+  name: rls
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RlsQuotaConfig
+    grpc_service:
+      envoy_grpc:
+        cluster_name: rls_cluster
+)EOF");
+  ASSERT_FALSE(factory_cb.ok());
+  EXPECT_THAT(factory_cb.status().message(), HasSubstr("invalid grpc service"));
 }
 
 } // namespace

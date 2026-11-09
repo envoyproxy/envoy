@@ -4,6 +4,7 @@ package envoy.extensions.http.ai_filters.model_router.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
@@ -165,6 +166,19 @@ message RedisQuotaConfig {
   google.protobuf.Duration timeout = 3 [(validate.rules).duration = {gt {}}];
 }
 
+// Configuration for tracking model usage quotas via an external gRPC RateLimitService (RLS).
+message RlsQuotaConfig {
+  // Specifies the gRPC service that hosts the rate limit service.
+  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // The rate limit domain to use when calling the rate limit service.
+  // If unset, defaults to ``model_router``.
+  string domain = 2;
+
+  // The timeout for rate limit service gRPC calls. If unset, defaults to 1000ms.
+  google.protobuf.Duration timeout = 3 [(validate.rules).duration = {gt {}}];
+}
+
 // Configuration for the Model Router AI filter.
 //
 // The Model Router AI filter maps the client's requested model (populated in the
@@ -192,9 +206,11 @@ message ModelRouter {
   repeated RoutingEntry routes = 3;
 
   // Quota backend configuration (e.g., :ref:`LocalQuotaConfig
-  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.LocalQuotaConfig>` or
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.LocalQuotaConfig>`,
   // :ref:`RedisQuotaConfig
-  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RedisQuotaConfig>`). Must be
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RedisQuotaConfig>`, or
+  // :ref:`RlsQuotaConfig
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RlsQuotaConfig>`). Must be
   // specified if any configured :ref:`Model
   // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Model>` defines :ref:`quotas
   // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.Model.quotas>`.

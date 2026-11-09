@@ -81,6 +81,52 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "async_rls_lib",
+    srcs = ["async_rls.cc"],
+    hdrs = ["async_rls.h"],
+    deps = [
+        "//envoy/grpc:async_client_interface",
+        "//envoy/grpc:status",
+        "//envoy/http:async_client_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/tracing:tracer_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/grpc:status_lib",
+        "//source/common/grpc:typed_async_client_lib",
+        "//source/common/protobuf",
+        "//source/common/tracing:http_tracer_lib",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rls_quota_lib",
+    srcs = ["rls_quota.cc"],
+    hdrs = ["rls_quota.h"],
+    deps = [
+        ":async_rls_lib",
+        ":quota_interface_lib",
+        "//envoy/grpc:async_client_interface",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -122,6 +168,7 @@ envoy_cc_extension(
         ":local_quota_lib",
         ":quota_interface_lib",
         ":redis_quota_lib",
+        ":rls_quota_lib",
         "//envoy/registry",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",

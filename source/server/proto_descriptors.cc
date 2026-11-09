@@ -27,6 +27,8 @@ void validateProtoDescriptors() {
       "envoy.service.listener.v3.ListenerDiscoveryService.StreamListeners",
       "envoy.service.listener.v3.ListenerDiscoveryService.DeltaListeners",
       "envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit",
+      "envoy.service.ratelimit.v3.RateLimitService.CheckRateLimit",
+      "envoy.service.ratelimit.v3.RateLimitService.ConsumeRateLimit",
       "envoy.service.route.v3.RouteDiscoveryService.FetchRoutes",
       "envoy.service.route.v3.RouteDiscoveryService.StreamRoutes",
       "envoy.service.route.v3.RouteDiscoveryService.DeltaRoutes",
