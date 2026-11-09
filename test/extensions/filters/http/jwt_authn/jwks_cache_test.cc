@@ -294,38 +294,27 @@ providers:
 }
 
 // Test "crit" header constraints for JwtProvider
-TEST_F(JwksCacheTest, TestCriticalHeaders) {
+TEST_F(JwksCacheTest, TestAllowedCriticalHeaders) {
   setupCache(R"(
 providers:
   provider1:
     issuer: issuer1
-    critical_headers:
-      allowed:
-      - exp-extension
+    allowed_critical_headers:
+    - exp-a
+    - exp-b
   provider2:
     issuer: issuer2
-    critical_headers: {}
-  provider3:
-    issuer: issuer3
 )");
 
-  JwtVerify::Jwt good_jwt;
-  ASSERT_EQ(good_jwt.parseFromString(GoodToken), Status::Ok);
-  JwtVerify::Jwt crit_jwt;
-  ASSERT_EQ(crit_jwt.parseFromString(CritToken), Status::Ok);
-
   auto* data1 = cache_->findByIssuer("issuer1");
-  EXPECT_EQ(data1->verifyCriticalHeaders(good_jwt), Status::Ok);
-  EXPECT_EQ(data1->verifyCriticalHeaders(crit_jwt), Status::Ok);
+  EXPECT_TRUE(data1->areCriticalHeadersAllowed({}));
+  EXPECT_TRUE(data1->areCriticalHeadersAllowed({"exp-a", "exp-b"}));
+  EXPECT_FALSE(data1->areCriticalHeadersAllowed({"exp-a", "exp-c"}));
 
-  // An empty allowed list rejects any JWT with "crit".
+  // Without allowed_critical_headers, no "crit" parameter is allowed.
   auto* data2 = cache_->findByIssuer("issuer2");
-  EXPECT_EQ(data2->verifyCriticalHeaders(good_jwt), Status::Ok);
-  EXPECT_EQ(data2->verifyCriticalHeaders(crit_jwt), Status::JwtCritHeaderNotAllowed);
-
-  // Without critical_headers, "crit" is ignored.
-  auto* data3 = cache_->findByIssuer("issuer3");
-  EXPECT_EQ(data3->verifyCriticalHeaders(crit_jwt), Status::Ok);
+  EXPECT_TRUE(data2->areCriticalHeadersAllowed({}));
+  EXPECT_FALSE(data2->areCriticalHeadersAllowed({"exp-a"}));
 }
 
 // Test lifetime constraints for JwtProvider

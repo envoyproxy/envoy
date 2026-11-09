@@ -101,17 +101,6 @@ message JwtProvider {
     EDDSA = 12;
   }
 
-  // Validation of the JWT ``crit`` header.
-  message CriticalHeaders {
-    // Extension header parameters a JWT may list in ``crit``. Envoy does not process any extension
-    // parameter itself, so list only those handled after this filter. They must then see the JWT
-    // header: by default the JWT is removed from the request, so set
-    // :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
-    // or :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.header_in_metadata>`.
-    // If empty, any JWT with ``crit`` is rejected.
-    repeated string allowed = 1 [(validate.rules).repeated = {items {string {min_len: 1}}}];
-  }
-
   // Alters the payload representation in the request dynamic metadata to facilitate its use in matching.
   message NormalizePayload {
     // Each claim in this list will be interpreted as a space-delimited string
@@ -219,21 +208,27 @@ message JwtProvider {
   repeated Algorithm allowed_algorithms = 22
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 
-  // If set, a JWT with a ``crit`` header
-  // (`RFC 7515 <https://tools.ietf.org/html/rfc7515#section-4.1.11>`_) is only accepted if
-  // ``crit`` is a non-empty list of extension parameters present in the header, each listed in
-  // :ref:`allowed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.CriticalHeaders.allowed>`.
-  // A JWT without ``crit`` is not affected. If not set, ``crit`` is ignored.
+  // Extension header parameters a JWT may list in its ``crit`` header
+  // (`RFC 7515 <https://tools.ietf.org/html/rfc7515#section-4.1.11>`_). A JWT is rejected if
+  // ``crit`` is not a non-empty list of extension parameters present in the header, or lists a
+  // parameter outside this list. If empty, any JWT with ``crit`` is rejected.
+  //
+  // Envoy does not process any extension parameter itself, so list only those handled after this
+  // filter. They need the JWT header, so either
+  // :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
+  // or :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.header_in_metadata>`
+  // must be set.
   //
   // Example:
   //
   // .. code-block:: yaml
   //
-  //     critical_headers:
-  //       allowed:
-  //       - exp-extension
+  //     allowed_critical_headers:
+  //     - exp-extension
+  //     forward: true
   //
-  CriticalHeaders critical_headers = 23;
+  repeated string allowed_critical_headers = 23
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

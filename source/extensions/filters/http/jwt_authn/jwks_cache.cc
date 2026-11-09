@@ -55,8 +55,8 @@ public:
               : JwtProvider::Algorithm_Name(static_cast<JwtProvider::Algorithm>(alg)));
     }
 
-    allowed_critical_headers_.insert(jwt_provider_.critical_headers().allowed().begin(),
-                                     jwt_provider_.critical_headers().allowed().end());
+    allowed_critical_headers_.insert(jwt_provider_.allowed_critical_headers().begin(),
+                                     jwt_provider_.allowed_critical_headers().end());
 
     if (jwt_provider_.has_subjects()) {
       sub_matcher_.emplace(jwt_provider_.subjects(), context);
@@ -205,21 +205,13 @@ public:
     return allowed_algorithms_.empty() || allowed_algorithms_.contains(alg);
   }
 
-  Status verifyCriticalHeaders(const JwtVerify::Jwt& jwt) const override {
-    if (!jwt_provider_.has_critical_headers()) {
-      return Status::Ok;
-    }
-    std::vector<std::string> crit;
-    const Status status = jwt.getCriticalHeaders(&crit);
-    if (status != Status::Ok) {
-      return status;
-    }
+  bool areCriticalHeadersAllowed(const std::vector<std::string>& crit) const override {
     for (const auto& param : crit) {
       if (!allowed_critical_headers_.contains(param)) {
-        return Status::JwtCritHeaderNotAllowed;
+        return false;
       }
     }
-    return Status::Ok;
+    return true;
   }
 
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }

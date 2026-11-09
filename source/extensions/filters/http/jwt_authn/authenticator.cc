@@ -13,6 +13,7 @@
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/jwt/verify.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -248,10 +249,19 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
-  status = jwks_data_->verifyCriticalHeaders(*jwt_);
-  if (status != Status::Ok) {
-    doneWithStatus(status);
-    return;
+  // Check if "crit" header parameters are allowed
+  if (!jwks_data_->getJwtProvider().allowed_critical_headers().empty() ||
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_authn_reject_unknown_crit")) {
+    std::vector<std::string> crit;
+    status = jwt_->getCriticalHeaders(&crit);
+    if (status != Status::Ok) {
+      doneWithStatus(status);
+      return;
+    }
+    if (!jwks_data_->areCriticalHeadersAllowed(crit)) {
+      doneWithStatus(Status::JwtCritHeaderNotAllowed);
+      return;
+    }
   }
 
   const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);

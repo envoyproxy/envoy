@@ -37,6 +37,17 @@ FilterConfigImpl::FilterConfigImpl(
         return;
       }
     }
+
+    // Allowed "crit" parameters are handled after this filter, so the JWT header must reach it.
+    const auto& provider = std::get<1>(provider_pair);
+    if (!provider.allowed_critical_headers().empty() && !provider.forward() &&
+        provider.header_in_metadata().empty()) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("Provider '{}' sets allowed_critical_headers but neither forward nor "
+                      "header_in_metadata",
+                      std::get<0>(provider_pair)));
+      return;
+    }
   }
 
   auto jwks_cache_or =

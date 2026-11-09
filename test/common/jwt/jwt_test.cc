@@ -264,41 +264,74 @@ TEST(JwtParseTest, TestParseHeaderCrit) {
   EXPECT_TRUE(crit.empty());
 }
 
-TEST(JwtParseTest, TestParseHeaderBadCrit) {
-  // Header:  {"alg":"RS256","crit":"exp-extension","exp-extension":true}
-  const std::string bad_crit_not_list =
+TEST(JwtParseTest, TestParseHeaderCritNotList) {
+  // JWT with "crit" that is not a list. Parsing ignores "crit", so only getCriticalHeaders reports
+  // it. Header:  {"alg":"RS256","crit":"exp-extension","exp-extension":true}
+  const std::string jwt_text =
       "eyJhbGciOiJSUzI1NiIsImNyaXQiOiJleHAtZXh0ZW5zaW9uIiwiZXhwLWV4dGVuc2lvbiI6dHJ1ZX0."
       "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
       "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
+}
+
+TEST(JwtParseTest, TestParseHeaderCritEmpty) {
+  // JWT with an empty "crit". Parsing ignores "crit", so only getCriticalHeaders reports it.
   // Header:  {"alg":"RS256","crit":[]}
-  const std::string bad_crit_empty =
+  const std::string jwt_text =
       "eyJhbGciOiJSUzI1NiIsImNyaXQiOltdfQ."
       "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
       "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
-  // Header:  {"alg":"RS256","crit":[1]}
-  const std::string bad_crit_not_string =
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
+}
+
+TEST(JwtParseTest, TestParseHeaderCritNotString) {
+  // JWT with a "crit" entry that is not a string. Parsing ignores "crit", so only
+  // getCriticalHeaders reports it. Header:  {"alg":"RS256","crit":[1]}
+  const std::string jwt_text =
       "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsxXX0."
       "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
       "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
-  // Header:  {"alg":"RS256","crit":["kid"],"kid":"abc"}
-  const std::string bad_crit_registered =
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
+}
+
+TEST(JwtParseTest, TestParseHeaderCritRegisteredParameter) {
+  // JWT with "crit" naming a registered header parameter. Parsing ignores "crit", so only
+  // getCriticalHeaders reports it. Header:  {"alg":"RS256","crit":["kid"],"kid":"abc"}
+  const std::string jwt_text =
       "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsia2lkIl0sImtpZCI6ImFiYyJ9."
       "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
       "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
-  // Header:  {"alg":"RS256","crit":["exp-extension"]}
-  const std::string bad_crit_missing =
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
+}
+
+TEST(JwtParseTest, TestParseHeaderCritMissingParameter) {
+  // JWT with "crit" naming a parameter missing from the header. Parsing ignores "crit", so only
+  // getCriticalHeaders reports it. Header:  {"alg":"RS256","crit":["exp-extension"]}
+  const std::string jwt_text =
       "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsiZXhwLWV4dGVuc2lvbiJdfQ."
       "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
       "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
 
-  for (const auto& jwt_text : {bad_crit_not_list, bad_crit_empty, bad_crit_not_string,
-                               bad_crit_registered, bad_crit_missing}) {
-    // Parsing ignores "crit", so only getCriticalHeaders reports it.
-    Jwt jwt;
-    ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
-    std::vector<std::string> crit;
-    EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
-  }
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
 }
 
 TEST(JwtParseTest, TestParsePayloadBadBase64) {
