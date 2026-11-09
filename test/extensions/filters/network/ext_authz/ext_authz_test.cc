@@ -298,7 +298,6 @@ TEST_P(ExtAuthzFilterManagerTest, RejectInvalidStateAfterFilterInstallation) {
   EXPECT_EQ(Network::Connection::State::Open, connection.state());
 
   auto next_filter = std::make_shared<testing::StrictMock<Network::MockReadFilter>>();
-  EXPECT_CALL(*next_filter, initializeReadFilterCallbacks(_));
   manager.addReadFilter(next_filter);
 
   EXPECT_CALL(*next_filter, onNewConnection()).Times(0);
