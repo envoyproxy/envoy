@@ -418,7 +418,8 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
                              Eq(0));
 }
 
-class Http2RawFrameOverloadIntegrationTest : public BaseOverloadIntegrationTest,
+class Http2RawFrameOverloadIntegrationTest : public Event::TestUsingSimulatedTime,
+                                             public BaseOverloadIntegrationTest,
                                              public Http2RawFrameIntegrationTest,
                                              public testing::Test {
 public:
@@ -1995,8 +1996,11 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMiss) {
   // Verify that the global workers megamiss counter is incremented.
   test_server_->waitForCounter("workers.watchdog_mega_miss", Ge(1));
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Verifies that when the runtime guard is disabled, worker threads fallback to the main thread
@@ -2033,8 +2037,11 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
   EXPECT_EQ(test_server_->counter("server.worker_0.watchdog_mega_miss")->value(), 0);
   EXPECT_EQ(test_server_->counter("workers.watchdog_mega_miss")->value(), 0);
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 class TcpProxyLoadShedPointIntegrationTest

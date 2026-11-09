@@ -2005,7 +2005,6 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "overload_integration_test",
-    size = "large",
     srcs = ["overload_integration_test.cc"],
     rbe_pool = "linux_x64_small",
     shard_count = 8,
