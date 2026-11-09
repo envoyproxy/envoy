@@ -102,6 +102,28 @@ local_path_override(
     path = "envoy_build_config",
 )
 
+# TESTING: envoyproxy/toolshed#5580 (per-test lcov stripping). Do not merge.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "11e1a632ef35d2ee6bed7589f4debc8cd153e49d",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "11e1a632ef35d2ee6bed7589f4debc8cd153e49d",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
+
+git_override(
+    module_name = "rules_jq",
+    commit = "11e1a632ef35d2ee6bed7589f4debc8cd153e49d",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "rules_jq",
+)
+
 single_version_override(
     module_name = "openssl",
     version = "3.5.7.envoy",
