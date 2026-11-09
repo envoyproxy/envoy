@@ -19,6 +19,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
+struct ConnectionMetadataConfig {
+  std::string metadata_key;
+  std::chrono::milliseconds delay;
+  std::chrono::milliseconds shutdown_notice_delay;
+  std::chrono::milliseconds goaway_delay;
+};
+
+constexpr absl::string_view metadata_val{"true"};
+
 // Interposes between the HTTP/2 server codec and the HCM's ServerConnectionCallbacks to observe a
 // peer GOAWAY, which the default server path ignores (ConnectionManagerImpl::onGoAway is a no-op
 // for servers). For reverse tunnels we treat it as "this tunnel is going away" and dial a
@@ -28,8 +37,10 @@ class DrainAwareServerConnectionCallbacks : public Http::ServerConnectionCallbac
                                             public Logger::Loggable<Logger::Id::filter> {
 public:
   DrainAwareServerConnectionCallbacks(Http::ServerConnectionCallbacks& inner,
-                                      std::function<void()> on_peer_goaway)
-      : inner_(inner), on_peer_goaway_(std::move(on_peer_goaway)) {}
+                                      std::function<void()> on_peer_goaway,
+                                      std::shared_ptr<ConnectionMetadataConfig> metadata_config)
+      : inner_(inner), on_peer_goaway_(std::move(on_peer_goaway)),
+        metadata_config_(std::move(metadata_config)) {}
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
@@ -39,16 +50,7 @@ public:
 
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override {
-    // Envoy's codec only delivers the first GOAWAY, but guard anyway so a re-dial fires at most
-    // once per tunnel from this path.
-    if (!peer_goaway_handled_ && on_peer_goaway_ != nullptr) {
-      peer_goaway_handled_ = true;
-      ENVOY_LOG(info,
-                "drain_aware_hcm: peer GOAWAY for connection (code={}); draining tunnel and "
-                "dialing replacement",
-                static_cast<int>(error_code));
-      on_peer_goaway_();
-    }
+    onPeerGoaway(error_code);
     inner_.onGoAway(error_code);
   }
   void onSettings(Http::ReceivedSettings& settings) override { inner_.onSettings(settings); }
@@ -56,10 +58,41 @@ public:
     inner_.onMaxStreamsChanged(num_streams);
   }
 
+  void onPeerGoaway(Http::GoAwayErrorCode error_code) {
+    if (peer_goaway_handled_ || !on_peer_goaway_) {
+      return;
+    }
+
+    peer_goaway_handled_ = true;
+    ENVOY_LOG(info,
+              "drain_aware_hcm: peer GOAWAY for connection (code={}); draining tunnel and "
+              "dialing replacement",
+              static_cast<int>(error_code));
+    on_peer_goaway_();
+  }
+
+  void onMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override {
+    if (!metadata_config_) {
+      return inner_.onMetadata(std::move(metadata_map_ptr));
+    }
+
+    auto it = metadata_map_ptr->find(metadata_config_->metadata_key);
+    if (it != metadata_map_ptr->end() && it->second == metadata_val) {
+      ENVOY_LOG(info,
+                "drain_aware_hcm: drain metadata matched key='{}'; draining tunnel and "
+                "dialing replacement",
+                metadata_config_->metadata_key);
+      onPeerGoaway(Http::GoAwayErrorCode::NoError);
+    }
+
+    inner_.onMetadata(std::move(metadata_map_ptr));
+  }
+
 private:
   Http::ServerConnectionCallbacks& inner_;
   std::function<void()> on_peer_goaway_;
   bool peer_goaway_handled_{false};
+  std::shared_ptr<ConnectionMetadataConfig> metadata_config_;
 };
 
 // Wraps an Http::ServerConnection and proactively sends an HTTP/2 GOAWAY frame when the listener
@@ -81,17 +114,24 @@ public:
       const Network::DrainDecision& drain_decision,
       Server::Configuration::ServerFactoryContext& server_context,
       std::function<void()> on_local_drain = nullptr,
-      std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper = nullptr)
+      std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper = nullptr,
+      std::shared_ptr<ConnectionMetadataConfig> metadata_config = nullptr)
       : callbacks_wrapper_(std::move(callbacks_wrapper)), inner_(std::move(inner)),
         connection_(connection), drain_decision_(drain_decision), server_context_(server_context),
         drain_type_(Network::listenerDrainType(connection)),
-        on_local_drain_(std::move(on_local_drain)) {
+        on_local_drain_(std::move(on_local_drain)), metadata_config_(metadata_config) {
     ENVOY_LOG(debug, "drain_aware_hcm: created server connection wrapper, protocol={}",
               static_cast<int>(inner_->protocol()));
     // Observe connection-level drain notifications so onDrainCheckTimer() can react to them.
     connection_.addConnectionCallbacks(*this);
     drain_check_timer_ = connection_.dispatcher().createTimer([this]() { onDrainCheckTimer(); });
     drain_check_timer_->enableTimer(std::chrono::milliseconds(100));
+
+    drain_connection_metadata_timer_ =
+        connection_.dispatcher().createTimer([this]() { sendDrainMetadata(); });
+    drain_shutdown_notice_timer_ =
+        connection_.dispatcher().createTimer([this]() { inner_->shutdownNotice(); });
+    drain_goaway_timer_ = connection_.dispatcher().createTimer([this]() { inner_->goAway(); });
   }
 
   // `connection_` is guaranteed to outlive this wrapper: the wrapper is owned by
@@ -112,9 +152,12 @@ public:
   void shutdownNotice() override {
     // The HCM calls this at the start of a graceful drain (e.g. max_connection_duration). For
     // reverse tunnels (on_local_drain_ set) we use it as the "tunnel draining" signal to dial a
-    // replacement now, but SUPPRESS the early GOAWAY so the peer keeps using this tunnel during the
-    // grace window. The HCM's final GOAWAY at drain_timeout (via goAway()) then migrates new
-    // requests to the established replacement while in-flight requests finish here.
+    // replacement now, but SUPPRESS this early soft GOAWAY so the peer keeps using this tunnel
+    // while the replacement dials. The drain sequence is then driven by three independent timers
+    // armed in notifyLocalDrain(): (1) metadata frame at `delay` (client propagation), (2) soft
+    // GOAWAY at `shutdown_notice_delay` (peer stops new streams), (3) final GOAWAY at
+    // `goaway_delay` = drain_timeout (close). Each fires once, in order, so the migration is
+    // gradual instead of a single sudden cutover.
     if (on_local_drain_ != nullptr) {
       notifyLocalDrain();
       return;
@@ -161,8 +204,10 @@ private:
       ENVOY_LOG(info, "drain_aware_hcm: drain detected, sending GOAWAY");
       drain_goaway_sent_ = true;
       notifyLocalDrain();
-      inner_->goAway();
-      return;
+      if (metadata_config_) {
+        return drain_goaway_timer_->enableTimer(metadata_config_->goaway_delay);
+      }
+      return inner_->goAway();
     }
     drain_check_timer_->enableTimer(std::chrono::milliseconds(100));
   }
@@ -174,6 +219,24 @@ private:
     }
     local_drain_notified_ = true;
     on_local_drain_();
+    if (metadata_config_) {
+      drain_connection_metadata_timer_->enableTimer(metadata_config_->delay);
+      drain_shutdown_notice_timer_->enableTimer(metadata_config_->shutdown_notice_delay);
+    }
+  }
+
+  void sendDrainMetadata() {
+    RELEASE_ASSERT(metadata_config_,
+                   "metadata_config_ must be set or the timer should not be enabled");
+
+    ENVOY_LOG(info, "drain_aware_hcm: sending drain metadata (key='{}')",
+              metadata_config_->metadata_key);
+    Http::MetadataMap metadata_map;
+    metadata_map.emplace(metadata_config_->metadata_key, metadata_val);
+    Http::MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::make_unique<Http::MetadataMap>(std::move(metadata_map)));
+
+    inner_->encodeMetadata(metadata_map_vector);
   }
 
   // Declared before inner_ so the codec (which holds a reference to this wrapper) is destroyed
@@ -197,6 +260,10 @@ private:
   Event::TimerPtr drain_check_timer_;
   bool drain_goaway_sent_{false};
   bool local_drain_notified_{false};
+  std::shared_ptr<ConnectionMetadataConfig> metadata_config_;
+  Event::TimerPtr drain_connection_metadata_timer_;
+  Event::TimerPtr drain_shutdown_notice_timer_;
+  Event::TimerPtr drain_goaway_timer_;
 };
 
 } // namespace ReverseTunnel

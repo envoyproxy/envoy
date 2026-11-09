@@ -29,7 +29,10 @@ public:
                                     const ReverseTunnelUpstreamCodecStats& stats,
                                     UpstreamCodecDrainRegistrySharedPtr registry)
       : enable_drain_with_goaway_(proto.enable_drain_with_goaway()), stats_(stats),
-        registry_(std::move(registry)) {}
+        registry_(std::move(registry)),
+        metadata_key_(!proto.metadata_key().empty()
+                          ? std::make_shared<std::string>(proto.metadata_key())
+                          : nullptr) {}
 
   // Upstream::ProtocolOptionsConfig
   OptRef<const Envoy::Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
@@ -43,6 +46,7 @@ private:
   const bool enable_drain_with_goaway_;
   const ReverseTunnelUpstreamCodecStats stats_;
   const UpstreamCodecDrainRegistrySharedPtr registry_;
+  std::shared_ptr<std::string> metadata_key_;
 };
 
 /**
