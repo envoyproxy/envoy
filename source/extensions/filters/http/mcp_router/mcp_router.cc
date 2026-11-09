@@ -68,7 +68,7 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
     std::string lower_key = absl::AsciiStrToLower(key);
 
     if (!kSkipHeaders.contains(lower_key) && headerCanBeForwarded(lower_key, header_forwarding)) {
-      dest.addCopy(Http::LowerCaseString(std::string(key)), header.value().getStringView());
+      dest.addCopy(Http::LowerCaseString(key), header.value().getStringView());
     }
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -162,7 +162,7 @@ Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   // Extract session ID from header
-  auto session_header = headers.get(Http::LowerCaseString(std::string(kSessionIdHeader)));
+  auto session_header = headers.get(Http::LowerCaseString(kSessionIdHeader));
   if (!session_header.empty()) {
     encoded_session_id_ = std::string(session_header[0]->value().getStringView());
   }
@@ -2007,14 +2007,14 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
   } else if (request_headers_ != nullptr) {
     headers->setHost(request_headers_->getHostValue());
   }
-  headers->setContentType(std::string(kContentTypeJson));
+  headers->setContentType(kContentTypeJson);
 
   // Accept both JSON and SSE responses.
   headers->addCopy(Http::LowerCaseString("accept"),
                    absl::StrCat(kContentTypeSse, ", ", kContentTypeJson));
 
   if (!backend_session_id.empty()) {
-    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
+    headers->addCopy(Http::LowerCaseString(kSessionIdHeader), backend_session_id);
   }
 
   if (request_headers_) {
@@ -2084,11 +2084,11 @@ void McpRouterFilter::sendJsonResponse(const std::string& body, const std::strin
   // Standard JSON response path.
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
-  headers->setContentType(std::string(kContentTypeJson));
+  headers->setContentType(kContentTypeJson);
   headers->setContentLength(body.length());
 
   if (!session_id.empty()) {
-    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), session_id);
+    headers->addCopy(Http::LowerCaseString(kSessionIdHeader), session_id);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(headers), body.empty(), "mcp_router");
@@ -2104,7 +2104,7 @@ void McpRouterFilter::sendAccepted() {
   headers->setStatus(202);
 
   if (!encoded_session_id_.empty()) {
-    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), encoded_session_id_);
+    headers->addCopy(Http::LowerCaseString(kSessionIdHeader), encoded_session_id_);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(headers), true, "mcp_router");

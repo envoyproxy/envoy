@@ -948,6 +948,18 @@ TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, PostsSocketOptionsF
                           sockets.back()->connectionInfoProvider().localAddress()->asString())));
 }
 
+TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, ValidateModeSkipsSockets) {
+  ON_CALL(listener_context_.server_factory_context_.options_, mode())
+      .WillByDefault(Return(Server::Mode::Validate));
+
+  const auto mock_option = std::make_shared<StrictMock<Network::MockSocketOption>>();
+  makeCidGeneratorFactory(mock_option);
+  std::ignore = makeListenSocketFactory({});
+
+  EXPECT_OK(factory_->initializeWorkerRouting(socket_factories_));
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::cidGeneratorFactory(*factory_), cid_generator_factory_);
+}
+
 TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, InitInCtorWhenFlagOff) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.restart_features.defer_worker_routing_init", "false"}});

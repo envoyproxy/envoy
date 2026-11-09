@@ -226,7 +226,7 @@ LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_
     return std::make_unique<CgroupV1CpuStatsReader>(fs, time_source);
   }
 
-  return absl::InvalidArgumentError(std::string(NoSupportedCGroupMessage));
+  return absl::InvalidArgumentError(NoSupportedCGroupMessage);
 }
 
 CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)

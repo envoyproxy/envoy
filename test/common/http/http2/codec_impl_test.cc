@@ -2446,6 +2446,41 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
 }
 
+// Verify that trailers are sent when the body exactly exhausts the stream window, leaving
+// nothing pending in the codec when the trailers are encoded.
+// See https://github.com/envoyproxy/envoy/issues/40821.
+TEST_P(Http2CodecImplFlowControlTest, TrailersAfterBodyFillingStreamWindow) {
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  // The client does not read the body yet, so it sends no WINDOW_UPDATE.
+  const uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
+  ASSERT_EQ(65535, initial_stream_window);
+  Buffer::OwnedImpl body(std::string(initial_stream_window, 'a'));
+  response_encoder_->encodeData(body, false);
+  EXPECT_EQ(0, getStreamSendWindowSize(server_, 1));
+  EXPECT_EQ(0, server_->getStream(1)->pending_send_data_->length());
+
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
+
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  driveToCompletion();
+  EXPECT_OK(server_wrapper_->status_);
+  EXPECT_OK(client_wrapper_->status_);
+}
+
 // Verify that we create and handle the stream flush timeout when trailers follow a stream that
 // does not have enough window.
 TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout) {

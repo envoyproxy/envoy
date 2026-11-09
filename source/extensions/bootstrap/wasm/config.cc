@@ -20,7 +20,7 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
       config_.config(), context, context.scope(), context.initManager(), config_.singleton());
 }
 
-Server::BootstrapExtensionPtr
+Server::BootstrapExtensionCreationResult
 WasmFactory::createBootstrapExtension(const Protobuf::Message& config,
                                       Server::Configuration::ServerFactoryContext& context) {
   const auto& typed_config =

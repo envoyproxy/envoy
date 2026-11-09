@@ -385,6 +385,9 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_rem
                envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
                envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete,
+               envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr)
+
 WEAK_STUB(envoy_dynamic_module_type_metrics_result,
           envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter,
           envoy_dynamic_module_type_metrics_result_MetricNotFound,
@@ -513,6 +516,25 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, uint64_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result,
+          envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update,
+          envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer, uint64_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result,
+          envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove,
+          envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 // ---------------------- Cluster extension callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the cluster extension abi_impl.cc when the cluster extension is used.
@@ -581,6 +603,9 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_pre_init_complete,
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_use_persistent_host_map,
                envoy_dynamic_module_type_cluster_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions, false,
+          envoy_dynamic_module_type_cluster_config_envoy_ptr)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count, 0,
           envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t)
@@ -2241,6 +2266,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_name, fa
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_virtual_cluster, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code,
           false, envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint32_t)
 
@@ -2972,6 +3001,13 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_add_wire_bytes,
 
 // Stats sink snapshot callbacks. Real implementations live in
 // source/extensions/stat_sinks/dynamic_modules/abi_impl.cc when the stats sink extension is linked.
+
+WEAK_STUB(envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+          envoy_dynamic_module_callback_stat_sink_snapshot_retain, nullptr,
+          envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_stat_sink_snapshot_release,
+               envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count, 0,
           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr)

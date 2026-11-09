@@ -15,7 +15,7 @@ void addAttributes(const std::string& content, Resource& resource) {
     if (key_value.size() != 2) {
       continue;
     }
-    resource.attributes_[std::string(key_value[0])] = std::string(key_value[1]);
+    resource.attributes_[std::string(key_value[0])] = key_value[1];
   }
 }
 

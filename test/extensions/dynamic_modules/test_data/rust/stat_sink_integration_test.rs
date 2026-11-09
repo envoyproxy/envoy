@@ -32,11 +32,15 @@ fn new_stat_sink(
   let scheduler = envoy_config.new_config_scheduler();
 
   // Aggregate snapshots on a dedicated worker thread to model a module that offloads work from the
-  // main thread, for example onto a Tokio runtime. The worker owns the scheduler and commits the
-  // aggregated total as the event id, which the main thread then publishes into the gauge.
-  let (sender, receiver) = channel::<OwnedMetricSnapshot>();
+  // main thread, for example onto a Tokio runtime. The worker receives retained snapshots, decodes
+  // every name and value off the main thread, and drops each snapshot there, which releases it. It
+  // owns the scheduler and commits the aggregated total as the event id, which the main thread then
+  // publishes into the gauge.
+  let (sender, receiver) = channel::<RetainedMetricSnapshot>();
   let worker = std::thread::spawn(move || {
-    while let Ok(snapshot) = receiver.recv() {
+    while let Ok(retained) = receiver.recv() {
+      let snapshot = retained.to_owned();
+      drop(retained);
       let total: u64 = snapshot.counters.iter().map(|counter| counter.value).sum();
       scheduler.commit(total);
     }
@@ -51,7 +55,7 @@ fn new_stat_sink(
 
 struct TestStatSink {
   gauge_id: EnvoyGaugeId,
-  sender: Mutex<Option<Sender<OwnedMetricSnapshot>>>,
+  sender: Mutex<Option<Sender<RetainedMetricSnapshot>>>,
   worker: Mutex<Option<JoinHandle<()>>>,
 }
 
@@ -147,9 +151,10 @@ impl StatSink for TestStatSink {
       snapshot.gauge_count(),
       snapshot.histogram_count()
     );
-    // Copy the snapshot so it outlives this call, then hand it to the worker thread to aggregate.
+    // Retain the snapshot so it outlives this call, then hand it to the worker thread to decode and
+    // aggregate.
     if let Some(sender) = self.sender.lock().unwrap().as_ref() {
-      let _ = sender.send(snapshot.to_owned());
+      let _ = sender.send(snapshot.retain());
     }
   }
 
@@ -172,7 +177,9 @@ impl StatSink for TestStatSink {
 
 impl Drop for TestStatSink {
   fn drop(&mut self) {
-    // Close the channel so the worker thread exits, then wait for it to finish.
+    // Close the channel so the worker thread exits, then wait for it to finish. The worker drops
+    // every retained snapshot it receives, so joining it also releases them all before the sink is
+    // destroyed, as the retain contract requires.
     self.sender.lock().unwrap().take();
     if let Some(worker) = self.worker.lock().unwrap().take() {
       let _ = worker.join();

@@ -230,6 +230,7 @@ envoy_cc_test(
         "@quiche//:quiche_balsa_http_validation_policy_lib",
         "@quiche//:quiche_balsa_noop_balsa_visitor_lib",
         "@quiche//:quiche_balsa_simple_buffer_lib",
+        "@quiche//:quiche_common_platform_code_count_reader",
         "@quiche//:quiche_common_platform_expect_bug",
         "@quiche//:quiche_common_platform_logging",
         "@quiche//:quiche_common_platform_test",

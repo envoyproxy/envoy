@@ -334,6 +334,16 @@ config_setting(
 )
 
 config_setting(
+    name = "gcc_requested",
+    flag_values = {":use_gcc": "true"},
+)
+
+bool_flag(
+    name = "use_gcc",
+    build_setting_default = False,
+)
+
+config_setting(
     name = "gcc_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
@@ -1031,6 +1041,46 @@ selects.config_setting_group(
     match_all = [
         ":engflow_rbe",
         ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_asan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":asan_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_coverage",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":coverage_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_gcc",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":gcc_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_msan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":msan_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_tsan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":tsan_build",
     ],
 )
 

@@ -25,7 +25,7 @@ Server related statistics are rooted at *server.* with following statistics:
   total_connections, Gauge, Total connections of both new and old Envoy processes
   version, Gauge, Integer represented version number based on SCM revision or :ref:`stats_server_version_override <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_server_version_override>` if set.
   days_until_first_cert_expiring, Gauge, Number of days until the next certificate being managed will expire
-  seconds_until_first_ocsp_response_expiring, Gauge, Number of seconds until the next OCSP response being managed will expire
+  seconds_until_first_ocsp_response_expiring, Gauge, "Number of seconds until the next OCSP response being managed will expire, or 0 when no OCSP response is managed"
   hot_restart_epoch, Gauge, Current hot restart epoch -- an integer passed via command line flag ``--restart-epoch`` usually indicating generation.
   hot_restart_generation, Gauge, Current hot restart generation -- like hot_restart_epoch but computed automatically by incrementing from parent.
   hot_restart_udp_forwarding_datagrams, Counter, Datagrams of UDP packets this (parent) instance forwarded to its hot restart child while draining.

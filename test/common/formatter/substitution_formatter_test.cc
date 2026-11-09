@@ -3003,6 +3003,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
+}
+
+TEST(SubstitutionFormatterTest, streamInfoFormatterWithUpstreamSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_SESSION_ID");
@@ -4391,7 +4394,7 @@ TEST(SubstitutionFormatterTest, SpanIDFormatter) {
   }
 
   {
-    // Span present but getSpanId() returns empty (e.g., Zipkin, Datadog, SkyWalking).
+    // Span present but getSpanId() returns empty (e.g., Zipkin, SkyWalking).
     Tracing::MockSpan active_span;
     EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return(""));
 

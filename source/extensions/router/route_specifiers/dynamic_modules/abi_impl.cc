@@ -870,6 +870,34 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_name(
   return true;
 }
 
+bool envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer virtual_cluster_name) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const DeclaredVirtualClusterSet* declared = context->config.virtualClusters();
+  if (declared == nullptr) {
+    return false;
+  }
+  const absl::string_view name = toStringView(virtual_cluster_name);
+  const Envoy::Router::VirtualCluster* cluster = declared->find(name);
+  // No declared name is empty, so testing the length also rejects a null buffer with a length.
+  if (cluster == nullptr && virtual_cluster_name.length != 0) {
+    if (virtual_cluster_name.ptr == nullptr) {
+      ENVOY_LOG_MISC(debug,
+                     "dynamic module route specifier selected a virtual cluster with a null buffer "
+                     "of length {}",
+                     virtual_cluster_name.length);
+    } else {
+      ENVOY_LOG_MISC(debug, "dynamic module route specifier selected unknown virtual cluster '{}'",
+                     name);
+    }
+    context->config.stats().virtual_cluster_unknown_.inc();
+    return false;
+  }
+  context->overrides.virtual_cluster = cluster;
+  return true;
+}
+
 void envoy_dynamic_module_callback_route_specifier_set_timeout(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     uint64_t timeout_ms) {

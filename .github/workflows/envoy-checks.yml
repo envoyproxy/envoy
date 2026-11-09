@@ -76,6 +76,7 @@ jobs:
     if: >-
       fromJSON(needs.load.outputs.request).run.check-build-openssl
       || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
+      || fromJSON(needs.load.outputs.request).run.check-build-openssl-asan
     needs:
     - load
     with:
@@ -155,6 +156,7 @@ jobs:
       && (fromJSON(needs.load.outputs.request).run.check-build
           || fromJSON(needs.load.outputs.request).run.check-build-openssl
           || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
+          || fromJSON(needs.load.outputs.request).run.check-build-openssl-asan
           || fromJSON(needs.load.outputs.request).run.check-coverage
           || fromJSON(needs.load.outputs.request).run.check-san)
     needs:

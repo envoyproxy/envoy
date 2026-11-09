@@ -36,7 +36,7 @@ message Qatzstd {
   // Set compression parameters according to pre-defined compression level table.
   // Note that exact compression parameters are dynamically determined,
   // depending on both compression level and source content size (when known).
-  // Value 0 means default, and default level is 3.
+  // If not set, defaults to 3.
   //
   // Setting a level does not automatically set all other compression parameters
   // to default. Setting this will however eventually dynamically impact the compression
@@ -53,7 +53,8 @@ message Qatzstd {
   // Special: value 0 means "use default strategy".
   Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
 
-  // Value for compressor's next output buffer. If not set, defaults to 4096.
+  // Value for compressor's next output buffer. If not set, defaults to the zstd recommended
+  // output buffer size, ``ZSTD_CStreamOutSize()`` (about 128 KiB).
   google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
 
   // Enable QAT to accelerate Zstd compression or not. If not set, defaults to false.

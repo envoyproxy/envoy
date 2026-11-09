@@ -2003,8 +2003,12 @@ macro_rules! declare_cert_validator_init_functions {
 /// The `name` is the value of `selector_name` from the `dynamic_modules` TLS certificate selector
 /// configuration, allowing a single module to dispatch to different implementations. The `config`
 /// is the raw bytes from the `selector_config` field. `is_upstream` is true when the configuration
-/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics and provides
-/// the dynamic certificates. Returning `None` causes Envoy to reject the TLS context configuration.
+/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics, provides
+/// the dynamic certificates and signals the end of the initialization, which the listeners and
+/// clusters that use the TLS context wait for. Dynamic certificates provided during this call, or
+/// before `signal_init_complete`, are available to the first handshake, unless the TLS context
+/// waits for its SDS validation context. Returning `None` causes Envoy to reject the TLS context
+/// configuration.
 pub type NewTlsCertificateSelectorConfigFunction =
   fn(
     name: &str,

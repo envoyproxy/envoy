@@ -1,5 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
+#include "source/common/common/base64.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -49,6 +53,35 @@ public:
 
   std::string testDataDir(const std::string& subdir) {
     return TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/" + subdir);
+  }
+
+  // Starts Envoy with the bootstrap_cluster_writer_test module, which writes startup_cluster at
+  // startup when it is not empty.
+  void initializeWithClusterWriter(const std::string& startup_cluster) {
+    TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir("rust"), 1);
+    config_helper_.addBootstrapExtension(
+        fmt::format(R"EOF(
+      name: envoy.bootstrap.dynamic_modules
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+        dynamic_module_config:
+          name: bootstrap_cluster_writer_test
+        extension_name: writer
+        extension_config:
+          "@type": type.googleapis.com/google.protobuf.BytesValue
+          value: "{}"
+    )EOF",
+                    Base64::encode(startup_cluster.data(), startup_cluster.size())));
+    HttpIntegrationTest::initialize();
+  }
+
+  // Sends an action to the admin endpoint of the bootstrap_cluster_writer_test module.
+  std::string clusterWriterRequest(absl::string_view action, const std::string& body) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "POST", absl::StrCat("/cluster_writer?", action), body,
+        Http::CodecType::HTTP1, version_);
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return response->body();
   }
 };
 
@@ -705,6 +738,152 @@ resources: []
       lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
   EXPECT_EQ("200", after->headers().getStatusValue());
   EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("fc_a")));
+}
+
+// Verifies that a module adds, fails and removes clusters through the cluster writer, that
+// requests reach a written cluster, and that its worker event runs on every worker.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  concurrency_ = 2;
+  // Route the requests to a cluster that only exists once the module writes it.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        route_config->mutable_validate_clusters()->set_value(false);
+        route_config->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route()->set_cluster(
+            "writer.a");
+      });
+  initializeWithClusterWriter("");
+
+  envoy::config::cluster::v3::Cluster cluster =
+      ConfigHelper::buildStaticCluster("writer.a", fake_upstreams_[0]->localAddress()->ip()->port(),
+                                       Network::Test::getLoopbackAddressString(version_));
+  // The fake upstream speaks HTTP/1.
+  cluster.clear_typed_extension_protocol_options();
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  EXPECT_EQ("Success 1", clusterWriterRequest("add=writer.a", serialized_cluster));
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+  EXPECT_EQ(1,
+            test_server_->gauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer")
+                ->value());
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(1));
+  EXPECT_THAT(clusterWriterRequest("outcomes", ""), testing::HasSubstr("1 writer.a Active"));
+
+  // Once the worker event completed, every worker routes to the written cluster.
+  EXPECT_EQ("true", clusterWriterRequest("run_on_all_workers=7", ""));
+  test_server_->waitForGauge("dynamicmodulescustom.last_done_event_id", testing::Eq(7));
+  EXPECT_EQ(2, test_server_->counter("dynamicmodulescustom.worker_events_total")->value());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+
+  // A cluster whose configuration has another name fails.
+  EXPECT_EQ("Success 2", clusterWriterRequest("add=writer.b", serialized_cluster));
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_failed.config_name.writer",
+                               testing::Eq(1));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
+  EXPECT_THAT(clusterWriterRequest("outcomes", ""),
+              testing::HasSubstr("2 writer.b Failed cluster writer.b is named writer.a"));
+
+  EXPECT_EQ("Success", clusterWriterRequest("remove=writer.a", ""));
+  test_server_->waitForGauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer",
+                             testing::Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
+}
+
+// Verifies that CDS keeps a written cluster that its updates leave out, and that the writer gives
+// up a cluster that CDS replaces.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterWithCdsRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  const std::string cds_path = TestEnvironment::writeStringToFileForTest("cluster_writer_cds.yaml",
+                                                                         R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cds_cluster
+  connect_timeout: 0.25s
+  type: STATIC
+)EOF");
+  config_helper_.addConfigModifier([cds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+    cds->mutable_path_config_source()->set_path(cds_path);
+    cds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  });
+  initializeWithClusterWriter("");
+
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("writer.a");
+  cluster.mutable_connect_timeout()->set_seconds(1);
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  EXPECT_EQ("Success 1", clusterWriterRequest("add=writer.a", serialized_cluster));
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+
+  // A CDS update without the written cluster removes only the CDS cluster.
+  TestEnvironment::renameFile(TestEnvironment::writeStringToFileForTest(
+                                  "cluster_writer_cds_empty.yaml", "version_info: \"2\""),
+                              cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
+  BufferingStreamDecoderPtr clusters = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/clusters", "", Http::CodecType::HTTP1, version_);
+  EXPECT_THAT(clusters->body(), testing::HasSubstr("writer.a::"));
+  EXPECT_THAT(clusters->body(), testing::Not(testing::HasSubstr("cds_cluster::")));
+
+  // A CDS update that replaces the written cluster takes it over, so later writes of it fail.
+  TestEnvironment::renameFile(TestEnvironment::writeStringToFileForTest("cluster_writer_cds_a.yaml",
+                                                                        R"EOF(
+version_info: "3"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: writer.a
+  connect_timeout: 2s
+  type: STATIC
+)EOF"),
+                              cds_path);
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.ownership_lost.config_name.writer",
+                               testing::Eq(1));
+  test_server_->waitForGauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer",
+                             testing::Eq(0));
+  EXPECT_EQ("Success 2", clusterWriterRequest("add=writer.a", serialized_cluster));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
+  EXPECT_THAT(
+      clusterWriterRequest("outcomes", ""),
+      testing::HasSubstr("2 writer.a Failed cluster writer.a exists and is not owned by this "
+                         "extension"));
+  EXPECT_EQ("NotFound", clusterWriterRequest("remove=writer.a", ""));
+}
+
+// Verifies that a worker event posted while Envoy starts, before the main dispatcher runs, runs on
+// every worker when the module signals that its initialization is complete from a later scheduler
+// event.
+TEST_P(DynamicModulesBootstrapIntegrationTest, RunOnAllWorkersAtStartupC) {
+  concurrency_ = 2;
+  initializeWithBootstrapExtension(testDataDir("c"), "bootstrap_optional_hooks", "test",
+                                   "run_on_all_workers_at_startup");
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_total", testing::Eq(2));
+}
+
+// Verifies that a write from a scheduler event that the module commits in config_new is applied.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterStartupRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("writer.startup");
+  cluster.mutable_connect_timeout()->set_seconds(1);
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  initializeWithClusterWriter(serialized_cluster);
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/clusters", "", Http::CodecType::HTTP1, version_);
+  EXPECT_THAT(response->body(), testing::HasSubstr("writer.startup::"));
 }
 
 } // namespace DynamicModules
