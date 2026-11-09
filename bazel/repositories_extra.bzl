@@ -5,7 +5,6 @@ load("@envoy_examples//bazel:env.bzl", "envoy_examples_env")
 load("@envoy_toolshed//pgp:repositories.bzl", "setup_sq")
 load("@envoy_toolshed//pgp:toolchain.bzl", "load_pgp_toolchains")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
-load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 load("@toolchains_llvm//toolchain:deps.bzl", "bazel_toolchain_dependencies")
@@ -36,7 +35,6 @@ def envoy_dependencies_extra(
     setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
     raze_fetch_remote_crates()
-    crate_repositories()
     py_repositories()
 
     # Registers underscored Python minor version - eg `python3_10`
