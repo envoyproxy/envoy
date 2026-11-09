@@ -1215,9 +1215,9 @@ int StreamHandleWrapper::luaFilterContext(lua_State* state) {
   if (filter_context_wrapper_.get() != nullptr) {
     filter_context_wrapper_.pushStack();
   } else {
-    // The context is owned by the filter's config, which this filter holds, or by route
-    // configuration, which the stream's route config snapshot holds; a per-route script's VM
-    // already depends on the latter.
+    // The context is owned by the filter's config, which this filter holds, or by the route's
+    // per-filter config, which the connection manager keeps alive until the stream ends even
+    // after the route cache is cleared.
     filter_context_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(
                                       state, std::cref(callbacks_.filterContext())),
                                   true);
