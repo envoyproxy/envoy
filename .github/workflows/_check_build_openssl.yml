@@ -58,3 +58,6 @@ jobs:
         - target: openssl.presubmit
           name: OpenSSL (presubmit)
           skip: ${{ fromJSON(inputs.request).request.pr == '' || ! fromJSON(inputs.request).run.check-build-openssl-presubmit }}
+        - target: openssl.asan
+          name: OpenSSL ASAN
+          skip: ${{ fromJSON(inputs.request).request.pr != '' || ! fromJSON(inputs.request).run.check-build-openssl-asan }}
