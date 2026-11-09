@@ -2928,7 +2928,6 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
             cached_route_.value().get()));
   }
 
-  filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
   const FilterManager::CreateChainResult create_chain_result =
       filter_manager_.createDownstreamFilterChain();
   if (create_chain_result.upgradeAccepted()) {

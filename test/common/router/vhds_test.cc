@@ -9,6 +9,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -887,6 +888,7 @@ REGISTER_FACTORY(WarmingPerRouteFilterFactory, Server::Configuration::NamedHttpF
 TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailurePreservesWarmingRdsVersionInfo) {
   Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
   WarmingPerRouteFilterFactory::init_target_ = &filter_init_target;
+  Cleanup cleanup([]() { WarmingPerRouteFilterFactory::init_target_ = nullptr; });
 
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
@@ -917,7 +919,6 @@ vhds:
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
       Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
   filter_init_target.ready();
-  WarmingPerRouteFilterFactory::init_target_ = nullptr;
 
   EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
   EXPECT_FALSE(config_update_info->configWarming());
