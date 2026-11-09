@@ -211,6 +211,41 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
             tls_config.privateKey());
 }
 
+// A rejected SDS update must not be cached as accepted. In particular, re-sending the same
+// resource must run the validation callbacks again instead of taking the unchanged-hash fast path.
+TEST_F(SdsApiTest, RejectedTlsCertificateUpdateIsNotCached) {
+  envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
+  TlsCertificateSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+      []() {}, *dispatcher_, *api_, true);
+  init_manager_.add(*sds_api.initTarget());
+  initialize();
+
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  typed_secret.set_name("abc.com");
+  typed_secret.mutable_tls_certificate()->mutable_certificate_chain()->set_inline_bytes("cert");
+  typed_secret.mutable_tls_certificate()->mutable_private_key()->set_inline_bytes("key");
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret())
+      .WillOnce(Return(absl::InvalidArgumentError("reject this update")));
+  EXPECT_THROW(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1")
+                   .IgnoreError(),
+               EnvoyException);
+  EXPECT_EQ("uninitialized", sds_api.secretData().version_info_);
+
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret())
+      .WillOnce(Return(absl::InvalidArgumentError("reject this update again")));
+  EXPECT_THROW(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1")
+                   .IgnoreError(),
+               EnvoyException);
+}
+
 TEST_F(SdsApiTest, CertificateRemoval) {
   envoy::config::core::v3::ConfigSource config_source;
   setupMocks();

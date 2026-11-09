@@ -121,6 +121,8 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   const uint64_t new_hash = MessageUtil::hash(secret);
 
   if (new_hash != secret_hash_) {
+    const uint64_t previous_secret_hash = secret_hash_;
+    const std::string previous_version_info = secret_data_.version_info_;
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
@@ -163,7 +165,16 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     const auto files = loadFiles();
     files_hash_ = getHashForFiles(files);
     resolveSecret(files);
-    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
+    try {
+      THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
+    } catch (...) {
+      // Keep a rejected update from taking the unchanged-hash fast path on a re-send. The
+      // candidate secret may still be retained for filesystem recovery when loading itself fails,
+      // but callback rejection must leave the control-plane version uncommitted.
+      secret_hash_ = previous_secret_hash;
+      secret_data_.version_info_ = previous_version_info;
+      throw;
+    }
     // Update last_updated only after successful file load and callbacks.
     secret_data_.last_updated_ = time_source_.systemTime();
   }
