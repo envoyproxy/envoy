@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -24,12 +25,59 @@ namespace SetMetadataFilter {
 
 using FilterSharedPtr = std::shared_ptr<SetMetadataFilter>;
 
+// Filter state object that serializes to a (non-Any) proto message.
+class TestProtoFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  explicit TestProtoFilterStateObject(absl::string_view value) : value_(value) {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<envoy::extensions::filters::http::set_metadata::v3::Config>();
+    message->set_metadata_namespace(value_);
+    return message;
+  }
+
+private:
+  const std::string value_;
+};
+
+// Filter state object that serializes directly to an Any.
+class TestAnyFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  explicit TestAnyFilterStateObject(absl::string_view value) : value_(value) {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    envoy::extensions::filters::http::set_metadata::v3::Config message;
+    message.set_metadata_namespace(value_);
+    auto any = std::make_unique<Protobuf::Any>();
+    any->PackFrom(message);
+    return any;
+  }
+
+private:
+  const std::string value_;
+};
+
+// Filter state object that only supports string serialization.
+class TestStringFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  explicit TestStringFilterStateObject(absl::string_view value) : value_(value) {}
+
+  std::optional<std::string> serializeAsString() const override { return value_; }
+
+private:
+  const std::string value_;
+};
+
+// Filter state object that supports no serialization at all.
+class TestOpaqueFilterStateObject : public StreamInfo::FilterState::Object {};
+
 class SetMetadataFilterTest : public testing::Test {
 
 public:
   SetMetadataFilterTest() = default;
 
-  void runFilter(envoy::config::core::v3::Metadata& metadata, const std::string& yaml_config) {
+  void runFilter(envoy::config::core::v3::Metadata& metadata, const std::string& yaml_config,
+                 StreamInfo::FilterStateSharedPtr filter_state = nullptr) {
     envoy::extensions::filters::http::set_metadata::v3::Config proto_config;
     TestUtility::loadFromYaml(yaml_config, proto_config);
     config_ = std::make_shared<Config>(proto_config, *stats_store_.rootScope(), "");
@@ -39,6 +87,9 @@ public:
 
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
+    if (filter_state != nullptr) {
+      req_info.filter_state_ = std::move(filter_state);
+    }
     filter_->setDecoderFilterCallbacks(decoder_callbacks);
 
     EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
@@ -489,10 +540,192 @@ TEST_F(SetMetadataFilterTest, LogsErrorWhenNoValueConfigured) {
     - metadata_namespace: thenamespace
   )EOF";
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_LOG_CONTAINS(
-      "warn",
-      "set_metadata filter configuration contains metadata entries without value or typed_value",
-      runFilter(metadata, yaml_config));
+  EXPECT_LOG_CONTAINS("warn",
+                      "set_metadata filter configuration contains metadata entries without value, "
+                      "typed_value or filter_state",
+                      runFilter(metadata, yaml_config));
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateProtoObject) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey",
+                        std::make_shared<TestProtoFilterStateObject>("from_filter_state"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  // Verify that the proto returned by the filter state object was packed into typed metadata.
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  const auto& any_val = it_namespace->second;
+  ASSERT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config unpacked;
+  ASSERT_TRUE(any_val.UnpackTo(&unpacked));
+  EXPECT_EQ("from_filter_state", unpacked.metadata_namespace());
+
+  // Untyped metadata must be untouched.
+  EXPECT_TRUE(metadata.filter_metadata().empty());
+  EXPECT_EQ(0, config_->stats().filter_state_not_found_.value());
+  EXPECT_EQ(0, config_->stats().filter_state_not_serializable_.value());
+  EXPECT_EQ(0, config_->stats().overwrite_denied_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateAnyObjectIsNotDoubleWrapped) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey", std::make_shared<TestAnyFilterStateObject>("from_any"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  const auto& any_val = it_namespace->second;
+  // The Any produced by the object is used as is (type URL is the inner message, not Any).
+  ASSERT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config unpacked;
+  ASSERT_TRUE(any_val.UnpackTo(&unpacked));
+  EXPECT_EQ("from_any", unpacked.metadata_namespace());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateStringObject) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey", std::make_shared<TestStringFilterStateObject>("hello"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  const auto& any_val = it_namespace->second;
+  ASSERT_EQ("type.googleapis.com/google.protobuf.StringValue", any_val.type_url());
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(any_val.UnpackTo(&unpacked));
+  EXPECT_EQ("hello", unpacked.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateNotFound) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: missing
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config);
+
+  EXPECT_TRUE(metadata.typed_filter_metadata().empty());
+  EXPECT_TRUE(metadata.filter_metadata().empty());
+  EXPECT_EQ(1, config_->stats().filter_state_not_found_.value());
+  EXPECT_EQ(0, config_->stats().filter_state_not_serializable_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateNotSerializable) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey", std::make_shared<TestOpaqueFilterStateObject>());
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  EXPECT_TRUE(metadata.typed_filter_metadata().empty());
+  EXPECT_EQ(0, config_->stats().filter_state_not_found_.value());
+  EXPECT_EQ(1, config_->stats().filter_state_not_serializable_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateWithAllowOverwrite) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: static_namespace
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+      allow_overwrite: true
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey",
+                        std::make_shared<TestProtoFilterStateObject>("from_filter_state"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  envoy::extensions::filters::http::set_metadata::v3::Config unpacked;
+  ASSERT_TRUE(it_namespace->second.UnpackTo(&unpacked));
+  EXPECT_EQ("from_filter_state", unpacked.metadata_namespace());
+  EXPECT_EQ(0, config_->stats().overwrite_denied_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateWithNoAllowOverwrite) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: static_namespace
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey",
+                        std::make_shared<TestProtoFilterStateObject>("from_filter_state"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  envoy::extensions::filters::http::set_metadata::v3::Config unpacked;
+  ASSERT_TRUE(it_namespace->second.UnpackTo(&unpacked));
+  EXPECT_EQ("static_namespace", unpacked.metadata_namespace());
+  EXPECT_EQ(1, config_->stats().overwrite_denied_.value());
 }
 
 TEST_F(SetMetadataFilterTest, RouteSpecificConfigOverride) {

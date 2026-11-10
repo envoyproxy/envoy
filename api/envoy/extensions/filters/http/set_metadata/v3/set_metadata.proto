@@ -17,10 +17,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Set-Metadata Filter]
 //
-// This filters adds or updates dynamic metadata with static data.
+// This filters adds or updates dynamic metadata with static data, or with data
+// copied from a filter state object.
 //
 // [#extension: envoy.filters.http.set_metadata]
 
+// [#next-free-field: 6]
 message Metadata {
   // The metadata namespace.
   string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
@@ -32,14 +34,40 @@ message Metadata {
   // overwrite or merge with any existing values in that namespace. See
   // :ref:`the filter documentation <config_http_filters_set_metadata>` for
   // more information on how this value is merged with potentially existing
-  // ones if ``allow_overwrite`` is configured. Only one of ``value`` and
-  // ``typed_value`` may be set.
+  // ones if ``allow_overwrite`` is configured. Only one of ``value``,
+  // ``typed_value`` and ``filter_state`` may be set.
   google.protobuf.Struct value = 3;
 
   // The value to place at the namespace. If ``allow_overwrite``, this will
-  // overwrite any existing values in that namespace. Only one of ``value`` and
-  // ``typed_value`` may be set.
+  // overwrite any existing values in that namespace. Only one of ``value``,
+  // ``typed_value`` and ``filter_state`` may be set.
   google.protobuf.Any typed_value = 4;
+
+  // A filter state object whose contents should be copied into the typed
+  // dynamic metadata at the namespace.
+  //
+  // The object is converted to a ``google.protobuf.Any`` as follows:
+  //
+  // * If the object supports proto serialization (``serializeAsProto()``), the
+  //   resulting message is packed into the ``Any``. If the message is already
+  //   an ``Any`` it is used as is.
+  // * Otherwise, if the object supports string serialization
+  //   (``serializeAsString()``), the string is packed as a
+  //   ``google.protobuf.StringValue``.
+  // * Otherwise nothing is written and the ``filter_state_not_serializable``
+  //   counter is incremented.
+  //
+  // If no object exists under the key, nothing is written and the
+  // ``filter_state_not_found`` counter is incremented. If ``allow_overwrite``,
+  // this will overwrite any existing typed value in that namespace. Only one
+  // of ``value``, ``typed_value`` and ``filter_state`` may be set.
+  FilterStateSource filter_state = 5;
+}
+
+// Identifies a filter state object to copy into dynamic metadata.
+message FilterStateSource {
+  // The key of the filter state object.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
 }
 
 message Config {
