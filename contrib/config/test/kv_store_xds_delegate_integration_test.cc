@@ -266,10 +266,9 @@ protected:
     // under in the KV store, so the restarted Envoy must keep using it. Holding the port here
     // also stops anything else from listening on it: that would accept the SDS stream instead
     // of refusing it, and the secret would never be loaded from the KV store.
-    fake_upstreams_.emplace_back(
-        std::make_unique<FakeUpstream>(sds_upstream_port, version_,
-                                       configWithType(Http::CodecType::HTTP2),
-                                       /*defer_initialization=*/true));
+    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
+        sds_upstream_port, version_, configWithType(Http::CodecType::HTTP2),
+        /*defer_initialization=*/true));
     // Adds the new RTDS upstream.
     fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
         0, version_, configWithType(Http::CodecType::HTTP2), /*defer_initialization=*/true));
