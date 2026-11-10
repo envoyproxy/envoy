@@ -14739,7 +14739,7 @@ fn update_resource_monitor(
   abi::envoy_dynamic_module_type_resource_monitor_update_status,
   f64,
 ) {
-  let config_ptr = wrap_into_c_void_ptr!(monitor);
+  let config_ptr = wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::Refresh(monitor));
   // Envoy reads the pressure only on Success, so a marker value shows whether the hook wrote it.
   let mut resource_pressure = -7.0;
   let status = unsafe {
@@ -14782,7 +14782,8 @@ fn test_resource_monitor_config_new_and_destroy() {
     "unknown",
     b"config",
     &mut envoy_config,
-    &new_fn,
+    Some(&new_fn),
+    None,
   );
   assert!(config_ptr.is_null());
 
@@ -14790,7 +14791,8 @@ fn test_resource_monitor_config_new_and_destroy() {
     "monitor",
     b"config",
     &mut envoy_config,
-    &new_fn,
+    Some(&new_fn),
+    None,
   );
   assert!(!config_ptr.is_null());
   unsafe {
@@ -14894,6 +14896,260 @@ fn test_resource_monitor_scheduler_mock() {
     .times(1)
     .return_const(());
   mock_scheduler.report_resource_usage(0.42);
+}
+
+thread_local! {
+  // What the enable stub returns, how often it was called on this thread, and how often the refresh
+  // factory was asked for a monitor.
+  static RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT: std::cell::Cell<bool> =
+    const { std::cell::Cell::new(true) };
+  static RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS: std::cell::Cell<usize> =
+    const { std::cell::Cell::new(0) };
+  static RESOURCE_MONITOR_REFRESH_FACTORY_CALLS: std::cell::Cell<usize> =
+    const { std::cell::Cell::new(0) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
+) -> bool {
+  assert_eq!(config_envoy_ptr, resource_monitor_envoy_config());
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS
+    .set(RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.get() + 1);
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.get()
+}
+
+struct TestSynchronousFeedbackResourceMonitor(f64);
+
+impl resource_monitor::SynchronousFeedbackResourceMonitor
+  for TestSynchronousFeedbackResourceMonitor
+{
+  fn resource_usage(&self) -> f64 {
+    self.0
+  }
+}
+
+fn new_synchronous_feedback_resource_monitor(
+  name: &str,
+  _config: &[u8],
+) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>> {
+  matches!(name, "synchronous" | "both").then(|| {
+    Box::new(TestSynchronousFeedbackResourceMonitor(0.7))
+      as Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>
+  })
+}
+
+fn new_refresh_resource_monitor(
+  name: &str,
+  _config: &[u8],
+  _envoy_config: &mut resource_monitor::EnvoyResourceMonitorConfig,
+) -> Option<Box<dyn resource_monitor::ResourceMonitor>> {
+  RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.set(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get() + 1);
+  matches!(name, "refresh" | "both").then(|| {
+    Box::new(TestResourceMonitor(
+      resource_monitor::ResourceMonitorUpdate::Pressure(0.2),
+    )) as Box<dyn resource_monitor::ResourceMonitor>
+  })
+}
+
+// Creates a configuration with both factories registered. Returns the outcome and the pressure of
+// the update hook, the pressure from the synchronous feedback hook, and the number of times the
+// configuration enabled synchronous feedback.
+fn new_resource_monitor_config(
+  name: &str,
+) -> Option<(
+  abi::envoy_dynamic_module_type_resource_monitor_update_status,
+  f64,
+  f64,
+  usize,
+)> {
+  let new_fn: NewResourceMonitorConfigFunction = new_refresh_resource_monitor;
+  let new_synchronous_feedback_fn: NewSynchronousFeedbackResourceMonitorConfigFunction =
+    new_synchronous_feedback_resource_monitor;
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.set(0);
+  RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.set(0);
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    name,
+    b"",
+    &mut resource_monitor_envoy_config_handle(),
+    Some(&new_fn),
+    Some(&new_synchronous_feedback_fn),
+  );
+  if config_ptr.is_null() {
+    return None;
+  }
+  let mut refresh_pressure = -7.0;
+  let (update_status, synchronous_pressure) = unsafe {
+    (
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+        resource_monitor_envoy_config(),
+        config_ptr,
+        &mut refresh_pressure,
+      ),
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_get_resource_usage(config_ptr),
+    )
+  };
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  Some((
+    update_status,
+    refresh_pressure,
+    synchronous_pressure,
+    RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.get(),
+  ))
+}
+
+#[test]
+fn test_resource_monitor_synchronous_feedback_factory_comes_first() {
+  use abi::envoy_dynamic_module_type_resource_monitor_update_status as Status;
+
+  // The synchronous feedback monitor answers only the synchronous path, after enabling it, and the
+  // refresh factory is not asked even when it has a monitor for the name too.
+  for name in ["synchronous", "both"] {
+    assert_eq!(
+      new_resource_monitor_config(name),
+      Some((Status::Failure, -7.0, 0.7, 1)),
+      "{name}"
+    );
+    assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 0, "{name}");
+  }
+  // The other names fall back to the refresh factory, which answers only the refresh path.
+  assert_eq!(
+    new_resource_monitor_config("refresh"),
+    Some((Status::Success, 0.2, 0.0, 0))
+  );
+  assert_eq!(new_resource_monitor_config("unknown"), None);
+  assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 1);
+}
+
+#[test]
+fn test_resource_monitor_synchronous_feedback_fails_when_enable_is_rejected() {
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.set(false);
+  // The refresh factory is not asked either, even when it has a monitor for the name.
+  assert_eq!(new_resource_monitor_config("both"), None);
+  assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 0);
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.set(true);
+}
+
+#[test]
+fn test_resource_monitor_refresh_factory_is_optional() {
+  let new_synchronous_feedback_fn: NewSynchronousFeedbackResourceMonitorConfigFunction =
+    new_synchronous_feedback_resource_monitor;
+  let new_config_ptr = |name: &str| {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+      name,
+      b"",
+      &mut resource_monitor_envoy_config_handle(),
+      None,
+      Some(&new_synchronous_feedback_fn),
+    )
+  };
+  // A module with only a synchronous feedback factory creates those monitors and rejects the other
+  // names.
+  let config_ptr = new_config_ptr("synchronous");
+  assert!(!config_ptr.is_null());
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  assert!(new_config_ptr("refresh").is_null());
+}
+
+fn new_synchronous_feedback_config_ptr(
+  monitor: Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>,
+) -> *const std::ffi::c_void {
+  wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::SynchronousFeedback(monitor))
+}
+
+#[test]
+fn test_resource_monitor_get_resource_usage_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for PanicMonitor {
+    fn resource_usage(&self) -> f64 {
+      panic!("intentional panic in resource_usage");
+    }
+  }
+
+  let config_ptr = new_synchronous_feedback_config_ptr(Box::new(PanicMonitor));
+  unsafe {
+    assert_eq!(
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_get_resource_usage(config_ptr),
+      0.0
+    );
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_resource_monitor_load_accepted_passes_name() {
+  thread_local! {
+    static ACCEPTED: std::cell::RefCell<Vec<String>> =
+      const { std::cell::RefCell::new(Vec::new()) };
+  }
+
+  struct AcceptingMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for AcceptingMonitor {
+    fn resource_usage(&self) -> f64 {
+      0.0
+    }
+
+    fn on_load_accepted(&self, load_shed_point_name: EnvoyBuffer<'_>) {
+      ACCEPTED.with(|accepted| {
+        accepted
+          .borrow_mut()
+          .push(String::from_utf8(load_shed_point_name.as_slice().to_vec()).unwrap())
+      });
+    }
+  }
+
+  let name = "point";
+  let name_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  for config_ptr in [
+    new_synchronous_feedback_config_ptr(Box::new(AcceptingMonitor)),
+    // The default implementation and a refresh monitor ignore accepted load.
+    new_synchronous_feedback_config_ptr(Box::new(TestSynchronousFeedbackResourceMonitor(0.0))),
+    wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::Refresh(Box::new(
+      TestResourceMonitor(resource_monitor::ResourceMonitorUpdate::Failure)
+    ))),
+  ] {
+    unsafe {
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_load_accepted(
+        config_ptr,
+        name_buffer,
+      );
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+    }
+  }
+  assert_eq!(ACCEPTED.with(|accepted| accepted.take()), ["point"]);
+}
+
+#[test]
+fn test_resource_monitor_load_accepted_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for PanicMonitor {
+    fn resource_usage(&self) -> f64 {
+      0.0
+    }
+
+    fn on_load_accepted(&self, _load_shed_point_name: EnvoyBuffer<'_>) {
+      panic!("intentional panic in on_load_accepted");
+    }
+  }
+
+  let config_ptr = new_synchronous_feedback_config_ptr(Box::new(PanicMonitor));
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_load_accepted(
+      config_ptr,
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      },
+    );
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
 }
 
 // =============================================================================

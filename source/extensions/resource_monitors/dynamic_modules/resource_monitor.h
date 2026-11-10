@@ -25,6 +25,10 @@ using OnResourceMonitorConfigDestroyType =
     decltype(&envoy_dynamic_module_on_resource_monitor_config_destroy);
 using OnResourceMonitorUpdateResourceUsageType =
     decltype(&envoy_dynamic_module_on_resource_monitor_update_resource_usage);
+using OnResourceMonitorGetResourceUsageType =
+    decltype(&envoy_dynamic_module_on_resource_monitor_get_resource_usage);
+using OnResourceMonitorLoadAcceptedType =
+    decltype(&envoy_dynamic_module_on_resource_monitor_load_accepted);
 
 class DynamicModuleResourceMonitorConfig;
 
@@ -70,10 +74,24 @@ public:
    */
   void reportFailure();
 
+  /**
+   * Enables synchronous feedback.
+   * @return true if synchronous feedback is enabled, false if the module is not creating its
+   * configuration.
+   */
+  bool enableSynchronousFeedback();
+
   // The in-module configuration and the event hooks are set during creation and never change.
   envoy_dynamic_module_type_resource_monitor_config_module_ptr in_module_config_{nullptr};
   OnResourceMonitorConfigDestroyType on_config_destroy_{nullptr};
   OnResourceMonitorUpdateResourceUsageType on_update_resource_usage_{nullptr};
+  OnResourceMonitorGetResourceUsageType on_get_resource_usage_{nullptr};
+  // Null if the module does not implement the optional load accepted hook.
+  OnResourceMonitorLoadAcceptedType on_load_accepted_{nullptr};
+  // Whether envoy_dynamic_module_on_resource_monitor_config_new is running, which is the only time
+  // the module can enable synchronous feedback.
+  bool in_config_new_{false};
+  bool synchronous_feedback_enabled_{false};
 
   const std::shared_ptr<DynamicModuleResourceMonitorSchedulerTarget> scheduler_target_;
 
@@ -134,6 +152,24 @@ public:
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override {
     config_->updateResourceUsage(callbacks);
   }
+
+private:
+  const DynamicModuleResourceMonitorConfigSharedPtr config_;
+};
+
+/**
+ * Resource monitor backed by a dynamic module that enabled synchronous feedback.
+ */
+class DynamicModuleSynchronousFeedbackResourceMonitor
+    : public Server::SynchronousFeedbackResourceMonitor {
+public:
+  explicit DynamicModuleSynchronousFeedbackResourceMonitor(
+      DynamicModuleResourceMonitorConfigSharedPtr config)
+      : config_(std::move(config)) {}
+
+  // Server::SynchronousFeedbackResourceMonitor
+  Server::ResourceUsage getResourceUsage() override;
+  void onLoadAccepted(absl::string_view load_shed_point_name) override;
 
 private:
   const DynamicModuleResourceMonitorConfigSharedPtr config_;

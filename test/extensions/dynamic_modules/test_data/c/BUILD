@@ -425,3 +425,9 @@ test_program(name = "resource_monitor_missing_config_new")
 test_program(name = "resource_monitor_missing_config_destroy")
 
 test_program(name = "resource_monitor_missing_update_resource_usage")
+
+test_program(name = "resource_monitor_synchronous_feedback")
+
+test_program(name = "resource_monitor_synchronous_feedback_missing_get_resource_usage")
+
+test_program(name = "resource_monitor_synchronous_feedback_missing_load_accepted")

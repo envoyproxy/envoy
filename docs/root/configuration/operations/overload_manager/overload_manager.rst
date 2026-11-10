@@ -99,6 +99,11 @@ At each refresh interval the module reports the pressure of the resource, right 
 any thread through a scheduler. Envoy treats a pressure above 1 as 1, and a negative or non-finite
 pressure as a failed update.
 
+A module can also enable synchronous feedback. Load shed points with a trigger on the resource then
+ask the module for the pressure each time they decide whether to shed load, and tell it about the
+load they accept, so that the module can limit new load without waiting for the next refresh. In
+this mode Envoy treats a negative or NaN pressure as 0, and a pressure above 1 as 1.
+
 The following configuration sheds new requests once the pressure that the module reports for the
 ``queue_latency`` resource reaches 0.9.
 
