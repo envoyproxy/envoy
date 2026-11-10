@@ -125,10 +125,6 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
     return false;
   }
   for (const auto& virtual_host : input.config().virtual_hosts()) {
-    if (virtual_host.has_retry_policy_typed_config()) {
-      ENVOY_LOG_MISC(debug, "retry_policy_typed_config: not implemented");
-      return false;
-    }
     if (virtual_host.has_matcher() && !validateMatcherConfig(virtual_host.matcher())) {
       return false;
     }

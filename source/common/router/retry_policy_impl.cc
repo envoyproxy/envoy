@@ -1,9 +1,18 @@
 #include "source/common/router/retry_policy_impl.h"
 
 #include <memory>
+#include <string>
+#include <utility>
 
+#include "envoy/registry/registry.h"
+#include "envoy/router/retry.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/upstream/retry_factory.h"
@@ -22,6 +31,36 @@ RetryPolicyImpl::create(const envoy::config::route::v3::RetryPolicy& retry_polic
       new RetryPolicyImpl(retry_policy, validation_visitor, common_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
+}
+
+absl::StatusOr<RetryPolicyConstSharedPtr> RetryPolicyImpl::createFromTypedConfig(
+    const Protobuf::Any& typed_config, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::CommonFactoryContext& common_context) {
+  auto type_or_error = Envoy::Config::Utility::getFactoryTypeOrStatus(typed_config);
+  RETURN_IF_NOT_OK_REF(type_or_error.status());
+  auto* factory =
+      type_or_error->empty()
+          ? nullptr
+          : Registry::FactoryRegistry<RetryPolicyFactory>::getFactoryByType(*type_or_error);
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Didn't find a registered RetryPolicyFactory implementation for type: '{}'",
+                    *type_or_error));
+  }
+  ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
+  if (config == nullptr || config->GetTypeName() == "google.protobuf.Empty") {
+    return absl::InvalidArgumentError(fmt::format(
+        "Invalid empty config proto from RetryPolicyFactory for type: '{}'", *type_or_error));
+  }
+  RETURN_IF_NOT_OK(
+      Envoy::Config::Utility::translateOpaqueConfig(typed_config, validation_visitor, *config));
+  auto policy_or_error = factory->createRetryPolicy(*config, validation_visitor, common_context);
+  RETURN_IF_NOT_OK_REF(policy_or_error.status());
+  if (*policy_or_error == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("RetryPolicyFactory returned null policy for type: '{}'", *type_or_error));
+  }
+  return policy_or_error;
 }
 
 RetryPolicyConstSharedPtr RetryPolicyImpl::DefaultRetryPolicy = std::make_shared<RetryPolicyImpl>();

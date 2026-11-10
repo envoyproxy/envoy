@@ -1251,7 +1251,15 @@ absl::StatusOr<RetryPolicyConstSharedPtr> RouteEntryImplBase::buildRetryPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::CommonFactoryContext& factory_context) const {
+  if (route_config.has_retry_policy() && route_config.has_retry_policy_typed_config()) {
+    return absl::InvalidArgumentError(
+        "Cannot set both retry_policy and retry_policy_typed_config in RouteAction.");
+  }
   // Route specific policy wins, if available.
+  if (route_config.has_retry_policy_typed_config()) {
+    return RetryPolicyImpl::createFromTypedConfig(route_config.retry_policy_typed_config(),
+                                                  validation_visitor, factory_context);
+  }
   if (route_config.has_retry_policy()) {
     return RetryPolicyImpl::create(route_config.retry_policy(), validation_visitor,
                                    factory_context);
@@ -1709,7 +1717,17 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.
-  if (virtual_host.has_retry_policy()) {
+  if (virtual_host.has_retry_policy() && virtual_host.has_retry_policy_typed_config()) {
+    creation_status = absl::InvalidArgumentError(
+        "Cannot set both retry_policy and retry_policy_typed_config in VirtualHost.");
+    return;
+  }
+  if (virtual_host.has_retry_policy_typed_config()) {
+    auto policy_or_error = RetryPolicyImpl::createFromTypedConfig(
+        virtual_host.retry_policy_typed_config(), validator, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(policy_or_error.value());
+  } else if (virtual_host.has_retry_policy()) {
     auto policy_or_error =
         RetryPolicyImpl::create(virtual_host.retry_policy(), validator, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
