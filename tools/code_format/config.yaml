@@ -39,7 +39,6 @@ paths:
   - bazel/tests/codeql/
   - bazel/tests/external/
   - bazel-
-  - compat/openssl/
   - build
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc
@@ -227,6 +226,7 @@ paths:
   namespace_check:
     exclude:
     - tools/api_boost/testdata/
+    - compat/openssl/
 
   # Files that should not raise an error for using memcpy
   memcpy:
