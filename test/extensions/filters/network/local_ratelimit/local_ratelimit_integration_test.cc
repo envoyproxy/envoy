@@ -80,6 +80,9 @@ typed_config:
     fill_interval: 0.2s
 )EOF");
 
+  // Move past the initial fill boundary to allow for floating-point rounding.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
+
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
