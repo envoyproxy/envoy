@@ -191,15 +191,22 @@ public:
   // The request went out to `path` in the client's project and region, with the route's
   // credential and `body`. Vertex AI takes the Anthropic API's version in the body, so the header
   // Envoy's own Anthropic binding writes does not apply to a Vertex AI binding, nor to Gemini's.
-  void expectUpstreamRequest(absl::string_view path, const nlohmann::json& body) {
+  // The filters ahead of the transcoder read the client's model from its path too: the request
+  // passed schema validation without a `model` in the body, and request_info published it.
+  void expectUpstreamRequest(absl::string_view path, const nlohmann::json& body,
+                             absl::string_view client_model) {
     const Http::RequestHeaderMap& headers = upstream_request_->headers();
     EXPECT_EQ(headers.getMethodValue(), "POST");
     EXPECT_EQ(headers.getPathValue(), path);
     EXPECT_EQ(headers.getHostValue(), "us-east5-aiplatform.googleapis.com");
     EXPECT_THAT(headers, ContainsHeader("authorization", AccessToken));
     EXPECT_THAT(headers, ContainsHeader("x-vertex-location", "us-east5"));
+    EXPECT_THAT(headers, ContainsHeader("x-request-model", client_model));
     EXPECT_TRUE(headers.get(Http::LowerCaseString("anthropic-version")).empty());
     EXPECT_EQ(nlohmann::json::parse(upstream_body_), body);
+    EXPECT_EQ(test_server_->counter("ai_protocol_manager.schema_validation.valid")->value(), 1);
+    EXPECT_EQ(test_server_->counter("ai_protocol_manager.schema_validation.invalid")->value(), 0);
+    EXPECT_EQ(test_server_->counter("ai_protocol_manager.request_info.published")->value(), 1);
   }
 
 private:
@@ -236,6 +243,10 @@ private:
       auto* location = route->mutable_request_headers_to_add()->Add()->mutable_header();
       location->set_key("x-vertex-location");
       location->set_value("%FILTER_STATE(envoy.ai.binding.read:FIELD:location)%");
+      // What request_info read as the client's model, ahead of the transcoder.
+      auto* model = route->mutable_request_headers_to_add()->Add()->mutable_header();
+      model->set_key("x-request-model");
+      model->set_value("%FILTER_STATE(envoy.ai.model.request:PLAIN)%");
     });
 
     config_helper_.prependFilter(R"EOF(
@@ -244,6 +255,12 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
   request_handling: {}
   filters:
+  - name: envoy.http.ai_filters.schema_validation
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
+  - name: envoy.http.ai_filters.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
   - name: envoy.http.ai_filters.transcoder
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
@@ -338,7 +355,8 @@ TEST_P(TranscoderIntegrationTest, VertexClaudeRawPredictReachesGeminiGenerateCon
   expectUpstreamRequest(absl::StrCat(VertexGeminiPath, ":generateContent"),
                         {{"systemInstruction", {{"parts", {{{"text", SystemPrompt}}}}}},
                          {"contents", {{{"role", "user"}, {"parts", {{{"text", Question}}}}}}},
-                         {"generationConfig", {{"maxOutputTokens", 1024}}}});
+                         {"generationConfig", {{"maxOutputTokens", 1024}}}},
+                        ClaudeModel);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -368,7 +386,8 @@ TEST_P(TranscoderIntegrationTest, VertexClaudeStreamRawPredictReachesGeminiStrea
   expectUpstreamRequest(
       absl::StrCat(VertexGeminiPath, ":streamGenerateContent?alt=sse"),
       {{"contents", {{{"role", "user"}, {"parts", {{{"text", StreamQuestion}}}}}}},
-       {"generationConfig", {{"maxOutputTokens", 1024}}}});
+       {"generationConfig", {{"maxOutputTokens", 1024}}}},
+      ClaudeModel);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -407,7 +426,8 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiGenerateContentReachesClaudeRawPre
                          {"max_tokens", 1024},
                          {"stream", false},
                          {"system", SystemPrompt},
-                         {"messages", {{{"role", "user"}, {"content", Question}}}}});
+                         {"messages", {{{"role", "user"}, {"content", Question}}}}},
+                        GeminiModel);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -437,7 +457,8 @@ TEST_P(TranscoderIntegrationTest, FilterStateAloneDeclaresTheEndpoint) {
                         {{"anthropic_version", "vertex-2023-10-16"},
                          {"max_tokens", 1024},
                          {"stream", false},
-                         {"messages", {{{"role", "user"}, {"content", Question}}}}});
+                         {"messages", {{{"role", "user"}, {"content", Question}}}}},
+                        GeminiModel);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -462,7 +483,8 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiStreamGenerateContentReachesClaude
                         {{"anthropic_version", "vertex-2023-10-16"},
                          {"max_tokens", 1024},
                          {"stream", true},
-                         {"messages", {{{"role", "user"}, {"content", StreamQuestion}}}}});
+                         {"messages", {{{"role", "user"}, {"content", StreamQuestion}}}}},
+                        GeminiModel);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -514,6 +536,12 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
   request_handling: {}
   filters:
+  - name: envoy.http.ai_filters.schema_validation
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
+  - name: envoy.http.ai_filters.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
   - name: envoy.http.ai_filters.transcoder
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder

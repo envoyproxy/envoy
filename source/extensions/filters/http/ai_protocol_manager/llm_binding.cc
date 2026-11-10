@@ -228,9 +228,13 @@ bool removes(const std::vector<const LlmBinding::Mutation*>& edits, absl::string
   });
 }
 
+// Reads the path and `body` under `binding`. The edits go to `edited` -- `body` itself, or null
+// to leave it as it is; the read says the same either way, so a filter ahead of the transcoder
+// sees what it will do.
 std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& binding,
                                           const LlmBinding* api_binding, absl::string_view path,
-                                          nlohmann::json& body, const HeaderLookup& header) {
+                                          const nlohmann::json& body, nlohmann::json* edited,
+                                          const HeaderLookup& header) {
   LlmBindingRead read{binding};
   const std::vector<const LlmBinding::Mutation*> edits = editsOf(*binding, api_binding);
   if (const UriPattern* pattern = patternOf(*binding, api_binding); pattern != nullptr) {
@@ -242,13 +246,19 @@ std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& bindin
     // that does not name the streaming mode leaves the body's.
     if (body.is_object()) {
       if (!match->model.empty() && (removes(edits, ModelField) || !body.contains(ModelField))) {
-        body[ModelField] = match->model;
+        read.model_from_path = true;
+        if (edited != nullptr) {
+          (*edited)[ModelField] = match->model;
+        }
       }
       if (match->stream.has_value()) {
         if (removes(edits, StreamField)) {
-          body[StreamField] = *match->stream;
+          read.stream = *match->stream;
         } else if (*match->stream && !body.contains(StreamField)) {
-          body[StreamField] = true;
+          read.stream = true;
+        }
+        if (edited != nullptr && read.stream.has_value()) {
+          (*edited)[StreamField] = *read.stream;
         }
       }
     }
@@ -270,14 +280,45 @@ std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& bindin
     if (!body.is_object()) {
       continue;
     }
-    const auto field = body.find(mutation->body_field);
-    if (field == body.end()) {
+    if (edited == nullptr) {
+      if (const auto field = body.find(mutation->body_field); field != body.end()) {
+        read.written_fields.emplace(mutation->body_field, *field);
+      }
+      continue;
+    }
+    const auto field = edited->find(mutation->body_field);
+    if (field == edited->end()) {
       continue;
     }
     read.written_fields.emplace(mutation->body_field, std::move(*field));
-    body.erase(field);
+    edited->erase(field);
   }
   return read;
+}
+
+// `readRequest` under the first of the bindings that matches.
+std::optional<LlmBindingRead>
+readFirstMatch(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
+               absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
+               const nlohmann::json& body, nlohmann::json* edited, const HeaderLookup& header) {
+  if (binding != nullptr) {
+    return readRequest(binding, api_binding.get(), path, body, edited, header);
+  }
+  if (api_binding != nullptr) {
+    if (std::optional<LlmBindingRead> read =
+            readRequest(api_binding, nullptr, path, body, edited, header);
+        read.has_value()) {
+      return read;
+    }
+  }
+  for (const LlmBindingConstSharedPtr& client_binding : client_bindings) {
+    if (std::optional<LlmBindingRead> read =
+            readRequest(client_binding, nullptr, path, body, edited, header);
+        read.has_value()) {
+      return read;
+    }
+  }
+  return std::nullopt;
 }
 
 } // namespace
@@ -349,23 +390,15 @@ std::optional<LlmBindingRead>
 readClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
                absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
                nlohmann::json& body, const HeaderLookup& header) {
-  if (binding != nullptr) {
-    return readRequest(binding, api_binding.get(), path, body, header);
-  }
-  if (api_binding != nullptr) {
-    if (std::optional<LlmBindingRead> read = readRequest(api_binding, nullptr, path, body, header);
-        read.has_value()) {
-      return read;
-    }
-  }
-  for (const LlmBindingConstSharedPtr& client_binding : client_bindings) {
-    if (std::optional<LlmBindingRead> read =
-            readRequest(client_binding, nullptr, path, body, header);
-        read.has_value()) {
-      return read;
-    }
-  }
-  return std::nullopt;
+  return readFirstMatch(binding, api_binding, client_bindings, path, body, &body, header);
+}
+
+std::optional<LlmBindingRead>
+peekClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
+               absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
+               const nlohmann::json& body) {
+  const HeaderLookup no_headers = [](absl::string_view) { return std::optional<std::string>(); };
+  return readFirstMatch(binding, api_binding, client_bindings, path, body, nullptr, no_headers);
 }
 
 absl::StatusOr<std::optional<std::string>>

@@ -5,6 +5,7 @@
 
 #include "test/test_common/status_utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 
@@ -184,6 +185,51 @@ TEST(SchemaTest, VectorOverloadsAndConstructors) {
   Schema one_of_schema = Schema::oneOf(std::move(candidates));
   EXPECT_EQ(one_of_schema.type(), Schema::Type::OneOf);
   EXPECT_EQ(one_of_schema.oneOfCandidates().size(), 2);
+}
+
+// A root field the request's path carries is not missing; the rest is checked as before, the
+// nested objects untouched.
+TEST(SchemaTest, FieldsInThePathCountAsPresent) {
+  const Schema schema =
+      Schema::object({
+                         {"model", Schema::string().required()},
+                         {"max_tokens", Schema::integer().required()},
+                         {"metadata", Schema::object({{"user_id", Schema::string().required()}})},
+                     })
+          .customValidator([](const nlohmann::json& root) {
+            return root.contains("rejected") ? absl::InvalidArgumentError("rejected")
+                                             : absl::OkStatus();
+          });
+  constexpr absl::string_view model_in_path[] = {"model"};
+
+  const nlohmann::json without_model = {{"max_tokens", 8}};
+  EXPECT_THAT(schema.validate(without_model), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(schema.validateRoot(without_model, model_in_path), IsOk());
+  EXPECT_THAT(schema.validateRoot(without_model, {}),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Only the named field is excused.
+  const absl::Status missing_tokens = schema.validateRoot({{"stream", true}}, model_in_path);
+  EXPECT_THAT(missing_tokens, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(missing_tokens.message(), "missing required field: max_tokens");
+  // A body that names it too is still checked.
+  EXPECT_THAT(schema.validateRoot({{"model", 1}, {"max_tokens", 8}}, model_in_path),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  // The root alone: a nested object with the same name is not excused.
+  EXPECT_THAT(schema.validateRoot({{"max_tokens", 8}, {"metadata", nlohmann::json::object()}},
+                                  model_in_path),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  // The custom validator still runs.
+  const absl::Status rejected =
+      schema.validateRoot({{"max_tokens", 8}, {"rejected", true}}, model_in_path);
+  EXPECT_THAT(rejected, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(rejected.message(), testing::HasSubstr("rejected"));
+
+  // Through the request schema.
+  const PayloadSchema payload{RequestSchema{schema}};
+  EXPECT_THAT(payload.validateRequest(without_model, model_in_path), IsOk());
+  EXPECT_THAT(payload.validateRequest(without_model),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(SchemaTest, CustomValidator) {

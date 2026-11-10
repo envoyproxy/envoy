@@ -60,6 +60,13 @@ LlmBindingReadObject::fromFilterState(const StreamInfo::FilterState& filter_stat
   return object != nullptr ? &object->read() : nullptr;
 }
 
+LlmBindingConstSharedPtr requestBinding(const StreamInfo::FilterState& filter_state,
+                                        const LlmBindingConstSharedPtr& route_binding) {
+  const absl::StatusOr<LlmBindingConstSharedPtr> binding =
+      LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest);
+  return binding.ok() && *binding != nullptr ? *binding : route_binding;
+}
+
 StreamInfo::FilterState::Object::FieldType
 LlmBindingReadObject::getField(absl::string_view field_name) const {
   if (field_name == "model") {

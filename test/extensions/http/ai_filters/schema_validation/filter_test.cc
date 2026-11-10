@@ -18,6 +18,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 
@@ -76,7 +77,8 @@ public:
     std::vector<AiFilterSharedPtr> filters;
     filters.push_back(std::make_shared<SchemaValidationFilter>(
         std::make_shared<const SchemaValidationFilterConfig>(proto, *stats_store_.rootScope()),
-        AiFilterContext{stream_info_, request_headers_, declared_protocol}));
+        AiFilterContext{stream_info_, request_headers_, declared_protocol,
+                        /*request_payload_bytes=*/0, LLMProtocol::Unspecified, request_binding_}));
     filters.push_back(std::make_shared<ProtocolRecordingFilter>(seen_protocol_));
     FilterManager manager(std::move(filters));
 
@@ -133,6 +135,8 @@ public:
   envoy::type::ai::v3::LLMProtocol default_llm_protocol_{
       envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED};
   bool fail_open_{false};
+  // The route's request binding; null unless a test sets one.
+  HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr request_binding_;
 
   std::optional<absl::Status> status_;
   std::optional<Http::Code> reply_code_;
@@ -155,6 +159,50 @@ TEST_F(SchemaValidationFilterTest, RejectsPayloadViolatingTheDeclaredSchema) {
   run(R"({"model":"gpt-4o"})", LLMProtocol::OpenAiChatCompletions);
   expectRejected();
   EXPECT_EQ(counterValue("valid"), 0);
+}
+
+// Claude on Vertex AI names the model in the path and not in the body, which the Anthropic
+// schema requires: the binding the request arrived in supplies it.
+TEST_F(SchemaValidationFilterTest, AcceptsTheModelFromTheClientsPath) {
+  constexpr absl::string_view vertex_payload =
+      R"({"anthropic_version":"vertex-2023-10-16","max_tokens":1024,)"
+      R"("messages":[{"role":"user","content":"hi"}]})";
+  run(vertex_payload, LLMProtocol::AnthropicMessages,
+      "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+      "claude-sonnet-4-5@20250929:rawPredict");
+  expectForwarded();
+  EXPECT_EQ(counterValue("valid"), 1);
+  // Forwarded as sent: normalizing the body is the transcoder's.
+  EXPECT_EQ(nlohmann::json::parse(bridge_.injected_.toString()),
+            nlohmann::json::parse(vertex_payload));
+}
+
+// The same body on the API's own path has no model anywhere.
+TEST_F(SchemaValidationFilterTest, StillRequiresTheModelOnTheApisOwnPath) {
+  run(R"({"max_tokens":1024,"messages":[{"role":"user","content":"hi"}]})",
+      LLMProtocol::AnthropicMessages, "/v1/messages");
+  expectRejected();
+  EXPECT_THAT(reply_details_, testing::HasSubstr("model"));
+}
+
+// The path excuses the model only; the rest of the schema still applies.
+TEST_F(SchemaValidationFilterTest, TheClientsPathExcusesOnlyWhatItCarries) {
+  run(R"({"anthropic_version":"vertex-2023-10-16","messages":[{"role":"user","content":"hi"}]})",
+      LLMProtocol::AnthropicMessages,
+      "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+      "claude-sonnet-4-5@20250929:streamRawPredict");
+  expectRejected();
+  EXPECT_THAT(reply_details_, testing::HasSubstr("max_tokens"));
+}
+
+// A route's binding replaces the API's layouts, and its path's model counts the same way.
+TEST_F(SchemaValidationFilterTest, ReadsTheRoutesBinding) {
+  request_binding_ = *HttpFilters::AiProtocolManager::LlmBinding::parse(
+      R"({"uri_pattern": "/gw/{model}", "body_mutations": [{"remove": "model"}]})");
+  run(R"({"messages":[{"role":"user","content":"hi"}]})", LLMProtocol::OpenAiChatCompletions,
+      "/gw/gpt-4o");
+  expectForwarded();
+  EXPECT_EQ(counterValue("valid"), 1);
 }
 
 // `model` must stay inline; an offloaded one is rejected rather than read from the buffer.

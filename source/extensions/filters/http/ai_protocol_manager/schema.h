@@ -13,6 +13,7 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -128,6 +129,10 @@ public:
   absl::Status validate(const JsonWithExtBuf& payload) const {
     return validate(payload.json(), "");
   }
+  // Validates `json` as the root object, with `in_path` counting as present: the fields the
+  // request's binding carries in the path rather than the body, as Vertex AI does the model.
+  absl::Status validateRoot(const nlohmann::json& json,
+                            absl::Span<const absl::string_view> in_path) const;
 
   // Introspection & Reflection accessors:
   Type type() const { return type_; }
@@ -147,7 +152,8 @@ private:
   absl::Status validateInteger(const nlohmann::json& json, absl::string_view path) const;
   absl::Status validateBoolean(const nlohmann::json& json, absl::string_view path) const;
   absl::Status validateNull(const nlohmann::json& json, absl::string_view path) const;
-  absl::Status validateObject(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateObject(const nlohmann::json& json, absl::string_view path,
+                              absl::Span<const absl::string_view> in_path = {}) const;
   absl::Status validateArray(const nlohmann::json& json, absl::string_view path) const;
   absl::Status validateOneOf(const nlohmann::json& json, absl::string_view path) const;
 
@@ -205,6 +211,11 @@ public:
   }
   absl::Status validate(const nlohmann::json& json) const {
     return root_schema_.validate(json, "");
+  }
+  // `in_path`: root fields the request's binding carries in the path, so not missing.
+  absl::Status validate(const nlohmann::json& json,
+                        absl::Span<const absl::string_view> in_path) const {
+    return root_schema_.validateRoot(json, in_path);
   }
 
 private:
@@ -266,6 +277,11 @@ public:
   }
   absl::Status validateRequest(const nlohmann::json& json) const {
     return request_schema_.validate(json);
+  }
+  // `in_path`: root fields the request's binding carries in the path, so not missing.
+  absl::Status validateRequest(const nlohmann::json& json,
+                               absl::Span<const absl::string_view> in_path) const {
+    return request_schema_.validate(json, in_path);
   }
 
 private:
