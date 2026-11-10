@@ -64,6 +64,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/bootstrap/dynamic_modules:cluster_writer_lib",
+        "//source/extensions/bootstrap/dynamic_modules:writer_shared_state_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
