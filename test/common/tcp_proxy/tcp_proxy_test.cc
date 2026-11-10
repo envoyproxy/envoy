@@ -2883,7 +2883,8 @@ TEST_P(TcpProxyTest, SingleConnectionTriggerWithMultipleDataChunks) {
   EXPECT_EQ(connection_attempts, 1);
 }
 
-// Test empty data with end_stream doesn't trigger connection in ON_DOWNSTREAM_DATA mode.
+// Test empty data with end_stream doesn't trigger connection in ON_DOWNSTREAM_DATA mode, and
+// closes the downstream connection instead of leaving it open until idle_timeout.
 TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.set_upstream_connect_mode(
@@ -2896,8 +2897,11 @@ TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  // Empty data with end_stream should NOT trigger connection.
+  // Empty data with end_stream should NOT trigger connection, and should close downstream.
   Buffer::OwnedImpl empty_data;
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDownstreamClosedWithoutData));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, true));
 
   // No connection should be established.
