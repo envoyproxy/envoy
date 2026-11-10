@@ -183,6 +183,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
     closed_with_active_rq_ = true;
     break;
   case StreamResetReason::LocalReset:
+  case StreamResetReason::LocalResetNoError:
   case StreamResetReason::ProtocolError:
   case StreamResetReason::OverloadManager:
     parent_.host()->cluster().trafficStats()->upstream_rq_tx_reset_.inc();

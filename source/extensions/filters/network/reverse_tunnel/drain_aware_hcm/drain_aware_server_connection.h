@@ -36,6 +36,7 @@ public:
                                   bool is_internally_created = false) override {
     return inner_.newStream(response_encoder, is_internally_created);
   }
+  void onWantsToWriteCleared() override { inner_.onWantsToWriteCleared(); }
 
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override {

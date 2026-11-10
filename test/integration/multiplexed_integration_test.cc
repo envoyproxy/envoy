@@ -47,6 +47,7 @@ namespace Envoy {
 class MultiplexedIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
+  void drainCloseAfterFlowControlledResponse(bool request_open);
 };
 
 constexpr uint32_t GiantPayoadSizeByte = 10 * 1024 * 1024;
@@ -261,6 +262,75 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeoutOverride) {
                                         : "http2.tx_flush_timeout");
   test_server_->waitForCounter(flush_timeout_counter, Eq(1));
   ASSERT_TRUE(response->waitForReset());
+}
+
+// A draining connection must be closed once the last response has been sent, even when the drain
+// sequence ended while flow control was still holding back the end of that response.
+void MultiplexedIntegrationTest::drainCloseAfterFlowControlledResponse(bool request_open) {
+  // TODO(ggreenway): HTTP/3 never closes this connection. QUICHE keeps sending the response after
+  // the connection manager has finished the stream, and wantsToWrite() counts those bytes, but
+  // nothing re-checks the drain close once they have been sent. The QUIC codec should fire
+  // ServerConnectionCallbacks::onWantsToWriteCleared() when its buffered bytes reach zero.
+  EXCLUDE_DOWNSTREAM_HTTP3;
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    // Drain after the first request, and end the drain sequence before the response arrives.
+    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(1);
+    hcm.mutable_drain_timeout()->set_nanos(1'000'000); // 1ms
+  });
+  initialize();
+  const size_t stream_flow_control_window =
+      downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
+  http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
+#ifdef ENVOY_ENABLE_QUIC
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window);
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialSessionFlowControlWindowToSend(stream_flow_control_window);
+  }
+#endif
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  IntegrationStreamDecoderPtr response;
+  if (request_open) {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    request_encoder_ = &encoder_decoder.first;
+    response = std::move(encoder_decoder.second);
+  } else {
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  }
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // The client does not read until its dispatcher runs below, so Envoy can only send as much of
+  // the response as the client's flow-control window allows, and holds back the rest.
+  const size_t body_size = stream_flow_control_window + 2000;
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(body_size, true);
+  // Once the router has finished the upstream request, Envoy has the whole response. The
+  // connection is not closed while the codec still has some of it to send.
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  EXPECT_EQ(1, test_server_->gauge("http.config_test.downstream_cx_active")->value());
+
+  // Reading lets the rest of the response out. Envoy must then close the drained connection.
+  EXPECT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(body_size, response->body().size());
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+  // Close the client while `response` can still receive its callbacks, even if a check failed.
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(MultiplexedIntegrationTest, DrainCloseAfterFlowControlledResponseWithOpenRequest) {
+  drainCloseAfterFlowControlledResponse(true);
+}
+
+TEST_P(MultiplexedIntegrationTest, DrainCloseAfterFlowControlledResponse) {
+  drainCloseAfterFlowControlledResponse(false);
 }
 
 TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {

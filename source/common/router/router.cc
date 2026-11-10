@@ -1848,6 +1848,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::ConnectionTermination:
     return StreamInfo::CoreResponseFlag::UpstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::LocalResetNoError:
   case Http::StreamResetReason::LocalRefusedStreamReset:
   case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     return StreamInfo::CoreResponseFlag::LocalReset;

@@ -38,6 +38,7 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::AtMost;
 using testing::ElementsAre;
 using testing::EndsWith;
 using testing::Eq;
@@ -132,6 +133,11 @@ public:
     }
     return stream_ids;
   }
+  // Whether the adapter has frames it can send now. Unlike ConnectionImpl::wantsToWrite(), this is
+  // false while a held reset waits for a WINDOW_UPDATE, when dispatching cannot make progress.
+  static bool adapterWantsToWrite(ConnectionImpl& connection) {
+    return connection.adapter_->want_write();
+  }
 
   static std::unique_ptr<ConnectionImpl::Http2Options>
   createHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
@@ -172,7 +178,7 @@ public:
 
     // Returns true if there are bytes to send or receive, and the connection is in good state.
     bool canDispatch() const {
-      return (buffer_.length() > 0 || connection_->wantsToWrite()) && status_.ok();
+      return (buffer_.length() > 0 || adapterWantsToWrite(*connection_)) && status_.ok();
     }
 
     bool dispatching_{};
@@ -2007,6 +2013,9 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
 }
 
 TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndStreamBeforeReset) {
+  // A LocalReset aborts the stream, so the deferred reset is only best effort: response data that
+  // flow control is still holding back is discarded. Http2CodecImplHeldResetTest covers the
+  // LocalResetNoError reset, which is held until the response has been sent.
   initialize();
 
   InSequence s;
@@ -2085,6 +2094,332 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalE
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   driveToCompletion();
   EXPECT_OK(client_wrapper_->status_);
+}
+
+// The connection manager resets the stream with LocalResetNoError when a response completes before
+// its request. If flow control is still holding back part of the response, the codec holds that
+// reset until the response's END_STREAM has been sent, instead of discarding the rest of the
+// response.
+class Http2CodecImplHeldResetTest : public Http2CodecImplTest {
+protected:
+  // Like BufferMemoryAccountImpl, resets the stream until clearDownstream() is called.
+  class FakeStreamAccount : public Buffer::BufferMemoryAccount {
+  public:
+    explicit FakeStreamAccount(Stream& stream) : stream_(&stream) {}
+    void charge(uint64_t) override {}
+    void credit(uint64_t) override {}
+    void clearDownstream() override { stream_ = nullptr; }
+    void resetDownstream() override {
+      if (stream_ != nullptr) {
+        stream_->resetStream(StreamResetReason::OverloadManager);
+      }
+    }
+    bool hasDownstream() const { return stream_ != nullptr; }
+
+  private:
+    Stream* stream_;
+  };
+
+  static constexpr uint64_t ResponseBodySize = 1024 * 1024;
+
+  // Sends request headers without END_STREAM, so the request stays open.
+  void startRequest() {
+    initialize();
+    request_encoder_->getStream().addCallbacks(client_stream_callbacks_);
+    TestRequestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+    EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+    driveToCompletion();
+  }
+
+  void expectFlushTimer() {
+    flush_timer_ = new NiceMock<Event::MockTimer>();
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce([this](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer_->callback_ = cb;
+          return flush_timer_;
+        });
+    EXPECT_CALL(*flush_timer_, enableTimer(std::chrono::milliseconds(30000), _));
+  }
+
+  void expectResponseData() {
+    EXPECT_CALL(response_decoder_, decodeData(_, _))
+        .WillRepeatedly([this](Buffer::Instance& data, bool end_stream) {
+          received_bytes_ += data.length();
+          response_end_stream_ = end_stream;
+        });
+  }
+
+  // Sends a response larger than the client's flow-control window, lets the client receive what
+  // the window allows without sending its WINDOW_UPDATE to the server, then resets the stream the
+  // way the connection manager does, which stops observing the stream when it resets it.
+  void sendResponseAndReset(bool flush_timeout_enabled = true) {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+    response_encoder_->encodeHeaders(response_headers, false);
+    driveToCompletion();
+
+    expectResponseData();
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    if (flush_timeout_enabled) {
+      expectFlushTimer();
+    } else {
+      response_encoder_->getStream().setFlushTimeout(std::chrono::milliseconds(0));
+      EXPECT_CALL(server_connection_.dispatcher_,
+                  createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+          .Times(0);
+    }
+    Buffer::OwnedImpl body(std::string(ResponseBodySize, 'a'));
+    response_encoder_->encodeData(body, true);
+    driveServer();
+    driveClient();
+
+    expectResetDetachesCallbacks();
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalResetNoError);
+
+    // The reset is held: it was not sent, and the codec still wants to write the response.
+    EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+    EXPECT_GT(received_bytes_, 0);
+    EXPECT_LT(received_bytes_, ResponseBodySize);
+    EXPECT_FALSE(response_end_stream_);
+    EXPECT_TRUE(server_->wantsToWrite());
+  }
+
+  void expectResetDetachesCallbacks() {
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalResetNoError, _))
+        .WillOnce([this](StreamResetReason, absl::string_view) {
+          response_encoder_->getStream().removeCallbacks(server_stream_callbacks_);
+          response_encoder_->getStream().registerCodecEventCallbacks(nullptr);
+        });
+  }
+
+  MockStreamCallbacks client_stream_callbacks_;
+  NiceMock<Event::MockTimer>* flush_timer_{};
+  uint64_t received_bytes_{};
+  bool response_end_stream_{};
+};
+
+// Once the client's WINDOW_UPDATEs let the rest of the response out, the held reset is sent with
+// NO_ERROR.
+TEST_P(Http2CodecImplHeldResetTest, ResetSentAfterResponse) {
+  startRequest();
+  sendResponseAndReset();
+
+  // Finishing during dispatch() does not notify the connection callbacks; the connection manager
+  // checks wantsToWrite() after dispatch() returns.
+  EXPECT_CALL(server_callbacks_, onWantsToWriteCleared()).Times(0);
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  driveToCompletion();
+  EXPECT_EQ(ResponseBodySize, received_bytes_);
+  EXPECT_TRUE(response_end_stream_);
+  EXPECT_FALSE(server_->wantsToWrite());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+  EXPECT_OK(server_wrapper_->status_);
+  EXPECT_OK(client_wrapper_->status_);
+}
+
+// The connection manager often resets the stream while the codec is dispatching, for example for a
+// local reply sent from decodeHeaders(). That reset is held the same way.
+TEST_P(Http2CodecImplHeldResetTest, ResetDuringDispatch) {
+  initialize();
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks_);
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce([&]() {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    expectFlushTimer();
+    Buffer::OwnedImpl body(std::string(ResponseBodySize, 'a'));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalResetNoError, _));
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalResetNoError);
+  });
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  // Drive the client once to send the request headers, and the server once to send what the
+  // window allows of the response.
+  driveClient();
+  driveServer();
+  EXPECT_TRUE(server_->wantsToWrite());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  expectResponseData();
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  driveToCompletion();
+  EXPECT_EQ(ResponseBodySize, received_bytes_);
+  EXPECT_TRUE(response_end_stream_);
+  EXPECT_FALSE(server_->wantsToWrite());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+}
+
+// If the client never grants more window, the flush timeout resets the stream with an error, and
+// the connection callbacks learn that no held resets remain.
+TEST_P(Http2CodecImplHeldResetTest, FlushTimeoutResetsHeldStream) {
+  startRequest();
+  sendResponseAndReset();
+
+  EXPECT_CALL(server_callbacks_, onWantsToWriteCleared());
+  flush_timer_->invokeCallback();
+  EXPECT_FALSE(server_->wantsToWrite());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
+
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  driveToCompletion();
+  EXPECT_LT(received_bytes_, ResponseBodySize);
+  EXPECT_FALSE(response_end_stream_);
+}
+
+// If the client ends the request while the reset is held, the stream closes without a reset once
+// the response has been sent. The request is dropped: the connection manager has finished with
+// the stream.
+TEST_P(Http2CodecImplHeldResetTest, ClientEndsRequestWhileResetHeld) {
+  startRequest();
+  sendResponseAndReset();
+
+  EXPECT_CALL(request_decoder_, decodeData(_, _)).Times(0);
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(_, _)).Times(0);
+  Buffer::OwnedImpl request_body("request body");
+  request_encoder_->encodeData(request_body, true);
+  driveToCompletion();
+  EXPECT_EQ(ResponseBodySize, received_bytes_);
+  EXPECT_TRUE(response_end_stream_);
+  EXPECT_FALSE(server_->wantsToWrite());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+}
+
+// If the client resets the stream while the reset is held, the server sends nothing more.
+TEST_P(Http2CodecImplHeldResetTest, ClientResetWhileResetHeld) {
+  startRequest();
+  sendResponseAndReset();
+
+  EXPECT_CALL(server_callbacks_, onWantsToWriteCleared()).Times(0);
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  driveToCompletion();
+  EXPECT_FALSE(server_->wantsToWrite());
+  EXPECT_LT(received_bytes_, ResponseBodySize);
+  EXPECT_FALSE(response_end_stream_);
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+}
+
+// The held stream stays on its buffer memory account, so the overload manager can still reset it
+// to reclaim the buffered response.
+TEST_P(Http2CodecImplHeldResetTest, OverloadManagerResetsHeldStream) {
+  startRequest();
+  auto account = std::make_shared<FakeStreamAccount>(response_encoder_->getStream());
+  response_encoder_->getStream().setAccount(account);
+  sendResponseAndReset();
+  EXPECT_TRUE(account->hasDownstream());
+
+  EXPECT_CALL(server_callbacks_, onWantsToWriteCleared());
+  account->resetDownstream();
+  EXPECT_FALSE(account->hasDownstream());
+  EXPECT_FALSE(server_->wantsToWrite());
+
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  driveToCompletion();
+  EXPECT_LT(received_bytes_, ResponseBodySize);
+  EXPECT_FALSE(response_end_stream_);
+}
+
+// The connection manager has finished a held stream, so the codec drops its request data and
+// returns the flow-control window, even if the stream was left read-disabled. Otherwise the held
+// stream would use up connection window that the other streams share.
+TEST_P(Http2CodecImplHeldResetTest, HeldResetReleasesRequestWindow) {
+  startRequest();
+  // As a filter might, leave the stream read-disabled, so request data stays buffered.
+  server_->getStream(1)->readDisable(true);
+  EXPECT_CALL(request_decoder_, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl request_body(std::string(1024, 'q'));
+  request_encoder_->encodeData(request_body, false);
+  driveToCompletion();
+  EXPECT_EQ(1024, server_->getStream(1)->unconsumed_bytes_);
+
+  sendResponseAndReset();
+  EXPECT_EQ(0, server_->getStream(1)->unconsumed_bytes_);
+  EXPECT_EQ(0, server_->getStream(1)->pending_recv_data_->length());
+
+  // Request data that arrives while the reset is held is dropped as well.
+  Buffer::OwnedImpl more_request_body(std::string(1024, 'q'));
+  request_encoder_->encodeData(more_request_body, false);
+  driveClient();
+  driveServer();
+  EXPECT_EQ(0, server_->getStream(1)->unconsumed_bytes_);
+  EXPECT_EQ(0, server_->getStream(1)->pending_recv_data_->length());
+
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  driveToCompletion();
+  EXPECT_EQ(ResponseBodySize, received_bytes_);
+  EXPECT_TRUE(response_end_stream_);
+}
+
+// With the flush timeout disabled, a held reset waits for the client without a time limit, as a
+// stream whose request is complete already does.
+TEST_P(Http2CodecImplHeldResetTest, HeldResetWithoutFlushTimeout) {
+  startRequest();
+  sendResponseAndReset(false);
+
+  EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  driveToCompletion();
+  EXPECT_EQ(ResponseBodySize, received_bytes_);
+  EXPECT_TRUE(response_end_stream_);
+}
+
+// If flow control holds back only the end of the response, e.g. trailers after a body that exactly
+// used up the window, the codec has no response data of its own, so encoding the response armed no
+// flush timer. Holding the reset arms one, so the flush timeout still limits the hold.
+TEST_P(Http2CodecImplHeldResetTest, HeldResetArmsFlushTimer) {
+  startRequest();
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  expectResponseData();
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_)).Times(AnyNumber());
+  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+  const uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
+  ASSERT_EQ(65535, initial_stream_window);
+  // The client does not read the body yet, so it sends no WINDOW_UPDATE.
+  Buffer::OwnedImpl body(std::string(initial_stream_window, 'a'));
+  response_encoder_->encodeData(body, false);
+  EXPECT_EQ(0, server_->getStream(1)->pending_send_data_->length());
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
+
+  NiceMock<Event::MockTimer>* flush_timer = nullptr;
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .Times(AtMost(1))
+      .WillOnce([&flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer = new NiceMock<Event::MockTimer>();
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      });
+  expectResetDetachesCallbacks();
+  response_encoder_->getStream().resetStream(StreamResetReason::LocalResetNoError);
+
+  // oghttp2 sends the trailers only after the next WINDOW_UPDATE (see
+  // TrailersAfterBodyFillingStreamWindow), so its reset is held.
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    ASSERT_TRUE(server_->wantsToWrite());
+  }
+  if (server_->wantsToWrite()) {
+    ASSERT_NE(nullptr, flush_timer);
+    EXPECT_TRUE(flush_timer->enabled_);
+    EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+    flush_timer->invokeCallback();
+    EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
+  } else {
+    // The end of the response was sent right away, so there was nothing to hold.
+    EXPECT_CALL(client_stream_callbacks_, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  }
+  driveToCompletion();
+  EXPECT_FALSE(server_->wantsToWrite());
 }
 
 class Http2CodecImplFlowControlTest : public Http2CodecImplTest {};
@@ -2884,6 +3219,11 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(
     Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
+    ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE, HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+                       ::testing::Values(Http2Impl::Nghttp2, Http2Impl::Oghttp2)));
+
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplHeldResetTest, Http2CodecImplHeldResetTest,
     ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE, HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
                        ::testing::Values(Http2Impl::Nghttp2, Http2Impl::Oghttp2)));
 

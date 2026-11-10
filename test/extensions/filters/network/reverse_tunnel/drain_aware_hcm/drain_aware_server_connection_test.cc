@@ -270,6 +270,14 @@ TEST_F(DrainAwareServerConnectionCallbacksTest, OnMaxStreamsChangedDelegates) {
   wrapper.onMaxStreamsChanged(7);
 }
 
+// onWantsToWriteCleared passes through to the inner callbacks unchanged, so that a draining
+// connection is still closed once the codec has nothing left to write.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnWantsToWriteClearedDelegates) {
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, nullptr);
+  EXPECT_CALL(inner_callbacks_, onWantsToWriteCleared());
+  wrapper.onWantsToWriteCleared();
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters
