@@ -12,6 +12,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
@@ -54,6 +55,8 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
   // We do all listener removals before adding the new listeners. This allows adding a new
   // listener with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {
+    // SotW listeners whose TTL expires are removed here, so they are no longer tracked.
+    sotw_listener_names_.erase(removed_listener);
     if (listener_manager_.removeListener(removed_listener)) {
       ENVOY_LOG(info, "lds: remove listener '{}'", removed_listener);
       any_applied = true;
@@ -121,6 +124,28 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
 
 absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                         const std::string& version_info) {
+  absl::flat_hash_set<std::string> next_sotw_listener_names;
+  next_sotw_listener_names.reserve(resources.size());
+  for (const auto& resource : resources) {
+    next_sotw_listener_names.insert(
+        Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(
+            resource.get().resource())
+            .name());
+  }
+
+  // Other components may add listeners, so only remove the listeners received via SotW.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lds_sotw_track_resources")) {
+    Protobuf::RepeatedPtrField<std::string> to_remove;
+    for (const std::string& listener_name : sotw_listener_names_) {
+      if (!next_sotw_listener_names.contains(listener_name)) {
+        to_remove.Add(std::string(listener_name));
+      }
+    }
+    absl::Status status = onConfigUpdate(resources, to_remove, version_info);
+    sotw_listener_names_ = std::move(next_sotw_listener_names);
+    return status;
+  }
+
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   absl::node_hash_set<std::string> listeners_to_remove;
@@ -137,7 +162,11 @@ absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourc
   for (const auto& listener : listeners_to_remove) {
     *to_remove_repeated.Add() = listener;
   }
-  return onConfigUpdate(resources, to_remove_repeated, version_info);
+  absl::Status status = onConfigUpdate(resources, to_remove_repeated, version_info);
+  // Track the names even if unused, so enabling the guard at runtime doesn't leak listeners. Store
+  // them after the call, since it untracks the listeners that it removes.
+  sotw_listener_names_ = std::move(next_sotw_listener_names);
+  return status;
 }
 
 void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
