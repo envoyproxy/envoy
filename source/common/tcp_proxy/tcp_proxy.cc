@@ -1163,17 +1163,19 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
           return Network::FilterStatus::StopIteration;
         }
       }
-    } else if (!upstream_ && !connecting_ && end_stream && early_data_buffer_.length() == 0) {
-      // Downstream half-closed without sending data, and no upstream connection is in flight.
-      // ON_DOWNSTREAM_DATA intentionally skips establishUpstreamConnection() for an empty FIN.
-      // Half-close is enabled on the downstream connection, so this FIN is not reported as
-      // RemoteClose. Leaving the session open would hold it until idle_timeout (or forever if
-      // idle_timeout is unset), and with max_early_data_bytes == 0 would also read-disable the
-      // socket so further close signals are missed. Close locally instead.
+    } else if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA &&
+               !initial_data_received_ && end_stream && early_data_buffer_.length() == 0) {
+      // ON_DOWNSTREAM_DATA intentionally never connects upstream for a downstream that half-closes
+      // without sending any data. Half-close is enabled on the downstream connection, so this FIN
+      // is not reported as RemoteClose, and nothing else would end the session until idle_timeout
+      // (or forever if it is unset). With max_early_data_bytes == 0 the socket is also
+      // read-disabled, so further close signals are missed. Close locally instead.
       //
-      // IMMEDIATE / ON_DOWNSTREAM_TLS_HANDSHAKE with an in-flight upstream keep connecting_ true
-      // (or already have upstream_), so they continue to buffer end_stream and flush it when the
-      // upstream connects.
+      // Other modes are deliberately excluded. IMMEDIATE and ON_DOWNSTREAM_TLS_HANDSHAKE start
+      // (or have already started) an upstream connect, and an empty end_stream there is buffered
+      // and flushed to upstream on connect. Transient states such as a pending ODCDS lookup or a
+      // retry timer also leave connecting_ false, and closing there would drop a half-close the
+      // upstream is still expected to see.
       ENVOY_CONN_LOG(debug,
                      "Downstream closed without data before upstream connect; closing connection",
                      read_callbacks_->connection());

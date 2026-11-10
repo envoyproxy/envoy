@@ -1057,9 +1057,11 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
 TEST_P(TcpProxyTest, ReceiveBeforeConnectDownstreamClosesWithoutData) {
   setup(/*connections=*/1, /*set_redirect_records=*/false, /*receive_before_connect=*/true);
 
-  // Downstream closes without sending any data.
+  // Downstream closes without sending any data. The upstream connect is already in flight
+  // (IMMEDIATE), so the downstream must not be closed here; the FIN is buffered for the upstream.
   Buffer::OwnedImpl empty_buffer;
   EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
   filter_->onData(empty_buffer, /*end_stream=*/true);
 
   // When upstream connection is established, the end_stream signal should be sent even though
