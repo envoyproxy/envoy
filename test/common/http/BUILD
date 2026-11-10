@@ -125,7 +125,7 @@ envoy_proto_library(
         srcs = ["codec_impl_fuzz_test.cc"],
         corpus = "codec_impl_corpus",
         defines = ["FUZZ_PROTOCOL_%s" % http_protocol],
-        rbe_pool = "linux_x64_small",
+        rbe_pool = {"build": "linux_x64_small"},
         deps = [
             ":codec_impl_fuzz_proto_cc_proto",
             "//source/common/http:conn_manager_lib",
