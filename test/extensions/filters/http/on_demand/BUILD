@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -58,6 +59,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -88,6 +90,7 @@ envoy_extension_cc_test(
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
     ],
 )
