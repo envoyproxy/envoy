@@ -269,6 +269,11 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onDestroy() {
   route_config_updated_callback_.reset();
   cluster_discovery_handle_.reset();
+}
+
+// Runs before the access logs, which onDestroy() does not, so a discovery that never completed is
+// recorded as cancelled in time for the logs to show it.
+void OnDemandRouteUpdate::onStreamComplete() {
   // A discovery still in flight here was abandoned, e.g. the client went away while waiting.
   if (route_discovery_in_flight_) {
     discoveryState().routeCancelled();

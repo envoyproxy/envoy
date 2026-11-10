@@ -28,6 +28,7 @@ namespace {
 
 using OnDemandScopedRdsIntegrationTest = ScopedRdsIntegrationTest;
 using testing::ContainsRegex;
+using testing::Eq;
 using testing::Ge;
 
 // Adds a file access log that prints the on-demand discovery filter state. useAccessLog() can't be
@@ -573,6 +574,50 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[1]);
   EXPECT_THAT(entries[2], ContainsRegex("^route=found host=vhost_1 vhost=my_route/vhost_1 "
                                         "cluster=- route_us=[0-9]+$"));
+}
+
+// tests a scenario when:
+//  - Upstream makes a request to an unknown host
+//  - the management server never answers the discovery request
+//  - the client goes away while the request waits
+// The discovery counts as cancelled, and the access log, which runs before the filter is destroyed,
+// already shows it as cancelled.
+TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateCancelledWhenTheClientGoesAway) {
+  access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  addDiscoveryAccessLog(config_helper_, access_log_name_);
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost_1"},
+                                                 {"x-lyft-user-id", "123"}};
+  codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost_1")}, {},
+                                           vhds_stream_.get()));
+  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(1));
+
+  // No answer: the client goes away instead.
+  codec_client_->close();
+
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_cancelled", Eq(1));
+  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(0));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.on_demand.route_discovery_found")->value());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.on_demand.route_discovery_not_found")->value());
+
+  const std::vector<std::string> entries = waitForAccessLogEntries(access_log_name_, nullptr, 3);
+  EXPECT_EQ("route=cancelled host=vhost_1 vhost=- cluster=- route_us=-", entries[2]);
 }
 
 // tests a scenario when:

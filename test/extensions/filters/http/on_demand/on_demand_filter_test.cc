@@ -658,6 +658,8 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
   EXPECT_FALSE(hasField("route_status"));
   EXPECT_FALSE(hasField("host"));
   // Destroying the stream afterwards must not report a cancellation either.
+  // The same order as a real stream: the access logs run in between.
+  filter_->onStreamComplete();
   filter_->onDestroy();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
 }
@@ -665,6 +667,8 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
 TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
   setupWithStats(false);
   startRouteDiscovery();
+  // The same order as a real stream: the access logs run in between.
+  filter_->onStreamComplete();
   filter_->onDestroy();
   EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, counter("route_discovery_found"));
@@ -681,6 +685,8 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotCancelledAfterCompletion) {
   auto callback = startRouteDiscovery();
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   (*callback)(true);
+  // The same order as a real stream: the access logs run in between.
+  filter_->onStreamComplete();
   filter_->onDestroy();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
@@ -739,6 +745,8 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) {
   setupWithStats(true);
   startClusterDiscovery();
+  // The same order as a real stream: the access logs run in between.
+  filter_->onStreamComplete();
   filter_->onDestroy();
   EXPECT_EQ(1UL, counter("cluster_discovery_cancelled"));
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));
