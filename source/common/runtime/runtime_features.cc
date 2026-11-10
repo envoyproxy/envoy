@@ -87,6 +87,11 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 // removal) with the configured Server::Options::drainStrategy() instead of always forcing
 // DrainStrategy::Immediate.
 RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strategy);
+// When an encoder filter adds trailers during encodeData() and a later encoder filter stops
+// iteration, forward the added trailers via encodeTrailers() instead of dropping them, and make
+// ActiveStreamEncoderFilter::doTrailers() defer to that forwarding pass so trailers are neither
+// skipped for intermediate filters nor encoded twice.
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_encode_trailers_on_stop_iteration);
 // When a filter drains the current data frame into the filter-manager buffer via
 // addDecoded/EncodedData() and then returns Continue (e.g. a wasm filter resuming after buffering),
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not

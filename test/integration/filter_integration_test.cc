@@ -482,6 +482,43 @@ typed_config:
   }
 }
 
+// An encoder filter adds response trailers in encodeData(end_stream=true) while the next encoder
+// filter is still paused on headers and buffers that data. The added trailers must still reach the
+// buffering filter so its default encodeTrailers() continues the chain and the client sees the
+// body, the trailers, and the end of the stream. Without
+// envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration the trailers are
+// dropped and the response never completes.
+TEST_P(MultiProtocolFilterIntegrationTest, AddedEncodedTrailersReachStoppedEncoderFilter) {
+  // prependFilter() inserts at the front of the chain, so add-trailers-filter ends up closest to
+  // the router and runs first on the encode path.
+  prependFilter(R"EOF(
+name: add-trailers-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+)EOF");
+  prependFilter(R"EOF(
+name: encoder-decoder-buffer-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(128, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(128, response->body().size());
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    ASSERT_NE(nullptr, response->trailers());
+    EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
+  }
+}
+
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(FilterIntegrationTest, DownstreamRequestWithFaultyFilter) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");

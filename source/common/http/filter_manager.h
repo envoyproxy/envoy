@@ -1126,7 +1126,12 @@ private:
   // to update stats, do end stream bookkeeping, and send the data to encoder.
   void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
+  // `filter_iteration_start_state` is CanStartFromCurrent when a filter resumes trailer iteration
+  // itself (doTrailers()), and AlwaysStartFromNext when forwarding trailers that `filter` added
+  // during its own encodeData() callback, since that filter has already seen the end of stream.
+  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers,
+                      FilterIterationStartState filter_iteration_start_state =
+                          FilterIterationStartState::CanStartFromCurrent);
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
   bool hasSavedResponseMetadata() const;
   void encodeSavedResponseMetadataToCodec();
