@@ -352,6 +352,8 @@ struct FcdsTlsUpdateBenchmarkState {
     tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(&server_context_.dispatcher_);
     manager_ = std::make_shared<FcdsSharedFilterChainManager>(server_context_,
                                                               listener_component_factory_);
+    // Makes FCDS subscribe to the filter chains.
+    config_source_.mutable_ads();
     for (int64_t i = 0; i < chain_count; i++) {
       const std::string name = absl::StrCat("dynamic_filter_chain_", i);
       auto handle = manager_->subscribe(config_source_, name, dummy_fcds_callbacks_, init_manager_);

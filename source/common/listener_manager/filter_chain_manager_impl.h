@@ -7,6 +7,7 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
@@ -515,11 +516,16 @@ class FcdsSharedFilterChainManager
       public FilterChainUpdateCallbacks,
       public Logger::Loggable<Logger::Id::config> {
 public:
+  // Called with the name of each committed filter chain once it is posted to the workers.
+  using FilterChainPublishedCb = std::function<void(absl::string_view filter_chain_name)>;
+
   FcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
-                               ListenerComponentFactory& listener_component_factory);
+                               ListenerComponentFactory& listener_component_factory,
+                               FilterChainPublishedCb filter_chain_published_cb = nullptr);
   const Network::FilterChain* findThreadLocalFilterChain(const std::string& name) const;
 
-  // Subscribes a listener callback for a filter chain name FCDS distribution.
+  // Subscribes a listener to a filter chain name, through FCDS when the config source is set and to
+  // a local filter chain otherwise. A name of the other kind is rejected.
   absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
   subscribe(const envoy::config::core::v3::ConfigSource& config_source,
             const std::string& filter_chain_name, FcdsClientCallbacks& callbacks,
@@ -536,6 +542,14 @@ public:
   Network::DrainableFilterChainSharedPtr
   activeFilterChain(const std::string& filter_chain_name) const;
 
+  // Adds or updates a filter chain that no FCDS subscription delivers. Returns false when it is
+  // unchanged. Main-thread only.
+  absl::StatusOr<bool> addOrUpdateLocalFilterChain(const FilterChainProto& filter_chain);
+
+  // Removes a filter chain that addOrUpdateLocalFilterChain() added. Returns false when there is no
+  // such filter chain. Main-thread only.
+  bool removeLocalFilterChain(const std::string& filter_chain_name);
+
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
@@ -543,7 +557,8 @@ public:
 private:
   friend class FcdsSharedFilterChainManagerPeer;
 
-  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
+  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject,
+                            public Event::DispatcherThreadDeletable {
     absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
   };
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -556,12 +571,18 @@ private:
     std::unique_ptr<FcdsApiImpl> api_;
     absl::flat_hash_set<FcdsSubscriptionHandle*> handles_;
     Network::DrainableFilterChainSharedPtr warming_filter_chain_;
+    // True while a local caller provides the filter chain, which then outlives its subscribers.
+    bool local_{false};
   };
   absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>> subscriptions_;
 
   void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
   void updateTlsState();
   void scheduleTlsUpdate();
+
+  const FilterChainPublishedCb filter_chain_published_cb_;
+  // The filter chains committed since the last thread local publish.
+  absl::flat_hash_set<std::string> committed_filter_chain_names_;
 
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;

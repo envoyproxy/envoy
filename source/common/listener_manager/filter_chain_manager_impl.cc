@@ -9,6 +9,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/fcds_api.h"
@@ -1064,12 +1065,14 @@ void FcdsContextCreator::initialize(std::function<void()> completion) {
 
 FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
     Server::Configuration::ServerFactoryContext& server_context,
-    ListenerComponentFactory& listener_component_factory)
+    ListenerComponentFactory& listener_component_factory,
+    FilterChainPublishedCb filter_chain_published_cb)
     : server_context_(server_context), listener_component_factory_(listener_component_factory),
       tls_slot_(ThreadLocal::TypedSlot<ThreadLocalState>::makeUnique(server_context.threadLocal())),
       scope_(server_context_.scope().createScope("filter_chain_manager.")),
       resource_type_helper_(server_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),
+      filter_chain_published_cb_(std::move(filter_chain_published_cb)),
       tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
           [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
@@ -1114,17 +1117,31 @@ FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSou
                                         FcdsClientCallbacks& callbacks,
                                         Init::Manager& init_manager) {
   auto iter = subscriptions_.find(filter_chain_name);
+  const bool has_config_source =
+      config_source.config_source_specifier_case() !=
+      envoy::config::core::v3::ConfigSource::CONFIG_SOURCE_SPECIFIER_NOT_SET;
   // Assume config_source is the same for the same filter chain name. This would be the case for
   // xdstp names.
   if (iter == subscriptions_.end()) {
-    absl::Status creation_status;
-    auto api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
-                                             server_context_.clusterManager(), *scope_,
-                                             resource_type_helper_, creation_status);
-    RETURN_IF_NOT_OK(creation_status);
+    std::unique_ptr<FcdsApiImpl> api;
+    if (!has_config_source) {
+      // Without a config source, the listener waits for a local caller to add the filter chain.
+      api = std::make_unique<FcdsApiImpl>(filter_chain_name, *this);
+    } else {
+      absl::Status creation_status;
+      api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
+                                          server_context_.clusterManager(), *scope_,
+                                          resource_type_helper_, creation_status);
+      RETURN_IF_NOT_OK(creation_status);
+    }
     auto state = std::make_unique<SubscriptionState>();
     state->api_ = std::move(api);
     iter = subscriptions_.emplace(filter_chain_name, std::move(state)).first;
+  } else if (has_config_source != iter->second->api_->hasSubscription()) {
+    return absl::AlreadyExistsError(
+        has_config_source
+            ? fmt::format("filter chain {} is added or awaited locally", filter_chain_name)
+            : fmt::format("filter chain {} is discovered through FCDS", filter_chain_name));
   }
   SubscriptionState& state = *iter->second;
   init_manager.add(state.api_->initTarget());
@@ -1140,10 +1157,62 @@ void FcdsSharedFilterChainManager::unsubscribe(const std::string& filter_chain_n
   if (iter != subscriptions_.end()) {
     SubscriptionState& state = *iter->second;
     state.handles_.erase(&handle);
-    if (state.handles_.empty()) {
+    if (state.handles_.empty() && !state.local_) {
       subscriptions_.erase(iter);
     }
   }
+}
+
+absl::StatusOr<bool>
+FcdsSharedFilterChainManager::addOrUpdateLocalFilterChain(const FilterChainProto& filter_chain) {
+  if (committed_filter_chain_names_.contains(filter_chain.name())) {
+    // The callbacks only learn the name, so the committed version is published before this update.
+    tls_update_cb_->cancel();
+    updateTlsState();
+  }
+  auto iter = subscriptions_.find(filter_chain.name());
+  if (iter == subscriptions_.end()) {
+    auto state = std::make_unique<SubscriptionState>();
+    state->api_ = std::make_unique<FcdsApiImpl>(filter_chain.name(), *this);
+    iter = subscriptions_.emplace(filter_chain.name(), std::move(state)).first;
+  } else if (iter->second->api_->hasSubscription()) {
+    return absl::AlreadyExistsError(
+        fmt::format("filter chain {} is discovered through FCDS", filter_chain.name()));
+  }
+  // The listeners that the update warms can unsubscribe, so the state is local while it runs.
+  const bool was_local = std::exchange(iter->second->local_, true);
+  absl::StatusOr<bool> updated;
+  // Building a filter chain can throw.
+  TRY_ASSERT_MAIN_THREAD { updated = iter->second->api_->update(filter_chain); }
+  END_TRY
+  CATCH(const EnvoyException& e, { updated = absl::InvalidArgumentError(e.what()); });
+  if (!updated.ok() && !was_local) {
+    iter->second->local_ = false;
+    if (iter->second->handles_.empty()) {
+      subscriptions_.erase(iter);
+    }
+  }
+  return updated;
+}
+
+bool FcdsSharedFilterChainManager::removeLocalFilterChain(const std::string& filter_chain_name) {
+  auto iter = subscriptions_.find(filter_chain_name);
+  if (iter == subscriptions_.end() || !iter->second->local_) {
+    return false;
+  }
+  SubscriptionState& state = *iter->second;
+  // A filter chain that still warms is not committed once removed.
+  state.warming_filter_chain_ = nullptr;
+  // The listeners that the removal warms can unsubscribe, so the state is local while it runs.
+  state.api_->remove();
+  state.local_ = false;
+  if (state.handles_.empty()) {
+    subscriptions_.erase(filter_chain_name);
+  } else {
+    // The removal readied the listeners that waited, and the later ones wait for the next write.
+    state.api_ = std::make_unique<FcdsApiImpl>(filter_chain_name, *this);
+  }
+  return true;
 }
 
 absl::Status FcdsSharedFilterChainManager::onFilterChainUpdated(const FilterChainProto& proto) {
@@ -1184,6 +1253,7 @@ void FcdsSharedFilterChainManager::onFilterChainWarmed(
   if (state.warming_filter_chain_ != filter_chain) {
     return;
   }
+  committed_filter_chain_names_.insert(iter->first);
 
   Network::DrainableFilterChainSharedPtr draining = state.api_->filterChain();
   ENVOY_LOG(debug, "FCDS: updating warmed shared filter chain name={}", filter_chain->name());
@@ -1226,7 +1296,17 @@ void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
 }
 
 void FcdsSharedFilterChainManager::updateTlsState() {
-  auto filter_chains = std::make_shared<ThreadLocalState>();
+  // A worker can drop the last reference to a replaced filter chain, whose filters own objects of
+  // the main thread, so the main thread deletes the state.
+  std::shared_ptr<ThreadLocalState> filter_chains(
+      new ThreadLocalState(),
+      [&dispatcher = server_context_.mainThreadDispatcher()](ThreadLocalState* state) {
+        if (Thread::MainThread::isMainOrTestThread()) {
+          delete state;
+        } else {
+          dispatcher.deleteInDispatcherThread(Event::DispatcherThreadDeletableConstPtr(state));
+        }
+      });
   filter_chains->filter_chains_.reserve(subscriptions_.size());
   for (const auto& name_and_state : subscriptions_) {
     const auto& active_chain = name_and_state.second->api_->filterChain();
@@ -1237,6 +1317,11 @@ void FcdsSharedFilterChainManager::updateTlsState() {
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
   // Resume filter chain discovery now that the update is posted to workers.
   xds_pause_.reset();
+  for (const std::string& name : std::exchange(committed_filter_chain_names_, {})) {
+    if (filter_chain_published_cb_ != nullptr && filter_chains->filter_chains_.contains(name)) {
+      filter_chain_published_cb_(name);
+    }
+  }
 }
 
 bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {

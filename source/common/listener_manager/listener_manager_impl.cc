@@ -13,6 +13,7 @@
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -1777,6 +1778,38 @@ void ListenerManagerImpl::notifyListenerListenFailureCallbacks(absl::string_view
                                                                bool removed) {
   notifyListenerCallbacks(
       [&](ListenerUpdateCallbacks* cb) { cb->onListenerListenFailure(listener_name, removed); });
+}
+
+void ListenerManagerImpl::notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onFilterChainAddOrUpdate(filter_chain_name); });
+}
+
+SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
+
+std::shared_ptr<FcdsSharedFilterChainManager> ListenerManagerImpl::fcdsSharedFilterChainManager() {
+  return server_.serverFactoryContext().singletonManager().getTyped<FcdsSharedFilterChainManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
+      [this]() -> Singleton::InstanceSharedPtr {
+        return std::make_shared<FcdsSharedFilterChainManager>(
+            server_.serverFactoryContext(), *factory_, [this](absl::string_view filter_chain_name) {
+              notifyFilterChainUpdateCallbacks(filter_chain_name);
+            });
+      });
+}
+
+absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (local_fcds_manager_ == nullptr) {
+    local_fcds_manager_ = fcdsSharedFilterChainManager();
+  }
+  return local_fcds_manager_->addOrUpdateLocalFilterChain(filter_chain);
+}
+
+bool ListenerManagerImpl::removeFilterChain(const std::string& name) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  return local_fcds_manager_ != nullptr && local_fcds_manager_->removeLocalFilterChain(name);
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

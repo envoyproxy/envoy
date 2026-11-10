@@ -304,9 +304,15 @@ public:
   ApiListenerOptRef apiListener() override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
+  absl::StatusOr<bool>
+  addOrUpdateFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain) override;
+  bool removeFilterChain(const std::string& name) override;
   void
   drainFilterChains(ListenerImpl& listener,
                     std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
+
+  // Returns the manager of the filter chains that the listeners with fcds_config find by name.
+  std::shared_ptr<FcdsSharedFilterChainManager> fcdsSharedFilterChainManager();
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
@@ -441,6 +447,7 @@ private:
                                      Network::ListenerConfig& listener_config);
   void notifyListenerRemovalCallbacks(const std::string& listener_name);
   void notifyListenerListenFailureCallbacks(absl::string_view listener_name, bool removed);
+  void notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name);
 
   absl::Status validateNoDuplicatedAddress(const std::string& name,
                                            const ListenerImpl& listener) const;
@@ -505,6 +512,8 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
+  // Keeps the filter chains of addOrUpdateFilterChain() when no listener uses them.
+  std::shared_ptr<FcdsSharedFilterChainManager> local_fcds_manager_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {
