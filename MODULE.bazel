@@ -219,6 +219,11 @@ grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grc
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
 
+# Prebuilt lcov merger for the coverage report (toolshed bins release).
+lcov_merge_ext = use_extension("@envoy_toolshed//coverage/lcov:extensions.bzl", "lcov_merge_extension")
+lcov_merge_ext.setup(bins_release_version = "0.2.32")
+use_repo(lcov_merge_ext, "lcov_merge")
+
 # Hermetic (prebuilt) git toolchain.
 git_prebuilt_ext = use_extension("@envoy_toolshed//git:extensions.bzl", "git_prebuilt_extension")
 git_prebuilt_ext.setup()
