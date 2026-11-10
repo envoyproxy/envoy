@@ -64,6 +64,10 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 
+constexpr size_t MaxFieldPathDepth = 64;
+constexpr absl::string_view DepthExceededErrorPrefix = "Field path exceeds maximum depth of ";
+constexpr absl::string_view ConflictingBindingErrorPrefix = "Conflicting binding for field ";
+
 const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
 }
@@ -318,6 +322,7 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
                                               MethodInfoSharedPtr& method_info) {
   method_info = std::make_shared<MethodInfo>();
   method_info->descriptor_ = descriptor;
+  method_info->request_body_omitted_ = http_rule.body().empty();
 
   Status status =
       resolveField(descriptor->input_type(), http_rule.body(),
@@ -383,6 +388,10 @@ absl::Status JsonTranscoderConfig::createTranscoder(
   }
 
   for (const auto& binding : variable_bindings) {
+    if (binding.field_path.size() > MaxFieldPathDepth) {
+      return absl::InvalidArgumentError(absl::StrCat(DepthExceededErrorPrefix, MaxFieldPathDepth));
+    }
+
     google::grpc::transcoding::RequestWeaver::BindingInfo resolved_binding;
     status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
                                             &resolved_binding.field_path);
@@ -395,6 +404,31 @@ absl::Status JsonTranscoderConfig::createTranscoder(
         continue;
       }
       return status;
+    }
+
+    // Prevent query parameters from overriding path-template bindings on non-repeated fields,
+    // and reject collisions when reject_binding_body_field_collisions is enabled.
+    const bool is_repeated =
+        !resolved_binding.field_path.empty() &&
+        resolved_binding.field_path.back()->cardinality() == Protobuf::Field::CARDINALITY_REPEATED;
+    if (!is_repeated) {
+      const bool collision = absl::c_any_of(
+          request_info.variable_bindings,
+          [&resolved_binding](
+              const google::grpc::transcoding::RequestWeaver::BindingInfo& existing) {
+            const size_t min_len =
+                std::min(existing.field_path.size(), resolved_binding.field_path.size());
+            return min_len > 0 &&
+                   std::equal(existing.field_path.begin(), existing.field_path.begin() + min_len,
+                              resolved_binding.field_path.begin());
+          });
+      if (collision) {
+        if (request_validation_options_.reject_binding_body_field_collisions()) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              ConflictingBindingErrorPrefix, "\"", absl::StrJoin(binding.field_path, "."), "\""));
+        }
+        continue;
+      }
     }
 
     // HttpBody fields should be passed as-is and not be parsed as JSON.
@@ -414,6 +448,10 @@ absl::Status JsonTranscoderConfig::createTranscoder(
   if (method_info->request_type_is_http_body_) {
     request_translator = std::make_unique<RequestMessageTranslator>(*type_helper_->Resolver(),
                                                                     false, std::move(request_info));
+    request_translator->Input().StartObject("")->EndObject();
+  } else if (request_info.body_field_path.empty()) {
+    request_translator = std::make_unique<RequestMessageTranslator>(*type_helper_->Resolver(), true,
+                                                                    std::move(request_info));
     request_translator->Input().StartObject("")->EndObject();
   } else {
     json_request_translator = std::make_unique<JsonRequestTranslator>(
@@ -512,6 +550,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     }
 
     if (status.code() == StatusCode::kInvalidArgument &&
+        !absl::StartsWith(status.message(), DepthExceededErrorPrefix) &&
+        !absl::StartsWith(status.message(), ConflictingBindingErrorPrefix) &&
         !per_route_config_->request_validation_options_.reject_unknown_query_parameters()) {
       ENVOY_STREAM_LOG(debug,
                        "Request is passed through without transcoding because it contains unknown "
@@ -569,7 +609,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   headers.removeContentLength();
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
   headers.setEnvoyOriginalPath(headers.getPathValue());
-  headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod, headers.getMethodValue());
+  headers.setReferenceKey(Http::Headers::get().EnvoyOriginalMethod, headers.getMethodValue());
   headers.setPath(absl::StrCat("/", method_->descriptor_->service()->full_name(), "/",
                                method_->descriptor_->name()));
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
@@ -633,6 +673,12 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     } else {
       // TODO(euroelessar): Avoid buffering if content length is already known.
       return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
+  } else if (method_->request_body_omitted_) {
+    data.drain(data.length());
+    if (end_stream) {
+      request_in_.finish();
+      readToBuffer(*transcoder_->RequestOutput(), data);
     }
   } else {
     stats_->transcoder_request_buffer_bytes_.add(data.length());
