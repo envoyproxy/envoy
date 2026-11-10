@@ -388,7 +388,7 @@ if [[ "$CI_TARGET" =~ bazel.* ]]; then
     echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
 fi
 
-if [[ "${CI_TARGET}" == "deps.update" ]]; then
+if [[ "${CI_TARGET}" == "deps.update" || "${CI_TARGET}" == "registry" ]]; then
     DEPENDENCY_ARGS=("$@")
     set --
 fi
@@ -677,11 +677,11 @@ case $CI_TARGET in
         ;;
 
     deps.update)
-        if [[ ${#DEPENDENCY_ARGS[@]} -ne 1 ]]; then
-            echo "Usage: ci/do_ci.sh deps.update <name[=version]>" >&2
+        if [[ ${#DEPENDENCY_ARGS[@]} -lt 1 ]]; then
+            echo "Usage: ci/do_ci.sh deps.update <name[=version]>..." >&2
             exit 1
         fi
-        deps_update "${DEPENDENCY_ARGS[0]}"
+        deps_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     dev)
@@ -921,6 +921,18 @@ case $CI_TARGET in
         build_openssl_presubmit
         ;;
 
+    openssl.asan)
+        echo "bazel ASAN/UBSAN build of OpenSSL compat layer tests"
+        bazel_with_collection test \
+            --config=asan \
+            --config=openssl \
+            --dynamic_mode=off \
+            --copt=-fno-sanitize=function \
+            --linkopt=-fno-sanitize=function \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            //compat/openssl/test/...
+        ;;
+
     publish)
         BUILD_SHA="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
@@ -944,7 +956,7 @@ case $CI_TARGET in
             registry_check
             exit 0
         fi
-        registry_update
+        registry_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     release|release.server_only|release.test_only)

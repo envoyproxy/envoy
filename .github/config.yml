@@ -36,6 +36,7 @@ checks:
     - check-build-execution-context
     - check-build-openssl
     - check-build-openssl-presubmit
+    - check-build-openssl-asan
     - check-coverage
     - check-runtime
     - check-san
@@ -207,6 +208,13 @@ run:
     - test/extensions/transport_sockets/tls/**/*
     - envoy/ssl/**/*
     - envoy/extensions/transport_sockets/tls/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+  check-build-openssl-asan:
+    paths:
+    - compat/openssl/**/*
     - bazel/**/*
     - .bazelrc
     - ci/do_ci.sh

@@ -115,7 +115,11 @@ rust_library(
     # isolating Rust-mangled factory state as well as the exported C hooks.
     compile_data = [":symbol_prefix_env"],
     edition = "2021",
-    deps = crate_deps(["smallvec"]) + [":build_script"],
+    proc_macro_deps = crate_deps(["strum_macros"]),
+    deps = crate_deps([
+        "smallvec",
+        "strum",
+    ]) + [":build_script"],
     alwayslink = select({
         ":unprefixed": False,
         "//conditions:default": True,
@@ -132,6 +136,10 @@ rust_library(
     crate_features = ["mock"],
     crate_name = "envoy_proxy_dynamic_modules_rust_sdk",
     edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -142,6 +150,10 @@ rust_test(
     name = "envoy_proxy_dynamic_modules_rust_sdk_test",
     crate = ":envoy_proxy_dynamic_modules_rust_sdk_mock",
     edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,

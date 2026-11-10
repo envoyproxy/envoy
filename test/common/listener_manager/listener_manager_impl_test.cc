@@ -11162,7 +11162,7 @@ public:
   bool ipFamilySupported(int domain) override { return domain == AF_INET || domain == AF_INET6; }
 
   // Server::Configuration::BootstrapExtensionFactory
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override {
     UNREFERENCED_PARAMETER(config);

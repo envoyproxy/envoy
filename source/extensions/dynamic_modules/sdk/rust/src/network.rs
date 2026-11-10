@@ -5,12 +5,14 @@ use crate::{
   bytes_to_module_buffer,
   drop_wrapped_c_void_ptr,
   ffi_export,
+  new_load_shed_point,
   str_to_module_buffer,
   wrap_into_c_void_ptr,
   ClusterHostCount,
   EnvoyCounterId,
   EnvoyGaugeId,
   EnvoyHistogramId,
+  EnvoyLoadShedPoint,
   NewNetworkFilterConfigFunction,
   NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
@@ -84,6 +86,14 @@ pub trait EnvoyNetworkFilterConfig {
   ///
   /// This allows scheduling events to be delivered on the main thread.
   fn new_config_scheduler(&self) -> impl EnvoyNetworkFilterConfigScheduler + 'static;
+
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the connection processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name or the listener
+  /// of the filter bypasses the overload manager. Filters of a filter chain that FCDS delivers do
+  /// not see the bypass and get the load shed point.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
 }
 
 /// The trait that represents the configuration for an Envoy network filter configuration.
@@ -892,6 +902,15 @@ impl EnvoyNetworkFilterConfig for EnvoyNetworkFilterConfigImpl {
         raw_ptr: scheduler_ptr,
       }
     }
+  }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+        self.raw,
+        str_to_module_buffer(name),
+      )
+    })
   }
 }
 

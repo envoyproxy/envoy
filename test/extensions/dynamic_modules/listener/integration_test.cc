@@ -5,6 +5,7 @@
 
 #include "source/common/router/string_accessor_impl.h"
 
+#include "test/integration/base_overload_integration_test.h"
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -57,15 +58,15 @@ public:
 )EOF") {}
 
 protected:
-  void initializeFilter(const std::string& filter_name) {
+  void initializeFilter(const std::string& filter_name, const std::string& config = "") {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
                                     GetParam()),
         1);
 
-    config_helper_.addConfigModifier([filter_name](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([filter_name,
+                                      config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* filter = listener->add_listener_filters();
       filter->set_name("envoy.filters.listener.dynamic_modules");
@@ -74,6 +75,11 @@ protected:
           dynamic_module_config;
       dynamic_module_config.mutable_dynamic_module_config()->set_name("listener_integration_test");
       dynamic_module_config.set_filter_name(filter_name);
+      if (!config.empty()) {
+        Protobuf::StringValue filter_config;
+        filter_config.set_value(config);
+        std::ignore = dynamic_module_config.mutable_filter_config()->PackFrom(filter_config);
+      }
       std::ignore = filter->mutable_typed_config()->PackFrom(dynamic_module_config);
     });
 
@@ -167,6 +173,70 @@ TEST_P(DynamicModulesListenerSdkIntegrationTest, FilterStateTyped) {
   ASSERT_TRUE(tcp_client->write("ping"));
   tcp_client->waitForData("ping");
   tcp_client->close();
+}
+
+class DynamicModulesListenerLoadShedPointIntegrationTest
+    : public BaseOverloadIntegrationTest,
+      public DynamicModulesListenerSdkIntegrationTest {
+public:
+  // Saturates the trigger of the load shed point that the module checks.
+  void initializeOverloadedLoadShedPoint(bool bypass_overload_manager) {
+    setupOverloadManagerConfig(
+        TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "test.dynamic_module_load_shed_point"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+    config_helper_.addConfigModifier(
+        [this, bypass_overload_manager](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          *bootstrap.mutable_overload_manager() = overload_manager_config_;
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->set_bypass_overload_manager(
+              bypass_overload_manager);
+        });
+    initializeFilter("load_shed_point", "test.dynamic_module_load_shed_point");
+    updateResource(0.95);
+    test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                               testing::Eq(100));
+  }
+
+  void expectEchoedConnection() {
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+    ASSERT_TRUE(tcp_client->write("ping"));
+    ASSERT_TRUE(tcp_client->waitForData(4));
+    EXPECT_EQ("ping", tcp_client->data());
+    tcp_client->close();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesListenerLoadShedPointIntegrationTest,
+                         DynamicModulesListenerSdkIntegrationTestValues,
+                         [](const testing::TestParamInfo<std::string>& info) {
+                           return info.param;
+                         });
+
+TEST_P(DynamicModulesListenerLoadShedPointIntegrationTest, ShedsLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+  test_server_->waitForCounter("overload.test.dynamic_module_load_shed_point.shed_load_count",
+                               testing::Eq(1));
+
+  updateResource(0.8);
+  test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                             testing::Eq(0));
+  expectEchoedConnection();
+}
+
+TEST_P(DynamicModulesListenerLoadShedPointIntegrationTest,
+       ListenerBypassingOverloadManagerDoesNotShedLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/true);
+
+  expectEchoedConnection();
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
 }
 
 // Proves a filter chain matcher selects a filter chain from filter state that a dynamic-module

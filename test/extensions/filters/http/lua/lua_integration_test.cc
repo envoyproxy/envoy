@@ -2822,6 +2822,10 @@ typed_config:
       end
 )EOF";
 
+  // On HTTP/2 the connection is closed from the HCM drain timer (5s by default) after the GOAWAY.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_drain_timeout()->set_nanos(100 * 1000 * 1000); });
   initializeFilter(filter_config);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

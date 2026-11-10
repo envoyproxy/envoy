@@ -26,7 +26,7 @@ class WasmFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
   ~WasmFactory() override = default;
   std::string name() const override { return "envoy.bootstrap.wasm"; }
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

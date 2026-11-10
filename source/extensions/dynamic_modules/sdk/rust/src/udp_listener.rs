@@ -4,11 +4,13 @@ use crate::{
   bytes_to_module_buffer,
   drop_wrapped_c_void_ptr,
   ffi_export,
+  new_load_shed_point,
   str_to_module_buffer,
   wrap_into_c_void_ptr,
   EnvoyCounterId,
   EnvoyGaugeId,
   EnvoyHistogramId,
+  EnvoyLoadShedPoint,
   NewUdpListenerFilterConfigFunction,
   NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
 };
@@ -76,6 +78,13 @@ pub trait EnvoyUdpListenerFilterConfig {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the datagram processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name or the listener
+  /// of the filter bypasses the overload manager.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
 }
 
 /// The trait that represents the configuration for an Envoy UDP listener filter configuration.
@@ -315,6 +324,15 @@ impl EnvoyUdpListenerFilterConfig for EnvoyUdpListenerFilterConfigImpl {
     } else {
       Err(res)
     }
+  }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+        self.raw,
+        str_to_module_buffer(name),
+      )
+    })
   }
 }
 
