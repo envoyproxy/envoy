@@ -21,8 +21,7 @@ namespace HttpFilters {
 namespace OnDemand {
 
 /**
- * All on-demand filter stats. Route discovery covers on-demand VHDS and on-demand SRDS, which the
- * filter cannot tell apart. @see stats_macros.h
+ * All on-demand filter stats. Route discovery covers on-demand VHDS and SRDS. @see stats_macros.h
  */
 #define ALL_ON_DEMAND_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                      \
   COUNTER(route_discovery_requested)                                                               \
@@ -48,12 +47,11 @@ struct OnDemandFilterStats {
 };
 
 /**
- * Request filter state with the details of the discoveries a request waited for, for access logs
+ * Request filter state describing the discoveries a request waited for, for access logs
  * (%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:<field>)%) and other filters. It only
- * exists if a discovery started, and unset fields read as absent. Fields: host (:authority), vhost
- * (discovered virtual host, "<route config>/<domain>" for VHDS), cluster, route_status,
- * cluster_status, route_discovery_duration_us and cluster_discovery_duration_us (set for every
- * outcome once finished).
+ * exists if a discovery started; unset fields read as absent. Fields: host, vhost
+ * ("<route config>/<domain>" for VHDS), cluster, route_status, cluster_status and
+ * {route,cluster}_discovery_duration_us (set for every outcome).
  */
 class DiscoveryState : public StreamInfo::FilterState::Object {
 public:
@@ -98,8 +96,7 @@ public:
   }
 
 private:
-  // The status views point at these literals, which live for the whole program, so the object
-  // never holds a view into memory that goes away before the request does.
+  // Literals, so the stored status views never dangle.
   static constexpr absl::string_view Pending = "pending";
   static constexpr absl::string_view Cancelled = "cancelled";
   static constexpr absl::string_view Found = "found";
@@ -110,7 +107,7 @@ private:
 
   using FieldGetter = FieldType (*)(const DiscoveryState&);
 
-  // All the fields getField() supports in one place: adding one is a single line.
+  // All supported fields; adding one is a single line.
   static const absl::flat_hash_map<absl::string_view, FieldGetter>& fieldGetters() {
     static const absl::flat_hash_map<absl::string_view, FieldGetter> Getters{
         {"host", [](const DiscoveryState& s) { return stringField(s.host_); }},
@@ -171,7 +168,7 @@ using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 class OnDemandFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior);
-  // Same as above, and creates the filter stats as "<stats_prefix>on_demand.<name>" in scope.
+  // Also creates the stats as "<stats_prefix>on_demand.<name>" in scope.
   OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior, Stats::Scope& scope,
                        const std::string& stats_prefix);
   // Constructs config from extension's proto config.
@@ -179,7 +176,7 @@ public:
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
       absl::Status& creation_status);
-  // Same as above, and creates the filter stats as "<stats_prefix>on_demand.<name>" in scope.
+  // Also creates the stats as "<stats_prefix>on_demand.<name>" in scope.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -243,7 +240,7 @@ public:
 
 private:
   MonotonicTime now() const;
-  // The request's DiscoveryState, looked up or created on first use and cached.
+  // The request's DiscoveryState, cached after the first use.
   DiscoveryState& discoveryState();
   void startRouteDiscovery(MonotonicTime start);
   void finishRouteDiscovery(bool route_exists);
@@ -259,13 +256,12 @@ private:
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
   bool downstream_end_stream_{false};
-  // Only valid during decodeHeaders(), which is where a route discovery is started.
+  // Only valid during decodeHeaders().
   Http::RequestHeaderMap* request_headers_{};
   std::shared_ptr<DiscoveryState> discovery_state_;
-  // Set when the route config update callback ran inside decodeHeaders(), i.e. no asynchronous
-  // discovery was started.
+  // The route update callback ran inside decodeHeaders(): nothing to discover.
   bool route_update_completed_sync_{false};
-  // In flight: requested but neither completed nor cancelled by the stream going away.
+  // Requested, and neither completed nor ended with the stream.
   bool route_discovery_in_flight_{false};
   bool cluster_discovery_in_flight_{false};
   MonotonicTime route_discovery_start_;

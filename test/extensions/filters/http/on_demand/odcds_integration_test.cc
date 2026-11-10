@@ -355,8 +355,8 @@ using testing::ContainsRegex;
 using testing::Eq;
 using testing::Ge;
 
-// Adds a file access log that prints the on-demand discovery filter state. useAccessLog() can't be
-// used: it expects the HCM to already have an access log entry, which this test config does not.
+// Adds a file access log printing the discovery filter state (useAccessLog() needs an existing
+// HCM access log).
 void addDiscoveryAccessLog(ConfigHelper& config_helper, const std::string& path) {
   config_helper.addConfigModifier([path](ConfigHelper::HttpConnectionManager& hcm) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_log;
@@ -752,7 +752,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
             test_server_->counter("http.config_test.on_demand.cluster_discovery_missing")->value());
   EXPECT_EQ(
       0, test_server_->counter("http.config_test.on_demand.cluster_discovery_available")->value());
-  // The log still shows how long the request waited, which the duration histogram leaves out.
+  // The log shows the wait, which the histogram leaves out.
   const std::vector<std::string> entries = waitForAccessLogEntries(access_log_name_, nullptr, 1);
   EXPECT_THAT(entries[0],
               ContainsRegex("^cluster=new_cluster status=timeout cluster_us=[0-9]+ route=-$"));

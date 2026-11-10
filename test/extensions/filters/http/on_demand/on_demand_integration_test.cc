@@ -31,8 +31,8 @@ using testing::ContainsRegex;
 using testing::Eq;
 using testing::Ge;
 
-// Adds a file access log that prints the on-demand discovery filter state. useAccessLog() can't be
-// used: it expects the HCM to already have an access log entry, which these test configs do not.
+// Adds a file access log printing the discovery filter state (useAccessLog() needs an existing
+// HCM access log).
 void addDiscoveryAccessLog(ConfigHelper& config_helper, const std::string& path) {
   config_helper.addConfigModifier(
       [path](
@@ -567,8 +567,7 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 
   cleanupUpstreamAndDownstream();
 
-  // The two requests to known hosts waited for nothing, so they log "-" for every field. The third
-  // one waited for the virtual host, and the log shows what was discovered and how long it took.
+  // Requests that did not wait log "-"; the third one shows what was discovered.
   const std::vector<std::string> entries = waitForAccessLogEntries(access_log_name_, nullptr, 3);
   EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[0]);
   EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[1]);
@@ -580,8 +579,7 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 //  - Upstream makes a request to an unknown host
 //  - the management server never answers the discovery request
 //  - the client goes away while the request waits
-// The discovery counts as cancelled, and the access log, which runs before the filter is destroyed,
-// already shows it as cancelled.
+// The discovery counts as cancelled, and the access log (run before onDestroy()) shows it.
 TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateCancelledWhenTheClientGoesAway) {
   access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   addDiscoveryAccessLog(config_helper_, access_log_name_);

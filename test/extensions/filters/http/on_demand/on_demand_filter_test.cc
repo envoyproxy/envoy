@@ -516,7 +516,7 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithI
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
-// Tests for the discovery stats and the timing keys latched into the stream's downstream timing.
+// Tests for the discovery stats and filter state.
 class OnDemandFilterStatsTest : public OnDemandFilterTest {
 public:
   static constexpr absl::string_view Prefix = "http.test.on_demand.";
@@ -542,8 +542,7 @@ public:
   uint64_t pending(absl::string_view name) {
     return store_.gauge(absl::StrCat(Prefix, name), Stats::Gauge::ImportMode::Accumulate).value();
   }
-  // Values recorded into the histogram, or empty if it never recorded. TestStore::histogramValues()
-  // asserts that the histogram recorded at least once, which is not the case when no discovery ran.
+  // Recorded histogram values, or empty if none (histogramValues() asserts there is at least one).
   std::vector<uint64_t> durations(absl::string_view name) {
     const std::string full_name = absl::StrCat(Prefix, name);
     if (!store_.histogramRecordedValues(full_name)) {
@@ -552,8 +551,7 @@ public:
     return store_.histogramValues(full_name, true);
   }
 
-  // Fields of the request's DiscoveryState, read through the generic filter state interface like
-  // any other filter would. monostate if the state or the field does not exist.
+  // A DiscoveryState field read through the generic interface; monostate if unset.
   StreamInfo::FilterState::Object::FieldType field(absl::string_view name) {
     const auto* state = decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
         DiscoveryState::key());
@@ -567,7 +565,7 @@ public:
     return !absl::holds_alternative<absl::monostate>(field(name));
   }
 
-  // Starts an asynchronous route discovery and returns the callback the filter registered.
+  // Starts a route discovery and returns the filter's callback.
   Http::RouteConfigUpdatedCallbackSharedPtr startRouteDiscovery() {
     Http::RouteConfigUpdatedCallbackSharedPtr callback;
     Http::TestRequestHeaderMapImpl headers{{":authority", "foo.example.com"}};
@@ -640,8 +638,7 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotFound) {
   EXPECT_TRUE(hasField("route_discovery_duration_us"));
 }
 
-// The callback running inside decodeHeaders() means there was nothing to discover (neither VHDS nor
-// on-demand SRDS applies), so it must not be counted as a discovery.
+// A callback that ran inside decodeHeaders() means nothing to discover: it is not counted.
 TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery) {
   setupWithStats(false);
   Http::TestRequestHeaderMapImpl headers;
@@ -657,7 +654,7 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
   EXPECT_TRUE(durations("route_discovery_duration").empty());
   EXPECT_FALSE(hasField("route_status"));
   EXPECT_FALSE(hasField("host"));
-  // Ending the stream afterwards must not report a cancellation either.
+  // Ending the stream is not a cancellation either.
   filter_->onStreamComplete();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   filter_->onDestroy();
@@ -667,8 +664,8 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
 TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
   setupWithStats(false);
   startRouteDiscovery();
-  // A real stream runs onStreamComplete(), then the access logs, then onDestroy(). The logs read
-  // the filter state, so the cancellation must already be there before onDestroy().
+  // A real stream runs onStreamComplete(), the access logs, then onDestroy(): the logs must
+  // already see the cancellation.
   filter_->onStreamComplete();
   EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, counter("route_discovery_found"));
@@ -678,7 +675,7 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
   expectField("route_status", "cancelled");
   EXPECT_FALSE(hasField("route_discovery_duration_us"));
 
-  // onDestroy() changes nothing, and does not count the cancellation a second time.
+  // onDestroy() changes nothing and does not count it again.
   filter_->onDestroy();
   EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
@@ -691,7 +688,7 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotCancelledAfterCompletion) {
   auto callback = startRouteDiscovery();
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   (*callback)(true);
-  // The logs run between the two, and see the outcome of the finished discovery.
+  // The logs run in between and see the outcome.
   filter_->onStreamComplete();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
@@ -753,7 +750,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) {
   setupWithStats(true);
   startClusterDiscovery();
-  // As above: the access logs read the filter state between onStreamComplete() and onDestroy().
+  // As above, the logs read the state before onDestroy().
   filter_->onStreamComplete();
   EXPECT_EQ(1UL, counter("cluster_discovery_cancelled"));
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));

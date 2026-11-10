@@ -187,8 +187,7 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   callbacks_->downstreamCallbacks()->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
-  // The callback runs synchronously when there is nothing to discover (neither VHDS nor on-demand
-  // SRDS applies); only a callback still pending here is an actual discovery.
+  // A callback that already ran means there was nothing to discover.
   if (!route_update_completed_sync_) {
     startRouteDiscovery(start);
   }
@@ -271,10 +270,9 @@ void OnDemandRouteUpdate::onDestroy() {
   cluster_discovery_handle_.reset();
 }
 
-// Runs before the access logs, which onDestroy() does not, so a discovery that never completed is
-// recorded as cancelled in time for the logs to show it.
+// Runs before the access logs (onDestroy() does not), so they can show a cancelled discovery.
 void OnDemandRouteUpdate::onStreamComplete() {
-  // A discovery still in flight here was abandoned, e.g. the client went away while waiting.
+  // Still in flight: the stream ended before the discovery did.
   if (route_discovery_in_flight_) {
     discoveryState().routeCancelled();
   }
@@ -403,8 +401,7 @@ DiscoveryState& OnDemandRouteUpdate::discoveryState() {
   if (discovery_state_ != nullptr) {
     return *discovery_state_;
   }
-  // The state is request scoped, so a stream recreated after a discovery finds the one that the
-  // original stream created.
+  // Request scoped, so a recreated stream finds the state of the original one.
   auto& filter_state = callbacks_->streamInfo().filterState();
   discovery_state_ = std::dynamic_pointer_cast<DiscoveryState>(
       filter_state->getDataSharedMutableGeneric(DiscoveryState::key()));
@@ -450,8 +447,7 @@ void OnDemandRouteUpdate::finishRouteDiscovery(bool route_exists) {
   if (auto stats = config_->stats(); stats.has_value()) {
     (route_exists ? stats->route_discovery_found_ : stats->route_discovery_not_found_).inc();
     stats->route_discovery_pending_.dec();
-    // Only successful discoveries are timed, so that the histogram is the latency of a usable
-    // answer rather than a mix with negative answers.
+    // Only successful discoveries are timed; negative answers would skew the latency.
     if (route_exists) {
       stats->route_discovery_duration_.recordValue(milliseconds(elapsed));
     }
@@ -459,8 +455,7 @@ void OnDemandRouteUpdate::finishRouteDiscovery(bool route_exists) {
 }
 
 void OnDemandRouteUpdate::recordVirtualHost() {
-  // Only called after a route discovery completed, so the state exists. A route can only resolve
-  // against the refreshed route config.
+  // Called after a route discovery completed, so the state exists.
   if (auto route = callbacks_->route(); route.has_value()) {
     discoveryState().setVirtualHost(route->virtualHost().name());
   }
@@ -490,9 +485,8 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
     switch (cluster_status) {
     case Upstream::ClusterDiscoveryStatus::Available:
       stats->cluster_discovery_available_.inc();
-      // Only successful discoveries are timed: a timeout always lasts about the configured
-      // timeout, and a missing cluster is a quick negative answer, so neither says anything about
-      // how long it takes to get a usable cluster.
+      // Only Available is timed: a timeout lasts about the configured timeout, and Missing is a
+      // quick negative answer.
       stats->cluster_discovery_duration_.recordValue(milliseconds(elapsed));
       break;
     case Upstream::ClusterDiscoveryStatus::Missing:
