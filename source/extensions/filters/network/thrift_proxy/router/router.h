@@ -14,6 +14,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/stats/prefix_utility.h"
+#include "source/common/upstream/host_utility.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
@@ -228,7 +229,7 @@ public:
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_success_);
     ASSERT(upstream_host != nullptr);
-    upstream_host->stats().rq_success_.inc();
+    Upstream::HostUtility::chargeRequestSuccess(*upstream_host);
   }
 
   /**
@@ -244,7 +245,7 @@ public:
     // Currently IDL exceptions are always considered endpoint error but it's possible for an error
     // to have semantics matching HTTP 4xx, rather than 5xx. rq_error classification chosen
     // here to match outlier detection external failure in upstream_request.cc.
-    upstream_host->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*upstream_host);
   }
 
   /**
@@ -257,7 +258,7 @@ public:
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_exception_);
     ASSERT(upstream_host != nullptr);
     incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_remote_);
-    upstream_host->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*upstream_host);
   }
 
   /**
@@ -300,7 +301,7 @@ public:
                               Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_invalid_type_);
     ASSERT(upstream_host != nullptr);
-    upstream_host->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*upstream_host);
   }
 
   /**
@@ -312,7 +313,7 @@ public:
                                 Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_decoding_error_);
     ASSERT(upstream_host != nullptr);
-    upstream_host->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*upstream_host);
   }
 
   /**
@@ -324,7 +325,7 @@ public:
                                Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_metadata_null_);
     ASSERT(upstream_host != nullptr);
-    upstream_host->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*upstream_host);
   }
 
   /**

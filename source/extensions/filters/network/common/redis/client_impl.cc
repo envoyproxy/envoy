@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
+#include "source/common/upstream/host_utility.h"
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 
@@ -309,7 +310,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
   END_TRY catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
     host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
-    host_->stats().rq_error_.inc();
+    Upstream::HostUtility::chargeRequestError(*host_);
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
@@ -480,9 +481,8 @@ ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& 
         parent_.scope_, command_, parent_.time_source_);
   }
   parent.host_->cluster().trafficStats()->upstream_rq_total_.inc();
-  parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().trafficStats()->upstream_rq_active_.inc();
-  parent.host_->stats().rq_active_.inc();
+  Upstream::HostUtility::chargeRequestIssued(*parent.host_);
 }
 
 ClientImpl::PendingRequest::~PendingRequest() {
