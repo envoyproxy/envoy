@@ -136,7 +136,7 @@ ShadowRequestContext::~ShadowRequestContext() {
   }
 }
 
-void ShadowRequestContext::recordResponse(const Http::ResponseMessage& response) {
+void ShadowRequestContext::recordResponse(Http::ResponseMessage& response) {
   ASSERT(!outcome_recorded_);
   outcome_recorded_ = true;
   const std::optional<uint64_t> status =

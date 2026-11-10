@@ -57,7 +57,7 @@ public:
   /**
    * Records a 2xx response as a success and any other response as a failure.
    */
-  void recordResponse(const Http::ResponseMessage& response);
+  void recordResponse(Http::ResponseMessage& response);
 
   /**
    * Records a failure, unless an outcome was already recorded.
