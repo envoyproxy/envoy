@@ -26,6 +26,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.content_parsers.json"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/content_parsers/json:config",
         "//test/mocks/server:server_factory_context_mocks",

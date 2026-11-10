@@ -33,7 +33,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.ai_protocol_manager",
         "envoy.ai_protocol_manager.external_buffer.in_memory",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/buffer:buffer_lib",
@@ -47,7 +47,6 @@ envoy_extension_cc_test(
     name = "json_with_ext_buf_test",
     srcs = ["json_with_ext_buf_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//test/test_common:status_utility_lib",
@@ -58,7 +57,6 @@ envoy_extension_cc_test(
     name = "json_readers_test",
     srcs = ["json_readers_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
@@ -71,7 +69,6 @@ envoy_extension_cc_test(
     name = "schema_test",
     srcs = ["schema_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
         "//test/test_common:status_utility_lib",
@@ -82,7 +79,6 @@ envoy_extension_cc_test(
     name = "transcoding_engine_test",
     srcs = ["transcoding_engine_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
@@ -97,7 +93,6 @@ envoy_extension_cc_test(
     name = "json_with_ext_buf_parser_test",
     srcs = ["json_with_ext_buf_parser_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
@@ -111,7 +106,6 @@ envoy_extension_cc_test(
     name = "buffer_manager_test",
     srcs = ["buffer_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
@@ -127,7 +121,6 @@ envoy_extension_cc_test(
     name = "llm_protocol_adapters_test",
     srcs = ["llm_protocol_adapters_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_adapters_lib",
@@ -141,7 +134,6 @@ envoy_extension_cc_test(
     name = "response_handler_test",
     srcs = ["response_handler_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:response_handler_lib",
@@ -155,7 +147,10 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "asan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
@@ -178,7 +173,6 @@ envoy_extension_cc_test(
     name = "replay_awaitable_test",
     srcs = ["replay_awaitable_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
@@ -196,7 +190,6 @@ envoy_extension_cc_test(
     name = "serializer_test",
     srcs = ["serializer_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
@@ -216,7 +209,6 @@ envoy_extension_cc_test(
     name = "llm_binding_test",
     srcs = ["llm_binding_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//test/test_common:status_utility_lib",
@@ -228,7 +220,6 @@ envoy_extension_cc_test(
     name = "uri_pattern_test",
     srcs = ["uri_pattern_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:uri_pattern_lib",
         "//test/test_common:status_utility_lib",
@@ -239,7 +230,7 @@ envoy_extension_cc_test(
     name = "ai_filter_state_test",
     srcs = ["ai_filter_state_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//envoy/router:string_accessor_interface",
@@ -260,7 +251,6 @@ envoy_extension_cc_test(
     name = "ai_request_test",
     srcs = ["ai_request_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:ai_request_lib",
         "//test/test_common:status_utility_lib",
@@ -272,7 +262,6 @@ envoy_extension_cc_test(
     name = "flattening_json_codec_test",
     srcs = ["flattening_json_codec_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
@@ -292,7 +281,6 @@ envoy_extension_cc_test(
     name = "filter_manager_test",
     srcs = ["filter_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
@@ -315,7 +303,7 @@ envoy_extension_cc_test(
     name = "filter_chain_bridge_test",
     srcs = ["filter_chain_bridge_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_chain_bridge_lib",
@@ -329,7 +317,6 @@ envoy_extension_cc_benchmark_binary(
     name = "response_handler_benchmark",
     srcs = ["response_handler_benchmark.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:response_handler_lib",
@@ -357,7 +344,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["encode_sse_fuzz_test.cc"],
     corpus = "encode_sse_corpus",
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":encode_sse_fuzz_proto_cc_proto",
         "//envoy/http:codes_interface",
@@ -385,7 +372,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.ai_protocol_manager",
         "envoy.ai_protocol_manager.external_buffer.in_memory",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -406,7 +393,11 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["ai_protocol_manager_integration_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "asan": {"build": "linux_x64_small"},
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     shard_count = 4,
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
@@ -428,7 +419,6 @@ envoy_extension_cc_test(
     name = "response_filter_manager_test",
     srcs = ["response_filter_manager_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
@@ -444,7 +434,6 @@ envoy_extension_cc_test(
     name = "filter_pipeline_test",
     srcs = ["filter_pipeline_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
@@ -459,7 +448,6 @@ envoy_extension_cc_test(
     name = "task_group_test",
     srcs = ["task_group_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/coroutine:async_queue_lib",
         "//source/common/coroutine:status_macros_lib",
@@ -482,7 +470,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["encode_unary_fuzz_test.cc"],
     corpus = "encode_unary_corpus",
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":encode_unary_fuzz_proto_cc_proto",
         "//envoy/http:codes_interface",

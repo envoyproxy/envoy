@@ -15,6 +15,7 @@ envoy_cc_test(
         "//test/extensions/filters/http/proto_api_scrubber:scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/common:optref_lib",
         "//source/common/protobuf",

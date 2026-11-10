@@ -57,12 +57,6 @@ fn bazel_clang_args() -> Vec<String> {
         let llvm_major = env::var("ENVOY_LLVM_MAJOR").unwrap_or_default();
         args.push("-resource-dir".to_string());
         args.push(format!("{}/lib/clang/{}", root.display(), llvm_major));
-        args.push("-isystem".to_string());
-        args.push(format!(
-          "{}/lib_legacy/clang/{}/include",
-          root.display(),
-          llvm_major
-        ));
       }
     }
   }

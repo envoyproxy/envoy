@@ -25,8 +25,9 @@ _HEADER = "//source/extensions/dynamic_modules/abi:abi.h"
 
 _BINDINGS = "//source/extensions/dynamic_modules/sdk/rust:src/abi.rs"
 
-# The hermetic clang: its libclang and resource directory (builtin headers). The generator parses
-# freestanding for a fixed target, so no sysroot is involved and the output is the same on any host.
+# The hermetic clang: its libclang and the resource directory's builtin headers (stdbool.h and
+# friends, which abi.h includes). The generator parses freestanding for a fixed target, so no
+# sysroot is involved and the output is the same on any host.
 _LINUX_ENV = {
     "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
     "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
@@ -35,7 +36,7 @@ _LINUX_ENV = {
 
 _LINUX_DATA = [
     "@llvm_toolchain_llvm//:lib/libclang.so",
-    "@llvm_toolchain_llvm//:lib_legacy",
+    "@llvm_toolchain_llvm//:cxx_builtin_include",
 ]
 
 _ENV = select({
