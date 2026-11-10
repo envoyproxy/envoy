@@ -995,10 +995,13 @@ cc_library(
         "source",
     ],
     linkopts = ["-ldl"],
-    local_defines = [
-        'OSSL_RUNFILES_LIB_DIR=\\"%s/%s\\"' % (repo_name() or "_main", package_name()),
-    ],
     linkstatic = True,
+    local_defines = [
+        'OSSL_RUNFILES_LIB_DIR=\\"%s/%s\\"' % (
+            repo_name() or "_main",
+            package_name(),
+        ),
+    ],
     visibility = ["//visibility:public"],
 )
 

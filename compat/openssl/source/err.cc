@@ -96,7 +96,7 @@ extern "C" uint32_t ERR_peek_error_line_data(const char** file, int* line, const
 extern "C" uint32_t ERR_peek_last_error(void) { return o2b(ossl.ossl_ERR_peek_last_error()); }
 
 extern "C" const char* ERR_reason_error_string(uint32_t packed_error) {
-// clang-format off
+  // clang-format off
   // Handle system library errors like BoringSSL does
   // For system errors, return strerror(errno) like BoringSSL does
   if (ossl_ERR_SYSTEM_ERROR(packed_error)) {
@@ -109,7 +109,7 @@ extern "C" const char* ERR_reason_error_string(uint32_t packed_error) {
     if (reason > 0 && reason < 256) {
       return strerror(reason);
     }
-// clang-format on
+    // clang-format on
     return "unknown error";
   }
 
