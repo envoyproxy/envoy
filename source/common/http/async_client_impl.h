@@ -69,12 +69,8 @@ public:
   // Http::AsyncClient
   Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
-  Request* send(RequestMessagePtr&& request, CallbacksPtr&& callbacks,
-                const AsyncClient::RequestOptions& options) override;
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
   OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
-                               const AsyncClient::RequestOptions& options) override;
-  OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, CallbacksPtr&& callbacks,
                                const AsyncClient::RequestOptions& options) override;
   Server::Configuration::CommonFactoryContext& factory_context_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
@@ -351,6 +347,9 @@ class AsyncRequestSharedImpl : public virtual AsyncClient::Request,
                                protected AsyncClient::StreamCallbacks {
 public:
   void cancel() final;
+  OptRef<AsyncClient::RequestContext> context() const final {
+    return makeOptRefFromPtr(context_.get());
+  }
 
 protected:
   AsyncRequestSharedImpl(AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
@@ -360,11 +359,9 @@ protected:
   void onTrailers(ResponseTrailerMapPtr&& trailers) final;
   void onComplete() final;
   void onReset() final;
-  void onCreationFailure();
 
-  // Set when the client owns the callbacks; they are destroyed with this request.
-  AsyncClient::CallbacksPtr owned_callbacks_;
   AsyncClient::Callbacks& callbacks_;
+  const AsyncClient::RequestContextSharedPtr context_;
   Tracing::SpanPtr child_span_;
   std::unique_ptr<ResponseMessageImpl> response_;
   bool cancelled_{};
@@ -377,14 +374,11 @@ class AsyncOngoingRequestImpl final : public AsyncClient::OngoingRequest,
 public:
   static AsyncOngoingRequestImpl* create(RequestHeaderMapPtr&& request_headers,
                                          AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                                         AsyncClient::CallbacksPtr owned_callbacks,
                                          const AsyncClient::RequestOptions& options) {
     absl::Status creation_status = absl::OkStatus();
     auto* ret = new AsyncOngoingRequestImpl(std::move(request_headers), parent, callbacks, options,
                                             creation_status);
-    ret->owned_callbacks_ = std::move(owned_callbacks);
     if (!creation_status.ok()) {
-      ret->onCreationFailure();
       delete ret;
       return nullptr;
     }
@@ -415,14 +409,11 @@ class AsyncRequestImpl final : public AsyncRequestSharedImpl {
 public:
   static AsyncRequestImpl* create(RequestMessagePtr&& request, AsyncClientImpl& parent,
                                   AsyncClient::Callbacks& callbacks,
-                                  AsyncClient::CallbacksPtr owned_callbacks,
                                   const AsyncClient::RequestOptions& options) {
     absl::Status creation_status = absl::OkStatus();
     auto* ret =
         new AsyncRequestImpl(std::move(request), parent, callbacks, options, creation_status);
-    ret->owned_callbacks_ = std::move(owned_callbacks);
     if (!creation_status.ok()) {
-      ret->onCreationFailure();
       delete ret;
       return nullptr;
     }

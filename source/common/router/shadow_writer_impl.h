@@ -30,8 +30,10 @@ public:
                   const ShadowPolicyStatsSharedPtr& stats) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
-  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request& request,
+                 Http::AsyncClient::FailureReason) override;
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 
@@ -44,20 +46,23 @@ private:
 };
 
 /**
- * Async client callbacks of one mirror request of a policy with stats. They record how the mirror
- * ended. The async client owns them and destroys them with the request, so a request destroyed
- * without onSuccess() or onFailure() was cancelled.
+ * Context of one mirror request of a policy with stats. It records how the mirror ended. The
+ * request holds it until it is destroyed, so a context destroyed without an outcome was cancelled.
  */
-class ShadowRequestCallbacks : public Http::AsyncClient::Callbacks {
+class ShadowRequestContext : public Http::AsyncClient::RequestContext {
 public:
-  explicit ShadowRequestCallbacks(ShadowPolicyStatsSharedPtr stats) : stats_(std::move(stats)) {}
-  ~ShadowRequestCallbacks() override;
+  explicit ShadowRequestContext(ShadowPolicyStatsSharedPtr stats) : stats_(std::move(stats)) {}
+  ~ShadowRequestContext() override;
 
-  // Http::AsyncClient::Callbacks
-  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
-  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
-  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
-                                    const Http::ResponseHeaderMap*) override {}
+  /**
+   * Records a 2xx response as a success and any other response as a failure.
+   */
+  void recordResponse(const Http::ResponseMessage& response);
+
+  /**
+   * Records a failure, unless an outcome was already recorded.
+   */
+  void recordFailure();
 
 private:
   const ShadowPolicyStatsSharedPtr stats_;

@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/filter.h"
@@ -69,6 +70,16 @@ public:
 class AsyncClient {
 public:
   /**
+   * Caller data attached to a request, see StreamOptions::setContext().
+   */
+  class RequestContext {
+  public:
+    virtual ~RequestContext() = default;
+  };
+
+  using RequestContextSharedPtr = std::shared_ptr<RequestContext>;
+
+  /**
    * An in-flight HTTP request.
    */
   class Request {
@@ -79,6 +90,11 @@ public:
      * Signals that the request should be cancelled.
      */
     virtual void cancel() PURE;
+
+    /**
+     * @return the context set in the options of the request, if any.
+     */
+    virtual OptRef<RequestContext> context() const PURE;
   };
 
   /**
@@ -129,8 +145,6 @@ public:
     virtual void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span& span,
                                               const Http::ResponseHeaderMap* response_headers) PURE;
   };
-
-  using CallbacksPtr = std::unique_ptr<Callbacks>;
 
   /**
    * Notifies caller of async HTTP stream status.
@@ -404,6 +418,10 @@ public:
       upstream_override_host_ = host;
       return *this;
     }
+    StreamOptions& setContext(RequestContextSharedPtr context) {
+      context_ = std::move(context);
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -476,6 +494,10 @@ public:
 
     // Optional upstream override host for bypassing load balancer selection
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
+
+    // Optional caller context of a request, held by the request until it is destroyed and
+    // returned by Request::context(). Not used by streams started with start().
+    RequestContextSharedPtr context_;
   };
 
   /**
@@ -497,19 +519,6 @@ public:
                         const RequestOptions& options) PURE;
 
   /**
-   * Send an HTTP request asynchronously. The client owns the callbacks and destroys them with the
-   * request, after their last call, including when the request is cancelled.
-   * @param request the request to send.
-   * @param callbacks the callbacks to be notified of request status.
-   * @param options the data struct to control the request sending.
-   * @return a request handle or nullptr if no request could be created. NOTE: In this case
-   *         onSuccess() or onFailure() has already been called inline, including when the request
-   *         could not be initialized, and the callbacks have already been destroyed.
-   */
-  virtual Request* send(RequestMessagePtr&& request, CallbacksPtr&& callbacks,
-                        const RequestOptions& options) PURE;
-
-  /**
    * Starts a new OngoingRequest asynchronously with the given headers.
    *
    * @param request_headers headers to send.
@@ -520,18 +529,6 @@ public:
    * should be called instead.
    */
   virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
-                                       const RequestOptions& options) PURE;
-
-  /**
-   * Starts a new OngoingRequest asynchronously with the given headers. The client owns the
-   * callbacks, see the `send` overload taking CallbacksPtr.
-   * @param request_headers headers to send.
-   * @param callbacks the callbacks to be notified of request status.
-   * @param options the data struct to control the request sending.
-   * @return a request handle or nullptr if no request could be created.
-   */
-  virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers,
-                                       CallbacksPtr&& callbacks,
                                        const RequestOptions& options) PURE;
 
   /**

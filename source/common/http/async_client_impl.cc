@@ -59,34 +59,15 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
                                             AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
-      AsyncRequestImpl::create(std::move(request), *this, callbacks, nullptr, options);
-  return internalStartRequest(async_request);
-}
-
-AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request, CallbacksPtr&& callbacks,
-                                            const AsyncClient::RequestOptions& options) {
-  ASSERT(callbacks != nullptr);
-  AsyncClient::Callbacks& callbacks_ref = *callbacks;
-  AsyncRequestImpl* async_request = AsyncRequestImpl::create(
-      std::move(request), *this, callbacks_ref, std::move(callbacks), options);
+      AsyncRequestImpl::create(std::move(request), *this, callbacks, options);
   return internalStartRequest(async_request);
 }
 
 AsyncClient::OngoingRequest*
 AsyncClientImpl::startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                               const AsyncClient::RequestOptions& options) {
-  AsyncOngoingRequestImpl* async_request = AsyncOngoingRequestImpl::create(
-      std::move(request_headers), *this, callbacks, nullptr, options);
-  return internalStartRequest(async_request);
-}
-
-AsyncClient::OngoingRequest*
-AsyncClientImpl::startRequest(RequestHeaderMapPtr&& request_headers, CallbacksPtr&& callbacks,
-                              const AsyncClient::RequestOptions& options) {
-  ASSERT(callbacks != nullptr);
-  AsyncClient::Callbacks& callbacks_ref = *callbacks;
-  AsyncOngoingRequestImpl* async_request = AsyncOngoingRequestImpl::create(
-      std::move(request_headers), *this, callbacks_ref, std::move(callbacks), options);
+  AsyncOngoingRequestImpl* async_request =
+      AsyncOngoingRequestImpl::create(std::move(request_headers), *this, callbacks, options);
   return internalStartRequest(async_request);
 }
 
@@ -372,6 +353,7 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                const AsyncClient::RequestOptions& options,
                                                absl::Status& creation_status)
     : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks),
+      context_(options.context_),
       response_buffer_limit_(parent.config_->runtime_.snapshot().getInteger(
           AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
   if (!creation_status.ok()) {
@@ -485,13 +467,6 @@ void AsyncRequestSharedImpl::onReset() {
       // In this case we don't have a valid response so we do need to raise a failure.
       callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
     }
-  }
-}
-
-void AsyncRequestSharedImpl::onCreationFailure() {
-  // Owned callbacks are destroyed with the request, so they are the only way left to report it.
-  if (owned_callbacks_ != nullptr) {
-    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 

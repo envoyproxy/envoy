@@ -31,6 +31,18 @@ std::string shadowAppendedHost(absl::string_view host) {
                       host.substr(port_start, host.length()));
 }
 
+std::shared_ptr<ShadowRequestContext>
+attachContext(const Http::AsyncClient::RequestOptions& options,
+              const ShadowPolicyStatsSharedPtr& stats) {
+  auto context = std::make_shared<ShadowRequestContext>(stats);
+  const_cast<Http::AsyncClient::RequestOptions&>(options).setContext(context);
+  return context;
+}
+
+ShadowRequestContext* shadowContext(const Http::AsyncClient::Request& request) {
+  return dynamic_cast<ShadowRequestContext*>(request.context().ptr());
+}
+
 } // namespace
 
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
@@ -51,7 +63,11 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
     return;
   }
   stats->rq_started_.inc();
-  async_client.send(std::move(request), std::make_unique<ShadowRequestCallbacks>(stats), options);
+  const auto context = attachContext(options, stats);
+  if (async_client.send(std::move(request), *this, options) == nullptr) {
+    // The request failed inline, or could not be created and the callbacks were not called.
+    context->recordFailure();
+  }
 }
 
 Http::AsyncClient::OngoingRequest*
@@ -71,8 +87,27 @@ ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeade
     return async_client.startRequest(std::move(headers), *this, options);
   }
   stats->rq_started_.inc();
-  return async_client.startRequest(std::move(headers),
-                                   std::make_unique<ShadowRequestCallbacks>(stats), options);
+  const auto context = attachContext(options, stats);
+  Http::AsyncClient::OngoingRequest* request =
+      async_client.startRequest(std::move(headers), *this, options);
+  if (request == nullptr) {
+    context->recordFailure();
+  }
+  return request;
+}
+
+void ShadowWriterImpl::onSuccess(const Http::AsyncClient::Request& request,
+                                 Http::ResponseMessagePtr&& response) {
+  if (auto* context = shadowContext(request); context != nullptr) {
+    context->recordResponse(*response);
+  }
+}
+
+void ShadowWriterImpl::onFailure(const Http::AsyncClient::Request& request,
+                                 Http::AsyncClient::FailureReason) {
+  if (auto* context = shadowContext(request); context != nullptr) {
+    context->recordFailure();
+  }
 }
 
 Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAndOptions(
@@ -95,17 +130,17 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
   return thread_local_cluster;
 }
 
-ShadowRequestCallbacks::~ShadowRequestCallbacks() {
+ShadowRequestContext::~ShadowRequestContext() {
   if (!outcome_recorded_) {
     stats_->rq_cancelled_.inc();
   }
 }
 
-void ShadowRequestCallbacks::onSuccess(const Http::AsyncClient::Request&,
-                                       Http::ResponseMessagePtr&& response) {
+void ShadowRequestContext::recordResponse(const Http::ResponseMessage& response) {
+  ASSERT(!outcome_recorded_);
   outcome_recorded_ = true;
   const std::optional<uint64_t> status =
-      Http::Utility::getResponseStatusOrNullopt(response->headers());
+      Http::Utility::getResponseStatusOrNullopt(response.headers());
   if (status.has_value() && Http::CodeUtility::is2xx(status.value())) {
     stats_->rq_success_.inc();
   } else {
@@ -113,8 +148,10 @@ void ShadowRequestCallbacks::onSuccess(const Http::AsyncClient::Request&,
   }
 }
 
-void ShadowRequestCallbacks::onFailure(const Http::AsyncClient::Request&,
-                                       Http::AsyncClient::FailureReason) {
+void ShadowRequestContext::recordFailure() {
+  if (outcome_recorded_) {
+    return;
+  }
   outcome_recorded_ = true;
   stats_->rq_failure_.inc();
 }

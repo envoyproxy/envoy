@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/http/async_client.h"
@@ -521,18 +520,6 @@ public:
                                const RequestOptions& args) override {
     return startRequest_(headers, callbacks, args);
   }
-  Request* send(RequestMessagePtr&& request, CallbacksPtr&& callbacks,
-                const RequestOptions& args) override {
-    Callbacks& callbacks_ref = *callbacks;
-    owned_callbacks_.push_back(std::move(callbacks));
-    return send_(request, callbacks_ref, args);
-  }
-  OngoingRequest* startRequest(RequestHeaderMapPtr&& headers, CallbacksPtr&& callbacks,
-                               const RequestOptions& args) override {
-    Callbacks& callbacks_ref = *callbacks;
-    owned_callbacks_.push_back(std::move(callbacks));
-    return startRequest_(headers, callbacks_ref, args);
-  }
   MOCK_METHOD(Request*, send_,
               (RequestMessagePtr & request, Callbacks& callbacks, const RequestOptions& args));
   MOCK_METHOD(OngoingRequest*, startRequest_,
@@ -542,8 +529,6 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  // Callbacks passed with ownership. Clearing them simulates the destruction of their requests.
-  std::vector<CallbacksPtr> owned_callbacks_;
 };
 
 class MockAsyncClientCallbacks : public AsyncClient::Callbacks {
@@ -587,6 +572,7 @@ public:
   ~MockAsyncClientRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(OptRef<AsyncClient::RequestContext>, context, (), (const));
 
   MockAsyncClient* client_;
 };
