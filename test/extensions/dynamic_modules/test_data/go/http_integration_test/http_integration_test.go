@@ -46,6 +46,7 @@ func init() {
 		"runtime_values":               &RuntimeValuesConfigFactory{},
 		"generic_secret_callbacks":     &GenericSecretCallbacksConfigFactory{},
 		"filter_state_object_recreate": &FilterStateObjectRecreateConfigFactory{},
+		"load_shed_point":              &LoadShedPointConfigFactory{},
 	})
 }
 
@@ -1942,5 +1943,55 @@ func (p *FilterStateObjectRecreateFilter) OnRequestHeaders(headers shared.Header
 	token := <-exchange.tokens
 	p.handle.SendLocalResponse(200,
 		[][2]string{{"x-live-object-value", fmt.Sprintf("%#x", token)}}, nil, "")
+	return shared.HeadersStatusStop
+}
+
+// -----------------------------------------------------------------------------
+// LoadShedPoint
+// -----------------------------------------------------------------------------
+
+// LoadShedPointConfigFactory creates filters that send a local reply when the load shed point
+// named in the filter config sheds the request. Otherwise the filters tell the upstream in a
+// request header whether they got the load shed point.
+type LoadShedPointConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LoadShedPointConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &LoadShedPointFilterFactory{loadShedPoint: handle.GetLoadShedPoint(string(config))}, nil
+}
+
+type LoadShedPointFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	loadShedPoint shared.LoadShedPoint
+}
+
+func (f *LoadShedPointFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &LoadShedPointFilter{
+		handle:           handle,
+		hasLoadShedPoint: f.loadShedPoint != nil,
+		shedLoad:         f.loadShedPoint != nil && f.loadShedPoint.ShouldShedLoad(),
+	}
+}
+
+type LoadShedPointFilter struct {
+	shared.EmptyHttpFilter
+	handle           shared.HttpFilterHandle
+	hasLoadShedPoint bool
+	shedLoad         bool
+}
+
+func (p *LoadShedPointFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if !p.shedLoad {
+		if p.hasLoadShedPoint {
+			headers.Set("x-load-shed-point", "present")
+		} else {
+			headers.Set("x-load-shed-point", "absent")
+		}
+		return shared.HeadersStatusContinue
+	}
+	p.handle.SendLocalResponse(503, nil, []byte("shed"), "")
 	return shared.HeadersStatusStop
 }

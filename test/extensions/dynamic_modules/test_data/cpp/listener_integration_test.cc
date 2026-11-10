@@ -129,5 +129,48 @@ public:
 
 REGISTER_LISTENER_FILTER_CONFIG_FACTORY(DynamicMetadataConfigFactory, "dynamic_metadata");
 
+// Closes an accepted socket when the load shed point named in the filter config sheds it.
+class LoadShedPointFilter : public ListenerFilter {
+public:
+  LoadShedPointFilter(ListenerFilterHandle& handle, bool shed_load)
+      : handle_(handle), shed_load_(shed_load) {}
+
+  ListenerFilterStatus onAccept() override {
+    if (!shed_load_) {
+      return ListenerFilterStatus::Continue;
+    }
+    handle_.closeSocket("load_shed");
+    return ListenerFilterStatus::StopIteration;
+  }
+
+private:
+  ListenerFilterHandle& handle_;
+  const bool shed_load_;
+};
+
+class LoadShedPointFactory : public ListenerFilterFactory {
+public:
+  explicit LoadShedPointFactory(std::unique_ptr<LoadShedPoint> load_shed_point)
+      : load_shed_point_(std::move(load_shed_point)) {}
+
+  std::unique_ptr<ListenerFilter> create(ListenerFilterHandle& handle) override {
+    return std::make_unique<LoadShedPointFilter>(handle, load_shed_point_ != nullptr &&
+                                                             load_shed_point_->shouldShedLoad());
+  }
+
+private:
+  const std::unique_ptr<LoadShedPoint> load_shed_point_;
+};
+
+class LoadShedPointConfigFactory : public ListenerFilterConfigFactory {
+public:
+  std::unique_ptr<ListenerFilterFactory> create(ListenerFilterConfigHandle& handle,
+                                                std::string_view config) override {
+    return std::make_unique<LoadShedPointFactory>(handle.getLoadShedPoint(config));
+  }
+};
+
+REGISTER_LISTENER_FILTER_CONFIG_FACTORY(LoadShedPointConfigFactory, "load_shed_point");
+
 } // namespace DynamicModules
 } // namespace Envoy

@@ -882,6 +882,20 @@ func (mr *MockListenerFilterConfigHandleMockRecorder) DefineHistogram(name any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockListenerFilterConfigHandle)(nil).DefineHistogram), name)
 }
 
+// GetLoadShedPoint mocks base method.
+func (m *MockListenerFilterConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLoadShedPoint", name)
+	ret0, _ := ret[0].(shared.LoadShedPoint)
+	return ret0
+}
+
+// GetLoadShedPoint indicates an expected call of GetLoadShedPoint.
+func (mr *MockListenerFilterConfigHandleMockRecorder) GetLoadShedPoint(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLoadShedPoint", reflect.TypeOf((*MockListenerFilterConfigHandle)(nil).GetLoadShedPoint), name)
+}
+
 // GetRuntimeBool mocks base method.
 func (m *MockListenerFilterConfigHandle) GetRuntimeBool(key string, defaultValue bool) bool {
 	m.ctrl.T.Helper()

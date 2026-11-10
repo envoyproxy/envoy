@@ -99,6 +99,11 @@ At each refresh interval the module reports the pressure of the resource, right 
 any thread through a scheduler. Envoy treats a pressure above 1 as 1, and a negative or non-finite
 pressure as a failed update.
 
+A module can also enable synchronous feedback. Load shed points with a trigger on the resource then
+ask the module for the pressure each time they decide whether to shed load, and tell it about the
+load they accept, so that the module can limit new load without waiting for the next refresh. In
+this mode Envoy treats a negative or NaN pressure as 0, and a pressure above 1 as 1.
+
 The following configuration sheds new requests once the pressure that the module reports for the
 ``queue_latency`` resource reaches 0.9.
 
@@ -248,6 +253,13 @@ using a lot of memory even if those streams aren't actively making progress.
 Compared to overload actions, Load Shed Points are also more flexible to
 integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
 has access to the Overload Manager to request the custom Load Shed Point.
+
+For example, the :ref:`dynamic module <arch_overview_dynamic_modules>` HTTP, network, listener
+and UDP listener filters can get custom Load Shed Points by name and shed load at them. A filter
+on a listener that :ref:`bypasses the overload manager
+<envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>` gets no Load Shed Point,
+unless the route configuration or the Filter Chain Discovery Service (FCDS) created it, and an
+upstream HTTP filter gets none.
 
 The following core load shed points are supported:
 

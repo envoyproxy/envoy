@@ -582,6 +582,20 @@ typedef enum envoy_dynamic_module_type_socket_direction {
   envoy_dynamic_module_type_socket_direction_Downstream = 1,
 } envoy_dynamic_module_type_socket_direction;
 
+/**
+ * envoy_dynamic_module_type_load_shed_point_envoy_ptr is a raw pointer to a load shed point of the
+ * overload manager in Envoy, which corresponds to Server::LoadShedPoint. It is returned by
+ * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point and its network, listener
+ * and UDP listener filter counterparts, and checked with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The module can use it in the event hooks of the filter
+ * configuration that returned it and of the filters of that configuration, but not in the destroy
+ * hook of the configuration or on threads of its own, since Envoy can destroy the overload manager
+ * before the configuration when it shuts down.
+ */
+typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
+
 // =============================================================================
 // Common Event Hooks
 // =============================================================================
@@ -846,6 +860,28 @@ bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_typ
  */
 bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
                                                    void** data_ptr_out);
+
+// ----------------------------- Load Shed Points ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load is called by the module to decide
+ * whether to shed load at a load shed point of the overload manager.
+ *
+ * Each call decides for one unit of load, such as one request. It returns true with the
+ * probability that the triggers of the load shed point give, and counts shed load in the
+ * shed_load_count statistic of the load shed point. It reads the pressure of the synchronous
+ * feedback resource monitors of the triggers and reports accepted load to them on the calling
+ * thread. Checking a load shed point that Envoy also checks counts the same load twice.
+ *
+ * This is thread-safe. See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that
+ * can call it.
+ *
+ * @param load_shed_point_envoy_ptr is the load shed point to check. It can be nullptr, which never
+ * sheds load.
+ * @return true if the module should shed the load, false otherwise.
+ */
+bool envoy_dynamic_module_callback_load_shed_point_should_shed_load(
+    envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point_envoy_ptr);
 
 // =============================================================================
 // ============================== HTTP Filter ==================================
@@ -1968,6 +2004,31 @@ bool envoy_dynamic_module_callback_http_filter_get_generic_secret(
 bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+// ------------------------ Load Shed Point callbacks --------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point is called by the module to
+ * get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the request processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_http_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name, the filter is an upstream filter, or the listener of its filter chain bypasses the overload
+ * manager. Filters that the route configuration creates, such as those of a per-route filter chain,
+ * and filters of a filter chain that FCDS delivers do not see the bypass and get the load shed
+ * point.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
 
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 
@@ -5502,6 +5563,29 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
     envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Network Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_get_load_shed_point is called by the module
+ * to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the connection processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_network_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager. Filters of a filter chain that
+ * FCDS delivers do not see the bypass and get the load shed point.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 // --------------------- Network Filter Callbacks - Misc ---------------
 
 /**
@@ -6868,6 +6952,28 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
     envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Listener Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point is called by the module
+ * to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the connection processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_listener_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 // --------------------- Listener Filter Callbacks - Misc ---------------
 
 /**
@@ -7315,6 +7421,28 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
+
+// --------------------- UDP Listener Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point is called by the
+ * module to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the datagram processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_udp_listener_filter_config_new.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
 
 // --------------------- UDP Listener Filter Callbacks - Misc ---------------
 
@@ -19834,7 +19962,9 @@ bool envoy_dynamic_module_on_header_formatter_format(
 // This extension enables custom overload manager resource monitors via dynamic modules. At each
 // refresh interval of the overload manager, the module reports the pressure of the monitored
 // resource, which is the ratio of its usage to its limit. The overload actions and load shed points
-// with a trigger on the resource act on that pressure.
+// with a trigger on the resource act on that pressure. A module can also enable synchronous
+// feedback, in which case the load shed points with a trigger on the resource ask the module for
+// the pressure each time they decide whether to shed load, and tell it about the load they accept.
 
 // =============================================================================
 // Resource Monitor Types
@@ -19923,8 +20053,11 @@ envoy_dynamic_module_on_resource_monitor_config_new(
  * valid. A pending update is dropped without being reported. The module may be unloaded once this
  * returns, so it must stop the threads it started before returning.
  *
- * In validation mode, the module must not call envoy_dynamic_module_callback_get_concurrency or
- * envoy_dynamic_module_callback_is_validation_mode here.
+ * When the server shuts down, if the module enables synchronous feedback and a load shed point has
+ * a trigger on the resource, this runs only after the worker threads have stopped and the bootstrap
+ * extensions have been destroyed. In that case and in validation mode, the module must not call
+ * envoy_dynamic_module_callback_get_concurrency or envoy_dynamic_module_callback_is_validation_mode
+ * here.
  *
  * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
  */
@@ -19942,6 +20075,9 @@ void envoy_dynamic_module_on_resource_monitor_config_destroy(
  * pending update, so the overload manager keeps acting on the last reported pressure until the
  * module reports the outcome.
  *
+ * This hook is not called when the module enables synchronous feedback, and Envoy then accepts the
+ * configuration without it.
+ *
  * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
  * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
  * @param resource_pressure is where the module writes the pressure of the resource before it
@@ -19956,9 +20092,62 @@ envoy_dynamic_module_on_resource_monitor_update_resource_usage(
     envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
     double* resource_pressure);
 
+/**
+ * envoy_dynamic_module_on_resource_monitor_get_resource_usage is called to get the pressure of the
+ * resource when the module enables synchronous feedback. The load shed points with a trigger on the
+ * resource call it each time they decide whether to shed load, on the thread that makes the
+ * decision, and the overload manager calls it on the main thread at each refresh interval. It runs
+ * concurrently on several threads, so implementations must be thread-safe and must not block.
+ *
+ * This hook is required when the module enables synchronous feedback, and Envoy rejects the
+ * configuration without it. Other modules do not need to implement it.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @return the pressure of the resource, which is the ratio of its usage to its limit. Envoy treats
+ * a negative or NaN pressure as 0, and a pressure above 1 as 1.
+ */
+double envoy_dynamic_module_on_resource_monitor_get_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_load_accepted is called when the module enables
+ * synchronous feedback and a load shed point with a trigger on the resource decides not to shed
+ * load, on the thread that makes the decision. This lets the module account for the accepted load
+ * right away. It runs concurrently on several threads, so implementations must be thread-safe and
+ * must not block.
+ *
+ * This hook is optional. Modules that do not account for accepted load do not need to implement
+ * it.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @param load_shed_point_name is the name of the load shed point. It is owned by Envoy and valid
+ * only for the duration of this call.
+ */
+void envoy_dynamic_module_on_resource_monitor_load_accepted(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer load_shed_point_name);
+
 // =============================================================================
 // Resource Monitor Callbacks
 // =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback enables
+ * synchronous feedback for the resource monitor. Envoy then gets the pressure from
+ * envoy_dynamic_module_on_resource_monitor_get_resource_usage instead of
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage, and reports the load that the
+ * load shed points accept to envoy_dynamic_module_on_resource_monitor_load_accepted. See
+ * envoy_dynamic_module_on_resource_monitor_config_destroy for when the destroy hook runs.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_resource_monitor_config_new.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @return true if synchronous feedback is enabled, false if this is not called on the main thread
+ * during envoy_dynamic_module_on_resource_monitor_config_new.
+ */
+bool envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new creates a new resource

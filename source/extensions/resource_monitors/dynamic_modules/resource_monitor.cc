@@ -81,6 +81,28 @@ void DynamicModuleResourceMonitorConfig::reportFailure() {
   }
 }
 
+bool DynamicModuleResourceMonitorConfig::enableSynchronousFeedback() {
+  if (!in_config_new_) {
+    return false;
+  }
+  synchronous_feedback_enabled_ = true;
+  return true;
+}
+
+Server::ResourceUsage DynamicModuleSynchronousFeedbackResourceMonitor::getResourceUsage() {
+  const double resource_pressure = config_->on_get_resource_usage_(config_->in_module_config_);
+  // A load shed point cannot fail its check, so a negative or NaN pressure counts as no pressure.
+  return {std::isnan(resource_pressure) ? 0 : std::clamp(resource_pressure, 0.0, 1.0)};
+}
+
+void DynamicModuleSynchronousFeedbackResourceMonitor::onLoadAccepted(
+    absl::string_view load_shed_point_name) {
+  if (config_->on_load_accepted_ != nullptr) {
+    config_->on_load_accepted_(config_->in_module_config_,
+                               {load_shed_point_name.data(), load_shed_point_name.size()});
+  }
+}
+
 void DynamicModuleResourceMonitorConfigScheduler::reportResourceUsage(double resource_pressure) {
   post([resource_pressure](DynamicModuleResourceMonitorConfig& config) {
     config.reportResourceUsage(resource_pressure);
@@ -120,16 +142,21 @@ newDynamicModuleResourceMonitorConfig(absl::string_view resource_monitor_name,
       "envoy_dynamic_module_on_resource_monitor_config_destroy");
   RETURN_IF_NOT_OK_REF(on_config_destroy.status());
 
+  // Which of these are required depends on whether the module enables synchronous feedback, which
+  // is only known once it has created its configuration.
   auto on_update_resource_usage =
       dynamic_module->getFunctionPointer<OnResourceMonitorUpdateResourceUsageType>(
           "envoy_dynamic_module_on_resource_monitor_update_resource_usage");
-  RETURN_IF_NOT_OK_REF(on_update_resource_usage.status());
+  auto on_get_resource_usage =
+      dynamic_module->getFunctionPointer<OnResourceMonitorGetResourceUsageType>(
+          "envoy_dynamic_module_on_resource_monitor_get_resource_usage");
+  auto on_load_accepted = dynamic_module->getFunctionPointer<OnResourceMonitorLoadAcceptedType>(
+      "envoy_dynamic_module_on_resource_monitor_load_accepted");
 
   auto config = std::make_shared<DynamicModuleResourceMonitorConfig>(std::move(dynamic_module),
                                                                      main_thread_dispatcher);
   config->scheduler_target_->config_ = config;
   config->on_config_destroy_ = on_config_destroy.value();
-  config->on_update_resource_usage_ = on_update_resource_usage.value();
 
   // The buffers borrow the caller's strings, which the ABI only promises for the duration of the
   // event hook.
@@ -137,11 +164,23 @@ newDynamicModuleResourceMonitorConfig(absl::string_view resource_monitor_name,
                                                               resource_monitor_name.size()};
   const envoy_dynamic_module_type_envoy_buffer config_buffer = {resource_monitor_config.data(),
                                                                 resource_monitor_config.size()};
+  config->in_config_new_ = true;
   config->in_module_config_ =
       on_config_new.value()(static_cast<void*>(config.get()), name_buffer, config_buffer);
+  config->in_config_new_ = false;
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError(
         "Failed to initialize dynamic module resource monitor config");
+  }
+  if (config->synchronous_feedback_enabled_) {
+    RETURN_IF_NOT_OK_REF(on_get_resource_usage.status());
+    config->on_get_resource_usage_ = on_get_resource_usage.value();
+    if (on_load_accepted.ok()) {
+      config->on_load_accepted_ = on_load_accepted.value();
+    }
+  } else {
+    RETURN_IF_NOT_OK_REF(on_update_resource_usage.status());
+    config->on_update_resource_usage_ = on_update_resource_usage.value();
   }
   return config;
 }

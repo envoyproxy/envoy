@@ -35,6 +35,13 @@ public:
   // its pressure from the runtime, and adds the given overload manager fields.
   void initializeOverloadManager(const std::string& resource_monitor_name,
                                  const std::string& overload_manager_fields) {
+    initializeOverloadManager(resource_monitor_name, std::string(PressureRuntimeKey),
+                              overload_manager_fields);
+  }
+
+  void initializeOverloadManager(const std::string& resource_monitor_name,
+                                 const std::string& resource_monitor_config,
+                                 const std::string& overload_manager_fields) {
     const std::string yaml = absl::StrCat(R"EOF(
 refresh_interval: 0.01s
 resource_monitors:
@@ -48,8 +55,8 @@ resource_monitors:
                                           resource_monitor_name, R"EOF(
     resource_monitor_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
-      value: )EOF",
-                                          PressureRuntimeKey, "\n", overload_manager_fields);
+      value: ")EOF",
+                                          resource_monitor_config, "\"\n", overload_manager_fields);
     const auto overload_manager =
         TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(yaml);
     config_helper_.addConfigModifier(
@@ -121,6 +128,32 @@ TEST_P(DynamicModuleResourceMonitorIntegrationTest, ReportsPendingUpdatesFromMod
 
   setPressure(0.6);
   test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Eq(60));
+}
+
+TEST_P(DynamicModuleResourceMonitorIntegrationTest, ShedsLoadWithSynchronousFeedback) {
+  // The module accepts two requests and reports full pressure afterwards.
+  initializeOverloadManager("admission", "2", R"EOF(
+loadshed_points:
+- name: envoy.load_shed_points.http_connection_manager_decode_headers
+  triggers:
+  - name: dynamic_module_monitor
+    threshold:
+      value: 1.0
+)EOF");
+
+  for (int i = 0; i < 2; ++i) {
+    SCOPED_TRACE(i);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+  expectOverloadedResponse();
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.shed_load_count",
+      Eq(1));
+  test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Eq(100));
 }
 
 } // namespace

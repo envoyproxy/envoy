@@ -105,11 +105,12 @@ pub fn log_ffi_panic(function_name: &str, payload: Box<dyn Any + Send>) {
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
-// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
-// `__darwin_pthread_handler_rec` on macOS.
+///
+/// `abi.rs` is generated from `abi/abi.h` by `//tools/dynamic_modules/bindgen` and checked in;
+/// `bazel run //tools/dynamic_modules/bindgen:fix` regenerates it after a header change.
 #[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
-  include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+  include!("abi.rs");
 }
 
 /// Declare the init functions for the dynamic module.
@@ -361,6 +362,50 @@ pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
   } else {
     None
   }
+}
+
+/// A load shed point of the overload manager, which a filter configuration returns from
+/// `get_load_shed_point`, for example [`EnvoyHttpFilterConfig::get_load_shed_point`].
+///
+/// The module can check it in the event hooks of the filter configuration that returned it and of
+/// its filters, but not while the configuration is dropped or on threads of its own, since Envoy
+/// can destroy the overload manager before the configuration when it shuts down. A module typically
+/// gets it once while its configuration is created and keeps it in its own configuration.
+#[cfg_attr(any(test, feature = "mock"), mockall::automock)]
+pub trait EnvoyLoadShedPoint: Send + Sync {
+  /// Decides whether to shed one unit of load, such as one request.
+  ///
+  /// It returns true with the probability that the triggers of the load shed point give, and counts
+  /// shed load in the `shed_load_count` statistic of the load shed point. It reads the pressure of
+  /// the synchronous feedback resource monitors of the triggers and reports accepted load to them
+  /// on the calling thread. Checking a load shed point that Envoy also checks counts the same load
+  /// twice.
+  fn should_shed_load(&self) -> bool;
+}
+
+struct EnvoyLoadShedPointImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+}
+
+// SAFETY: Envoy allows the filters on all worker threads to check a load shed point concurrently.
+unsafe impl Send for EnvoyLoadShedPointImpl {}
+unsafe impl Sync for EnvoyLoadShedPointImpl {}
+
+impl EnvoyLoadShedPoint for EnvoyLoadShedPointImpl {
+  fn should_shed_load(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_load_shed_point_should_shed_load(self.raw_ptr) }
+  }
+}
+
+/// Wraps a load shed point that a `get_load_shed_point` callback returned, which is null when
+/// there is none.
+pub(crate) fn new_load_shed_point(
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+  if raw_ptr.is_null() {
+    return None;
+  }
+  Some(Box::new(EnvoyLoadShedPointImpl { raw_ptr }))
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -824,6 +869,9 @@ macro_rules! declare_network_filter_init_functions {
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
 /// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
+/// - `synchronous_feedback_resource_monitor:` —
+///   [`NewSynchronousFeedbackResourceMonitorConfigFunction`] for resource monitors with synchronous
+///   feedback
 ///
 /// # Examples
 ///
@@ -1091,6 +1139,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION,
       $fn,
       "NEW_RESOURCE_MONITOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register synchronous_feedback_resource_monitor : $fn:expr) => {
+    $crate::set_factory_once!(
+      $crate::NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -2053,6 +2108,23 @@ pub type NewResourceMonitorConfigFunction =
 /// of [`declare_all_init_functions!`] and is not intended to be set directly.
 pub static NEW_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<NewResourceMonitorConfigFunction> =
   OnceLock::new();
+
+/// The function signature for creating a new resource monitor with synchronous feedback.
+///
+/// The `name` and `config` are the same as for [`NewResourceMonitorConfigFunction`]. The SDK calls
+/// this factory first, and calls the `resource_monitor:` factory only when it returns `None`.
+pub type NewSynchronousFeedbackResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>>;
+
+/// The global factory function for resource monitors with synchronous feedback. This is set via
+/// the `synchronous_feedback_resource_monitor:` arm of [`declare_all_init_functions!`] and is not
+/// intended to be set directly.
+pub static NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<
+  NewSynchronousFeedbackResourceMonitorConfigFunction,
+> = OnceLock::new();
 
 // =============================================================================
 // Config Validator

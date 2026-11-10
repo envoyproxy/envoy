@@ -184,6 +184,11 @@ type ListenerFilterConfigHandle interface {
 
 	// GetScheduler returns a scheduler bound to the config context.
 	GetScheduler() Scheduler
+	// GetLoadShedPoint returns a load shed point of the overload manager by name, to shed load at
+	// the plugin's own point of the connection processing. It returns nil if the overload manager
+	// has no load shed point with the name or the listener of the filter bypasses the overload
+	// manager.
+	GetLoadShedPoint(name string) LoadShedPoint
 	// Log writes a formatted message through Envoy's logging subsystem.
 	Log(level LogLevel, format string, args ...any)
 }

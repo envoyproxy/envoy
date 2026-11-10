@@ -2,9 +2,17 @@
 //!
 //! A resource monitor reports to the overload manager the pressure of a resource, which is the
 //! ratio of its usage to its limit. Register a factory through the `resource_monitor:` arm of
-//! [`crate::declare_all_init_functions!`] and return a [`ResourceMonitor`] from it.
+//! [`crate::declare_all_init_functions!`] and return a [`ResourceMonitor`] from it. A factory
+//! registered through the `synchronous_feedback_resource_monitor:` arm returns a
+//! [`SynchronousFeedbackResourceMonitor`] instead.
 
-use crate::{abi, ffi_export, NewResourceMonitorConfigFunction};
+use crate::{
+  abi,
+  ffi_export,
+  EnvoyBuffer,
+  NewResourceMonitorConfigFunction,
+  NewSynchronousFeedbackResourceMonitorConfigFunction,
+};
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::c_void;
@@ -41,10 +49,39 @@ pub trait ResourceMonitor: Send + Sync {
   fn update_resource_usage(&self) -> ResourceMonitorUpdate;
 }
 
+/// A resource monitor that the load shed points with a trigger on the resource ask for the
+/// pressure each time they decide whether to shed load.
+///
+/// A single instance is created per resource monitor configuration. Its methods run concurrently on
+/// any thread, so they must be thread-safe and must not block. The overload manager also gets the
+/// pressure from [`SynchronousFeedbackResourceMonitor::resource_usage`] at each refresh interval.
+///
+/// Resource cleanup belongs in a [`Drop`] implementation, which must stop the threads that the
+/// monitor started, since the module may be unloaded once it returns. At shutdown, a load shed
+/// point with a trigger on the resource keeps the monitor alive until after the worker threads
+/// have stopped and the bootstrap extensions have been destroyed. In that case and in validation
+/// mode, its [`Drop`] must not call [`crate::get_server_concurrency`] or
+/// [`crate::is_validation_mode`].
+pub trait SynchronousFeedbackResourceMonitor: Send + Sync {
+  /// Returns the pressure of the resource, which is the ratio of its usage to its limit. Envoy
+  /// treats a negative or NaN pressure as 0, and a pressure above 1 as 1.
+  fn resource_usage(&self) -> f64;
+
+  /// Called when a load shed point with a trigger on the resource decides not to shed load, with
+  /// the name of the load shed point. The default implementation does nothing.
+  fn on_load_accepted(&self, _load_shed_point_name: EnvoyBuffer<'_>) {}
+}
+
+/// The resource monitor that a module configuration holds.
+pub(crate) enum ModuleResourceMonitor {
+  Refresh(Box<dyn ResourceMonitor>),
+  SynchronousFeedback(Box<dyn SynchronousFeedbackResourceMonitor>),
+}
+
 /// The Envoy-side resource monitor configuration handle backed by an opaque Envoy pointer.
 ///
-/// It is passed to the factory registered via [`crate::declare_all_init_functions!`], which runs on
-/// the main thread.
+/// It is passed to the `resource_monitor:` factory of [`crate::declare_all_init_functions!`], which
+/// runs on the main thread.
 pub struct EnvoyResourceMonitorConfig {
   raw_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
 }
@@ -71,6 +108,14 @@ impl EnvoyResourceMonitorConfig {
     };
     EnvoyResourceMonitorConfigSchedulerImpl {
       raw_ptr: scheduler_ptr,
+    }
+  }
+
+  fn enable_synchronous_feedback(&mut self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+        self.raw_ptr,
+      )
     }
   }
 }
@@ -160,9 +205,6 @@ ffi_export! {
     let config_bytes = unsafe {
       crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let new_fn = crate::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_RESOURCE_MONITOR_CONFIG_FUNCTION must be set");
     // SAFETY: `config_envoy_ptr` is the pointer Envoy passed to this hook, and the handle is only
     // lent to the factory for the duration of the hook.
     let mut envoy_config = unsafe { EnvoyResourceMonitorConfig::new(config_envoy_ptr) };
@@ -170,7 +212,8 @@ ffi_export! {
       name_str.as_ref(),
       config_bytes,
       &mut envoy_config,
-      new_fn,
+      crate::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION.get(),
+      crate::NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION.get(),
     )
   }
   on_panic = ptr::null()
@@ -178,16 +221,24 @@ ffi_export! {
 
 /// Testable wrapper for [`envoy_dynamic_module_on_resource_monitor_config_new`].
 ///
-/// The FFI entry point extracts the inputs and resolves the registered factory. This function
-/// performs the `Option`-to-pointer conversion that unit tests can drive directly.
+/// The FFI entry point extracts the inputs and resolves the registered factories. This function
+/// asks the synchronous feedback factory first, and performs the `Option`-to-pointer conversion
+/// that unit tests can drive directly.
 pub fn envoy_dynamic_module_on_resource_monitor_config_new_impl(
   name: &str,
   config: &[u8],
   envoy_config: &mut EnvoyResourceMonitorConfig,
-  new_fn: &NewResourceMonitorConfigFunction,
+  new_fn: Option<&NewResourceMonitorConfigFunction>,
+  new_synchronous_feedback_fn: Option<&NewSynchronousFeedbackResourceMonitorConfigFunction>,
 ) -> *const c_void {
-  match new_fn(name, config, envoy_config) {
-    Some(monitor) => crate::wrap_into_c_void_ptr!(monitor),
+  if let Some(monitor) = new_synchronous_feedback_fn.and_then(|factory| factory(name, config)) {
+    if !envoy_config.enable_synchronous_feedback() {
+      return ptr::null();
+    }
+    return crate::wrap_into_c_void_ptr!(ModuleResourceMonitor::SynchronousFeedback(monitor));
+  }
+  match new_fn.and_then(|factory| factory(name, config, envoy_config)) {
+    Some(monitor) => crate::wrap_into_c_void_ptr!(ModuleResourceMonitor::Refresh(monitor)),
     None => ptr::null(),
   }
 }
@@ -200,7 +251,7 @@ ffi_export! {
   unsafe fn envoy_dynamic_module_on_resource_monitor_config_destroy(
     config_ptr: *const c_void,
   ) {
-    crate::drop_wrapped_c_void_ptr!(config_ptr, ResourceMonitor);
+    drop(Box::from_raw(config_ptr as *mut ModuleResourceMonitor));
   }
 }
 
@@ -214,7 +265,11 @@ ffi_export! {
     config_ptr: *const c_void,
     resource_pressure: *mut f64,
   ) -> abi::envoy_dynamic_module_type_resource_monitor_update_status {
-    let monitor = &*(config_ptr as *const Box<dyn ResourceMonitor>);
+    // Envoy does not call this hook for a monitor with synchronous feedback.
+    let ModuleResourceMonitor::Refresh(monitor) = &*(config_ptr as *const ModuleResourceMonitor)
+    else {
+      return abi::envoy_dynamic_module_type_resource_monitor_update_status::Failure;
+    };
     match monitor.update_resource_usage() {
       ResourceMonitorUpdate::Pressure(pressure) => {
         *resource_pressure = pressure;
@@ -229,4 +284,42 @@ ffi_export! {
     }
   }
   on_panic = abi::envoy_dynamic_module_type_resource_monitor_update_status::Failure
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_resource_monitor_get_resource_usage(
+    config_ptr: *const c_void,
+  ) -> f64 {
+    // Envoy only calls this hook for a monitor with synchronous feedback.
+    match &*(config_ptr as *const ModuleResourceMonitor) {
+      ModuleResourceMonitor::SynchronousFeedback(monitor) => monitor.resource_usage(),
+      ModuleResourceMonitor::Refresh(_) => 0.0,
+    }
+  }
+  on_panic = 0.0
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_resource_monitor_load_accepted(
+    config_ptr: *const c_void,
+    load_shed_point_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    // Envoy only calls this hook for a monitor with synchronous feedback.
+    if let ModuleResourceMonitor::SynchronousFeedback(monitor) =
+      &*(config_ptr as *const ModuleResourceMonitor)
+    {
+      monitor.on_load_accepted(EnvoyBuffer::new_from_raw(
+        load_shed_point_name.ptr as *const u8,
+        load_shed_point_name.length,
+      ));
+    }
+  }
 }

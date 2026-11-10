@@ -965,6 +965,17 @@ bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
   return secretToModuleBuffer(filter_config->getGenericSecretById(id), result);
 }
 
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  if (!filter_config->load_shed_point_provider_.has_value()) {
+    return nullptr;
+  }
+  return filter_config->load_shed_point_provider_->getLoadShedPoint(moduleBufferToStringView(name));
+}
+
 bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
@@ -1779,15 +1790,16 @@ bool envoy_dynamic_module_callback_http_set_filter_state_object(
     return false;
   }
   absl::string_view key_view(key.ptr, key.length);
+  const auto filter_state_life_span = toFilterStateLifeSpan(life_span);
+  if (!ContextAccessor::canSetFilterState(filter_state, key_view, filter_state_life_span)) {
+    free_object();
+    return false;
+  }
   filter_state->setData(key_view,
                         std::make_shared<DynamicModuleFilterStateObject>(
                             filter->getFilterConfigSharedPtr(), module_object, destructor),
-                        toFilterStateLifeSpan(life_span));
-  // setData is a no-op when the key already exists at a conflicting life_span. The wrapper is then
-  // destroyed and the destructor has already freed the object. Confirm our object was stored by
-  // pointer identity (an address compare, never a dereference) and report a failed store otherwise.
-  auto* stored = filter_state->getDataMutable<DynamicModuleFilterStateObject>(key_view);
-  return stored != nullptr && stored->object() == module_object;
+                        filter_state_life_span);
+  return true;
 }
 
 envoy_dynamic_module_type_filter_state_object_module_ptr

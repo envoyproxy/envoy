@@ -1,7 +1,11 @@
 // NOLINT(namespace-envoy)
 
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/resource_monitors/dynamic_modules/resource_monitor.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace {
 
@@ -17,6 +21,16 @@ DynamicModuleResourceMonitorConfigScheduler* toResourceMonitorConfigScheduler(
 } // namespace
 
 extern "C" {
+
+bool envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  return static_cast<DynamicModuleResourceMonitorConfig*>(config_envoy_ptr)
+      ->enableSynchronousFeedback();
+}
 
 envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr
 envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(
