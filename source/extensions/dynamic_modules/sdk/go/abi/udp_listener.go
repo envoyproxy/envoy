@@ -323,6 +323,15 @@ func (h *dymUdpListenerConfigHandle) RecordHistogramValue(
 	)
 }
 
+func (h *dymUdpListenerConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	loadShedPoint := C.envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+	)
+	runtime.KeepAlive(name)
+	return newLoadShedPoint(loadShedPoint)
+}
+
 func (h *dymUdpListenerConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	hostLog(level, format, args)
 }

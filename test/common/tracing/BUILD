@@ -14,7 +14,7 @@ envoy_cc_test(
     srcs = [
         "http_tracer_impl_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -40,7 +40,10 @@ envoy_cc_test(
     srcs = [
         "tracer_impl_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "asan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/network:address_lib",
@@ -62,7 +65,7 @@ envoy_cc_test(
     srcs = [
         "tracer_manager_impl_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/tracing:tracer_config_lib",
         "//source/common/tracing:tracer_lib",
@@ -79,7 +82,7 @@ envoy_cc_test(
     srcs = [
         "tracer_config_impl_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/tracing:tracer_config_lib",
@@ -92,7 +95,6 @@ envoy_cc_test(
     srcs = [
         "trace_context_impl_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",

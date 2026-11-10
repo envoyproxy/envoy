@@ -9051,6 +9051,83 @@ fn test_envoy_dynamic_module_on_access_logger_new_destroy() {
   assert!(LOGGER_DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+#[test]
+fn test_response_flag_to_bitmask() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  assert_eq!(Flag::FailedLocalHealthCheck.to_bitmask(), 0x1);
+  assert_eq!(Flag::NoHealthyUpstream.to_bitmask(), 0x2);
+  assert_eq!(Flag::UnconditionalDropOverload.to_bitmask(), 1u64 << 29);
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_empty() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  assert_eq!(Flag::iter_from_bitmask(0).collect::<Vec<_>>(), Vec::new());
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_selected_flags() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let bitmask = Flag::NoHealthyUpstream.to_bitmask() | Flag::RateLimited.to_bitmask();
+  assert_eq!(
+    Flag::iter_from_bitmask(bitmask).collect::<Vec<_>>(),
+    vec![Flag::NoHealthyUpstream, Flag::RateLimited]
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_ignores_unknown_bits() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  // Bit 63 doesn't correspond to any known flag (today, this enum only defines bits 0..=29); it
+  // should be silently skipped rather than panicking or producing a bogus value. `bitmask` is a
+  // `u64` specifically so a bit this high is representable at all.
+  let bitmask = Flag::LocalReset.to_bitmask() | (1u64 << 63);
+  assert_eq!(
+    Flag::iter_from_bitmask(bitmask).collect::<Vec<_>>(),
+    vec![Flag::LocalReset]
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_full_mask_matches_from_repr() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let all = <Flag as strum::VariantArray>::VARIANTS;
+  let full_bitmask = all.iter().fold(0u64, |acc, &flag| acc | flag.to_bitmask());
+  assert_eq!(
+    Flag::iter_from_bitmask(full_bitmask).collect::<Vec<_>>(),
+    all
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_is_exact_size_iterator() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let bitmask = Flag::NoHealthyUpstream.to_bitmask()
+    | Flag::RateLimited.to_bitmask()
+    | Flag::LocalReset.to_bitmask();
+  let mut iter = Flag::iter_from_bitmask(bitmask);
+  assert_eq!(iter.len(), 3);
+  assert_eq!(iter.size_hint(), (3, Some(3)));
+  iter.next();
+  assert_eq!(iter.len(), 2);
+  assert_eq!(iter.size_hint(), (2, Some(2)));
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_exact_size_ignores_unknown_bits() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  // Unknown bits are pruned at construction, so len() doesn't overcount them.
+  let bitmask = Flag::LocalReset.to_bitmask() | (1u64 << 63);
+  assert_eq!(Flag::iter_from_bitmask(bitmask).len(), 1);
+}
+
 // =================================================================================================
 // FFI panic-handling helpers
 // =================================================================================================
@@ -14565,4 +14642,647 @@ fn test_envoy_route_specifier_config_impl() {
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
+}
+
+// =============================================================================
+// Resource Monitor
+// =============================================================================
+
+thread_local! {
+  // The id of the last scheduler created on this thread.
+  static LAST_RESOURCE_MONITOR_SCHEDULER_ID: std::cell::Cell<u64> =
+    const { std::cell::Cell::new(0) };
+}
+
+// A scheduler can be used and dropped on any thread, so its events are kept per scheduler id.
+static NEXT_RESOURCE_MONITOR_SCHEDULER_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(1);
+static RESOURCE_MONITOR_SCHEDULER_EVENTS: std::sync::Mutex<Vec<(u64, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+// Stands for the Envoy side configuration, so the stubs can check that the SDK passes it on.
+fn resource_monitor_envoy_config(
+) -> abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr {
+  static ENVOY_CONFIG: u8 = 0;
+  &ENVOY_CONFIG as *const u8 as *mut _
+}
+
+fn record_resource_monitor_scheduler_event(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+  event: String,
+) {
+  let id = unsafe { *(scheduler as *const u64) };
+  RESOURCE_MONITOR_SCHEDULER_EVENTS
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .push((id, event));
+}
+
+fn resource_monitor_scheduler_events(id: u64) -> Vec<String> {
+  RESOURCE_MONITOR_SCHEDULER_EVENTS
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .iter()
+    .filter(|(event_id, _)| *event_id == id)
+    .map(|(_, event)| event.clone())
+    .collect()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr {
+  assert_eq!(config_envoy_ptr, resource_monitor_envoy_config());
+  let id = NEXT_RESOURCE_MONITOR_SCHEDULER_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  LAST_RESOURCE_MONITOR_SCHEDULER_ID.set(id);
+  Box::into_raw(Box::new(id)) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+  resource_pressure: f64,
+) {
+  record_resource_monitor_scheduler_event(scheduler, format!("usage {resource_pressure}"));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+) {
+  record_resource_monitor_scheduler_event(scheduler, "failure".to_string());
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+) {
+  record_resource_monitor_scheduler_event(scheduler, "delete".to_string());
+  unsafe { drop(Box::from_raw(scheduler as *mut u64)) };
+}
+
+fn resource_monitor_envoy_config_handle() -> resource_monitor::EnvoyResourceMonitorConfig {
+  unsafe { resource_monitor::EnvoyResourceMonitorConfig::new(resource_monitor_envoy_config()) }
+}
+
+struct TestResourceMonitor(resource_monitor::ResourceMonitorUpdate);
+
+impl resource_monitor::ResourceMonitor for TestResourceMonitor {
+  fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+    self.0
+  }
+}
+
+fn update_resource_monitor(
+  monitor: Box<dyn resource_monitor::ResourceMonitor>,
+) -> (
+  abi::envoy_dynamic_module_type_resource_monitor_update_status,
+  f64,
+) {
+  let config_ptr = wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::Refresh(monitor));
+  // Envoy reads the pressure only on Success, so a marker value shows whether the hook wrote it.
+  let mut resource_pressure = -7.0;
+  let status = unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+      resource_monitor_envoy_config(),
+      config_ptr,
+      &mut resource_pressure,
+    )
+  };
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  (status, resource_pressure)
+}
+
+#[test]
+fn test_resource_monitor_config_new_and_destroy() {
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+  struct DroppedMonitor;
+  impl Drop for DroppedMonitor {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl resource_monitor::ResourceMonitor for DroppedMonitor {
+    fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+      resource_monitor::ResourceMonitorUpdate::Failure
+    }
+  }
+
+  let new_fn: NewResourceMonitorConfigFunction = |name, config, _envoy_config| {
+    assert_eq!(config, b"config");
+    (name == "monitor")
+      .then(|| Box::new(DroppedMonitor) as Box<dyn resource_monitor::ResourceMonitor>)
+  };
+  let mut envoy_config = resource_monitor_envoy_config_handle();
+
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    "unknown",
+    b"config",
+    &mut envoy_config,
+    Some(&new_fn),
+    None,
+  );
+  assert!(config_ptr.is_null());
+
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    "monitor",
+    b"config",
+    &mut envoy_config,
+    Some(&new_fn),
+    None,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  assert_eq!(DROPPED.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn test_resource_monitor_update_outcomes() {
+  use abi::envoy_dynamic_module_type_resource_monitor_update_status as Status;
+  use resource_monitor::ResourceMonitorUpdate;
+
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Pressure(0.25)
+    ))),
+    (Status::Success, 0.25)
+  );
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Failure
+    ))),
+    (Status::Failure, -7.0)
+  );
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Pending
+    ))),
+    (Status::Pending, -7.0)
+  );
+}
+
+#[test]
+fn test_resource_monitor_update_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::ResourceMonitor for PanicMonitor {
+    fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+      panic!("intentional panic in update_resource_usage");
+    }
+  }
+
+  assert_eq!(
+    update_resource_monitor(Box::new(PanicMonitor)),
+    (
+      abi::envoy_dynamic_module_type_resource_monitor_update_status::Failure,
+      -7.0
+    )
+  );
+}
+
+#[test]
+fn test_resource_monitor_scheduler_reports_and_delete() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  let scheduler = resource_monitor_envoy_config_handle().new_config_scheduler();
+  let id = LAST_RESOURCE_MONITOR_SCHEDULER_ID.get();
+  scheduler.report_resource_usage(0.5);
+
+  // The scheduler is Send, so a module thread can report and drop it.
+  std::thread::spawn(move || scheduler.report_failure())
+    .join()
+    .unwrap();
+
+  assert_eq!(
+    resource_monitor_scheduler_events(id),
+    ["usage 0.5", "failure", "delete"]
+  );
+}
+
+#[test]
+fn test_resource_monitor_boxed_scheduler_reports() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  fn report(scheduler: &impl EnvoyResourceMonitorConfigScheduler) {
+    scheduler.report_resource_usage(0.75);
+    scheduler.report_failure();
+  }
+
+  let scheduler: Box<dyn EnvoyResourceMonitorConfigScheduler> =
+    Box::new(resource_monitor_envoy_config_handle().new_config_scheduler());
+  let id = LAST_RESOURCE_MONITOR_SCHEDULER_ID.get();
+  report(&scheduler);
+  drop(scheduler);
+
+  assert_eq!(
+    resource_monitor_scheduler_events(id),
+    ["usage 0.75", "failure", "delete"]
+  );
+}
+
+#[test]
+fn test_resource_monitor_scheduler_mock() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  let mut mock_scheduler = resource_monitor::MockEnvoyResourceMonitorConfigScheduler::new();
+  mock_scheduler
+    .expect_report_resource_usage()
+    .with(mockall::predicate::eq(0.42))
+    .times(1)
+    .return_const(());
+  mock_scheduler.report_resource_usage(0.42);
+}
+
+thread_local! {
+  // What the enable stub returns, how often it was called on this thread, and how often the refresh
+  // factory was asked for a monitor.
+  static RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT: std::cell::Cell<bool> =
+    const { std::cell::Cell::new(true) };
+  static RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS: std::cell::Cell<usize> =
+    const { std::cell::Cell::new(0) };
+  static RESOURCE_MONITOR_REFRESH_FACTORY_CALLS: std::cell::Cell<usize> =
+    const { std::cell::Cell::new(0) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
+) -> bool {
+  assert_eq!(config_envoy_ptr, resource_monitor_envoy_config());
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS
+    .set(RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.get() + 1);
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.get()
+}
+
+struct TestSynchronousFeedbackResourceMonitor(f64);
+
+impl resource_monitor::SynchronousFeedbackResourceMonitor
+  for TestSynchronousFeedbackResourceMonitor
+{
+  fn resource_usage(&self) -> f64 {
+    self.0
+  }
+}
+
+fn new_synchronous_feedback_resource_monitor(
+  name: &str,
+  _config: &[u8],
+) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>> {
+  matches!(name, "synchronous" | "both").then(|| {
+    Box::new(TestSynchronousFeedbackResourceMonitor(0.7))
+      as Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>
+  })
+}
+
+fn new_refresh_resource_monitor(
+  name: &str,
+  _config: &[u8],
+  _envoy_config: &mut resource_monitor::EnvoyResourceMonitorConfig,
+) -> Option<Box<dyn resource_monitor::ResourceMonitor>> {
+  RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.set(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get() + 1);
+  matches!(name, "refresh" | "both").then(|| {
+    Box::new(TestResourceMonitor(
+      resource_monitor::ResourceMonitorUpdate::Pressure(0.2),
+    )) as Box<dyn resource_monitor::ResourceMonitor>
+  })
+}
+
+// Creates a configuration with both factories registered. Returns the outcome and the pressure of
+// the update hook, the pressure from the synchronous feedback hook, and the number of times the
+// configuration enabled synchronous feedback.
+fn new_resource_monitor_config(
+  name: &str,
+) -> Option<(
+  abi::envoy_dynamic_module_type_resource_monitor_update_status,
+  f64,
+  f64,
+  usize,
+)> {
+  let new_fn: NewResourceMonitorConfigFunction = new_refresh_resource_monitor;
+  let new_synchronous_feedback_fn: NewSynchronousFeedbackResourceMonitorConfigFunction =
+    new_synchronous_feedback_resource_monitor;
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.set(0);
+  RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.set(0);
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    name,
+    b"",
+    &mut resource_monitor_envoy_config_handle(),
+    Some(&new_fn),
+    Some(&new_synchronous_feedback_fn),
+  );
+  if config_ptr.is_null() {
+    return None;
+  }
+  let mut refresh_pressure = -7.0;
+  let (update_status, synchronous_pressure) = unsafe {
+    (
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+        resource_monitor_envoy_config(),
+        config_ptr,
+        &mut refresh_pressure,
+      ),
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_get_resource_usage(config_ptr),
+    )
+  };
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  Some((
+    update_status,
+    refresh_pressure,
+    synchronous_pressure,
+    RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.get(),
+  ))
+}
+
+#[test]
+fn test_resource_monitor_synchronous_feedback_factory_comes_first() {
+  use abi::envoy_dynamic_module_type_resource_monitor_update_status as Status;
+
+  // The synchronous feedback monitor answers only the synchronous path, after enabling it, and the
+  // refresh factory is not asked even when it has a monitor for the name too.
+  for name in ["synchronous", "both"] {
+    assert_eq!(
+      new_resource_monitor_config(name),
+      Some((Status::Failure, -7.0, 0.7, 1)),
+      "{name}"
+    );
+    assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 0, "{name}");
+  }
+  // The other names fall back to the refresh factory, which answers only the refresh path.
+  assert_eq!(
+    new_resource_monitor_config("refresh"),
+    Some((Status::Success, 0.2, 0.0, 0))
+  );
+  assert_eq!(new_resource_monitor_config("unknown"), None);
+  assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 1);
+}
+
+#[test]
+fn test_resource_monitor_synchronous_feedback_fails_when_enable_is_rejected() {
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.set(false);
+  // The refresh factory is not asked either, even when it has a monitor for the name.
+  assert_eq!(new_resource_monitor_config("both"), None);
+  assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 0);
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.set(true);
+}
+
+#[test]
+fn test_resource_monitor_refresh_factory_is_optional() {
+  let new_synchronous_feedback_fn: NewSynchronousFeedbackResourceMonitorConfigFunction =
+    new_synchronous_feedback_resource_monitor;
+  let new_config_ptr = |name: &str| {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+      name,
+      b"",
+      &mut resource_monitor_envoy_config_handle(),
+      None,
+      Some(&new_synchronous_feedback_fn),
+    )
+  };
+  // A module with only a synchronous feedback factory creates those monitors and rejects the other
+  // names.
+  let config_ptr = new_config_ptr("synchronous");
+  assert!(!config_ptr.is_null());
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  assert!(new_config_ptr("refresh").is_null());
+}
+
+fn new_synchronous_feedback_config_ptr(
+  monitor: Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>,
+) -> *const std::ffi::c_void {
+  wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::SynchronousFeedback(monitor))
+}
+
+#[test]
+fn test_resource_monitor_get_resource_usage_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for PanicMonitor {
+    fn resource_usage(&self) -> f64 {
+      panic!("intentional panic in resource_usage");
+    }
+  }
+
+  let config_ptr = new_synchronous_feedback_config_ptr(Box::new(PanicMonitor));
+  unsafe {
+    assert_eq!(
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_get_resource_usage(config_ptr),
+      0.0
+    );
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_resource_monitor_load_accepted_passes_name() {
+  thread_local! {
+    static ACCEPTED: std::cell::RefCell<Vec<String>> =
+      const { std::cell::RefCell::new(Vec::new()) };
+  }
+
+  struct AcceptingMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for AcceptingMonitor {
+    fn resource_usage(&self) -> f64 {
+      0.0
+    }
+
+    fn on_load_accepted(&self, load_shed_point_name: EnvoyBuffer<'_>) {
+      ACCEPTED.with(|accepted| {
+        accepted
+          .borrow_mut()
+          .push(String::from_utf8(load_shed_point_name.as_slice().to_vec()).unwrap())
+      });
+    }
+  }
+
+  let name = "point";
+  let name_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  for config_ptr in [
+    new_synchronous_feedback_config_ptr(Box::new(AcceptingMonitor)),
+    // The default implementation and a refresh monitor ignore accepted load.
+    new_synchronous_feedback_config_ptr(Box::new(TestSynchronousFeedbackResourceMonitor(0.0))),
+    wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::Refresh(Box::new(
+      TestResourceMonitor(resource_monitor::ResourceMonitorUpdate::Failure)
+    ))),
+  ] {
+    unsafe {
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_load_accepted(
+        config_ptr,
+        name_buffer,
+      );
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+    }
+  }
+  assert_eq!(ACCEPTED.with(|accepted| accepted.take()), ["point"]);
+}
+
+#[test]
+fn test_resource_monitor_load_accepted_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for PanicMonitor {
+    fn resource_usage(&self) -> f64 {
+      0.0
+    }
+
+    fn on_load_accepted(&self, _load_shed_point_name: EnvoyBuffer<'_>) {
+      panic!("intentional panic in on_load_accepted");
+    }
+  }
+
+  let config_ptr = new_synchronous_feedback_config_ptr(Box::new(PanicMonitor));
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_load_accepted(
+      config_ptr,
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      },
+    );
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Load Shed Point FFI stubs and tests.
+// =============================================================================
+
+// The filter types that can get a load shed point. Each one has its own Envoy side configuration,
+// so that a stub can check that the SDK calls the callback of the filter type it wraps.
+#[derive(Clone, Copy)]
+enum LoadShedPointFilter {
+  Http,
+  Network,
+  Listener,
+  UdpListener,
+}
+
+static LOAD_SHED_POINT_FILTER_CONFIGS: [u8; 4] = [0; 4];
+static SHEDDING_LOAD_SHED_POINT: bool = true;
+static ACCEPTING_LOAD_SHED_POINT: bool = false;
+
+fn load_shed_point_filter_config(filter: LoadShedPointFilter) -> *mut std::ffi::c_void {
+  &LOAD_SHED_POINT_FILTER_CONFIGS[filter as usize] as *const u8 as *mut std::ffi::c_void
+}
+
+fn lookup_test_load_shed_point(
+  filter: LoadShedPointFilter,
+  filter_config_envoy_ptr: *mut std::ffi::c_void,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  assert_eq!(
+    filter_config_envoy_ptr,
+    load_shed_point_filter_config(filter)
+  );
+  let name = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+  match name {
+    b"shedding" => &SHEDDING_LOAD_SHED_POINT as *const bool as *mut std::ffi::c_void,
+    b"accepting" => &ACCEPTING_LOAD_SHED_POINT as *const bool as *mut std::ffi::c_void,
+    _ => std::ptr::null_mut(),
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_load_shed_point_should_shed_load(
+  load_shed_point_envoy_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> bool {
+  unsafe { *(load_shed_point_envoy_ptr as *const bool) }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Http, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Network, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Listener, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(
+    LoadShedPointFilter::UdpListener,
+    filter_config_envoy_ptr,
+    name,
+  )
+}
+
+fn check_load_shed_points(
+  get_load_shed_point: impl Fn(&str) -> Option<Box<dyn EnvoyLoadShedPoint>>,
+) {
+  assert!(get_load_shed_point("shedding").unwrap().should_shed_load());
+  assert!(!get_load_shed_point("accepting").unwrap().should_shed_load());
+  assert!(get_load_shed_point("unknown").is_none());
+}
+
+#[test]
+fn test_http_filter_config_get_load_shed_point() {
+  let config = EnvoyHttpFilterConfigImpl {
+    raw_ptr: load_shed_point_filter_config(LoadShedPointFilter::Http),
+  };
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_network_filter_config_get_load_shed_point() {
+  let config =
+    EnvoyNetworkFilterConfigImpl::new(load_shed_point_filter_config(LoadShedPointFilter::Network));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_listener_filter_config_get_load_shed_point() {
+  let config = EnvoyListenerFilterConfigImpl::new(load_shed_point_filter_config(
+    LoadShedPointFilter::Listener,
+  ));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_udp_listener_filter_config_get_load_shed_point() {
+  let config = EnvoyUdpListenerFilterConfigImpl::new(load_shed_point_filter_config(
+    LoadShedPointFilter::UdpListener,
+  ));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_load_shed_point_mock() {
+  let mut config = network::MockEnvoyNetworkFilterConfig::new();
+  config.expect_get_load_shed_point().returning(|_| {
+    let mut load_shed_point = MockEnvoyLoadShedPoint::new();
+    load_shed_point.expect_should_shed_load().return_const(true);
+    Some(Box::new(load_shed_point))
+  });
+  assert!(config
+    .get_load_shed_point("shedding")
+    .unwrap()
+    .should_shed_load());
 }

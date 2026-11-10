@@ -171,3 +171,41 @@ func (mr *MockSchedulerMockRecorder) Schedule(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Schedule", reflect.TypeOf((*MockScheduler)(nil).Schedule), arg0)
 }
+
+// MockLoadShedPoint is a mock of LoadShedPoint interface.
+type MockLoadShedPoint struct {
+	ctrl     *gomock.Controller
+	recorder *MockLoadShedPointMockRecorder
+	isgomock struct{}
+}
+
+// MockLoadShedPointMockRecorder is the mock recorder for MockLoadShedPoint.
+type MockLoadShedPointMockRecorder struct {
+	mock *MockLoadShedPoint
+}
+
+// NewMockLoadShedPoint creates a new mock instance.
+func NewMockLoadShedPoint(ctrl *gomock.Controller) *MockLoadShedPoint {
+	mock := &MockLoadShedPoint{ctrl: ctrl}
+	mock.recorder = &MockLoadShedPointMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockLoadShedPoint) EXPECT() *MockLoadShedPointMockRecorder {
+	return m.recorder
+}
+
+// ShouldShedLoad mocks base method.
+func (m *MockLoadShedPoint) ShouldShedLoad() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShouldShedLoad")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ShouldShedLoad indicates an expected call of ShouldShedLoad.
+func (mr *MockLoadShedPointMockRecorder) ShouldShedLoad() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldShedLoad", reflect.TypeOf((*MockLoadShedPoint)(nil).ShouldShedLoad))
+}

@@ -13,7 +13,7 @@ fn init() -> bool {
 fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
   envoy_filter_config: &mut EC,
   name: &str,
-  _config: &[u8],
+  config: &[u8],
 ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
   match name {
     "flow_control" => Some(Box::new(FlowControlFilterConfig)),
@@ -34,6 +34,10 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "http_callout_reentrancy_probe" => Some(Box::new(HttpCalloutReentrancyProbeFilterConfig::new(
       envoy_filter_config,
     ))),
+    "load_shed_point" => Some(Box::new(LoadShedPointFilterConfig {
+      load_shed_point: envoy_filter_config
+        .get_load_shed_point(std::str::from_utf8(config).unwrap()),
+    })),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -521,5 +525,43 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for HttpCalloutReentrancyProbeF
     _body_chunks: Vec<EnvoyBuffer>,
   ) {
     let _ = envoy_filter.increment_counter(self.callout_done_total, 1);
+  }
+}
+
+// =============================================================================
+// Load Shed Point Test Filter
+// =============================================================================
+
+// Creates filters that close a new connection when the load shed point named in the filter config
+// sheds it.
+struct LoadShedPointFilterConfig {
+  load_shed_point: Option<Box<dyn EnvoyLoadShedPoint>>,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for LoadShedPointFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(LoadShedPointFilter {
+      shed_load: self
+        .load_shed_point
+        .as_ref()
+        .is_some_and(|load_shed_point| load_shed_point.should_shed_load()),
+    })
+  }
+}
+
+struct LoadShedPointFilter {
+  shed_load: bool,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for LoadShedPointFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    if !self.shed_load {
+      return abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue;
+    }
+    envoy_filter.close(abi::envoy_dynamic_module_type_network_connection_close_type::NoFlush);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
   }
 }

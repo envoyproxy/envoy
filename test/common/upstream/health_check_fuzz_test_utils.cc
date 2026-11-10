@@ -16,60 +16,53 @@ void HttpHealthCheckerImplTestBase::expectSessionCreate(
   TestSession& test_session = *test_sessions_.back();
   test_session.timeout_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   test_session.interval_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectClientCreate(test_sessions_.size() - 1, health_check_map);
+  setupClientCreate(test_sessions_.size() - 1, health_check_map);
 }
 
-void HttpHealthCheckerImplTestBase::expectClientCreate(
+void HttpHealthCheckerImplTestBase::setupClientCreate(
     size_t index, const HostWithHealthCheckMap& health_check_map) {
-  TestSession& test_session = *test_sessions_[index];
-  test_session.codec_ = new NiceMock<Http::MockClientConnection>();
-  ON_CALL(*test_session.codec_, protocol()).WillByDefault(testing::Return(Http::Protocol::Http11));
-  test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
-  connection_index_.push_back(index);
-  codec_index_.push_back(index);
-
-  EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
-      .Times(testing::AnyNumber())
-      .WillRepeatedly([&]() -> Network::ClientConnection* {
-        uint32_t index = connection_index_.front();
-        connection_index_.pop_front();
-        return test_sessions_[index]->client_connection_;
-      });
-  EXPECT_CALL(*health_checker_, createCodecClient_(_, _))
-      .WillRepeatedly([&](Upstream::Host::CreateConnectionData& conn_data,
-                          Http::CodecType) -> Http::CodecClient* {
-        if (!health_check_map.empty()) {
-          const auto& health_check_config =
-              health_check_map.at(conn_data.host_description_->address()->asString());
-          // To make sure health checker checks the correct port.
-          EXPECT_EQ(health_check_config.port_value(),
-                    conn_data.host_description_->healthCheckAddress()->ip()->port());
-        }
-        uint32_t index = codec_index_.front();
-        codec_index_.pop_front();
+  ON_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillByDefault([this, index]() -> Network::ClientConnection* {
         TestSession& test_session = *test_sessions_[index];
-        std::shared_ptr<Upstream::MockClusterInfo> cluster{
-            new NiceMock<Upstream::MockClusterInfo>()};
-        Event::MockDispatcher dispatcher_;
-        test_session.codec_client_ = new CodecClientForTest(
-            Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
-            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-        return test_session.codec_client_;
+        test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
+        return test_session.client_connection_;
       });
-}
-
-void HttpHealthCheckerImplTestBase::expectStreamCreate(size_t index) {
-  test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
-  EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
-      .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),
-                      ReturnRef(test_sessions_[index]->request_encoder_)));
+  ON_CALL(*health_checker_, createCodecClient_(_, _))
+      .WillByDefault(
+          [this, index, health_check_map](Upstream::Host::CreateConnectionData& conn_data,
+                                          Http::CodecType) -> Http::CodecClient* {
+            if (!health_check_map.empty()) {
+              const auto& health_check_config =
+                  health_check_map.at(conn_data.host_description_->address()->asString());
+              // To make sure health checker checks the correct port.
+              EXPECT_EQ(health_check_config.port_value(),
+                        conn_data.host_description_->healthCheckAddress()->ip()->port());
+            }
+            TestSession& test_session = *test_sessions_[index];
+            test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+            ON_CALL(*test_session.codec_, protocol())
+                .WillByDefault(testing::Return(Http::Protocol::Http11));
+            ON_CALL(*test_session.codec_, newStream(_))
+                .WillByDefault(
+                    [&test_session](Http::ResponseDecoder& decoder) -> Http::RequestEncoder& {
+                      // Every stream is created on the same encoder: drop the callbacks of the
+                      // previous one before the health checker registers the callbacks of this one.
+                      test_session.request_encoder_.stream_.callbacks_.clear();
+                      test_session.stream_response_callbacks_ = &decoder;
+                      return test_session.request_encoder_;
+                    });
+            std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                new NiceMock<Upstream::MockClusterInfo>()};
+            Event::MockDispatcher dispatcher_;
+            test_session.codec_client_ = new CodecClientForTest(
+                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+            return test_session.codec_client_;
+          });
 }
 
 void HttpHealthCheckerImplTestBase::expectSessionCreate() {
   expectSessionCreate(health_checker_map_);
-}
-void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index) {
-  expectClientCreate(index, health_checker_map_);
 }
 
 // This is needed to put expectations in LIFO order. The unit tests use inSequence, which makes
@@ -79,11 +72,13 @@ void TcpHealthCheckerImplTestBase::expectSessionCreate() {
   interval_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 }
 
-void TcpHealthCheckerImplTestBase::expectClientCreate() {
-  connection_ = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(testing::Return(connection_));
-  EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
+void TcpHealthCheckerImplTestBase::setupClientCreate() {
+  ON_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillByDefault([this]() -> Network::ClientConnection* {
+        connection_ = new NiceMock<Network::MockClientConnection>();
+        ON_CALL(*connection_, addReadFilter(_)).WillByDefault(testing::SaveArg<0>(&read_filter_));
+        return connection_;
+      });
 }
 
 GrpcHealthCheckerImplTestBaseUtils::GrpcHealthCheckerImplTestBaseUtils() {

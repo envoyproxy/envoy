@@ -39,9 +39,10 @@ also build as follows:
 For more information on building and different build targets, please refer to :repo:`ci/README.md`.
 
 .. warning::
-   These instructions for building Envoy use
-   `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
-   You will need 4-5GB of disk space to accommodate this image.
+   These instructions for building Envoy use the
+   `envoyproxy/envoy-build <https://hub.docker.com/r/envoyproxy/envoy-build/tags>`_ image.
+   The image itself is small, but Bazel fetches the toolchains and dependencies into the
+   build directory, which needs several GB of disk space.
 
    This script runs as effective root on your host system.
 
