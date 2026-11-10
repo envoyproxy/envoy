@@ -643,6 +643,9 @@ public:
   void initialize() override {
     // Let Envoy read the whole upstream body and the FIN without upstream back pressure.
     config_helper_.setBufferLimits(32 * 1024 * 1024, 32 * 1024 * 1024);
+    // With upstream half close, the FIN ends the stream instead of resetting it.
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close", "false");
     ConnectTerminationIntegrationTest::initialize();
   }
 

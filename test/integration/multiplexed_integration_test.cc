@@ -172,6 +172,43 @@ TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) 
 TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete(500);
 }
+
+// The upstream sends a complete response that does not fit in the client window while the request
+// is still open, so Envoy resets the stream with DATA frames still queued. The client must still
+// receive the whole body. See https://github.com/envoyproxy/envoy/issues/28329.
+TEST_P(MultiplexedIntegrationTest, LargeUpstreamResponseBeforeRequestCompleteSmallWindow) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  // Let Envoy read the whole upstream response without upstream back pressure.
+  config_helper_.setBufferLimits(32 * 1024 * 1024, 32 * 1024 * 1024);
+  initialize();
+
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  http2_options.mutable_initial_connection_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // The client dispatcher does not run until waitForAnyTermination(), so the client sends no
+  // WINDOW_UPDATE before Envoy has handled the end of the upstream response.
+  const uint64_t size = 4 * 1024 * 1024;
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(size, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  ASSERT_TRUE(response->waitForAnyTermination());
+  EXPECT_EQ(size, response->body().size());
+  EXPECT_TRUE(response->complete());
+  codec_client_->close();
+}
 TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }

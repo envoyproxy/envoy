@@ -450,6 +450,9 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     if (!skip_encoding_empty_trailers) {
       pending_trailers_to_encode_ = cloneTrailers(trailers);
       onLocalEndStream();
+    } else if (parent_.deferred_reset_waits_for_end_stream_) {
+      // Arm the flush timer so that a deferred reset waiting for END_STREAM stays bounded.
+      onLocalEndStream();
     }
   } else {
     submitTrailers(trailers);
