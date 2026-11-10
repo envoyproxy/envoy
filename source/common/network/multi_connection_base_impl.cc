@@ -210,7 +210,7 @@ Ssl::ConnectionInfoConstSharedPtr MultiConnectionBaseImpl::ssl() const {
 
 Connection::State MultiConnectionBaseImpl::state() const {
   if (!connect_finished_) {
-    ASSERT(connections_[0]->state() == Connection::State::Open);
+    ASSERT(connections_[0]->state() == Connection::State::Open || connections_[0]->connecting());
   }
   return connections_[0]->state();
 }

@@ -4692,6 +4692,112 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
   EXPECT_THAT(connection->transportFailureReason(), EndsWith("custom error"));
 }
 
+class FailSocketOsSysCalls : public Api::OsSysCallsImpl {
+public:
+  Api::SysCallSocketResult socket(int, int, int) override { return {-1, SOCKET_ERROR_NOT_SUP}; }
+};
+
+// Validates that when OS socket creation fails, synchronous connect()/write()/addReadFilter()
+// calls before the deferred LocalClose callback runs do not crash and properly report LocalClose.
+TEST_P(TcpClientConnectionImplTest, SocketCreationFailureConnectAndDeferredClose) {
+  Address::InstanceConstSharedPtr address = *Utility::resolveUrl(
+      fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam())));
+  FailSocketOsSysCalls fail_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&fail_os_sys_calls);
+
+  EXPECT_ENVOY_BUG(
+      {
+        ClientConnectionPtr connection = dispatcher_->createClientConnection(
+            address, Network::Address::InstanceConstSharedPtr(),
+            Network::Test::createRawBufferSocket(), nullptr, nullptr);
+        EXPECT_NE(connection->streamInfo().upstreamInfo(), nullptr);
+        EXPECT_TRUE(connection->connecting());
+        EXPECT_EQ(connection->state(), Connection::State::Closed);
+        EXPECT_EQ(connection->transportFailureReason(), "socket creation failure");
+
+        StrictMock<MockConnectionCallbacks> callbacks;
+        connection->addConnectionCallbacks(callbacks);
+        auto read_filter = std::make_shared<NiceMock<MockReadFilter>>();
+        connection->addReadFilter(read_filter);
+        connection->noDelay(true);
+        connection->connect();
+
+        Buffer::OwnedImpl write_data("ping");
+        connection->write(write_data, false);
+
+        EXPECT_CALL(callbacks, onEvent(ConnectionEvent::LocalClose));
+        dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+        EXPECT_FALSE(connection->connecting());
+      },
+      "socket(2) failed");
+}
+
+// Validates that closing or destroying a ClientConnectionImpl whose socket creation failed before
+// the next dispatcher loop raises LocalClose synchronously on close() and avoids use-after-free.
+TEST_P(TcpClientConnectionImplTest, SocketCreationFailureEarlyCloseAndDestroy) {
+  Address::InstanceConstSharedPtr address = *Utility::resolveUrl(
+      fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam())));
+  FailSocketOsSysCalls fail_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&fail_os_sys_calls);
+
+  EXPECT_ENVOY_BUG(
+      {
+        ClientConnectionPtr connection = dispatcher_->createClientConnection(
+            address, Network::Address::InstanceConstSharedPtr(),
+            Network::Test::createRawBufferSocket(), nullptr, nullptr);
+        StrictMock<MockConnectionCallbacks> callbacks;
+        connection->addConnectionCallbacks(callbacks);
+        connection->connect();
+
+        EXPECT_CALL(callbacks, onEvent(ConnectionEvent::LocalClose));
+        connection->close(ConnectionCloseType::NoFlush);
+        EXPECT_FALSE(connection->connecting());
+        dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+        ClientConnectionPtr destroyed_connection = dispatcher_->createClientConnection(
+            address, Network::Address::InstanceConstSharedPtr(),
+            Network::Test::createRawBufferSocket(), nullptr, nullptr);
+        destroyed_connection->connect();
+        destroyed_connection.reset();
+        dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+      },
+      "socket(2) failed");
+}
+
+// Exercises ClientConnectionImpl's !socket_->isOpen() path directly in both debug and release
+// builds without triggering the base ConnectionImpl ENVOY_BUG death in debug builds.
+TEST_P(TcpClientConnectionImplTest, UnopenConnectionSocketConnectDoesNotCrash) {
+  Address::InstanceConstSharedPtr address = *Utility::resolveUrl(
+      fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam())));
+  auto socket = std::make_unique<NiceMock<MockConnectionSocket>>();
+  socket->io_handle_ = std::make_unique<NiceMock<MockIoHandle>>();
+  ON_CALL(*socket, ioHandle()).WillByDefault(testing::ReturnRef(*socket->io_handle_));
+  ON_CALL(testing::Const(*socket), ioHandle())
+      .WillByDefault(testing::ReturnRef(*socket->io_handle_));
+  socket->connectionInfoProvider().setRemoteAddress(address);
+  EXPECT_CALL(*socket, isOpen()).WillOnce(Return(true)).WillRepeatedly(Return(false));
+
+  auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
+  EXPECT_CALL(*transport_socket, connect(_)).Times(0);
+
+  auto connection = std::make_unique<ClientConnectionImpl>(
+      *dispatcher_, std::move(socket), Network::Address::InstanceConstSharedPtr(),
+      std::move(transport_socket), nullptr, nullptr);
+  EXPECT_NE(connection->streamInfo().upstreamInfo(), nullptr);
+  EXPECT_TRUE(connection->connecting());
+  EXPECT_EQ(connection->transportFailureReason(), "socket creation failure");
+
+  StrictMock<MockConnectionCallbacks> callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  auto read_filter = std::make_shared<NiceMock<MockReadFilter>>();
+  connection->addReadFilter(read_filter);
+  connection->connect();
+
+  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::LocalClose));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(connection->connecting());
+}
+
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
   PipeClientConnectionImplTest()

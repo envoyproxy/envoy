@@ -117,6 +117,10 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   QuicClientPacketWriterFactory::CreationResult creation_result =
       info_impl->writer_factory_->createSocketAndQuicPacketWriter(server_addr, current_network,
                                                                   local_addr, options);
+  if (creation_result.socket_ == nullptr || !creation_result.socket_->isOpen() ||
+      creation_result.writer_ == nullptr) {
+    return nullptr;
+  }
   auto* wrapper = new quic::QuicForceBlockablePacketWriter();
   // Owns the inner writer.
   wrapper->set_writer(creation_result.writer_.release());

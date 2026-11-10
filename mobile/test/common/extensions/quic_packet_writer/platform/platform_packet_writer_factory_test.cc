@@ -173,5 +173,23 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, OtherErrorCodesNoRetry) {
   writePacketAndVerifyResult(quic::WRITE_STATUS_ERROR, SOCKET_ERROR_PERM);
 }
 
+TEST_F(QuicPlatformPacketWriterFactoryTest, SocketCreationFailureReturnsNullWriterAndSocket) {
+  ON_CALL(os_sys_calls_, socket(_, _, _))
+      .WillByDefault(Return(Api::SysCallSocketResult{-1, SOCKET_ERROR_NOT_SUP}));
+
+  Network::Address::InstanceConstSharedPtr peer_address =
+      quicAddressToEnvoyAddressInstance(peer_addr_);
+  Network::Address::InstanceConstSharedPtr local_address;
+  EXPECT_ENVOY_BUG(
+      {
+        QuicClientPacketWriterFactory::CreationResult result =
+            factory_.createSocketAndQuicPacketWriter(peer_address, /*network=*/123, local_address,
+                                                     nullptr);
+        EXPECT_EQ(result.writer_, nullptr);
+        EXPECT_EQ(result.socket_, nullptr);
+      },
+      "socket(2) failed");
+}
+
 } // namespace Quic
 } // namespace Envoy

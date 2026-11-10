@@ -987,5 +987,95 @@ TEST_P(EnvoyQuicClientSessionTest, ScopedIpv6PortMigrationCrash) {
   // SPELLCHECKER(on)
   EXPECT_NO_THROW(quic_connection_->OnPathDegradingDetected());
 }
+
+class FailSocketOsSysCalls : public Api::OsSysCallsImpl {
+public:
+  Api::SysCallSocketResult socket(int, int, int) override { return {-1, SOCKET_ERROR_NOT_SUP}; }
+};
+
+class MockPathContextCreationResultDelegate
+    : public quic::QuicPathContextFactory::CreationResultDelegate {
+public:
+  MOCK_METHOD(void, OnCreationSucceeded,
+              (std::unique_ptr<quic::QuicClientPathValidationContext> context), (override));
+  MOCK_METHOD(void, OnCreationFailed, (quic::QuicNetworkHandle network, absl::string_view error),
+              (override));
+};
+
+TEST_P(EnvoyQuicClientSessionTest, PortMigrationSocketCreationFailure) {
+  quic::QuicNewConnectionIdFrame frame;
+  frame.connection_id = quic::test::TestConnectionId(1234);
+  ASSERT_NE(frame.connection_id, quic_connection_->connection_id());
+  frame.stateless_reset_token = quic::QuicUtils::GenerateStatelessResetToken(frame.connection_id);
+  frame.retire_prior_to = 0u;
+  frame.sequence_number = 1u;
+  quic_connection_->OnNewConnectionIdFrame(frame);
+  quic_connection_->SetSelfAddress(envoyIpAddressToQuicSocketAddress(self_addr_->ip()));
+
+  FailSocketOsSysCalls fail_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&fail_os_sys_calls};
+
+  EXPECT_ENVOY_BUG(
+      {
+        quic_connection_->OnPathDegradingDetected();
+        EXPECT_FALSE(envoy_quic_session_->HasPendingPathValidation());
+        EXPECT_TRUE(quic_connection_->connected());
+      },
+      "socket(2) failed");
+}
+
+TEST_P(EnvoyQuicClientSessionTest, PathValidationSocketSetupFailure) {
+  quic::QuicNewConnectionIdFrame frame;
+  frame.connection_id = quic::test::TestConnectionId(1234);
+  ASSERT_NE(frame.connection_id, quic_connection_->connection_id());
+  frame.stateless_reset_token = quic::QuicUtils::GenerateStatelessResetToken(frame.connection_id);
+  frame.retire_prior_to = 0u;
+  frame.sequence_number = 1u;
+  quic_connection_->OnNewConnectionIdFrame(frame);
+  quic_connection_->SetSelfAddress(envoyIpAddressToQuicSocketAddress(self_addr_->ip()));
+
+  auto socket_option = std::make_shared<testing::NiceMock<Network::MockSocketOption>>();
+  quic_connection_->connectionSocket()->addOption(socket_option);
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(false));
+
+  quic_connection_->OnPathDegradingDetected();
+  EXPECT_FALSE(envoy_quic_session_->HasPendingPathValidation());
+  EXPECT_TRUE(quic_connection_->connected());
+
+  if (quiche_handles_migration_) {
+    EnvoyQuicClientConnection::EnvoyQuicMigrationHelper& migration_helper =
+        quic_connection_->getOrCreateMigrationHelper(writer_factory_, quic::kInvalidNetworkHandle,
+                                                     {});
+    std::unique_ptr<quic::QuicPathContextFactory> path_context_factory =
+        migration_helper.CreateQuicPathContextFactory();
+
+    // When network != kInvalidNetworkHandle and STATE_PREBIND fails, new_local_address remains
+    // nullptr; CreatePathValidationContext must invoke OnCreationFailed instead of dereferencing
+    // nullptr.
+    auto delegate = std::make_unique<testing::StrictMock<MockPathContextCreationResultDelegate>>();
+    EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+        .WillOnce(Return(false));
+    EXPECT_CALL(*delegate, OnCreationFailed(1, _));
+    path_context_factory->CreatePathValidationContext(
+        /*network=*/1, quic_connection_->peer_address(), std::move(delegate));
+
+    // Also verify STATE_LISTENING failure inside setUpConnectionSocket invokes OnCreationFailed.
+    auto listening_delegate =
+        std::make_unique<testing::StrictMock<MockPathContextCreationResultDelegate>>();
+    EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+        .WillOnce(Return(true));
+    EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+        .WillOnce(Return(true));
+    EXPECT_CALL(*socket_option,
+                setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
+        .WillOnce(Return(false));
+    EXPECT_CALL(*listening_delegate, OnCreationFailed(quic::kInvalidNetworkHandle, _));
+    path_context_factory->CreatePathValidationContext(quic::kInvalidNetworkHandle,
+                                                      quic_connection_->peer_address(),
+                                                      std::move(listening_delegate));
+    EXPECT_TRUE(quic_connection_->connected());
+  }
+}
 } // namespace Quic
 } // namespace Envoy
