@@ -1,7 +1,6 @@
-Fixed the ``ai_protocol_manager`` ``schema_validation`` and ``request_info`` filters not reading
-the binding a request arrived in. A Claude on Vertex AI request names the model in the path and
-not in the body, so ``schema_validation`` rejected it as missing ``model`` and ``request_info``
-published no model and the wrong streaming mode; only the transcoder read the path. Both filters
-now read it through the same built-in and route bindings as the transcoder, without editing the
-body. The Gemini API binding also matches ``/{version}/models/{model}:...`` under any API version,
-as ``request_info`` already did.
+``ai_protocol_manager``: ``schema_validation`` and ``request_info`` now read the request path the
+same way the transcoder does. A request may arrive in a provider's layout of its API rather than
+the API's own, such as Claude on Vertex AI, which names the model in the path instead of the body.
+``schema_validation`` counts a model the path names as present, and ``request_info`` takes the
+model and the streaming mode from the path when it names them. The Gemini API binding also
+matches ``/{version}/models/{model}:...`` under any API version.
