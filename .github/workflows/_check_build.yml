@@ -44,7 +44,8 @@ jobs:
       rbe: true
       request: ${{ inputs.request }}
       catch-errors: ${{ matrix.catch-errors || false }}
-      skip: ${{ matrix.skip != false && true || false }}
+      # A job runs when its run flag (`run`, from the branch's .github/config.yml) is set.
+      skip: ${{ fromJSON(inputs.request).run[matrix.run] != true }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
@@ -54,11 +55,14 @@ jobs:
         include:
         - target: api
           name: API
+          run: check-build
         - target: compile_time_options
           name: Compile time options
           docker-ci: true
+          run: check-build
         - target: execution_context
           name: Execution context
-          skip: ${{ fromJSON(inputs.request).run.check-build-execution-context != true }}
+          run: check-build-execution-context
         - target: gcc
           name: GCC
+          run: check-build
