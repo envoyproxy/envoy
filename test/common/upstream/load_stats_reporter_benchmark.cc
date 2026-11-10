@@ -3,7 +3,7 @@
 // shares of clusters with load to report.
 //
 // Run manually with e.g.
-//   bazel run -c opt //test/common/upstream:load_stats_reporter_benchmark \
+//   bazel run -c opt //test/common/upstream:load_stats_reporter_benchmark
 //     -- --benchmark_filter=SendLoadStatsRequest
 //
 // The runtime feature envoy.reloadable_features.lrs_skip_idle_clusters controls whether the hosts
