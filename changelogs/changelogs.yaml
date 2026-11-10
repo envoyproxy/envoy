@@ -126,6 +126,8 @@ areas:
     title: grpc_field_extraction
   grpc_http1_reverse_bridge:
     title: grpc_http1_reverse_bridge
+  grpc_sidestream:
+    title: grpc_sidestream
 
   happy_eyeballs:
     title: happy_eyeballs

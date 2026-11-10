@@ -274,9 +274,9 @@ TEST_F(EnvoyGoogleLessMockedAsyncClientImplTest, ClientDestroyedWhileWaitingForG
     // At this point both the stream and callback are deleted.
   }
 
-  // Simulate the AsyncGrpcClient deletion. This can happen if the it is getting evicted from a
+  // Simulate the AsyncGrpcClient deletion. This can happen if it is getting evicted from a
   // its cache in the cluster manager.
-  // Thre is no way to verify that thge queue was cancelled, the test can only check that nothing is
+  // There is no way to verify that the queue was cancelled, the test can only check that nothing is
   // crashing.
   grpc_client_ptr.reset();
 }
