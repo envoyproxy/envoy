@@ -43,7 +43,6 @@ jobs:
       pull-requests: read
     outputs:
       env: ${{ steps.data.outputs.value }}
-      caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
     - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
@@ -122,48 +121,6 @@ jobs:
               $link,
               "linked-title": $linkedTitle}
           | del(.config.tables)
-
-    # TODO(phlax): shift this to ci/request action above
-    - name: Check Docker cache (x64)
-      id: cache-exists-docker-x64
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}
-    - name: Check Docker cache (arm64)
-      id: cache-exists-docker-arm64
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
-    - name: Caches
-      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
-      id: caches
-      with:
-        input-format: yaml
-        input: |
-          docker:
-            x64: ${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}
-            arm64: ${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}
-        filter: |
-          .
-
-  cache:
-    permissions:
-      actions: write
-      contents: read
-      packages: read
-    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
-    needs: incoming
-    uses: ./.github/workflows/_request_cache.yml
-    secrets:
-      app-id: ${{ secrets.lock-app-id }}
-      app-key: ${{ secrets.lock-app-key }}
-    with:
-      caches: ${{ needs.incoming.outputs.caches }}
-      env: ${{ needs.incoming.outputs.env }}
 
   checks:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
