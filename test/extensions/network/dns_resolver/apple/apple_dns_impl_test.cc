@@ -624,9 +624,9 @@ public:
                 dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
         .WillOnce(DoAll(
             // Have the API call synchronously call the provided callback.
-            WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
+            WithArgs<5, 6>([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
               callback(nullptr, 0, 0, error_code, hostname.c_str(), nullptr, 30, context);
-            })),
+            }),
             Return(kDNSServiceErr_NoError)));
 
     // The returned value is nullptr because the query has already been fulfilled. Verify that the
@@ -934,12 +934,12 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
                                     StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(
           // Have the API call synchronously call the provided callback.
-          WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
+          WithArgs<5, 6>([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
             callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                      address.sockAddr(), 30, context);
             callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
                      emptyV6Address().sockAddr(), 30, context);
-          })),
+          }),
           Return(kDNSServiceErr_NoError)));
 
   // The returned value is nullptr because the query has already been fulfilled. Verify that the
@@ -974,12 +974,12 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
               dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(
           // Have the API call synchronously call the provided callback.
-          WithArgs<5, 6>(Invoke([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
+          WithArgs<5, 6>([&](DNSServiceGetAddrInfoReply callback, void* context) -> void {
             callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
                      address.sockAddr(), 30, context);
             callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoSuchRecord, hostname.c_str(),
                      emptyV6Address().sockAddr(), 30, context);
-          })),
+          }),
           Return(kDNSServiceErr_NoError)));
 
   // The returned value is nullptr because the query has already been fulfilled. Verify that the
@@ -1385,10 +1385,10 @@ TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
 
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, SERVICE_FLAGS, 0, 0, StrEq(hostname.c_str()), _, _))
-      .WillOnce(DoAll(
-          SaveArg<5>(&reply_callback),
-          WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
-          Return(kDNSServiceErr_NoError)));
+      .WillOnce(DoAll(SaveArg<5>(&reply_callback), WithArgs<0>([](DNSServiceRef* ref) -> void {
+                        *ref = new _DNSServiceRef_t{};
+                      }),
+                      Return(kDNSServiceErr_NoError)));
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))

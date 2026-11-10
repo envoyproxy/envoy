@@ -34,6 +34,8 @@ _realpath() {
 # shellcheck source=ci/bazel_fun.sh
 . "${CURRENT_SCRIPT_DIR}"/bazel_fun.sh
 
+hermetic_git
+
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
@@ -99,11 +101,12 @@ function cp_binary_for_image_build() {
   fi
 
   # Tools for the tools image. Strip to save size.
-  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  hermetic_strip
+  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  strip bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -111,7 +114,7 @@ function cp_binary_for_image_build() {
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
-  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
+  "${STRIP_BIN}" "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # only if BUILD_REASON exists (running in AZP)
   if [[ "${BUILD_REASON}" ]]; then
@@ -285,8 +288,8 @@ function build_openssl_presubmit() {
     # the target branch itself when history is too shallow for a merge base.
     local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
-        git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
-        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+        "${GIT_BIN}" fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
+        merge_base="$("${GIT_BIN}" merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
     else
         merge_base="HEAD~1"
     fi
@@ -294,7 +297,7 @@ function build_openssl_presubmit() {
     # A failed diff is fatal: an empty file list would otherwise select no tests
     # and report a green job that tested nothing.
     local changed_files
-    if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
+    if ! changed_files="$("${GIT_BIN}" diff --name-only "$merge_base" HEAD)"; then
         echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
         return 1
     fi
@@ -385,7 +388,7 @@ if [[ "$CI_TARGET" =~ bazel.* ]]; then
     echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
 fi
 
-if [[ "${CI_TARGET}" == "deps.update" ]]; then
+if [[ "${CI_TARGET}" == "deps.update" || "${CI_TARGET}" == "registry" ]]; then
     DEPENDENCY_ARGS=("$@")
     set --
 fi
@@ -420,7 +423,8 @@ case $CI_TARGET in
     api_compat)
         echo "Checking API for breaking changes to protobuf backwards compatibility..."
         BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
-        COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
+        COMMIT_TITLE=$("${GIT_BIN}" log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' \
+            "${BASE_BRANCH_REF}")
         echo -e "\tUsing base commit ${COMMIT_TITLE}"
         # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -652,6 +656,7 @@ case $CI_TARGET in
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
+        hermetic_jq
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         echo "Check bazel registry ..."
         registry_check
@@ -672,11 +677,11 @@ case $CI_TARGET in
         ;;
 
     deps.update)
-        if [[ ${#DEPENDENCY_ARGS[@]} -ne 1 ]]; then
-            echo "Usage: ci/do_ci.sh deps.update <name[=version]>" >&2
+        if [[ ${#DEPENDENCY_ARGS[@]} -lt 1 ]]; then
+            echo "Usage: ci/do_ci.sh deps.update <name[=version]>..." >&2
             exit 1
         fi
-        deps_update "${DEPENDENCY_ARGS[0]}"
+        deps_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     dev)
@@ -743,7 +748,7 @@ case $CI_TARGET in
             exit 1
         fi
         if [[ -z "$CI_SHA1" ]]; then
-            CI_SHA1="$(git rev-parse HEAD~1)"
+            CI_SHA1="$("${GIT_BIN}" rev-parse HEAD~1)"
             export CI_SHA1
         fi
         ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
@@ -864,17 +869,21 @@ case $CI_TARGET in
             --test_arg="-runs=10"
         ;;
 
-    gcc)
+    gcc|gcc.test_only|gcc.server_only)
         BAZEL_BUILD_OPTIONS+=("--config=gcc")
         echo "gcc toolchain configured: gcc"
-        echo "bazel fastbuild build with gcc..."
-        bazel_envoy_binary_build fastbuild
-        echo "Testing ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild  \
-            --remote_download_minimal \
-            -- "${TEST_TARGETS[@]}"
+        if [[ "$CI_TARGET" != "gcc.test_only" ]]; then
+            echo "bazel fastbuild build with gcc..."
+            bazel_envoy_binary_build fastbuild
+        fi
+        if [[ "$CI_TARGET" != "gcc.server_only" ]]; then
+            echo "Testing ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                -c fastbuild  \
+                --remote_download_minimal \
+                -- "${TEST_TARGETS[@]}"
+        fi
         ;;
 
     info)
@@ -912,8 +921,20 @@ case $CI_TARGET in
         build_openssl_presubmit
         ;;
 
+    openssl.asan)
+        echo "bazel ASAN/UBSAN build of OpenSSL compat layer tests"
+        bazel_with_collection test \
+            --config=asan \
+            --config=openssl \
+            --dynamic_mode=off \
+            --copt=-fno-sanitize=function \
+            --linkopt=-fno-sanitize=function \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            //compat/openssl/test/...
+        ;;
+
     publish)
-        BUILD_SHA="$(git rev-parse HEAD)"
+        BUILD_SHA="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
@@ -935,7 +956,7 @@ case $CI_TARGET in
             registry_check
             exit 0
         fi
-        registry_update
+        registry_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     release|release.server_only|release.test_only)
@@ -1109,16 +1130,12 @@ case $CI_TARGET in
     verify_examples)
         pushd "$ENVOY_DOCS_PATH"
         DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
-        bazel run --config=ci \
-                  --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --action_env="CARGO_BAZEL_REPIN=true" \
-                  --host_action_env="CARGO_BAZEL_REPIN=true" \
-                  --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-                  --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-                  --sandbox_writable_path="${HOME}/.docker/" \
-                  --sandbox_writable_path="$HOME" \
-                  @envoy-examples//:verify_examples
+        bazel test \
+              --config=ci \
+              --config=examples \
+              --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+              --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+              @envoy-examples//:verify_examples
         popd
         ;;
 
@@ -1131,7 +1148,7 @@ case $CI_TARGET in
         # `ENVOY_COMMIT`: The actual last commit of branch/PR
         # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
         #   cancellation, and to discriminate from other branch CI
-        COMMIT="$(git rev-parse HEAD)"
+        COMMIT="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         echo "Trigger workflow (${WORKFLOW})"

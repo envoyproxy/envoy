@@ -1,0 +1,19 @@
+config {
+  tool_config {
+    tools {
+      name: "create_note"
+      http_rule { post: "/v1/notes" body: "*" }
+    }
+  }
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "mcp-protocol-version" value: "2025-06-18" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  }
+}

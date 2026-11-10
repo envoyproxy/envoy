@@ -18,6 +18,20 @@ namespace DynamicModules {
 
 namespace {
 
+constexpr uint64_t DefaultCertificateRequestTimeoutMs = 15000;
+
+// Returns the dynamic certificate request timeout. A positive timeout below 1 ms is rounded up to
+// 1 ms, since 0 disables the timeout.
+std::chrono::milliseconds
+certificateRequestTimeout(const DynamicModuleTlsCertificateSelectorProto& proto_config) {
+  const std::chrono::milliseconds timeout(PROTOBUF_GET_MS_OR_DEFAULT(
+      proto_config, dynamic_certificate_request_timeout, DefaultCertificateRequestTimeoutMs));
+  if (timeout.count() == 0 && proto_config.dynamic_certificate_request_timeout().nanos() > 0) {
+    return std::chrono::milliseconds(1);
+  }
+  return timeout;
+}
+
 // Loads the dynamic module and creates the shared selector config from the typed config.
 absl::StatusOr<DynamicModuleTlsCertificateSelectorConfigSharedPtr>
 loadSelectorConfig(const DynamicModuleTlsCertificateSelectorProto& proto_config,
@@ -62,7 +76,8 @@ loadSelectorConfig(const DynamicModuleTlsCertificateSelectorProto& proto_config,
   // dynamic certificates built from it during config_new.
   auto selector_config_or_error = newDynamicModuleTlsCertificateSelectorConfig(
       selector_name, selector_config, is_upstream, metrics_namespace,
-      std::move(load_result->loaded), factory_context, tls_config,
+      certificateRequestTimeout(proto_config), std::move(load_result->loaded), factory_context,
+      tls_config,
       proto_config.allow_dynamic_certificates() ? std::move(dynamic_context_factory) : nullptr);
   if (!selector_config_or_error.ok()) {
     Envoy::Extensions::DynamicModules::incrementLoadFailure(
@@ -84,14 +99,6 @@ DynamicModuleTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFa
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const DynamicModuleTlsCertificateSelectorProto&>(
           config, factory_context.messageValidationVisitor());
-  // The session resumption context of the TLS context does not cover the dynamic certificates.
-  if (proto_config.allow_dynamic_certificates() &&
-      (!tls_config.disableStatelessSessionResumption() ||
-       !tls_config.disableStatefulSessionResumption())) {
-    return absl::InvalidArgumentError(
-        "Dynamic certificates require both stateless and stateful session resumption to be "
-        "disabled");
-  }
   auto selector_config = loadSelectorConfig(
       proto_config, factory_context, tls_config, false,
       [&tls_config](Stats::Scope& scope,

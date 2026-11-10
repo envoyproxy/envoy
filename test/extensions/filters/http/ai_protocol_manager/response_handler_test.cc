@@ -837,12 +837,12 @@ TEST_F(ResponseHandlerTest, OversizedSkippableEventDoesNotDegrade) {
                             "data: {\"type\":\"message_start\",\"message\":{"
                             "\"usage\":{\"input_tokens\":9,\"output_tokens\":1}}}\n\n";
   feed(handler, start, start.size(), /*end_stream=*/false);
-  // Split across frames so the discard path (not the in-frame fast path)
-  // classifies it; the name sits in the retained prefix.
-  const std::string big_head = "event: content_block_delta\ndata: " + std::string(200, 'x');
-  feed(handler, big_head, big_head.size(), /*end_stream=*/false);
-  const std::string big_tail = std::string(400, 'y') + "\n\n";
-  feed(handler, big_tail, big_tail.size(), /*end_stream=*/false);
+  // Split mid-`event:` across frames so the oversize path must combine the
+  // retained prefix with the incoming slice to classify the name.
+  const std::string head = "event: content_";
+  feed(handler, head, head.size(), /*end_stream=*/false);
+  const std::string tail = "block_delta\ndata: " + std::string(400, 'y') + "\n\n";
+  feed(handler, tail, tail.size(), /*end_stream=*/false);
   feed(handler,
        "event: message_delta\n"
        "data: {\"type\":\"message_delta\",\"delta\":{},"

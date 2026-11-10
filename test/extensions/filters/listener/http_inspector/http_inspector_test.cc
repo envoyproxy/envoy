@@ -15,8 +15,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
@@ -99,49 +97,49 @@ public:
       if (http2) {
         for (size_t i = 0; i < data.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                     ASSERT(length >= data.size());
                     memcpy(buffer, data.data() + i, 1);
                     return Api::SysCallSizeResult{ssize_t(1), 0};
-                  }))
+                  })
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       } else {
         for (size_t i = 0; i < header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
-                                            int) -> Api::SysCallSizeResult {
+              .WillOnce([&header, i](os_fd_t, void* buffer, size_t length,
+                                     int) -> Api::SysCallSizeResult {
                 ASSERT(length >= header.size());
                 memcpy(buffer, header.data() + i, 1);
                 return Api::SysCallSizeResult{ssize_t(1), 0};
-              }))
+              })
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       }
 #else
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce([]() {
         return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
-      }));
+      });
       if (http2) {
         for (size_t i = 1; i <= data.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                     ASSERT(length >= i);
                     memcpy(buffer, data.data(), i);
                     return Api::SysCallSizeResult{ssize_t(i), 0};
-                  }));
+                  });
         }
       } else {
         for (size_t i = 1; i <= header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
-                                            int) -> Api::SysCallSizeResult {
+              .WillOnce([&header, i](os_fd_t, void* buffer, size_t length,
+                                     int) -> Api::SysCallSizeResult {
                 ASSERT(length >= i);
                 memcpy(buffer, header.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+              });
         }
       }
 #endif
@@ -174,50 +172,50 @@ public:
       if (alpn == Http::Utility::AlpnNames::get().Http2c) {
         for (size_t i = 0; i < 24; i++) {
           EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                     ASSERT(length >= data.size());
                     memcpy(buffer, data.data() + i, 1);
                     return Api::SysCallSizeResult{ssize_t(1), 0};
-                  }))
+                  })
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       } else {
         for (size_t i = 0; i < header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
-                                            int) -> Api::SysCallSizeResult {
+              .WillOnce([&header, i](os_fd_t, void* buffer, size_t length,
+                                     int) -> Api::SysCallSizeResult {
                 ASSERT(length >= header.size());
                 memcpy(buffer, header.data() + i, 1);
                 return Api::SysCallSizeResult{ssize_t(1), 0};
-              }))
+              })
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       }
 #else
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce([]() {
         return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
-      }));
+      });
 
       if (alpn == Http::Utility::AlpnNames::get().Http2c) {
         for (size_t i = 0; i <= 24; i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                     ASSERT(length >= i);
                     memcpy(buffer, data.data(), i);
                     return Api::SysCallSizeResult{ssize_t(i), 0};
-                  }));
+                  });
         }
       } else {
         for (size_t i = 0; i <= header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
-                                            int) -> Api::SysCallSizeResult {
+              .WillOnce([&header, i](os_fd_t, void* buffer, size_t length,
+                                     int) -> Api::SysCallSizeResult {
                 ASSERT(length >= i);
                 memcpy(buffer, header.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+              });
         }
       }
 #endif
@@ -251,40 +249,36 @@ public:
 #ifdef WIN32
     if (alpn == Http::Utility::AlpnNames::get().Http2c) {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(
-              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-              }))
+          .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= header.size());
-                memcpy(buffer, header.data(), header.size());
-                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-              }))
+          .WillOnce([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= header.size());
+            memcpy(buffer, header.data(), header.size());
+            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+          })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     }
 #else
     if (alpn == Http::Utility::AlpnNames::get().Http2c) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(
-              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-              }));
+          .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          });
     } else {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= header.size());
-                memcpy(buffer, header.data(), header.size());
-                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-              }));
+          .WillOnce([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= header.size());
+            memcpy(buffer, header.data(), header.size());
+            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+          });
     }
 #endif
     const std::vector<absl::string_view> alpn_protos{alpn};
@@ -312,40 +306,36 @@ public:
 #ifdef WIN32
     if (http2) {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(
-              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-              }))
+          .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= header.size());
-                memcpy(buffer, header.data(), header.size());
-                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-              }))
+          .WillOnce([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= header.size());
+            memcpy(buffer, header.data(), header.size());
+            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+          })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     }
 #else
     if (http2) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(
-              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-              }));
+          .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          });
     } else {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= header.size());
-                memcpy(buffer, header.data(), header.size());
-                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-              }));
+          .WillOnce([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= header.size());
+            memcpy(buffer, header.data(), header.size());
+            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+          });
     }
 #endif
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
@@ -537,21 +527,19 @@ TEST_P(HttpInspectorTest, InvalidConnectionPreface) {
   std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.size());
-            memcpy(buffer, data.data(), data.size());
-            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }))
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= data.size());
+        memcpy(buffer, data.data(), data.size());
+        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+      })
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.size());
-            memcpy(buffer, data.data(), data.size());
-            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-          }));
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= data.size());
+        memcpy(buffer, data.data(), data.size());
+        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+      });
 #endif
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   auto accepted = filter_->onAccept(cb_);
@@ -623,9 +611,9 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
     EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce([]() {
       return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
-    }));
+    });
 #endif
 
     uint64_t num_loops = Config::DEFAULT_INITIAL_BUFFER_SIZE;
@@ -639,19 +627,19 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
     auto copy_len = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .Times(num_loops)
-        .WillRepeatedly(Invoke([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
-                                                       int) -> Api::SysCallSizeResult {
+        .WillRepeatedly([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
+                                                int) -> Api::SysCallSizeResult {
           ASSERT(length >= 1);
           memcpy(buffer, data.data() + *ctr, 1);
           *ctr += 1;
           return Api::SysCallSizeResult{ssize_t(1), 0};
-        }));
+        });
 #else
     auto ctr = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .Times(num_loops)
-        .WillRepeatedly(Invoke([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
-                                                       int) -> Api::SysCallSizeResult {
+        .WillRepeatedly([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
+                                                int) -> Api::SysCallSizeResult {
           size_t len = (*ctr);
           if (num_loops == 2) {
             ASSERT(*ctr != 3);
@@ -661,7 +649,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
           memcpy(buffer, data.data(), len);
           *ctr += 1;
           return Api::SysCallSizeResult{ssize_t(len), 0};
-        }));
+        });
 #endif
   }
 
@@ -694,27 +682,27 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     for (size_t i = 0; i < 21; i++) {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(Invoke(
+          .WillOnce(
               [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= 21);
                 memcpy(buffer, data.data() + i, 1);
                 return Api::SysCallSizeResult{ssize_t(1), 0};
-              }))
+              })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     }
 #else
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce([]() {
       return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
-    }));
+    });
 
     for (size_t i = 1; i <= 21; i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
+          .WillOnce(
               [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= data.size());
                 memcpy(buffer, data.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+              });
     }
 #endif
   }
@@ -745,12 +733,11 @@ TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
   buffer_->resetCapacity(Config::MAX_INSPECT_SIZE);
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            const size_t amount_to_copy = std::min(length, data.size());
-            memcpy(buffer, data.data(), amount_to_copy);
-            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-          }));
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        const size_t amount_to_copy = std::min(length, data.size());
+        memcpy(buffer, data.data(), amount_to_copy);
+        return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+      });
 
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
@@ -775,12 +762,11 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
   init();
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            const size_t amount_to_copy = std::min(length, data.size());
-            memcpy(buffer, data.data(), amount_to_copy);
-            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-          }));
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        const size_t amount_to_copy = std::min(length, data.size());
+        memcpy(buffer, data.data(), amount_to_copy);
+        return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+      });
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   auto accepted = filter_->onAccept(cb_);
@@ -792,12 +778,11 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
   buffer_->resetCapacity(buffer_size);
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            const size_t amount_to_copy = std::min(length, data.size());
-            memcpy(buffer, data.data(), amount_to_copy);
-            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-          }));
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        const size_t amount_to_copy = std::min(length, data.size());
+        memcpy(buffer, data.data(), amount_to_copy);
+        return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+      });
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   status = filter_->onData(*buffer_);
@@ -807,12 +792,11 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
   buffer_->resetCapacity(buffer_size);
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            const size_t amount_to_copy = std::min(length, data.size());
-            memcpy(buffer, data.data(), amount_to_copy);
-            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-          }));
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        const size_t amount_to_copy = std::min(length, data.size());
+        memcpy(buffer, data.data(), amount_to_copy);
+        return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+      });
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};

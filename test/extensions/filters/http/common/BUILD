@@ -61,7 +61,10 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:filter_interface",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:status_utility_lib",

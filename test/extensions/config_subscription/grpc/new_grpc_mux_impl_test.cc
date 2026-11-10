@@ -40,7 +40,6 @@
 using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -263,8 +262,7 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode_SendNodeOnGrpcStreamReset) {
 
   // Now disconnect.
   // Grpc stream retry timer will kick in and reconnection will happen.
-  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
-      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _)).WillOnce(grpc_stream_retry_timer_cb);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
   // On reconnection, node should be sent again with the first message.
@@ -342,8 +340,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   onDiscoveryResponse(std::move(response));
   // Now disconnect.
   // Grpc stream retry timer will kick in and reconnection will happen.
-  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
-      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _)).WillOnce(grpc_stream_retry_timer_cb);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
   // initial_resource_versions should contain client side all resource:version info.
@@ -410,14 +407,14 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   {
     auto response = create_response("x", "1000", "111");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1000"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     // Expect an ack with the nonce.
     expectSendMessage({.type_url = type_url, .nonce = "111"});
     onDiscoveryResponse(std::move(response));
@@ -427,22 +424,21 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   {
     auto response = create_response("y", "2000", "222");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2000"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     // No ack reply is expected in this case, as EDS is suspended.
     onDiscoveryResponse(std::move(response));
   }
 
   // Now disconnect.
   // Grpc stream retry timer will kick in and reconnection will happen.
-  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
-      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _)).WillOnce(grpc_stream_retry_timer_cb);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // initial_resource_versions should contain client side all resource:version info, and no
   // added resources because this is a wildcard request.
@@ -489,14 +485,14 @@ TEST_P(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     load_assignment.set_cluster_name("x");
     std::ignore = response->add_resources()->mutable_resource()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     onDiscoveryResponse(std::move(response));
   }
 }
@@ -592,13 +588,13 @@ TEST_P(NewGrpcMuxImplTest, XdsTpGlobCollection) {
                      "a?foo=bar&some=thing&thing=some");
   std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                          const Protobuf::RepeatedPtrField<std::string>&,
-                                          const std::string&) {
+      .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                   const Protobuf::RepeatedPtrField<std::string>&,
+                                   const std::string&) {
         EXPECT_EQ(1, added_resources.size());
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
         return absl::OkStatus();
-      }));
+      });
   onDiscoveryResponse(std::move(response));
 }
 
@@ -648,15 +644,15 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
     std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
   }
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                          const Protobuf::RepeatedPtrField<std::string>&,
-                                          const std::string&) {
+      .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                   const Protobuf::RepeatedPtrField<std::string>&,
+                                   const std::string&) {
         EXPECT_EQ(3, added_resources.size());
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[1].get().resource(), load_assignment));
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[2].get().resource(), load_assignment));
         return absl::OkStatus();
-      }));
+      });
   onDiscoveryResponse(std::move(response));
 }
 
@@ -738,14 +734,14 @@ TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
     std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
     expectSendMessage({.type_url = type_url}); // Ack.
     onDiscoveryResponse(std::move(response));
@@ -783,14 +779,14 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
     std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
     expectSendMessage({.type_url = type_url}); // Ack.
     onDiscoveryResponse(std::move(response));
@@ -837,14 +833,14 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
       std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-          .WillOnce(Invoke([&load_assignment](
-                               const std::vector<DecodedResourceRef>& added_resources,
-                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+          .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                       const Protobuf::RepeatedPtrField<std::string>&,
+                                       const std::string&) {
             EXPECT_EQ(1, added_resources.size());
             EXPECT_TRUE(
                 TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
             return absl::OkStatus();
-          }));
+          });
       EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
       expectSendMessage({.type_url = type_url}); // Ack.
       onDiscoveryResponse(std::move(response));
@@ -874,14 +870,14 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
       std::ignore = res->mutable_resource()->PackFrom(load_assignment);
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2"))
-          .WillOnce(Invoke([&load_assignment](
-                               const std::vector<DecodedResourceRef>& added_resources,
-                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+          .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                       const Protobuf::RepeatedPtrField<std::string>&,
+                                       const std::string&) {
             EXPECT_EQ(1, added_resources.size());
             EXPECT_TRUE(
                 TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
             return absl::OkStatus();
-          }));
+          });
       EXPECT_CALL(*eds_resources_cache_, setResource("y", ProtoEq(load_assignment)));
       expectSendMessage({.type_url = type_url}); // Ack.
       onDiscoveryResponse(std::move(response));
@@ -974,14 +970,14 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
     resource->set_version("x1");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage({.type_url = type_url, .nonce = "n1"});
     onDiscoveryResponse(std::move(response));
   }
@@ -1021,14 +1017,14 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
     resource->set_version("y1");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
-                                            const Protobuf::RepeatedPtrField<std::string>&,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                     const Protobuf::RepeatedPtrField<std::string>&,
+                                     const std::string&) {
           EXPECT_EQ(1, added_resources.size());
           EXPECT_TRUE(
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(
         {.type_url = type_url, .nonce = "n2", .async_stream = &replaced_async_stream_});
     onDiscoveryResponse(std::move(response));
@@ -1246,15 +1242,14 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigAccepted) {
 
   // Verify onConfigAccepted is called
   EXPECT_CALL(config_tracker_, onConfigAccepted(type_url, _, _))
-      .WillOnce(Invoke(
-          [](const absl::string_view,
-             absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
-             const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
-            EXPECT_EQ(1, added_resources.size());
-            EXPECT_EQ("x", added_resources[0]->name());
-            EXPECT_EQ(1, removed_resources.size());
-            EXPECT_EQ("y", removed_resources[0]);
-          }));
+      .WillOnce([](const absl::string_view,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+        EXPECT_EQ(1, added_resources.size());
+        EXPECT_EQ("x", added_resources[0]->name());
+        EXPECT_EQ(1, removed_resources.size());
+        EXPECT_EQ("y", removed_resources[0]);
+      });
 
   onDiscoveryResponse(std::move(response));
 
@@ -1298,12 +1293,12 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigRejected) {
   EXPECT_CALL(config_tracker_,
               onConfigRejected(
                   testing::An<const envoy::service::discovery::v3::DeltaDiscoveryResponse&>(), _))
-      .WillOnce(Invoke([type_url](const envoy::service::discovery::v3::DeltaDiscoveryResponse& msg,
-                                  const absl::string_view error) {
+      .WillOnce([type_url](const envoy::service::discovery::v3::DeltaDiscoveryResponse& msg,
+                           const absl::string_view error) {
         EXPECT_EQ(type_url, msg.type_url());
         EXPECT_TRUE(absl::StrContains(error, "type URL bar embedded in an individual Any does not "
                                              "match the message-wide type URL foo"));
-      }));
+      });
 
   onDiscoveryResponse(std::move(response));
 

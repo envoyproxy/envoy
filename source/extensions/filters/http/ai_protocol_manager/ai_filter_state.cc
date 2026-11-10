@@ -34,7 +34,10 @@ LlmProtocolFilterState::getField(absl::string_view field_name) const {
 }
 
 LlmBindingObject::LlmBindingObject(absl::string_view value)
-    : source_(value), binding_(LlmBinding::parse(value)) {}
+    : source_(std::string(value)), binding_(LlmBinding::parse(value)) {}
+
+LlmBindingObject::LlmBindingObject(LlmBindingConstSharedPtr binding)
+    : binding_(std::move(binding)) {}
 
 absl::StatusOr<LlmBindingConstSharedPtr>
 LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,
@@ -88,7 +91,7 @@ namespace {
 template <class T>
 std::unique_ptr<StreamInfo::FilterState::Object> protocolFromBytes(absl::string_view data) {
   envoy::type::ai::v3::LLMProtocol protocol;
-  if (!envoy::type::ai::v3::LLMProtocol_Parse(std::string(data), &protocol)) {
+  if (!envoy::type::ai::v3::LLMProtocol_Parse(data, &protocol)) {
     return nullptr;
   }
   return std::make_unique<T>(protocolFromProto(protocol));

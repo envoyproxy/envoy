@@ -582,6 +582,20 @@ typedef enum envoy_dynamic_module_type_socket_direction {
   envoy_dynamic_module_type_socket_direction_Downstream = 1,
 } envoy_dynamic_module_type_socket_direction;
 
+/**
+ * envoy_dynamic_module_type_load_shed_point_envoy_ptr is a raw pointer to a load shed point of the
+ * overload manager in Envoy, which corresponds to Server::LoadShedPoint. It is returned by
+ * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point and its network, listener
+ * and UDP listener filter counterparts, and checked with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The module can use it in the event hooks of the filter
+ * configuration that returned it and of the filters of that configuration, but not in the destroy
+ * hook of the configuration or on threads of its own, since Envoy can destroy the overload manager
+ * before the configuration when it shuts down.
+ */
+typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
+
 // =============================================================================
 // Common Event Hooks
 // =============================================================================
@@ -846,6 +860,28 @@ bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_typ
  */
 bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
                                                    void** data_ptr_out);
+
+// ----------------------------- Load Shed Points ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load is called by the module to decide
+ * whether to shed load at a load shed point of the overload manager.
+ *
+ * Each call decides for one unit of load, such as one request. It returns true with the
+ * probability that the triggers of the load shed point give, and counts shed load in the
+ * shed_load_count statistic of the load shed point. It reads the pressure of the synchronous
+ * feedback resource monitors of the triggers and reports accepted load to them on the calling
+ * thread. Checking a load shed point that Envoy also checks counts the same load twice.
+ *
+ * This is thread-safe. See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that
+ * can call it.
+ *
+ * @param load_shed_point_envoy_ptr is the load shed point to check. It can be nullptr, which never
+ * sheds load.
+ * @return true if the module should shed the load, false otherwise.
+ */
+bool envoy_dynamic_module_callback_load_shed_point_should_shed_load(
+    envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point_envoy_ptr);
 
 // =============================================================================
 // ============================== HTTP Filter ==================================
@@ -1251,7 +1287,8 @@ void envoy_dynamic_module_on_http_filter_destroy(
 
 /**
  * envoy_dynamic_module_on_http_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a HTTP filter.
+ * response is received initiated by a HTTP filter. Envoy reports a failure of a callout in flight
+ * from a later callback on the same thread.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -1356,7 +1393,9 @@ void envoy_dynamic_module_on_http_filter_http_stream_complete(
 /**
  * envoy_dynamic_module_on_http_filter_http_stream_reset is called when a streamable HTTP callout
  * stream is reset or fails. This may be called instead of the complete callback if the stream
- * encounters an error.
+ * encounters an error. Envoy reports a reset that the module did not request from a later callback
+ * on the same thread. A reset requested with
+ * envoy_dynamic_module_callback_http_filter_reset_http_stream is reported before that call returns.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -1405,7 +1444,8 @@ void envoy_dynamic_module_on_http_filter_config_scheduled(
 
 /**
  * envoy_dynamic_module_on_http_filter_config_http_callout_done is called when the HTTP callout
- * response is received for a callout initiated by an HTTP filter configuration.
+ * response is received for a callout initiated by an HTTP filter configuration. Envoy reports a
+ * failure of a callout in flight from a later callback on the same thread.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
@@ -1504,7 +1544,10 @@ void envoy_dynamic_module_on_http_filter_config_http_stream_complete(
 
 /**
  * envoy_dynamic_module_on_http_filter_config_http_stream_reset is called when a streamable HTTP
- * callout stream started from an HTTP filter configuration is reset or fails.
+ * callout stream started from an HTTP filter configuration is reset or fails. Envoy reports a reset
+ * that the module did not request from a later callback on the same thread. A reset requested with
+ * envoy_dynamic_module_callback_http_filter_config_reset_http_stream is reported before that call
+ * returns.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
@@ -1962,6 +2005,31 @@ bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_envoy_buffer* result);
 
+// ------------------------ Load Shed Point callbacks --------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point is called by the module to
+ * get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the request processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_http_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name, the filter is an upstream filter, or the listener of its filter chain bypasses the overload
+ * manager. Filters that the route configuration creates, such as those of a per-route filter chain,
+ * and filters of a filter chain that FCDS delivers do not see the bypass and get the load shed
+ * point.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 
 /**
@@ -2384,9 +2452,11 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch is called by the module to
  * set multiple string-valued dynamic metadata entries under a single namespace in one call. It is
  * equivalent to calling envoy_dynamic_module_callback_http_set_dynamic_metadata_string once per
- * entry but resolves the namespace and merges into the metadata struct only once. Existing entries
+ * entry but resolves the namespace once and writes each entry into it in order. Existing entries
  * with the same key are overwritten. Within a single call, a later entry overwrites an earlier
- * entry with the same key. An empty array is a no-op and does not create the namespace.
+ * entry with the same key. An empty array is a no-op and does not create the namespace. An entry's
+ * key and value must not point into this filter's dynamic metadata, such as a buffer a metadata
+ * getter returned, since writing an entry replaces the value under its key.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -3203,14 +3273,17 @@ void envoy_dynamic_module_callback_http_filter_reset_http_stream(
  * the request body in chunks.
  *
  * This must be called after the stream is started and headers have been sent. It can be called
- * multiple times until end_stream is set to true.
+ * multiple times until end_stream is set to true. When Envoy reset the stream and did not call the
+ * reset event hook yet, this drops the data and returns true, and the reset event hook follows
+ * unless the filter is destroyed first.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param stream_id is the handle to the HTTP stream.
  * @param data is the body data to send.
  * @param end_stream is true if this is the last data (no trailers will follow).
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the data is
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_stream_send_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
@@ -3221,14 +3294,17 @@ bool envoy_dynamic_module_callback_http_stream_send_data(
  * request trailers on an active streamable HTTP callout. This implicitly ends the stream.
  *
  * This must be called after the stream is started and all request data has been sent.
- * After calling this, no more data can be sent on the stream.
+ * After calling this, no more data can be sent on the stream. When Envoy reset the stream and did
+ * not call the reset event hook yet, this drops the trailers and returns true, and the reset event
+ * hook follows unless the filter is destroyed first.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param stream_id is the handle to the HTTP stream.
  * @param trailers is the trailers to send.
  * @param trailers_size is the size of the trailers.
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the trailers are
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_stream_send_trailers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
@@ -3320,13 +3396,16 @@ void envoy_dynamic_module_callback_http_filter_config_reset_http_stream(
  * configuration context. This can be called multiple times to stream the request body in chunks.
  *
  * This must be called after the stream is started and headers have been sent. It can be called
- * multiple times until end_stream is set to true.
+ * multiple times until end_stream is set to true. When Envoy reset the stream and did not call the
+ * reset event hook yet, this drops the data and returns true, and the reset event hook follows
+ * unless the configuration is destroyed first.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param stream_id is the handle to the HTTP stream.
  * @param data is the body data to send.
  * @param end_stream is true if this is the last data (no trailers will follow).
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the data is
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
@@ -3338,13 +3417,16 @@ bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
  * configuration context. This implicitly ends the stream.
  *
  * This must be called after the stream is started and all request data has been sent.
- * After calling this, no more data can be sent on the stream.
+ * After calling this, no more data can be sent on the stream. When Envoy reset the stream and did
+ * not call the reset event hook yet, this drops the trailers and returns true, and the reset event
+ * hook follows unless the configuration is destroyed first.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param stream_id is the handle to the HTTP stream.
  * @param trailers is the trailers to send.
  * @param trailers_size is the size of the trailers.
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the trailers are
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
@@ -3876,6 +3958,18 @@ bool envoy_dynamic_module_callback_http_filter_recreate_stream(
 void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_http_drain_connection_upon_completion marks the downstream
+ * connection to be drained once the current HTTP stream completes. For HTTP/1.1 this adds a
+ * "Connection: close" header; for HTTP/2 and HTTP/3 this triggers a GOAWAY frame after the
+ * response is sent.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ============================= Network Filter ================================
 // =============================================================================
@@ -4162,7 +4256,8 @@ void envoy_dynamic_module_on_network_filter_destroy(
 
 /**
  * envoy_dynamic_module_on_network_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a network filter.
+ * response is received initiated by a network filter. Envoy reports a failure of a callout in
+ * flight from a later callback on the same thread.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
  * corresponding network filter.
@@ -4886,6 +4981,40 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_struct is called by the module to
+ * merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing entries
+ * with the same key are overwritten. An empty struct is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_struct is the serialized google.protobuf.Struct owned by the module. Its
+ * pointer may be null only when its length is zero.
+ * @return true if the struct was merged, false if the buffer does not parse as a
+ * google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_typed_metadata is called by the module to set
+ * the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any, replacing
+ * an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_any is the serialized google.protobuf.Any owned by the module. Its pointer
+ * may be null only when its length is zero.
+ * @return true if the entry was set, false if the buffer does not parse as a google.protobuf.Any
+ * with a type URL.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
 // ------------------------------ HTTP Callouts -------------------------------
 
 /**
@@ -5434,6 +5563,29 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
     envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Network Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_get_load_shed_point is called by the module
+ * to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the connection processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_network_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager. Filters of a filter chain that
+ * FCDS delivers do not see the bypass and get the load shed point.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 // --------------------- Network Filter Callbacks - Misc ---------------
 
 /**
@@ -5743,7 +5895,8 @@ void envoy_dynamic_module_on_listener_filter_config_scheduled(
 
 /**
  * envoy_dynamic_module_on_listener_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a listener filter.
+ * response is received initiated by a listener filter. Envoy reports a failure of a callout in
+ * flight from a later callback on the same thread.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
  * corresponding listener filter.
@@ -6421,6 +6574,41 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_b
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct is called by the
+ * module to merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the dynamic metadata is not accessible or the
+ * buffer does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata is called by the module
+ * to set the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any,
+ * replacing an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the dynamic metadata is not accessible or the buffer
+ * does not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
  * module to determine the maximum number of bytes to read from the socket.
  *
@@ -6763,6 +6951,28 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
 void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
     envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
+
+// --------------------- Listener Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point is called by the module
+ * to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the connection processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_listener_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
 
 // --------------------- Listener Filter Callbacks - Misc ---------------
 
@@ -7211,6 +7421,28 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
+
+// --------------------- UDP Listener Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point is called by the
+ * module to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the datagram processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_udp_listener_filter_config_new.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
 
 // --------------------- UDP Listener Filter Callbacks - Misc ---------------
 
@@ -8993,6 +9225,56 @@ typedef enum {
 typedef void (*envoy_dynamic_module_type_bootstrap_active_resource_name_fn)(
     envoy_dynamic_module_type_envoy_buffer name, void* user_data);
 
+/**
+ * envoy_dynamic_module_type_bootstrap_cluster_writer_update_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
+  // The write is queued. The done hook reports its outcome with the returned update ID.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_Success = 0,
+  // The module has not called
+  // envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer, or the call was made
+  // off the main thread, before envoy_dynamic_module_on_bootstrap_extension_server_initialized or
+  // after shutdown began. A call off the main thread also reports an Envoy bug.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed = 1,
+} envoy_dynamic_module_type_bootstrap_cluster_writer_update_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+  // The removal is queued. A queued write of the cluster completes as Removed, and the removal of a
+  // cluster that is only queued cancels its write.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_Success = 0,
+  // The call is not allowed for the same reasons as a write.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed = 1,
+  // The extension neither owns nor has queued a cluster with this name.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotFound = 2,
+} envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_cluster_writer_update_status is the outcome of a write that
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done reports.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_status {
+  // The cluster finished warming with this configuration or an identical one, and Envoy serves it.
+  // Every worker applies the cluster before it runs any event that the module posts afterwards.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Active = 0,
+  // A later write of the cluster replaced this one before it became active.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Superseded = 1,
+  // A removal of the cluster ended this write before it became active. A warming write that
+  // finishes warming before Envoy applies the removal completes as Active instead.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Removed = 2,
+  // Envoy rejected the write. The cluster failed to parse or validate, its name differs from the
+  // name passed in, a cluster with this name exists that the extension does not own, or Envoy
+  // failed to create the cluster. The workers keep serving the previous configuration, if any.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Failed = 3,
+  // Another component removed the cluster before this write became active, so the extension no
+  // longer owns it.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_OwnershipLost = 4,
+} envoy_dynamic_module_type_bootstrap_cluster_writer_update_status;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -9055,8 +9337,10 @@ void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
 
 /**
- * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called when a worker
- * thread is initialized. This is called once per worker thread.
+ * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called once on the main
+ * thread after Envoy creates its workers and before it starts their threads. To run code on every
+ * worker thread, call envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers during
+ * or after envoy_dynamic_module_on_bootstrap_extension_server_initialized.
  *
  * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
  * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
@@ -9098,6 +9382,12 @@ typedef void (*envoy_dynamic_module_type_event_cb)(void* context);
  * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
  * flush batched data, close connections, or signal external systems that this Envoy instance is
  * going away.
+ *
+ * Shutdown has begun when Envoy calls this, so
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers returns false, the cluster
+ * writer callbacks return NotAllowed, and Envoy drops the done hooks of pending worker events and
+ * the pending cluster writer outcomes. A worker can still run the worker event hook of an event
+ * posted before shutdown began, until the workers stop.
  *
  * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
  * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
@@ -9249,6 +9539,9 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
 // =============================================================================
 // Bootstrap Extension Callbacks
 // =============================================================================
+//
+// A callback that must be called on the main thread reports an Envoy bug and fails when a module
+// calls it from another thread, unless its documentation says otherwise.
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new is called by the module
@@ -9305,7 +9598,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_http_callout_done is called when the HTTP callout
- * response is received initiated by a bootstrap extension.
+ * response is received initiated by a bootstrap extension. Envoy reports a failure of a callout in
+ * flight from a later callback on the main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9335,7 +9629,10 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
  * is received in envoy_dynamic_module_on_bootstrap_extension_http_callout_done.
  *
  * This must be called on the main thread. To call from other threads, use the scheduler mechanism
- * to post an event to the main thread first.
+ * to post an event to the main thread first. Off the main thread this reports an Envoy bug and
+ * returns CannotCreateRequest. Before the server is initialized and once the extension is
+ * destroyed, it returns ClusterNotFound. A callout that completes before this returns is reported
+ * only by the return value.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9369,8 +9666,13 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
  * envoy_dynamic_module_on_bootstrap_extension_config_new to unblock Envoy. If the module does not
  * require asynchronous initialization, it should call this immediately during config creation.
  *
+ * When this completes the initialization of Envoy, it can run other hooks and start the workers
+ * before it returns, and it waits until every worker ran the worker events posted before it. The
+ * module must not hold a lock across this call that those hooks take.
+ *
  * This must be called on the main thread. To call from other threads, use the scheduler mechanism
- * to post an event to the main thread first.
+ * to post an event to the main thread first. Off the main thread this reports an Envoy bug and
+ * signals from a later callback on the main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9663,7 +9965,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
  * When the timer fires, envoy_dynamic_module_on_bootstrap_extension_timer_fired is called on the
  * main thread.
  *
- * This must be called on the main thread.
+ * This must be called on the main thread. Off the main thread this reports an Envoy bug and
+ * returns a timer whose operations do nothing, which the module must still delete.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9818,7 +10121,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
  * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
  * endpoints).
  * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
- * not available or the prefix is already taken).
+ * not available or the prefix is already taken). Admin is not available once the extension is
+ * destroyed.
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
@@ -9835,7 +10139,7 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
  * object.
  * @param path_prefix is the URL prefix of the handler to remove.
  * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
- * was not found or is not removable).
+ * was not found or is not removable, or once the extension is destroyed).
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
@@ -9853,7 +10157,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ClusterManager is
  * not available until that point.
  *
- * This should be called at most once. Subsequent calls are no-ops and return false.
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once the server began to shut down and when Envoy runs with --mode init_only.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9874,7 +10179,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ListenerManager is
  * not available until that point.
  *
- * This should be called at most once. Subsequent calls are no-ops and return false.
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once the server began to shut down and when Envoy runs with --mode init_only.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9889,7 +10195,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
  * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names is called by the
  * module to enumerate the names of the currently active resources of a single kind, invoking
  * name_fn once per name. Each name is reported at most once. To read several kinds, call once per
- * kind. A no-op before the server is initialized. Must be called on the main thread.
+ * kind. A no-op before the server is initialized and once the extension is destroyed. Must be
+ * called on the main thread.
  *
  * The kinds report:
  * - FilterChain: the named filter chains of the active listeners: inline chains, the default
@@ -9912,6 +10219,210 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
     envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
+// -------------------- Bootstrap Extension - Run On All Workers --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_worker_event is called on every worker thread for an
+ * event posted by envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers. The worker
+ * threads call it concurrently.
+ *
+ * This hook is optional. It may only update metrics and commit events to a scheduler, and it should
+ * return quickly since it runs on the event loop of the worker.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param event_id is the ID passed to
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_worker_event(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done is called on the main thread
+ * once every worker thread ran the event posted by
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers. Events complete in the
+ * order they were posted, and none completes after shutdown began.
+ *
+ * This hook is optional.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param event_id is the ID passed to
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers is called by the module to
+ * run envoy_dynamic_module_on_bootstrap_extension_worker_event on every worker thread, followed by
+ * envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done on the main thread. The main
+ * thread does not run the worker event. The done hook follows even when the module does not
+ * implement the worker event hook.
+ *
+ * A worker runs the event after it applied every cluster addition, update and removal, and every
+ * host addition and removal, that Envoy posted to it before this call. Host health, weight and
+ * metadata changes merged by the update_merge_window of a cluster may reach the workers later.
+ *
+ * An event posted before the module calls
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete runs on each worker
+ * before that worker serves its first connection. The workers start only after initialization
+ * completes, so the module must not wait for the done hook before it signals that its
+ * initialization is complete. That signal can wait for the workers to run these events, so the
+ * module must not hold a lock across it that the worker event hook takes.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param event_id is the ID of the event. It can be any module-defined value.
+ * @return true if the event was posted. Returns false when called off the main thread, before
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, or after shutdown began. A call
+ * off the main thread also reports an Envoy bug.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t event_id);
+
+// -------------------- Bootstrap Extension - Cluster Writer --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done is called on the main
+ * thread with the outcome of a write accepted by
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update.
+ *
+ * This hook is optional. Without it, Envoy still applies the writes.
+ *
+ * Envoy calls this at most once per update ID, and never from inside a callback that the module
+ * called. It is called exactly once unless shutdown began first, the cluster never finishes
+ * warming, or Envoy never finishes initializing its clusters. To end a write that stays warming,
+ * write the cluster again or remove it, which completes the write as Superseded or Removed.
+ * Outcomes can arrive out of update ID order. When Envoy fails to create the cluster of a
+ * write, the status is Failed, Envoy logs the error at most once every 10 seconds, and the
+ * extension keeps owning the cluster if it exists.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param update_id is the ID returned by
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update.
+ * @param cluster_name is the name of the cluster. It is owned by Envoy and valid only during this
+ * call.
+ * @param status is the outcome of the write.
+ * @param error_details describes the problem when the status is Failed or OwnershipLost, and is
+ * empty otherwise. It is owned by Envoy and valid only during this call.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t update_id, envoy_dynamic_module_type_envoy_buffer cluster_name,
+    envoy_dynamic_module_type_bootstrap_cluster_writer_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer is called by the module
+ * to opt in to adding, updating and removing clusters. Until it is called,
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update and
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove return NotAllowed.
+ *
+ * This must be called on the main thread. It can be called before
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, for example from
+ * envoy_dynamic_module_on_bootstrap_extension_config_new.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once shutdown began.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the cluster writer was enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update is called by the
+ * module to add or update a cluster in the cluster manager. Envoy queues the write, applies it
+ * asynchronously on the main thread, and reports the outcome through
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done.
+ *
+ * The extension owns the clusters it writes, and CDS does not remove them. When another component,
+ * for example CDS, replaces an active cluster that the extension owns, the extension no longer owns
+ * it and later writes of the cluster complete as Failed. Envoy does not notice a replacement of a
+ * cluster that is still warming, so the module should only write clusters that no other component
+ * writes. Writes submitted before Envoy finishes initializing its static and CDS clusters are
+ * applied once it has. Envoy does not wait for written clusters before it finishes initializing, so
+ * to serve them from the first request, call
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete only after their
+ * writes completed as Active. When the module writes a cluster again before its previous write is
+ * applied, Envoy applies only the latest write and the previous one completes as Superseded.
+ *
+ * A written cluster has the same authority as a cluster delivered by CDS, so build clusters from a
+ * schema that the module owns. On the ADS stream and the xDS-TP authority streams, a written
+ * cluster holds back the CDS requests while it warms, as a cluster delivered by CDS does, unless
+ * its wait_for_warm_on_init is false. While Envoy applies a burst of writes, it holds back the EDS,
+ * LEDS and SDS requests on those streams, including their ACKs, for about one second, as it does
+ * while it applies a CDS update.
+ *
+ * A write that changes a cluster rebuilds it and drains its connection pools on every worker, so
+ * endpoint changes should not go through the writer. Use a dynamic module cluster and its host
+ * callbacks instead.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. The buffers are owned by the
+ * module and only need to be valid during this call. A buffer pointer may be null only when its
+ * length is zero.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param cluster_name is the name of the cluster.
+ * @param cluster is the serialized envoy.config.cluster.v3.Cluster. Its name must equal
+ * cluster_name.
+ * @param version_info is the version that Envoy stores with the cluster when the write changes it,
+ * and shows in the config dump.
+ * @param update_id_out receives a nonzero ID that increases with every accepted write, or 0 when
+ * the write is rejected. It must not be null.
+ * @return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result is Success when the
+ * write is queued.
+ */
+envoy_dynamic_module_type_bootstrap_cluster_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_buffer cluster,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove is called by the module
+ * to remove a cluster that it owns. Envoy queues the removal and applies it asynchronously on the
+ * main thread. A removal has no outcome of its own, and the workers can use the cluster until Envoy
+ * applies it and each worker processes the removal. With cluster lifecycle enabled,
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_removal reports the removal of an active
+ * cluster.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param cluster_name is the name of the cluster. The buffer is owned by the module and only needs
+ * to be valid during this call.
+ * @return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result is Success when the
+ * removal is queued.
+ */
+envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
 
 // =============================================================================
 // Common Host Types (shared by cluster and standalone load balancer extensions)
@@ -10193,8 +10704,14 @@ void envoy_dynamic_module_on_cluster_init(
     envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
 
 /**
- * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
- * should release any resources associated with the cluster.
+ * envoy_dynamic_module_on_cluster_destroy is called on the main thread when the cluster is
+ * destroyed. The module should release any resources associated with the cluster, for example by
+ * deleting its schedulers. Envoy can call this hook while it removes the cluster from the cluster
+ * manager and at exit after it stopped its workers, so callbacks that read or update clusters, such
+ * as host updates or envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names,
+ * are not safe from this hook. Scheduler commits and deletes stay safe. After this hook, Envoy
+ * cancels the HTTP callouts of the cluster that are still in flight, including any that the hook
+ * started, without calling envoy_dynamic_module_on_cluster_http_callout_done.
  *
  * @param cluster_module_ptr is the pointer to the in-module cluster.
  */
@@ -10297,8 +10814,9 @@ void envoy_dynamic_module_on_cluster_worker_event(
 /**
  * envoy_dynamic_module_on_cluster_worker_slot_data_destroy is invoked when a previously published
  * worker-slot pointer is no longer referenced — that is, when the slot has been overwritten or
- * the cluster has been torn down. The module is expected to release any allocation backing the
- * pointer.
+ * the cluster has been torn down. Once Envoy stopped its workers at exit, it is invoked for the
+ * new pointer before envoy_dynamic_module_callback_cluster_worker_slot_set returns. The module is
+ * expected to release any allocation backing the pointer.
  *
  * This is optional but required for modules that publish payloads, otherwise the prior payload
  * leaks. The hook fires on whichever thread drops the last reference, so the module must make
@@ -10360,7 +10878,8 @@ void envoy_dynamic_module_on_cluster_shutdown(
 /**
  * envoy_dynamic_module_on_cluster_http_callout_done is called on the main thread when an HTTP
  * callout initiated by envoy_dynamic_module_callback_cluster_http_callout receives a response or
- * fails.
+ * fails. Envoy reports a failure from a later callback, and does not call this for the callouts in
+ * flight when the cluster is destroyed.
  *
  * This is optional. Only modules that use HTTP callouts need to implement this. If not
  * implemented, envoy_dynamic_module_callback_cluster_http_callout will return
@@ -10538,8 +11057,12 @@ envoy_dynamic_module_callback_cluster_find_host_by_address(
 
 /**
  * envoy_dynamic_module_callback_cluster_pre_init_complete signals that the cluster's initial host
- * discovery is complete. The module must call this during or after
- * envoy_dynamic_module_on_cluster_init to allow Envoy to start routing traffic to this cluster.
+ * discovery is complete. The module must call this from envoy_dynamic_module_on_cluster_new onward
+ * to allow Envoy to start routing traffic to this cluster.
+ *
+ * When called before envoy_dynamic_module_on_cluster_init returns, for example inside
+ * envoy_dynamic_module_on_cluster_new, this takes effect once envoy_dynamic_module_on_cluster_init
+ * returns. Otherwise it takes effect from a later callback on the main thread.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
  */
@@ -10563,6 +11086,25 @@ void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
 
 /**
+ * envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions makes the cluster
+ * keep persistent host partitions, as if its ClusterConfig set use_persistent_host_partitions. This
+ * lets the module choose the host set storage without the cluster's configuration carrying the
+ * field. The same costs apply, so pair it with
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * This is optional and must be called on the main thread during
+ * envoy_dynamic_module_on_cluster_config_new, before the cluster and its host sets exist. A call
+ * made then off the main thread is reported as a bug. A refusal for the lb_policy is logged.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @return true if the cluster will keep persistent host partitions. It returns false on a null
+ * pointer, after envoy_dynamic_module_on_cluster_config_new returned, off the main thread, and
+ * when the cluster's lb_policy is not CLUSTER_PROVIDED.
+ */
+bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count returns the number of healthy
  * hosts at the given priority level in the cluster's host set.
  *
@@ -10576,6 +11118,11 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
 /**
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
  * index at the given priority level.
+ *
+ * With use_persistent_host_partitions, the first index getter for a host list after an update
+ * builds that list, which is O(N) on the worker. The healthy, total and degraded host count getters
+ * and envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts do not. The locality getters build
+ * the healthy per-locality list the same way.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
  * @param priority is the priority level.
@@ -11003,7 +11550,9 @@ void envoy_dynamic_module_callback_cluster_scheduler_commit(
 /**
  * envoy_dynamic_module_callback_cluster_run_on_all_workers posts the module's worker-event hook
  * to every worker thread registered with the server's thread-local engine. The main thread is
- * excluded. Must be called from the main thread.
+ * excluded. Must be called from the main thread. When called inside
+ * envoy_dynamic_module_on_cluster_new, the events are posted once that hook returns. Once Envoy
+ * stopped its workers at exit, this does nothing.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
  * @param event_id is a module-defined identifier delivered to each worker invocation.
@@ -11015,7 +11564,8 @@ void envoy_dynamic_module_callback_cluster_run_on_all_workers(
  * envoy_dynamic_module_callback_cluster_worker_slot_set publishes an opaque module pointer to
  * the cluster's worker thread-local slot. All registered threads observe the same pointer
  * (single-pointer semantics — not a per-worker factory). Any previously published pointer is
- * released through the module's destroy hook. Must be called from the main thread.
+ * released through the module's destroy hook. Must be called from the main thread. Once Envoy
+ * stopped its workers at exit, the pointer is released through the destroy hook right away.
  *
  * Threads that are not yet registered with the TLS engine at the time of the call will not
  * observe this update.
@@ -11681,6 +12231,41 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct merges a serialized
+ * google.protobuf.Struct into the request's dynamic metadata under the given namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the request has no stream info or the buffer
+ * does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata sets the
+ * typed_filter_metadata entry of the request's dynamic metadata under the given namespace from a
+ * serialized google.protobuf.Any, replacing an existing entry.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the request has no stream info or the buffer does
+ * not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
@@ -11706,7 +12291,9 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
  * and asynchronously delivers the response via envoy_dynamic_module_on_cluster_http_callout_done.
  *
  * This must be called on the main thread. The request requires ``:method``, ``:path``, and
- * ``host`` headers to be present.
+ * ``host`` headers to be present. Off the main thread this reports an Envoy bug and returns
+ * envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest. A callout that completes
+ * before this returns is reported only by the return value.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
  * @param callout_id_out is a pointer to a variable where the callout ID will be stored on success.
@@ -11827,6 +12414,55 @@ typedef struct envoy_dynamic_module_type_packed_address {
 bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
     envoy_dynamic_module_type_packed_address* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count returns how
+ * many hosts changed health since the previous update this worker applied, so a module can patch
+ * its healthy set from the current envoy_dynamic_module_on_cluster_lb_on_host_membership_update
+ * call instead of rereading every host. Envoy merges updates within the cluster's
+ * update_merge_window, so one call can carry several health changes. Each host is listed once, and
+ * hosts removed since the previous update are reported only by the member update getters. It is
+ * only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
+ *
+ * Envoy only knows this when the cluster keeps persistent host partitions, which requires
+ * use_persistent_host_partitions in the cluster's ClusterConfig or a call to
+ * envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions, and no health
+ * refresh happened since the previous update. A refresh covers every host, and with an active
+ * health checker it precedes a worker's first update. Otherwise it returns false and the module
+ * must reread the hosts it tracks.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param result receives the count. Its contents are unspecified when the callback returns false.
+ * @return true if the count is known, false on a null pointer, outside the callback, or when Envoy
+ * does not know which hosts changed health.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host returns a host
+ * whose health changed since the previous update this worker applied, with its priority and current
+ * health. The health is read when this is called, so it can be newer than the host lists of the
+ * same update. The host pointer stays valid while the host is in the cluster's host set. Valid
+ * indexes are below the count from
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count. It is only
+ * valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread
+ * that runs it.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the health-changed list.
+ * @param priority receives the host's priority. Its contents are unspecified when the callback
+ * returns nullptr.
+ * @param health receives the host's current health. Its contents are unspecified when the callback
+ * returns nullptr.
+ * @return the host pointer, or nullptr on a null pointer, an out-of-bounds index, outside the
+ * callback, or when Envoy does not know which hosts changed health.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, uint32_t* priority,
+    envoy_dynamic_module_type_host_health* health);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
@@ -13268,8 +13904,8 @@ envoy_dynamic_module_type_tls_handshaker_result envoy_dynamic_module_on_tls_hand
 // context. When a handshake needs a certificate the selector picks one of them, lets Envoy select
 // one, or picks a dynamic certificate by name. The module provides dynamic certificates at
 // runtime, and a handshake that picks a dynamic certificate that is not provided yet can wait
-// until the module provides or removes it. Envoy applies the configured OCSP stapling policy to
-// the certificate it uses.
+// until the module provides or removes it, or until its request times out. Envoy applies the
+// configured OCSP stapling policy to the certificate it uses.
 
 // =============================================================================
 // TLS Certificate Selector Types
@@ -13351,7 +13987,8 @@ typedef enum envoy_dynamic_module_type_tls_certificate_selector_status {
   // Envoy uses the dynamic certificate named by certificate_name. When the module has not provided
   // it yet, the handshake waits for it if the module implements
   // envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested, and fails
-  // otherwise. When allow_dynamic_certificates is not set, the handshake fails.
+  // otherwise or when its request times out. When allow_dynamic_certificates is not set, the
+  // handshake fails.
   envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic = 2,
   // Envoy fails the handshake.
   envoy_dynamic_module_type_tls_certificate_selector_status_Failed = 3,
@@ -13364,8 +14001,9 @@ typedef enum envoy_dynamic_module_type_tls_certificate_selector_status {
 /**
  * envoy_dynamic_module_on_tls_certificate_selector_config_new is called on the main thread when the
  * certificate selector config is loaded. Metrics can only be defined during this call. Dynamic
- * certificates provided during this call are available to the first handshake, unless the TLS
- * context waits for its SDS validation context.
+ * certificates provided during this call, or before
+ * envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete, are
+ * available to the first handshake, unless the TLS context waits for its SDS validation context.
  *
  * @param config_envoy_ptr is the pointer to the DynamicModuleTlsCertificateSelectorConfig object
  * for the corresponding config.
@@ -13458,11 +14096,14 @@ envoy_dynamic_module_on_tls_certificate_selector_select(
 /**
  * envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested is called on the
  * main thread when a handshake waits for a dynamic certificate that the module has not provided. It
- * is called once for each name until the certificate is provided or removed. The module
- * must answer with envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate or
+ * is called once for each name until the certificate is provided or removed, or its request times
+ * out. The module must answer with
+ * envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate or
  * envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate, either during
  * this call or later. Until then Envoy keeps the name, and the handshakes that wait for the
- * certificate stay paused until their connections close.
+ * certificate stay paused until their connections close. When dynamic_certificate_request_timeout
+ * expires first, Envoy fails them and forgets the name, so a later handshake requests the
+ * certificate again. An answer after the timeout still applies to the name.
  *
  * This hook is optional. Without it, a handshake that selects a dynamic certificate that the module
  * has not provided fails.
@@ -13587,6 +14228,23 @@ bool envoy_dynamic_module_callback_tls_certificate_selector_config_set_certifica
 void envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(
     envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete is called by
+ * the module to signal that the certificate selector configuration has completed its
+ * initialization. Envoy registers an init target for every certificate selector configuration, so
+ * the listeners and clusters that use the TLS context warm until the first call, and Envoy does not
+ * time out the wait. Later calls do nothing.
+ *
+ * The module must call this during or after
+ * envoy_dynamic_module_on_tls_certificate_selector_config_new. If the module does not require
+ * asynchronous initialization, it should call this during that call. This must be called on the
+ * main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTlsCertificateSelectorConfig object.
+ */
+void envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+    envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter is called by the
@@ -15819,7 +16477,9 @@ typedef const void* envoy_dynamic_module_type_stat_sink_config_module_ptr;
  * envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr is an opaque handle to the metric
  * snapshot for a single flush. It is passed to the snapshot read-back callbacks.
  *
- * OWNERSHIP: Envoy owns the pointer. Valid only during the flush event hook.
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the flush event hook. A handle returned by
+ * envoy_dynamic_module_callback_stat_sink_snapshot_retain is instead valid until the module passes
+ * it to envoy_dynamic_module_callback_stat_sink_snapshot_release.
  */
 typedef void* envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr;
 
@@ -15874,7 +16534,8 @@ void envoy_dynamic_module_on_stat_sink_config_destroy(
  * The module can iterate over counters, gauges, and text readouts via the snapshot callbacks.
  *
  * This is called on the main thread during the periodic stats flush. Implementations must not
- * block.
+ * block. A module that needs the snapshot after this call returns, for example to format it off
+ * the main thread, keeps it with envoy_dynamic_module_callback_stat_sink_snapshot_retain.
  *
  * @param config_module_ptr is the pointer to the in-module configuration object.
  * @param snapshot_envoy_ptr is the opaque snapshot handle. Valid only during this call.
@@ -15917,6 +16578,50 @@ void envoy_dynamic_module_on_stat_sink_config_scheduled(
 // =============================================================================
 // Stats Sink Callbacks
 // =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_retain keeps the snapshot readable after the
+ * flush event hook returns, so a module can read and format it off the main thread.
+ *
+ * Envoy takes a reference on every stat in the snapshot and copies their values: counter values and
+ * deltas, gauge values, text readout values, and histogram sample counts, sums, and buckets. The
+ * snapshot callbacks on the returned handle report those copied values, so every read reflects the
+ * time of this call. Stat names and tags are read on demand from the referenced stats.
+ *
+ * The returned handle may be read and released on any thread, but by one thread at a time. The
+ * module must release it with envoy_dynamic_module_callback_stat_sink_snapshot_release, and must
+ * do so before envoy_dynamic_module_on_stat_sink_config_destroy returns. A stat stays in the
+ * store while a handle references it, even after its scope is removed or it is evicted, so it
+ * keeps appearing in later flush snapshots and a stat created again under its name gets it back
+ * with its value. A handle still held when the next flush starts keeps such stats in that flush,
+ * and retaining every flush before releasing the previous one keeps them indefinitely.
+ *
+ * With the handle passed to envoy_dynamic_module_on_stat_sink_flush, this must be called on the
+ * main thread during that hook. With a retained handle that has not been released, it may be called
+ * on any thread, by the thread currently reading that handle. The new handle then reports the
+ * values that handle copied, so they date from the first retain rather than from this call. Its
+ * cost is linear in the number of stats but does no name decoding.
+ *
+ * @param snapshot_envoy_ptr is the handle passed to envoy_dynamic_module_on_stat_sink_flush, or a
+ *        handle previously returned by this callback and not yet released.
+ * @return a new snapshot handle that every snapshot callback accepts. The module owns its lifetime
+ *         and must release it as described above.
+ */
+envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr
+envoy_dynamic_module_callback_stat_sink_snapshot_retain(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_release drops a snapshot handle returned by
+ * envoy_dynamic_module_callback_stat_sink_snapshot_retain, along with its stat references. It may
+ * be called on any thread. The handle must not be used afterwards.
+ *
+ * @param retained_snapshot_envoy_ptr is a handle returned by
+ *        envoy_dynamic_module_callback_stat_sink_snapshot_retain. It must not be the handle passed
+ *        to envoy_dynamic_module_on_stat_sink_flush.
+ */
+void envoy_dynamic_module_callback_stat_sink_snapshot_release(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr retained_snapshot_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count returns the number of
@@ -16088,6 +16793,9 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
  * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
  * to associate those observations with an owned copy of this name and its tags. No tag extraction
  * or histogram statistics computation is performed by these callbacks.
+ *
+ * They also accept a handle returned by envoy_dynamic_module_callback_stat_sink_snapshot_retain,
+ * on which they are valid until the handle is released.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
@@ -16574,6 +17282,29 @@ bool envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(
  */
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_checker_get_host_health(
     envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_set_health_metadata attaches a string key/value pair
+ * to the result of the health check currently in flight for the session. The accumulated pairs
+ * replace the host's health check metadata when the check resolves (a reported result or a
+ * timeout), so each check starts with an empty set. Envoy forwards the metadata to the management
+ * server in the HDS EndpointHealth.health_metadata field. Setting an existing key overwrites it.
+ *
+ * The key ``http_status_code`` is reserved for the HTTP health checker and is rejected.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_health_checker_session_on_interval. The metadata applies to the check
+ * started by that interval, including when the check later times out.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param key is the metadata key. Envoy copies it.
+ * @param value is the metadata value. Envoy copies it.
+ * @return true if the pair was stored, false if the session pointer is null, the key is empty or
+ * reserved, or a buffer is invalid.
+ */
+bool envoy_dynamic_module_callback_health_checker_set_health_metadata(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 // =============================================================================
 // ============================ Cluster Specifier ==============================
@@ -17415,8 +18146,8 @@ typedef enum envoy_dynamic_module_type_route_specifier_built_route_lookup_result
   // Envoy caches the route the decision builds unless a route is already cached for the key.
   envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Miss = 1,
   // A route cached for the key serves the request, which Envoy uses when the decision is left
-  // Unspecified. The module records nothing more, since Envoy ignores the overrides and user data
-  // it records.
+  // Unspecified. The module records nothing more, since Envoy ignores the overrides it records and
+  // hands its user data to envoy_dynamic_module_on_route_specifier_user_data_discard.
   envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit = 2,
   // A route cached for the key serves the request, and the module records the route exactly as on
   // a miss. When the decision is left Unspecified, Envoy uses the route the recording builds, and
@@ -17546,6 +18277,28 @@ void envoy_dynamic_module_on_route_specifier_route_destroy(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     uint64_t user_data);
 
+/**
+ * envoy_dynamic_module_on_route_specifier_user_data_discard is called with the user data last
+ * recorded with envoy_dynamic_module_callback_route_specifier_set_route_user_data when the decision
+ * builds no route to carry it. That is the case for a decision other than Unspecified, a
+ * StopIterationAndSkipRoute status, a decision Envoy cannot honor, and a Hit from
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route, which uses the cached route. It
+ * is optional, resolved by Envoy with a nullable lookup, and absence is a no op.
+ *
+ * It is called on the thread that resolves the route, concurrently with other hooks, before the
+ * route specifier returns and always before envoy_dynamic_module_on_route_specifier_config_destroy
+ * for the owning configuration. It must not block, allocate heavily or call back into Envoy. With
+ * both hooks exported, the value set_route_user_data last records for a decision reaches either
+ * this hook or on_route_specifier_route_destroy, never both, so a module can release what it
+ * leased for the route in either.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param user_data is the value recorded with set_route_user_data.
+ */
+void envoy_dynamic_module_on_route_specifier_user_data_discard(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    uint64_t user_data);
+
 // =============================================================================
 // Route Specifier Callbacks
 // =============================================================================
@@ -17645,6 +18398,18 @@ bool envoy_dynamic_module_callback_route_specifier_config_register_route_templat
 void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache returns whether the
+ * route specifier configuration sets built_route_cache, so that a module whose routes rely on the
+ * cache can reject a configuration without it from the config hook. This may be called from the
+ * config hook or from the request path, since it is immutable after configuration load.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @return true if the configuration sets built_route_cache, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
 
 // ------------------- Route Specifier Callbacks - Metrics ---------------------
 
@@ -18273,10 +19038,12 @@ bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
  * key change over time folds a version of what they depend on into the key.
  *
  * On a hit a decision other than Unspecified and a StopIterationAndSkipRoute status still apply,
- * while the overrides and user data the module records are ignored. A verified hit uses the route
- * its recording builds instead, so every user data recorded on a miss or a verified hit stays on a
- * route of its own, which fires envoy_dynamic_module_on_route_specifier_route_destroy once neither
- * the cache nor a stream holds it.
+ * while the overrides the module records are ignored and its user data goes to
+ * envoy_dynamic_module_on_route_specifier_user_data_discard. A verified hit uses the route its
+ * recording builds instead, so the user data a miss or a verified hit records stays on a route of
+ * its own whenever the decision builds one, which fires
+ * envoy_dynamic_module_on_route_specifier_route_destroy once neither the cache nor a stream holds
+ * it.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param key is the key the module identifies the route with.
@@ -18290,11 +19057,13 @@ envoy_dynamic_module_callback_route_specifier_lookup_built_route(
  * envoy_dynamic_module_callback_route_specifier_set_route_user_data records a u64 on the route this
  * decision produces. It forces the produced route to be wrapped even when no other override was
  * recorded, so that envoy_dynamic_module_on_route_specifier_route_destroy fires for it with this
- * value. It is effective when the decision is left Unspecified.
+ * value. It is effective when the decision is left Unspecified. A later call replaces the value,
+ * and the last value goes to envoy_dynamic_module_on_route_specifier_user_data_discard instead when
+ * no route ends up carrying it.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param user_data is the value passed to on_route_specifier_route_destroy when the route is
- * destroyed.
+ * destroyed, or to on_route_specifier_user_data_discard when no route carries it.
  */
 void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
@@ -18427,6 +19196,29 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
 bool envoy_dynamic_module_callback_route_specifier_set_route_name(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer route_name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_virtual_cluster selects the virtual cluster of
+ * the request by one of the names that the virtual_cluster_override of the route specifier
+ * declares, or selects none with an empty name. The virtual_cluster_override configures how the
+ * router uses the selection. A later call replaces the selection.
+ *
+ * Like the recorded overrides, the selection takes effect only when the decision is left
+ * Unspecified. It is dropped without failing the decision when there is no route or when the route
+ * answers the request directly, and a selected virtual cluster is also dropped when the route
+ * belongs to a virtual host other than virtual_host_name. A route the built route cache holds
+ * keeps the selection it was built with, so the key the module looks the route up with must also
+ * determine the selection.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param virtual_cluster_name is the name of the virtual cluster, or empty to select none. The
+ * buffer is owned by the module. Its pointer may be null only when its length is zero.
+ * @return true if the route specifier declares virtual clusters and the name is empty or one of
+ * them, false otherwise, in which case the selection does not change.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer virtual_cluster_name);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_timeout records the route timeout for the
@@ -19162,6 +19954,261 @@ bool envoy_dynamic_module_on_header_formatter_format(
     envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
     envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* result);
+
+// =============================================================================
+// ============================= Resource Monitor ==============================
+// =============================================================================
+//
+// This extension enables custom overload manager resource monitors via dynamic modules. At each
+// refresh interval of the overload manager, the module reports the pressure of the monitored
+// resource, which is the ratio of its usage to its limit. The overload actions and load shed points
+// with a trigger on the resource act on that pressure. A module can also enable synchronous
+// feedback, in which case the load shed points with a trigger on the resource ask the module for
+// the pressure each time they decide whether to shed load, and tell it about the load they accept.
+
+// =============================================================================
+// Resource Monitor Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleResourceMonitorConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It remains valid until
+ * envoy_dynamic_module_on_resource_monitor_config_destroy returns, or until
+ * envoy_dynamic_module_on_resource_monitor_config_new returns if that returns nullptr.
+ */
+typedef void* envoy_dynamic_module_type_resource_monitor_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_config_module_ptr is a pointer to an in-module
+ * resource monitor configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_resource_monitor_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleResourceMonitorConfigScheduler class in Envoy.
+ *
+ * The scheduler reports the outcome of a pending update from any thread, which lets a module
+ * compute the pressure off the main thread. It is created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new, used via
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage and
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure, and destroyed by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Since its lifecycle is owned by the module, this has the _module_ptr
+ * suffix.
+ */
+typedef void* envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_monitor_update_status is returned by
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage to report the outcome of an
+ * update. There is no related C++ enum. Envoy reports a successful update with
+ * Server::ResourceUpdateCallbacks::onSuccess and a failed one with onFailure.
+ */
+typedef enum envoy_dynamic_module_type_resource_monitor_update_status {
+  // The module wrote the pressure of the resource to resource_pressure.
+  envoy_dynamic_module_type_resource_monitor_update_status_Success = 0,
+  // The update failed. The overload manager counts it in the failed_updates statistic of the
+  // resource and keeps acting on the last reported pressure.
+  envoy_dynamic_module_type_resource_monitor_update_status_Failure = 1,
+  // The module reports the outcome later with
+  // envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage or
+  // envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure.
+  envoy_dynamic_module_type_resource_monitor_update_status_Pending = 2,
+} envoy_dynamic_module_type_resource_monitor_update_status;
+
+// =============================================================================
+// Resource Monitor Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_config_new is called by the main thread when the
+ * overload manager creates the resource monitor during server initialization. This happens before
+ * clusters, listeners and worker threads are created.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @param name is the resource_monitor_name from the configuration. It is owned by Envoy and valid
+ * only for the duration of this call.
+ * @param config is the resource monitor configuration bytes owned by Envoy and valid only for the
+ * duration of this call.
+ * @return a pointer to the in-module resource monitor configuration. Returning nullptr indicates a
+ * failure to initialize the module, and Envoy fails to start.
+ */
+envoy_dynamic_module_type_resource_monitor_config_module_ptr
+envoy_dynamic_module_on_resource_monitor_config_new(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_config_destroy is called by the main thread when the
+ * resource monitor is destroyed. This happens when the server shuts down, and during startup when
+ * Envoy rejects the configuration after the module has created its own. Worker threads can still be
+ * running at that point, so state that the module shares with its other extensions must stay
+ * valid. A pending update is dropped without being reported. The module may be unloaded once this
+ * returns, so it must stop the threads it started before returning.
+ *
+ * When the server shuts down, if the module enables synchronous feedback and a load shed point has
+ * a trigger on the resource, this runs only after the worker threads have stopped and the bootstrap
+ * extensions have been destroyed. In that case and in validation mode, the module must not call
+ * envoy_dynamic_module_callback_get_concurrency or envoy_dynamic_module_callback_is_validation_mode
+ * here.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ */
+void envoy_dynamic_module_on_resource_monitor_config_destroy(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage is called by the main thread at
+ * each refresh interval of the overload manager to get the pressure of the resource.
+ * Implementations must not block. A module that needs slow work returns
+ * envoy_dynamic_module_type_resource_monitor_update_status_Pending and reports the outcome later.
+ *
+ * While an update is pending, the overload manager skips the following refreshes of the resource
+ * and counts them in the skipped_updates statistic of the resource. Envoy does not time out a
+ * pending update, so the overload manager keeps acting on the last reported pressure until the
+ * module reports the outcome.
+ *
+ * This hook is not called when the module enables synchronous feedback, and Envoy then accepts the
+ * configuration without it.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @param resource_pressure is where the module writes the pressure of the resource before it
+ * returns envoy_dynamic_module_type_resource_monitor_update_status_Success. The pressure is the
+ * ratio of the resource usage to its limit. Envoy treats a value above 1 as 1, and a negative or
+ * non-finite value as a failed update.
+ * @return the outcome of the update.
+ */
+envoy_dynamic_module_type_resource_monitor_update_status
+envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
+    double* resource_pressure);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_get_resource_usage is called to get the pressure of the
+ * resource when the module enables synchronous feedback. The load shed points with a trigger on the
+ * resource call it each time they decide whether to shed load, on the thread that makes the
+ * decision, and the overload manager calls it on the main thread at each refresh interval. It runs
+ * concurrently on several threads, so implementations must be thread-safe and must not block.
+ *
+ * This hook is required when the module enables synchronous feedback, and Envoy rejects the
+ * configuration without it. Other modules do not need to implement it.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @return the pressure of the resource, which is the ratio of its usage to its limit. Envoy treats
+ * a negative or NaN pressure as 0, and a pressure above 1 as 1.
+ */
+double envoy_dynamic_module_on_resource_monitor_get_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_resource_monitor_load_accepted is called when the module enables
+ * synchronous feedback and a load shed point with a trigger on the resource decides not to shed
+ * load, on the thread that makes the decision. This lets the module account for the accepted load
+ * right away. It runs concurrently on several threads, so implementations must be thread-safe and
+ * must not block.
+ *
+ * This hook is optional. Modules that do not account for accepted load do not need to implement
+ * it.
+ *
+ * @param config_module_ptr is the pointer to the in-module resource monitor configuration.
+ * @param load_shed_point_name is the name of the load shed point. It is owned by Envoy and valid
+ * only for the duration of this call.
+ */
+void envoy_dynamic_module_on_resource_monitor_load_accepted(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer load_shed_point_name);
+
+// =============================================================================
+// Resource Monitor Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback enables
+ * synchronous feedback for the resource monitor. Envoy then gets the pressure from
+ * envoy_dynamic_module_on_resource_monitor_get_resource_usage instead of
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage, and reports the load that the
+ * load shed points accept to envoy_dynamic_module_on_resource_monitor_load_accepted. See
+ * envoy_dynamic_module_on_resource_monitor_config_destroy for when the destroy hook runs.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_resource_monitor_config_new.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @return true if synchronous feedback is enabled, false if this is not called on the main thread
+ * during envoy_dynamic_module_on_resource_monitor_config_new.
+ */
+bool envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new creates a new resource
+ * monitor configuration scheduler, which reports the outcome of a pending update from any thread,
+ * including the ones managed by the module.
+ *
+ * The caller must delete the scheduler with
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete when it is no longer
+ * needed. See the comment on
+ * envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleResourceMonitorConfig object in Envoy.
+ * @return a pointer to the created scheduler.
+ */
+envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr
+envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(
+    envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage reports
+ * the pressure of the resource for the update that
+ * envoy_dynamic_module_on_resource_monitor_update_resource_usage left pending.
+ *
+ * This can be called from any thread. Envoy applies the report on the main thread to the update
+ * that is pending then, and drops it if no update is pending or the resource monitor is destroyed
+ * or the server shuts down first.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ * @param resource_pressure is the pressure of the resource. Envoy treats a value above 1 as 1, and
+ * a negative or non-finite value as a failed update.
+ */
+void envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage(
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr,
+    double resource_pressure);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure reports that the
+ * update that envoy_dynamic_module_on_resource_monitor_update_resource_usage left pending failed.
+ *
+ * This can be called from any thread. Envoy applies the report on the main thread to the update
+ * that is pending then, and drops it if no update is pending or the resource monitor is destroyed
+ * or the server shuts down first.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete deletes the scheduler
+ * created by envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ *
+ * This can be called from any thread, even after the resource monitor is destroyed.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
+    envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr);
 
 #ifdef __cplusplus
 }

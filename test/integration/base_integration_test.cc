@@ -39,7 +39,6 @@ using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
-using ::testing::Invoke;
 using ::testing::IsSubstring;
 using ::testing::NiceMock;
 using ::testing::ReturnRef;
@@ -74,12 +73,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(
-          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
-                                               std::move(above_overflow));
-          }));
+      .WillByDefault([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                        absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                           std::move(above_overflow));
+      });
   ON_CALL(factory_context_storage_->server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(*factory_context_storage_, statsScope())
       .WillByDefault(ReturnRef(*stats_store_.rootScope()));
@@ -145,6 +143,14 @@ void BaseIntegrationTest::initialize() {
 #endif
 }
 
+Stats::Scope& BaseIntegrationTest::upstreamStatsScope() {
+  if (upstream_stats_store_ == nullptr) {
+    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
+        server_factory_context_.serverScope().symbolTable());
+  }
+  return *upstream_stats_store_->rootScope();
+}
+
 Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -168,7 +174,7 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, server_factory_context_.serverScope());
+        std::move(cfg), context_manager_, upstreamStatsScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -637,10 +643,8 @@ void BaseIntegrationTest::createXdsUpstream() {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
 
-    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
-        server_factory_context_.serverScope().symbolTable());
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
+        std::move(cfg), context_manager_, upstreamStatsScope());
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();

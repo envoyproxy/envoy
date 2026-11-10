@@ -21,12 +21,12 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -61,7 +61,7 @@ makeHandshakeHeader(absl::string_view key, absl::string_view value,
                          Formatter::FormatterImpl::create(value, true, command_parsers).value()};
 }
 
-class RCConnectionWrapperTest : public testing::Test {
+class RCConnectionWrapperTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   void SetUp() override {
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
@@ -71,9 +71,9 @@ protected:
     EXPECT_CALL(thread_local_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     // connect() arms a handshake deadline timer, so hand out a no-op timer unless a test installs
     // its own via the MockTimer(&dispatcher_) pattern.
-    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(Invoke([](Event::TimerCb) -> Event::Timer* {
+    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault([](Event::TimerCb) -> Event::Timer* {
       return new NiceMock<Event::MockTimer>();
-    }));
+    });
     // Set stat prefix to "reverse_connections" for tests.
     config_.set_stat_prefix("reverse_connections");
     // Enable detailed stats for tests that need per-node/cluster stats.
@@ -146,19 +146,9 @@ protected:
 
   void addHostConnectionInfo(const std::string& host_address, const std::string& cluster_name,
                              uint32_t target_count) {
-    io_handle_->host_to_conn_info_map_[host_address] =
-        ReverseConnectionIOHandle::HostConnectionInfo{
-            host_address,
-            cluster_name,
-            {},           // connection_keys - empty set initially
-            target_count, // target_connection_count
-            0,            // failure_count
-            // last_failure_time
-            std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
-            // backoff_until
-            std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
-            {}                                // connection_states
-        };
+    io_handle_->host_to_conn_info_map_.emplace(
+        host_address, ReverseConnectionIOHandle::HostConnectionInfo(host_address, cluster_name,
+                                                                    target_count, dispatcher_));
   }
 
   // Helper to create a mock host.
@@ -180,11 +170,11 @@ protected:
     // Set up IO handle expectations.
     EXPECT_CALL(*mock_io_handle, resetFileEvents()).WillRepeatedly(Return());
     EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*mock_io_handle, duplicate()).WillRepeatedly(Invoke([]() {
+    EXPECT_CALL(*mock_io_handle, duplicate()).WillRepeatedly([]() {
       auto duplicated_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
       EXPECT_CALL(*duplicated_handle, isOpen()).WillRepeatedly(Return(true));
       return duplicated_handle;
-    }));
+    });
 
     // Set up socket expectations.
     EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
@@ -238,12 +228,12 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
 
   // Set up connection info provider expectations directly on the mock connection.
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   // Create a mock host.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -272,19 +262,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithCustomRequestPath) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -315,19 +305,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithAdditionalHeaders) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -362,19 +352,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwrite) 
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -411,19 +401,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersAddIfAbsent
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -464,19 +454,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwriteIf
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -519,19 +509,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeFormatterHeaders) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -570,19 +560,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -670,19 +660,19 @@ TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterIn
   auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   RCConnectionWrapper wrapper(*io_handle, std::move(mock_connection), mock_host, "test-cluster");
@@ -709,19 +699,19 @@ TEST_F(RCConnectionWrapperTest, ConnectIncludesInitiationTimeHeader) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -773,19 +763,19 @@ TEST_F(RCConnectionWrapperTest, ConnectHonorsSuppliedInitiationTime) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -826,19 +816,19 @@ TEST_F(RCConnectionWrapperTest, ConnectIncludesWorkerAndConnectionIdHeaders) {
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
 
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+      .WillOnce([&captured_buffer](Buffer::Instance& buffer, bool) {
         captured_buffer.add(buffer);
         buffer.drain(buffer.length());
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -866,9 +856,9 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
   EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-  EXPECT_CALL(*mock_connection, write(_, _)).WillOnce(Invoke([](Buffer::Instance&, bool) -> void {
+  EXPECT_CALL(*mock_connection, write(_, _)).WillOnce([](Buffer::Instance&, bool) -> void {
     throw EnvoyException("Write failed");
-  }));
+  });
 
   // Set up socket expectations.
   auto mock_address = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
@@ -876,12 +866,12 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
 
   // Set up connection info provider expectations directly on the mock connection.
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_address,
-                              mock_local_address]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_address,
+                       mock_local_address]() -> const Network::ConnectionInfoProvider& {
         static auto mock_provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local_address, mock_address);
         return *mock_provider;
-      }));
+      });
 
   // Create a mock host.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -1496,20 +1486,19 @@ TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
   EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(43));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-  EXPECT_CALL(*mock_connection, write(_, _))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& buffer, bool) {
-        written.append(buffer.toString());
-        buffer.drain(buffer.length());
-      }));
+  EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([&](Buffer::Instance& buffer, bool) {
+    written.append(buffer.toString());
+    buffer.drain(buffer.length());
+  });
 
   auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
   auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
         static auto provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
         return *provider;
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
@@ -1531,19 +1520,19 @@ TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
   // Allow writes made by the HTTP/1 encoder and drain them to simulate kernel behavior.
-  EXPECT_CALL(*mock_connection, write(_, _))
-      .WillRepeatedly(
-          Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
+  EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([](Buffer::Instance& buffer, bool) {
+    buffer.drain(buffer.length());
+  });
 
   // Provide connection info provider.
   auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
   auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
         static auto provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
         return *provider;
-      }));
+      });
 
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -1568,19 +1557,19 @@ TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispa
   EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-  EXPECT_CALL(*mock_connection, write(_, _))
-      .WillRepeatedly(
-          Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
+  EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([](Buffer::Instance& buffer, bool) {
+    buffer.drain(buffer.length());
+  });
   EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
   auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
   auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
         static auto provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
         return *provider;
-      }));
+      });
 
   addHostConnectionInfo("10.0.0.1:80", "test-cluster", 1);
 
@@ -1664,18 +1653,18 @@ TEST_F(RCConnectionWrapperTest, LocalCloseFailsHandshake) {
   EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(7));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
-  EXPECT_CALL(*mock_connection, write(_, _))
-      .WillRepeatedly(
-          Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
+  EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([](Buffer::Instance& buffer, bool) {
+    buffer.drain(buffer.length());
+  });
 
   auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
   auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
   EXPECT_CALL(*mock_connection, connectionInfoProvider())
-      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+      .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
         static auto provider =
             std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
         return *provider;
-      }));
+      });
 
   addHostConnectionInfo("10.0.0.1:80", "test-cluster", 1);
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();

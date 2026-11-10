@@ -69,10 +69,9 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "lua_integration_test",
-    size = "large",
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "linux_x64_large",
+    shard_count = 4,
     deps = [
         ":lua_test_filter_proto_cc_proto",
         "//source/common/protobuf:utility_lib",

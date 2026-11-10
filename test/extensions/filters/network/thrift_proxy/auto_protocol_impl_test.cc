@@ -387,9 +387,9 @@ TEST_F(AutoProtocolTest, ProtocolUpgradeDelegation) {
     NiceMock<MockDecoderEventHandler> handler;
     DirectResponse* response = new NiceMock<MockDirectResponse>();
     EXPECT_CALL(*proto, upgradeResponse(Ref(handler)))
-        .WillOnce(Invoke([&](const DecoderEventHandler&) -> DirectResponsePtr {
+        .WillOnce([&](const DecoderEventHandler&) -> DirectResponsePtr {
           return DirectResponsePtr{response};
-        }));
+        });
     EXPECT_EQ(response, auto_proto.upgradeResponse(handler).get());
   }
 
@@ -400,10 +400,9 @@ TEST_F(AutoProtocolTest, ProtocolUpgradeDelegation) {
     Buffer::OwnedImpl buffer;
     ThriftObject* obj = new NiceMock<MockThriftObject>();
     EXPECT_CALL(*proto, attemptUpgrade(Ref(transport), Ref(state), Ref(buffer)))
-        .WillOnce(
-            Invoke([&](Transport&, ThriftConnectionState&, Buffer::Instance&) -> ThriftObjectPtr {
-              return ThriftObjectPtr{obj};
-            }));
+        .WillOnce([&](Transport&, ThriftConnectionState&, Buffer::Instance&) -> ThriftObjectPtr {
+          return ThriftObjectPtr{obj};
+        });
     EXPECT_EQ(obj, auto_proto.attemptUpgrade(transport, state, buffer).get());
   }
 

@@ -64,6 +64,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/dynamic_modules:abi_impl",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],

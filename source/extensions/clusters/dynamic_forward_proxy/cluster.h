@@ -242,7 +242,7 @@ private:
   absl::Status
   addOrUpdateHost(absl::string_view host,
                   const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-                  Upstream::HostVector& hosts_added, Upstream::HostVector& hosts_removed)
+                  std::unique_ptr<Upstream::HostVector>& hosts_added)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

@@ -117,7 +117,12 @@ void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& na
       response.add("<script>\n");
     }
     response.add("renderHistogram(histogramDiv, supportedPercentiles,\n");
-    {
+    // JSON sanitization does not escape '<', so a stat name containing
+    // "</script>" would terminate this inline script.
+    if (Html::Utility::requiresSanitization(name) && sanitize_html_stats_names_) {
+      StatsJsonRender::generateHistogramDetail(Html::Utility::sanitize(name), histogram,
+                                               *streamer.makeRootMap());
+    } else {
       StatsJsonRender::generateHistogramDetail(name, histogram, *streamer.makeRootMap());
     }
     response.add(");\n</script>\n");

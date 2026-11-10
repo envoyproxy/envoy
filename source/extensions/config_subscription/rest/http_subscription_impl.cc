@@ -34,7 +34,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
       dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout),
       validation_visitor_(validation_visitor) {
   request_.mutable_node()->CopyFrom(local_info.node());
-  request_.set_type_url(std::string(type_url));
+  request_.set_type_url(type_url);
   ASSERT(service_method.options().HasExtension(google::api::http));
   const auto& http_rule = service_method.options().GetExtension(google::api::http);
   path_ = http_rule.post();

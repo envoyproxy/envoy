@@ -2241,5 +2241,63 @@ public:
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(RuntimeValuesConfigFactory, "runtime_values");
 
+// -----------------------------------------------------------------------------
+// LoadShedPoint
+// -----------------------------------------------------------------------------
+
+// Sends a local reply when the load shed point named in the filter config sheds the request.
+// Otherwise it tells the upstream in a request header whether it got the load shed point.
+class LoadShedPointFilter : public HttpFilter {
+public:
+  LoadShedPointFilter(HttpFilterHandle& handle, bool has_load_shed_point, bool shed_load)
+      : handle_(handle), has_load_shed_point_(has_load_shed_point), shed_load_(shed_load) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
+    if (!shed_load_) {
+      headers.set("x-load-shed-point", has_load_shed_point_ ? "present" : "absent");
+      return HeadersStatus::Continue;
+    }
+    handle_.sendLocalResponse(503, {}, "shed", "");
+    return HeadersStatus::StopAllAndBuffer;
+  }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  const bool has_load_shed_point_;
+  const bool shed_load_;
+};
+
+class LoadShedPointFilterFactory : public HttpFilterFactory {
+public:
+  explicit LoadShedPointFilterFactory(std::unique_ptr<LoadShedPoint> load_shed_point)
+      : load_shed_point_(std::move(load_shed_point)) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<LoadShedPointFilter>(handle, load_shed_point_ != nullptr,
+                                                 load_shed_point_ != nullptr &&
+                                                     load_shed_point_->shouldShedLoad());
+  }
+
+private:
+  const std::unique_ptr<LoadShedPoint> load_shed_point_;
+};
+
+class LoadShedPointConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    return std::make_unique<LoadShedPointFilterFactory>(handle.getLoadShedPoint(config_view));
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(LoadShedPointConfigFactory, "load_shed_point");
+
 } // namespace DynamicModules
 } // namespace Envoy

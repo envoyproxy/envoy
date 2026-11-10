@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -84,10 +85,28 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
-      fill_interval_(fill_interval), shadow_mode_(shadow_mode) {}
-bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
+      fill_interval_(fill_interval), shadow_mode_(shadow_mode),
+      preserve_one_request_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request")) {}
+bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume, bool overdraft) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
-  auto cb = [tokens = to_consume / factor](double total) { return total < tokens ? 0.0 : tokens; };
+  const double max_tokens = token_bucket_.maxTokens();
+  const double tokens = to_consume / factor;
+  // Sharing can make the cost of a request larger than the bucket. If the request fits in the
+  // bucket without sharing, admit it when the bucket holds max_tokens, but still consume the full
+  // shared cost. The bucket goes below zero and the next request waits for the refill, so the
+  // aggregate rate across the local cluster stays at the configured rate.
+  const double threshold = preserve_one_request_ && max_tokens > 0 && to_consume <= max_tokens
+                               ? std::min(tokens, max_tokens)
+                               : tokens;
+  auto cb = [tokens, threshold, overdraft, max_tokens](double total) {
+    if (overdraft) {
+      // Borrow future tokens when the bucket is short, but by at most max_tokens, so a single
+      // large cost can't block the bucket indefinitely.
+      return std::max(0.0, std::min(tokens, total + max_tokens));
+    }
+    return total >= threshold ? tokens : 0.0;
+  };
   return token_bucket_.consume(cb) != 0.0;
 }
 
@@ -181,6 +200,29 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
 
 LocalRateLimiterImpl::~LocalRateLimiterImpl() = default;
 
+RateLimitTokenBucketSharedPtr
+LocalRateLimiterImpl::getBucket(const RateLimit::Descriptor& descriptor) {
+  auto iter = descriptors_.find(descriptor);
+  return iter != descriptors_.end() ? iter->second : dynamic_descriptors_.getBucket(descriptor);
+}
+
+void LocalRateLimiterImpl::consumeDescriptors(
+    absl::Span<const RateLimit::Descriptor> request_descriptors) {
+  const double share_factor =
+      share_provider_ != nullptr ? share_provider_->getTokensShareFactor() : 1.0;
+  for (const auto& descriptor : request_descriptors) {
+    auto bucket = getBucket(descriptor);
+    if (bucket == nullptr) {
+      continue;
+    }
+    if (descriptor.is_negative_hits_ && descriptor.hits_addend_.has_value()) {
+      bucket->refill(descriptor.hits_addend_.value());
+    } else {
+      bucket->consume(share_factor, descriptor.hits_addend_.value_or(1), /*overdraft=*/true);
+    }
+  }
+}
+
 struct MatchResult {
   RateLimitTokenBucketSharedPtr token_bucket;
   std::reference_wrapper<const RateLimit::Descriptor> request_descriptor;
@@ -195,14 +237,9 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
 
   // Find all matched descriptors.
   for (const auto& request_descriptor : request_descriptors) {
-    auto iter = descriptors_.find(request_descriptor);
-    if (iter != descriptors_.end()) {
-      matched_results.push_back(MatchResult{iter->second, request_descriptor});
-    } else {
-      auto token_bucket = dynamic_descriptors_.getBucket(request_descriptor);
-      if (token_bucket != nullptr) {
-        matched_results.push_back(MatchResult{token_bucket, request_descriptor});
-      }
+    auto token_bucket = getBucket(request_descriptor);
+    if (token_bucket != nullptr) {
+      matched_results.push_back(MatchResult{std::move(token_bucket), request_descriptor});
     }
   }
 
@@ -333,9 +370,9 @@ void DynamicDescriptorMap::addDescriptor(const RateLimit::LocalDescriptor& confi
 }
 
 RateLimitTokenBucketSharedPtr
-DynamicDescriptorMap::getBucket(const RateLimit::Descriptor request_descriptor) {
+DynamicDescriptorMap::getBucket(const RateLimit::Descriptor& request_descriptor) {
   for (const auto& pair : config_descriptors_) {
-    auto config_descriptor = pair.first;
+    const auto& config_descriptor = pair.first;
     if (!matchDescriptorEntries(request_descriptor.entries_, config_descriptor.entries_)) {
       continue;
     }

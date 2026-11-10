@@ -136,11 +136,10 @@ TEST_F(NetworkConfigurationFilterTest, HostnameProxyConfig) {
   EXPECT_CALL(*connectivity_manager_, getProxySettings()).WillOnce(Return(proxy_settings_));
   EXPECT_CALL(decoder_callbacks_.stream_info_, filterState());
   EXPECT_CALL(*dns_cache_, loadDnsCacheEntry_(Eq("localhost"), 82, false, _))
-      .WillOnce(
-          Invoke([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
-            return MockDnsCache::MockLoadDnsCacheEntryResult{
-                DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr, host_info_};
-          }));
+      .WillOnce([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
+        return MockDnsCache::MockLoadDnsCacheEntryResult{DnsCache::LoadDnsCacheEntryStatus::InCache,
+                                                         nullptr, host_info_};
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_.decodeHeaders(default_request_headers_, false));
 }
@@ -170,11 +169,10 @@ TEST_F(NetworkConfigurationFilterTest, AsyncDnsLookupSuccess) {
       new NiceMock<Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle>();
   EXPECT_CALL(*handle, onDestroy());
   EXPECT_CALL(*dns_cache_, loadDnsCacheEntry_(Eq("localhost"), 82, false, _))
-      .WillOnce(
-          Invoke([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
-            return MockDnsCache::MockLoadDnsCacheEntryResult{
-                DnsCache::LoadDnsCacheEntryStatus::Loading, handle, std::nullopt};
-          }));
+      .WillOnce([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
+        return MockDnsCache::MockLoadDnsCacheEntryResult{DnsCache::LoadDnsCacheEntryStatus::Loading,
+                                                         handle, std::nullopt};
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_.decodeHeaders(default_request_headers_, false));
 
@@ -276,11 +274,10 @@ TEST_F(NetworkConfigurationFilterProxyResolverApiTest, ProxyWithHostConfigured) 
       });
   EXPECT_CALL(decoder_callbacks_.stream_info_, filterState());
   EXPECT_CALL(*dns_cache_, loadDnsCacheEntry_(Eq("foo.com"), 8080, false, _))
-      .WillOnce(
-          Invoke([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
-            return MockDnsCache::MockLoadDnsCacheEntryResult{
-                DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr, host_info_};
-          }));
+      .WillOnce([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
+        return MockDnsCache::MockLoadDnsCacheEntryResult{DnsCache::LoadDnsCacheEntryStatus::InCache,
+                                                         nullptr, host_info_};
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_.decodeHeaders(default_request_headers_, false));
 }

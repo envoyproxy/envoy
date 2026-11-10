@@ -11,6 +11,8 @@
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -54,8 +56,8 @@ Factory::createExtension(const Protobuf::Message& message,
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
           server_context, mutation_name, Extensions::DynamicModules::ConfigInitErrorStat);
-      throw EnvoyException("Failed to parse early header mutation config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(absl::StrCat("Failed to parse early header mutation config: ",
+                                        config_or_error.status().message()));
     }
     mutation_config = std::move(config_or_error.value());
   }
@@ -68,8 +70,8 @@ Factory::createExtension(const Protobuf::Message& message,
                                        ? Extensions::DynamicModules::ModuleLoadErrorStat
                                        : Extensions::DynamicModules::ConfigInitErrorStat;
     Extensions::DynamicModules::incrementLoadFailure(server_context, mutation_name, leaf);
-    throw EnvoyException("Failed to create early header mutation config: " +
-                         std::string(extension.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to create early header mutation config: ",
+                                      extension.status().message()));
   }
 
   return std::move(extension.value());

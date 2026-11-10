@@ -354,6 +354,22 @@ envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
 }
 
 // -----------------------------------------------------------------------------
+// Load Shed Point ABI Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name) {
+  auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  if (!config->load_shed_point_provider_.has_value()) {
+    return nullptr;
+  }
+  return config->load_shed_point_provider_->getLoadShedPoint(
+      absl::string_view(name.ptr, name.length));
+}
+
+// -----------------------------------------------------------------------------
 // Misc ABI Callbacks
 // -----------------------------------------------------------------------------
 

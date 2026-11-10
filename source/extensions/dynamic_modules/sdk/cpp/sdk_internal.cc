@@ -874,6 +874,10 @@ public:
     envoy_dynamic_module_callback_http_filter_send_go_away_and_close(host_plugin_ptr_, graceful);
   }
 
+  void drainConnectionUponCompletion() override {
+    envoy_dynamic_module_callback_http_drain_connection_upon_completion(host_plugin_ptr_);
+  }
+
   bool recreateStream(std::span<const HeaderView> headers) override {
     return envoy_dynamic_module_callback_http_filter_recreate_stream(
         host_plugin_ptr_,
@@ -1203,6 +1207,11 @@ public:
       return std::string_view{};
     }
     return value.toStringView();
+  }
+
+  std::unique_ptr<LoadShedPoint> getLoadShedPoint(std::string_view name) override {
+    return newLoadShedPoint(envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+        host_config_ptr_, envoy_dynamic_module_type_module_buffer{name.data(), name.size()}));
   }
 
   bool logEnabled(LogLevel level) override {

@@ -324,14 +324,13 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
 
   // Tear down by closing the upstream connection.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  if (downstream_protocol_ == Http::CodecType::HTTP3) {
-    // In HTTP/3 end stream will be sent when the upstream connection is closed, and
-    // STOP_SENDING frame sent instead of reset.
-    ASSERT_TRUE(response_->waitForEndStream());
-  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
-    ASSERT_TRUE(response_->waitForAnyTermination());
-  } else {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    // The upstream close arrives as an end of stream; the client then ends its side.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_FALSE(response_->reset());
+    codec_client_->sendData(*request_encoder_, "", true);
   }
   const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
   const int expected_wire_bytes_received = 6; // Upstream sends "there!".
@@ -343,14 +342,36 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
-  // When allow_multiplexed_upstream_half_close is enabled router and filter
-  // manager do not reset streams where upstream ended before downstream.
-  // Verify that stream with TCP proxy upstream is closed as soon as the upstream TCP
-  // connection is half closed even if the allow_multiplexed_upstream_half_close is enabled.
-  // In this case the stream is reset in the TcpUpstream::onUpstreamData
+// The upstream half close reaches the client as an end of stream with all data, and the client can
+// still send upstream.
+TEST_P(ConnectTerminationIntegrationTest, UpstreamHalfCloseKeepsTunnelOpen) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    // HTTP/1 has no per stream half close.
+    return;
+  }
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Queue payload the client has not read yet, then half close from the upstream side.
+  const std::string payload(64 * 1024, 'a');
+  ASSERT_TRUE(fake_raw_upstream_connection_->write(payload, /*end_stream=*/true));
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_FALSE(response_->reset());
+  EXPECT_EQ(absl::StrCat("there!", payload), response_->body());
+
+  codec_client_->sendData(*request_encoder_, "still here", true);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch("still here")));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseDisabled) {
+  // Without independent half close, the upstream half close resets the stream.
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+      "envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close", "false");
   initialize();
 
   setUpConnection();
@@ -378,7 +399,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
 }
 
 // Verify that upstream RST through tunneled CONNECT propagates as downstream RST
-// (default behavior with both guards enabled).
+// with the default reset propagation behavior.
 TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
   enableHalfClose(false);
   initialize();
@@ -396,32 +417,6 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
   } else {
     ASSERT_TRUE(response_->waitForAnyTermination());
   }
-}
-
-// Verify that upstream RST through tunneled CONNECT does NOT propagate as downstream RST
-// when the HTTP guard is explicitly disabled.
-TEST_P(ConnectTerminationIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.map_http_stream_reset_to_tcp_rst",
-                                    "false");
-  useAccessLog("%UPSTREAM_DETECTED_CLOSE_TYPE%");
-  initialize();
-
-  setUpConnection();
-  sendBidirectionalData();
-
-  // Upstream sends RST.
-  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
-  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
-
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response_->waitForAnyTermination());
-  }
-
-  // With HTTP guard disabled, close type should not be RemoteReset.
-  auto log_result = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log_result, testing::Ne("RemoteReset"));
 }
 
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {

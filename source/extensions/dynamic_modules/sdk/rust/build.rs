@@ -142,14 +142,25 @@ macro_rules! __export_name_impl {{
     })
     .derive_partialeq(true)
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-    .parse_callbacks(Box::new(TrimEnumNameFromVariantName));
+    .parse_callbacks(Box::new(TrimEnumNameFromVariantName))
+    .parse_callbacks(Box::new(StrumDerivesForResponseFlag));
 
-  // A dynamic module DLL imports the Envoy callbacks from the Envoy executable. A static module
-  // (non-empty prefix) is linked into the Envoy binary itself, where the callbacks are defined
-  // directly, so the import stubs would collide with those definitions.
+  // Set when building the SDK for a dynamic module DLL on Windows. See src/windows_delay_load.rs.
+  println!("cargo:rustc-check-cfg=cfg(envoy_dynamic_module_dll)");
+
+  // A dynamic module DLL imports the Envoy callbacks from `envoy.dll`, which
+  // src/windows_delay_load.rs redirects to the host executable at runtime. This requires the DLL to
+  // be linked with `/DELAYLOAD:envoy.dll`. A static module (non-empty prefix) is linked into the
+  // Envoy binary itself, where the callbacks are defined directly, so the import stubs would
+  // collide with those definitions. Only the Envoy ABI items are generated, since every function
+  // declared in the system headers that abi.h includes, such as the CRT's __security_init_cookie,
+  // would otherwise be imported from `envoy.dll` too.
   #[cfg(target_os = "windows")]
   let bindings = if prefix.is_empty() {
-    bindings.extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]")
+    println!("cargo:rustc-cfg=envoy_dynamic_module_dll");
+    bindings
+      .allowlist_item("envoy_.*")
+      .extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]")
   } else {
     bindings
   };
@@ -184,5 +195,24 @@ impl bindgen::callbacks::ParseCallbacks for TrimEnumNameFromVariantName {
       None => original_variant_name,
     };
     Some(variant_name.to_string())
+  }
+}
+
+#[derive(Debug)]
+// Derives strum_macros::{FromRepr,VariantArray} for envoy_dynamic_module_type_response_flag:
+// FromRepr gives a bit-index -> flag lookup and VariantArray gives Self::VARIANTS, both generated
+// from the bindgen-derived enum definition itself to prevent version skew issues.
+struct StrumDerivesForResponseFlag;
+
+impl bindgen::callbacks::ParseCallbacks for StrumDerivesForResponseFlag {
+  fn add_derives(&self, info: &bindgen::callbacks::DeriveInfo<'_>) -> Vec<String> {
+    if info.name == "envoy_dynamic_module_type_response_flag" {
+      vec![
+        "strum_macros::FromRepr".to_string(),
+        "strum_macros::VariantArray".to_string(),
+      ]
+    } else {
+      vec![]
+    }
   }
 }
