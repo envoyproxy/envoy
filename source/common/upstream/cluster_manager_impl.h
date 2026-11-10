@@ -955,6 +955,9 @@ private:
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
+  // Cancels the merged updates scheduled for delivery for all priorities of the cluster, and
+  // returns the priorities whose updates were cancelled so that the caller can deliver them.
+  std::vector<uint32_t> cancelPendingMergedUpdates(ClusterManagerCluster& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs(const Matchers::StringMatcher& name_matcher);
   static ClusterManagerStats generateStats(Stats::Scope& scope);
   static OdCdsDiscoveryStats generateOdCdsDiscoveryStats(Stats::Scope& scope);
