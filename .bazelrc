@@ -32,6 +32,9 @@ common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/41
 # common --lockfile_mode=off
 
 build --jobs=HOST_CPUS-1
+# Bazel caps concurrent remote action (Merkle tree) building at the local CPU count; with
+# --jobs=200 on a 4 vCPU CI runner that queue was the bulk of the post-analysis time.
+build --experimental_throttle_remote_action_building=false
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
 # silence absl logspam.
