@@ -44,8 +44,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "abi_impl_test",
-    size = "large",
     srcs = ["abi_impl_test.cc"],
+    # ~780 cases, most of them death tests that each re-exec the binary: ~13 minutes serially
+    # under asan on a single-core worker.
+    shard_count = 8,
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//test/mocks/server:server_factory_context_mocks",
