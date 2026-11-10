@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
