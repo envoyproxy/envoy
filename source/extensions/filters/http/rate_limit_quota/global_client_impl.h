@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
@@ -87,8 +88,8 @@ public:
   // Functions needed by LocalRateLimitClientImpl to make unsafe modifications
   // to global resources. All are non-blocking & safely callable by worker
   // threads and make unsafe changes by ensuring that all such changes are done
-  // by the main thread. Pointer swaps to TLS make the resources readable to
-  // worker threads' LocalRateLimitClientImpl instances.
+  // by the main thread. Each change is then applied to every worker's own BucketsCache
+  // (applyToTLS), which is what the workers' LocalRateLimitClientImpl instances read.
   void createBucket(const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
                     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                     std::chrono::milliseconds fallback_ttl, bool initial_request_allowed);
@@ -107,14 +108,19 @@ private:
   RateLimitQuotaUsageReports buildReports(std::shared_ptr<CachedBucket> cached_bucket);
 
   // Helpers to write to TLS.
-  // Copy source-of-truth BucketsCache & pointer-swap/write to TLS.
-  inline void writeBucketsToTLS() {
-    auto tl_buckets_cache =
-        std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>(buckets_cache_));
-    buckets_tls_.set([tl_buckets_cache]([[maybe_unused]] Envoy::Event::Dispatcher& dispatcher) {
-      return tl_buckets_cache;
-    });
-    ENVOY_LOG(debug, "RLQS buckets cache written to TLS.");
+  // Each thread owns its own BucketsCache (see initTlsStore),
+  // so changes are applied entry by entry on every thread.
+  // Copying the whole source-of-truth map into TLS on every change made creating N buckets O(N^2):
+  // createBucketImpl copied the full buckets_cache_ via writeBucketsToTLS for each new bucket.
+  struct TlsUpdate {
+    std::vector<std::pair<size_t, std::shared_ptr<CachedBucket>>> upserts;
+    std::vector<size_t> erasures;
+  };
+  void applyToTLS(TlsUpdate update);
+  inline void writeBucketToTLS(size_t id, std::shared_ptr<CachedBucket> bucket) {
+    TlsUpdate update;
+    update.upserts.emplace_back(id, std::move(bucket));
+    applyToTLS(std::move(update));
   }
 
   // Helpers to execute in the main thread, triggered by public interfaces or by
@@ -172,7 +178,8 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls_;
 
   // Source-of-truth for the quota bucket cache. All changes to the
-  // source-of-truth should be CachedBucket pointer swaps.
+  // source-of-truth should be CachedBucket pointer swaps,
+  // each mirrored to the per-thread caches with writeBucketToTLS or applyToTLS.
   BucketsCache buckets_cache_;
 
   std::chrono::milliseconds send_reports_interval_;

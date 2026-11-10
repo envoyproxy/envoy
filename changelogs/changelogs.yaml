@@ -202,6 +202,8 @@ areas:
   quic:
     title: quic
 
+  rate_limit_quota:
+    title: rate_limit_quota
   ratelimit:
     title: ratelimit
   ratelimit_descriptors:

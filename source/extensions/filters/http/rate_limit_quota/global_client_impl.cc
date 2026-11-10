@@ -22,6 +22,7 @@
 #include "envoy/type/v3/ratelimit_strategy.pb.h"
 #include "envoy/type/v3/token_bucket.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -198,11 +199,11 @@ void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size
     return;
   }
 
-  // Create new bucket and add it into the source-of-truth then pointer-swap
-  // with the BucketsCache already in TLS. Start the QuotaUsage at 1
-  // request to count the request that was allowed/denied before calling to
-  // CreateBucket. Default the bucket's action assignment to the configured
-  // no_assignment_behavior.
+  // Create new bucket, add it into the source-of-truth
+  // and push that one entry to every worker's BucketsCache.
+  // Start the QuotaUsage at 1 request to count the request that was allowed/denied
+  // before calling to CreateBucket.
+  // Default the bucket's action assignment to the configured no_assignment_behavior.
   std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
       time_source_.monotonicTime().time_since_epoch());
 
@@ -216,7 +217,7 @@ void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size
   RateLimitQuotaUsageReports initial_report = buildReports(buckets_cache_[id]);
   sendUsageReportImpl(initial_report);
 
-  writeBucketsToTLS();
+  writeBucketToTLS(id, buckets_cache_[id]);
   if (callbacks_ != nullptr) {
     callbacks_->onBucketCreated(buckets_cache_[id]->bucket_id, id);
   }
@@ -290,6 +291,8 @@ bool shouldReplaceTokenBucket(const CachedBucket* cached_bucket,
 
 void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse* response) {
   ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
+  // All changes from one response reach the workers in a single TLS update.
+  TlsUpdate tls_update;
   for (const auto& action : response->bucket_action()) {
     if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
       ENVOY_LOG(error,
@@ -335,16 +338,20 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
       case RateLimitStrategy::kTokenBucket:
         // Only create a new TokenBucket if the configuration is new or
         // different from the cache.)
+        // Both log lines below are at debug level on purpose:
+        // each is emitted once per bucket in every RLQS response, i.e. once per active user
+        // with per-user buckets. At info level that is 100k lines per response at 100k users,
+        // which drowns the log and spends main-thread time in the response handler.
         if (shouldReplaceTokenBucket(cached_bucket.get(), rate_limit_strategy)) {
           bucket->token_bucket_limiter = createTokenBucketFromAction(
               rate_limit_strategy, time_source_, cached_bucket->token_bucket_limiter.get());
-          ENVOY_LOG(info,
+          ENVOY_LOG(debug,
                     "A new TokenBucket has been configured by the RLQS "
                     "filter for id: {}",
                     bucket_id);
         } else {
           bucket->token_bucket_limiter = cached_bucket->token_bucket_limiter;
-          ENVOY_LOG(info,
+          ENVOY_LOG(debug,
                     "The TokenBucket for id: {} is carried over during "
                     "response processing as the assignment hasn't changed.",
                     bucket_id);
@@ -360,18 +367,20 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
       }
     } else if (action.has_abandon_action()) {
       buckets_cache_.erase(bucket_id);
+      tls_update.erasures.push_back(bucket_id);
       ENVOY_LOG(debug, "Cached bucket wiped by abandon action for bucket id: {}.", bucket_id);
       continue;
     }
 
     // Set the source of truth to the new bucket.
     buckets_cache_[bucket_id] = bucket;
+    tls_update.upserts.emplace_back(bucket_id, bucket);
 
     // Start the expiration timer for the newly set action based on the its TTL.
     startActionExpirationTimer(bucket.get(), bucket_id);
   }
   // Push updates to TLS.
-  writeBucketsToTLS();
+  applyToTLS(std::move(tls_update));
   if (callbacks_ != nullptr) {
     callbacks_->onQuotaResponseProcessed();
   }
@@ -469,7 +478,7 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
         /*default_action=*/cached_bucket->default_action,
         /*token_bucket_limiter=*/nullptr);
     // Write new bucket to TLS.
-    writeBucketsToTLS();
+    writeBucketToTLS(id, buckets_cache_[id]);
     return;
   }
 
@@ -513,7 +522,7 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
   // Start the fallback ttl timer for the new bucket.
   startFallbackExpirationTimer(new_bucket.get(), id);
   // Write new bucket to TLS.
-  writeBucketsToTLS();
+  writeBucketToTLS(id, new_bucket);
 }
 
 // Start a timer for the duration of the fallback action's TTL.
@@ -551,7 +560,35 @@ void GlobalRateLimitClientImpl::onFallbackExpirationTimer(CachedBucket* bucket, 
       /*default_action=*/cached_bucket->default_action,
       /*token_bucket_limiter=*/nullptr);
   // Write new bucket to TLS.
-  writeBucketsToTLS();
+  writeBucketToTLS(id, buckets_cache_[id]);
+}
+
+void GlobalRateLimitClientImpl::applyToTLS(TlsUpdate update) {
+  // The integration tests wait for this line after every response, also one that changed nothing,
+  // so it keeps its first sentence and is logged before the empty-update check.
+  ENVOY_LOG(debug, "RLQS buckets cache written to TLS. Upserts: {}, erasures: {}.",
+            update.upserts.size(), update.erasures.size());
+  if (update.upserts.empty() && update.erasures.empty()) {
+    return;
+  }
+  // The callback is copied once per thread, so the batch is shared, not copied.
+  auto shared_update = std::make_shared<const TlsUpdate>(std::move(update));
+  buckets_tls_.runOnAllThreads([shared_update](OptRef<ThreadLocalBucketsCache> tl_cache) {
+    ASSERT(tl_cache.has_value());
+    BucketsCache& buckets = *tl_cache->quota_buckets_;
+    // The new entries must be written before the erasures:
+    // a response that assigns a bucket and then abandons it puts that id into both lists,
+    // and the erasure has to win.
+    // The opposite order never reaches the batch:
+    // an abandoned bucket leaves buckets_cache_ at once,
+    // so a later action on it in the same response is dropped as unknown (see onQuotaResponseImpl).
+    for (const auto& [id, bucket] : shared_update->upserts) {
+      buckets[id] = bucket;
+    }
+    for (size_t id : shared_update->erasures) {
+      buckets.erase(id);
+    }
+  });
 }
 
 } // namespace RateLimitQuota
