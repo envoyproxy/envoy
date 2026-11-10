@@ -27,7 +27,7 @@ on:
         type: string
         default: ''
       ref:
-        description: 'Ref to test: sha, branch, tag or refs/pull/N/head (default: this branch)'
+        description: 'Ref to test: full sha, branch, tag or refs/pull/N/head (default: this branch)'
         type: string
         default: ''
       repository:
