@@ -657,9 +657,9 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
   EXPECT_TRUE(durations("route_discovery_duration").empty());
   EXPECT_FALSE(hasField("route_status"));
   EXPECT_FALSE(hasField("host"));
-  // Destroying the stream afterwards must not report a cancellation either.
-  // The same order as a real stream: the access logs run in between.
+  // Ending the stream afterwards must not report a cancellation either.
   filter_->onStreamComplete();
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   filter_->onDestroy();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
 }
@@ -667,9 +667,9 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
 TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
   setupWithStats(false);
   startRouteDiscovery();
-  // The same order as a real stream: the access logs run in between.
+  // A real stream runs onStreamComplete(), then the access logs, then onDestroy(). The logs read
+  // the filter state, so the cancellation must already be there before onDestroy().
   filter_->onStreamComplete();
-  filter_->onDestroy();
   EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, counter("route_discovery_found"));
   EXPECT_EQ(0UL, counter("route_discovery_not_found"));
@@ -677,6 +677,12 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
   EXPECT_TRUE(durations("route_discovery_duration").empty());
   expectField("route_status", "cancelled");
   EXPECT_FALSE(hasField("route_discovery_duration_us"));
+
+  // onDestroy() changes nothing, and does not count the cancellation a second time.
+  filter_->onDestroy();
+  EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  expectField("route_status", "cancelled");
 }
 
 // Once the discovery completed, destroying the (recreated) stream is not a cancellation.
@@ -685,11 +691,13 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotCancelledAfterCompletion) {
   auto callback = startRouteDiscovery();
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   (*callback)(true);
-  // The same order as a real stream: the access logs run in between.
+  // The logs run between the two, and see the outcome of the finished discovery.
   filter_->onStreamComplete();
-  filter_->onDestroy();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  expectField("route_status", "found");
+  filter_->onDestroy();
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   expectField("route_status", "found");
 }
 
@@ -745,9 +753,8 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) {
   setupWithStats(true);
   startClusterDiscovery();
-  // The same order as a real stream: the access logs run in between.
+  // As above: the access logs read the filter state between onStreamComplete() and onDestroy().
   filter_->onStreamComplete();
-  filter_->onDestroy();
   EXPECT_EQ(1UL, counter("cluster_discovery_cancelled"));
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));
   EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
@@ -756,6 +763,11 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) 
   EXPECT_TRUE(durations("cluster_discovery_duration").empty());
   expectField("cluster_status", "cancelled");
   EXPECT_FALSE(hasField("cluster_discovery_duration_us"));
+
+  filter_->onDestroy();
+  EXPECT_EQ(1UL, counter("cluster_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
+  expectField("cluster_status", "cancelled");
 }
 
 // A route that is already known and a cluster that already exists trigger no discovery at all.
