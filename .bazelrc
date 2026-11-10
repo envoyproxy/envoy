@@ -204,7 +204,7 @@ build:coverage --strategy=TestRunner=remote,sandboxed,local
 build:coverage --strategy=CoverageReport=local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
-build:coverage --experimental_split_coverage_postprocessing
+build:coverage --noexperimental_split_coverage_postprocessing
 build:coverage --experimental_fetch_all_coverage_outputs
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
@@ -218,13 +218,10 @@ build:coverage --define=dynamic_link_tests=false
 # Use custom report generator that also generates HTML
 build:coverage --coverage_report_generator=@envoy//tools/coverage:report
 build:coverage --coverage_output_generator=@envoy_toolshed//coverage:lcov_merger
-# TESTING: toolshed llvm wrappers: small lcov at export, counters-only raw profiles.
+# TESTING: toolshed llvm-cov wrapper (small export) + no split postprocessing (the merger
+# removes the coverage directory's intermediates inside the test action).
 build:coverage --coverage_support=@envoy_toolshed//coverage:llvm_support
 build:coverage --test_env=LLVM_COV=external/envoy_toolshed+/coverage/llvm/llvm-cov.sh
-build:coverage --test_env=LLVM_PROFDATA=external/envoy_toolshed+/coverage/llvm/llvm-profdata.sh
-build:coverage --copt=-mllvm
-build:coverage --copt=-profile-correlate=binary
-build:coverage --test_env=LLVM_PROFILE_CORRELATE=binary
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
