@@ -948,6 +948,7 @@ mapping_func_filegroup(
         "X509_VERIFY_PARAM_get_flags",
         "X509_VERIFY_PARAM_set_depth",
         "X509_VERIFY_PARAM_set_flags",
+        "X509_VERIFY_PARAM_set_time",
         "X509_VERIFY_PARAM_set_time_posix",
         "X509_VERIFY_PARAM_set1",
         "X509_verify",
