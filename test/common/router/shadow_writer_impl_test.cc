@@ -61,7 +61,7 @@ public:
   void holdContext(Http::MockAsyncClientRequest& request,
                    const Http::AsyncClient::RequestOptions& options) {
     context_ = options.context_;
-    ON_CALL(request, context()).WillByDefault(Return(makeOptRefFromPtr(context_.get())));
+    EXPECT_CALL(request, context()).WillRepeatedly(Return(makeOptRefFromPtr(context_.get())));
   }
   void destroyRequest() { context_.reset(); }
 
