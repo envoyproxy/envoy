@@ -1,7 +1,7 @@
-#include <cstdint>
-
 #include <openssl/ssl.h>
 #include <ossl.h>
+
+#include <cstdint>
 
 #include "iana_2_ossl_names.h"
 #include "ssl_compliance_policy.h"
