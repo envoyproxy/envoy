@@ -139,7 +139,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     return;
   }
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
-            describePool(attempt->pool()), host->hostname());
+            describePool(attempt->pool()), host != nullptr ? host->hostname() : "unknown");
   grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
 
   if (grid_.isPoolHttp3(attempt->pool())) {

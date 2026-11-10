@@ -1921,6 +1921,26 @@ TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
   grid.reset();
 }
 
+TEST_F(ConnectivityGridTest, PoolFailureWithNullHostLogsCleanly) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false,
+                              /*can_use_http3_=*/true}),
+            nullptr);
+  ASSERT_NE(grid_->http3Pool(), nullptr);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  EXPECT_LOG_CONTAINS("trace", "http3 pool failed to create connection to host 'unknown'",
+                      grid_->callbacks()->onPoolFailure(
+                          ConnectionPool::PoolFailureReason::LocalConnectionFailure, "", nullptr));
+  ASSERT_NE(grid_->http2Pool(), nullptr);
+
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, std::nullopt);
+  EXPECT_TRUE(grid_->isHttp3Broken());
+}
+
 #endif
 
 } // namespace
