@@ -527,6 +527,7 @@ void FaultFilter::onAbortDryRun(Http::Code http_status_code,
   auto& dry_run_abort = *(*filter_metadata.mutable_fields())["dry_run_abort"]
                              .mutable_struct_value()
                              ->mutable_fields();
+  dry_run_abort.clear();
   if (grpc_status.has_value()) {
     dry_run_abort["grpc_status"].set_number_value(static_cast<uint64_t>(grpc_status.value()));
   } else {

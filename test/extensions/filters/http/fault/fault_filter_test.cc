@@ -640,6 +640,11 @@ TEST_F(FaultFilterTest, AbortDryRunWithGrpcStatus) {
   setUpTest(fault);
 
   envoy::config::core::v3::Metadata dynamic_metadata;
+  (*(*(*dynamic_metadata.mutable_filter_metadata())["envoy.filters.http.fault"]
+          .mutable_fields())["dry_run_abort"]
+        .mutable_struct_value()
+        ->mutable_fields())["http_status"]
+      .set_number_value(429);
   envoy::config::core::v3::Metadata expected_metadata;
   auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
   (*(*filter_metadata["envoy.filters.http.fault"].mutable_fields())["dry_run_abort"]
