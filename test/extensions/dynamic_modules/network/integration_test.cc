@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/network/dynamic_modules/v3/dynamic_modules.pb.h"
 
+#include "test/integration/base_overload_integration_test.h"
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -20,33 +21,35 @@ protected:
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
                                TestEnvironment::substitute(search_path), 1);
 
-    config_helper_.addConfigModifier([filter_name, module_name,
-                                      config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->mutable_filter_chains(0);
+    config_helper_.addConfigModifier(
+        [filter_name, module_name, config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter_chain = listener->mutable_filter_chains(0);
 
-      // Get the existing tcp_proxy filter.
-      auto tcp_proxy_filter = filter_chain->filters(0);
+          // Get the existing tcp_proxy filter.
+          auto tcp_proxy_filter = filter_chain->filters(0);
 
-      // Clear and rebuild with dynamic modules first, then tcp_proxy.
-      filter_chain->clear_filters();
+          // Clear and rebuild with dynamic modules first, then tcp_proxy.
+          filter_chain->clear_filters();
 
-      // Add the dynamic module filter.
-      envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter
-          dm_config;
-      dm_config.mutable_dynamic_module_config()->set_name(module_name);
-      dm_config.set_filter_name(filter_name);
-      if (!config.empty()) {
-        std::ignore = dm_config.mutable_filter_config()->PackFrom(ValueUtil::stringValue(config));
-      }
+          // Add the dynamic module filter.
+          envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter
+              dm_config;
+          dm_config.mutable_dynamic_module_config()->set_name(module_name);
+          dm_config.set_filter_name(filter_name);
+          if (!config.empty()) {
+            Protobuf::StringValue filter_config;
+            filter_config.set_value(config);
+            std::ignore = dm_config.mutable_filter_config()->PackFrom(filter_config);
+          }
 
-      auto* dm_filter = filter_chain->add_filters();
-      dm_filter->set_name("envoy.filters.network.dynamic_modules");
-      std::ignore = dm_filter->mutable_typed_config()->PackFrom(dm_config);
+          auto* dm_filter = filter_chain->add_filters();
+          dm_filter->set_name("envoy.filters.network.dynamic_modules");
+          std::ignore = dm_filter->mutable_typed_config()->PackFrom(dm_config);
 
-      // Add the tcp_proxy back.
-      filter_chain->add_filters()->CopyFrom(tcp_proxy_filter);
-    });
+          // Add the tcp_proxy back.
+          filter_chain->add_filters()->CopyFrom(tcp_proxy_filter);
+        });
 
     BaseIntegrationTest::initialize();
   }
@@ -334,6 +337,76 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, ReadAttributes) {
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->waitForHalfClose();
   tcp_client->close();
+}
+
+class DynamicModulesNetworkLoadShedPointIntegrationTest
+    : public BaseOverloadIntegrationTest,
+      public DynamicModulesNetworkSdkIntegrationTest {
+public:
+  // Saturates the trigger of the load shed point that the module checks.
+  void initializeOverloadedLoadShedPoint(bool bypass_overload_manager) {
+    setupOverloadManagerConfig(
+        TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "test.dynamic_module_load_shed_point"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+    config_helper_.addConfigModifier(
+        [this, bypass_overload_manager](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          *bootstrap.mutable_overload_manager() = overload_manager_config_;
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->set_bypass_overload_manager(
+              bypass_overload_manager);
+        });
+    initializeSdkFilter("load_shed_point", "test.dynamic_module_load_shed_point");
+    updateResource(0.95);
+    test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                               testing::Eq(100));
+  }
+
+  void expectProxiedConnection() {
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+    FakeRawConnectionPtr fake_upstream_connection;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    ASSERT_TRUE(tcp_client->write("hello", /*end_stream=*/true));
+    ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+    ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+    ASSERT_TRUE(fake_upstream_connection->close());
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesNetworkLoadShedPointIntegrationTest,
+                         DynamicModulesNetworkSdkIntegrationTestValues,
+                         [](const testing::TestParamInfo<std::string>& info) {
+                           return info.param;
+                         });
+
+TEST_P(DynamicModulesNetworkLoadShedPointIntegrationTest, ShedsLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  // The client enables half close, so it sees the closed connection as the end of the stream.
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+  test_server_->waitForCounter("overload.test.dynamic_module_load_shed_point.shed_load_count",
+                               testing::Eq(1));
+
+  updateResource(0.8);
+  test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                             testing::Eq(0));
+  expectProxiedConnection();
+}
+
+TEST_P(DynamicModulesNetworkLoadShedPointIntegrationTest,
+       ListenerBypassingOverloadManagerDoesNotShedLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/true);
+
+  expectProxiedConnection();
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
 }
 
 } // namespace Envoy

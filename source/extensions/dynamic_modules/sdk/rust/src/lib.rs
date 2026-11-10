@@ -363,6 +363,50 @@ pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
   }
 }
 
+/// A load shed point of the overload manager, which a filter configuration returns from
+/// `get_load_shed_point`, for example [`EnvoyHttpFilterConfig::get_load_shed_point`].
+///
+/// The module can check it in the event hooks of the filter configuration that returned it and of
+/// its filters, but not while the configuration is dropped or on threads of its own, since Envoy
+/// can destroy the overload manager before the configuration when it shuts down. A module typically
+/// gets it once while its configuration is created and keeps it in its own configuration.
+#[cfg_attr(any(test, feature = "mock"), mockall::automock)]
+pub trait EnvoyLoadShedPoint: Send + Sync {
+  /// Decides whether to shed one unit of load, such as one request.
+  ///
+  /// It returns true with the probability that the triggers of the load shed point give, and counts
+  /// shed load in the `shed_load_count` statistic of the load shed point. It reads the pressure of
+  /// the synchronous feedback resource monitors of the triggers and reports accepted load to them
+  /// on the calling thread. Checking a load shed point that Envoy also checks counts the same load
+  /// twice.
+  fn should_shed_load(&self) -> bool;
+}
+
+struct EnvoyLoadShedPointImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+}
+
+// SAFETY: Envoy allows the filters on all worker threads to check a load shed point concurrently.
+unsafe impl Send for EnvoyLoadShedPointImpl {}
+unsafe impl Sync for EnvoyLoadShedPointImpl {}
+
+impl EnvoyLoadShedPoint for EnvoyLoadShedPointImpl {
+  fn should_shed_load(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_load_shed_point_should_shed_load(self.raw_ptr) }
+  }
+}
+
+/// Wraps a load shed point that a `get_load_shed_point` callback returned, which is null when
+/// there is none.
+pub(crate) fn new_load_shed_point(
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+  if raw_ptr.is_null() {
+    return None;
+  }
+  Some(Box::new(EnvoyLoadShedPointImpl { raw_ptr }))
+}
+
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///

@@ -965,6 +965,17 @@ bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
   return secretToModuleBuffer(filter_config->getGenericSecretById(id), result);
 }
 
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  if (!filter_config->load_shed_point_provider_.has_value()) {
+    return nullptr;
+  }
+  return filter_config->load_shed_point_provider_->getLoadShedPoint(moduleBufferToStringView(name));
+}
+
 bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,

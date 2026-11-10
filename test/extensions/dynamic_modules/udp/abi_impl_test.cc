@@ -8,6 +8,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/status_utility.h"
 
 namespace Envoy {
@@ -665,6 +666,33 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, ConfigStatsOperate) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
                 config, invalid_id, 1));
+}
+
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetLoadShedPointWithoutProvider) {
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+                         filter_config_.get(), {name.data(), name.size()}));
+}
+
+TEST(DynamicModuleUdpListenerFilterConfigTest, GetLoadShedPoint) {
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  proto_config.set_filter_name("test_filter");
+  proto_config.mutable_filter_config()->set_value("some_config");
+  Stats::IsolatedStoreImpl stats;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      proto_config, std::move(dynamic_module.value()), *stats.rootScope(), overload_manager);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point,
+            envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+                filter_config.get(), {name.data(), name.size()}));
 }
 
 } // namespace DynamicModules

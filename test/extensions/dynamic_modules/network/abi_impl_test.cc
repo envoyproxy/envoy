@@ -16,6 +16,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -2747,6 +2748,34 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterConfigSchedulerCo
 
   // Clean up.
   envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetLoadShedPointWithoutProvider) {
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+                         filter_config_.get(), {name.data(), name.size()}));
+}
+
+TEST(DynamicModuleNetworkFilterConfigTest, GetLoadShedPoint) {
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("network_no_op", "c"), /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  Stats::IsolatedStoreImpl stats;
+  testing::StrictMock<Upstream::MockClusterManager> cluster_manager;
+  testing::StrictMock<Event::MockDispatcher> main_thread_dispatcher;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher, overload_manager);
+  ASSERT_OK(filter_config);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point,
+            envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+                filter_config.value().get(), {name.data(), name.size()}));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitInvokesOnScheduled) {

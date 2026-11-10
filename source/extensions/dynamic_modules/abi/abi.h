@@ -582,6 +582,20 @@ typedef enum envoy_dynamic_module_type_socket_direction {
   envoy_dynamic_module_type_socket_direction_Downstream = 1,
 } envoy_dynamic_module_type_socket_direction;
 
+/**
+ * envoy_dynamic_module_type_load_shed_point_envoy_ptr is a raw pointer to a load shed point of the
+ * overload manager in Envoy, which corresponds to Server::LoadShedPoint. It is returned by
+ * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point and its network, listener
+ * and UDP listener filter counterparts, and checked with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The module can use it in the event hooks of the filter
+ * configuration that returned it and of the filters of that configuration, but not in the destroy
+ * hook of the configuration or on threads of its own, since Envoy can destroy the overload manager
+ * before the configuration when it shuts down.
+ */
+typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
+
 // =============================================================================
 // Common Event Hooks
 // =============================================================================
@@ -846,6 +860,28 @@ bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_typ
  */
 bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
                                                    void** data_ptr_out);
+
+// ----------------------------- Load Shed Points ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load is called by the module to decide
+ * whether to shed load at a load shed point of the overload manager.
+ *
+ * Each call decides for one unit of load, such as one request. It returns true with the
+ * probability that the triggers of the load shed point give, and counts shed load in the
+ * shed_load_count statistic of the load shed point. It reads the pressure of the synchronous
+ * feedback resource monitors of the triggers and reports accepted load to them on the calling
+ * thread. Checking a load shed point that Envoy also checks counts the same load twice.
+ *
+ * This is thread-safe. See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that
+ * can call it.
+ *
+ * @param load_shed_point_envoy_ptr is the load shed point to check. It can be nullptr, which never
+ * sheds load.
+ * @return true if the module should shed the load, false otherwise.
+ */
+bool envoy_dynamic_module_callback_load_shed_point_should_shed_load(
+    envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point_envoy_ptr);
 
 // =============================================================================
 // ============================== HTTP Filter ==================================
@@ -1968,6 +2004,31 @@ bool envoy_dynamic_module_callback_http_filter_get_generic_secret(
 bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+// ------------------------ Load Shed Point callbacks --------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point is called by the module to
+ * get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the request processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_http_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name, the filter is an upstream filter, or the listener of its filter chain bypasses the overload
+ * manager. Filters that the route configuration creates, such as those of a per-route filter chain,
+ * and filters of a filter chain that FCDS delivers do not see the bypass and get the load shed
+ * point.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
 
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 
@@ -5502,6 +5563,29 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
     envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Network Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_get_load_shed_point is called by the module
+ * to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the connection processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_network_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager. Filters of a filter chain that
+ * FCDS delivers do not see the bypass and get the load shed point.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 // --------------------- Network Filter Callbacks - Misc ---------------
 
 /**
@@ -6868,6 +6952,28 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
     envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Listener Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point is called by the module
+ * to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the connection processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_listener_filter_config_new.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
 // --------------------- Listener Filter Callbacks - Misc ---------------
 
 /**
@@ -7315,6 +7421,28 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
+
+// --------------------- UDP Listener Filter Callbacks - Load Shed Points ---------------
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point is called by the
+ * module to get a load shed point of the overload manager by name. The module checks it with
+ * envoy_dynamic_module_callback_load_shed_point_should_shed_load to shed load at its own point of
+ * the datagram processing.
+ *
+ * See envoy_dynamic_module_type_load_shed_point_envoy_ptr for the hooks that can call this. A
+ * module typically gets the load shed points it uses once in
+ * envoy_dynamic_module_on_udp_listener_filter_config_new.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig object.
+ * @param name is the name of the load shed point.
+ * @return the load shed point, or nullptr if the overload manager has no load shed point with the
+ * name or the listener of the filter bypasses the overload manager.
+ */
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
 
 // --------------------- UDP Listener Filter Callbacks - Misc ---------------
 
