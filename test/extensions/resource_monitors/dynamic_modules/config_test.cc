@@ -1,8 +1,11 @@
+#include <functional>
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/resource_monitors/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/resource_monitors/dynamic_modules/config.h"
 #include "source/server/resource_monitor_config_impl.h"
 
@@ -57,6 +60,23 @@ public:
     return factory_.createResourceMonitor(proto_config, context_);
   }
 
+  // Returns a function that reads how often the destroy hook of a C module ran. The function holds
+  // the module, which keeps the counter alive because the monitor and the function share one
+  // dlopen of the same path.
+  static std::function<int()> configDestroyCounter(const std::string& module_name) {
+    using GetConfigDestroyCountFuncType = int (*)(void);
+    auto module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath(module_name, "c"),
+        /*do_not_close=*/true);
+    EXPECT_TRUE(module.ok());
+    auto destroy_count =
+        module.value()->getFunctionPointer<GetConfigDestroyCountFuncType>("getConfigDestroyCount");
+    EXPECT_TRUE(destroy_count.ok());
+    return [module = std::shared_ptr(std::move(module.value())), count = destroy_count.value()]() {
+      return count();
+    };
+  }
+
   DynamicModuleResourceMonitorFactory factory_;
   Api::ApiPtr api_;
   testing::StrictMock<Event::MockDispatcher> dispatcher_;
@@ -84,11 +104,46 @@ TEST_F(DynamicModuleResourceMonitorFactoryTest, CreatesMonitor) {
   auto monitor = createMonitor(proto_config);
   ASSERT_OK(monitor.status());
   ASSERT_NE(nullptr, monitor.value());
+  EXPECT_EQ(nullptr, dynamic_cast<Server::SynchronousFeedbackResourceMonitor*>(monitor->get()));
 
   // The server runtime is not reachable here, so the module reports the default pressure.
   testing::StrictMock<MockResourceUpdateCallbacks> callbacks;
   EXPECT_CALL(callbacks, onSuccess(Server::ResourceUsage{0}));
   monitor.value()->updateResourceUsage(callbacks);
+}
+
+TEST_F(DynamicModuleResourceMonitorFactoryTest, CreatesSynchronousFeedbackMonitor) {
+  auto monitor = createMonitor(makeProto("resource_monitor_synchronous_feedback", "c", "monitor"));
+  ASSERT_OK(monitor.status());
+  auto* synchronous_feedback_monitor =
+      dynamic_cast<Server::SynchronousFeedbackResourceMonitor*>(monitor->get());
+  ASSERT_NE(nullptr, synchronous_feedback_monitor);
+  EXPECT_EQ(Server::ResourceUsage{0.25}, synchronous_feedback_monitor->getResourceUsage());
+
+  // The refresh reads the same pressure rather than calling the update hook of the module.
+  testing::StrictMock<MockResourceUpdateCallbacks> callbacks;
+  EXPECT_CALL(callbacks, onSuccess(Server::ResourceUsage{0.25}));
+  synchronous_feedback_monitor->updateResourceUsage(callbacks);
+}
+
+TEST_F(DynamicModuleResourceMonitorFactoryTest, SynchronousFeedbackMissingGetResourceUsage) {
+  const std::string module_name =
+      "resource_monitor_synchronous_feedback_missing_get_resource_usage";
+  auto config_destroy_count = configDestroyCounter(module_name);
+  const int destroyed_before = config_destroy_count();
+  EXPECT_THAT(
+      createMonitor(makeProto(module_name, "c", "monitor")).status().message(),
+      HasSubstr(
+          "Failed to resolve symbol envoy_dynamic_module_on_resource_monitor_get_resource_usage"));
+  // Envoy rejects the configuration only after the module created its own, so it destroys it.
+  EXPECT_EQ(destroyed_before + 1, config_destroy_count());
+}
+
+TEST_F(DynamicModuleResourceMonitorFactoryTest, SynchronousFeedbackWithoutLoadAccepted) {
+  auto monitor = createMonitor(
+      makeProto("resource_monitor_synchronous_feedback_missing_load_accepted", "c", "monitor"));
+  ASSERT_OK(monitor.status());
+  EXPECT_NE(nullptr, dynamic_cast<Server::SynchronousFeedbackResourceMonitor*>(monitor->get()));
 }
 
 TEST_F(DynamicModuleResourceMonitorFactoryTest, PassesEmptyConfigWhenUnset) {
@@ -155,12 +210,14 @@ TEST_F(DynamicModuleResourceMonitorFactoryTest, MissingConfigDestroy) {
 }
 
 TEST_F(DynamicModuleResourceMonitorFactoryTest, MissingUpdateResourceUsage) {
-  EXPECT_THAT(
-      createMonitor(makeProto("resource_monitor_missing_update_resource_usage", "c", "monitor"))
-          .status()
-          .message(),
-      HasSubstr("Failed to resolve symbol "
-                "envoy_dynamic_module_on_resource_monitor_update_resource_usage"));
+  const std::string module_name = "resource_monitor_missing_update_resource_usage";
+  auto config_destroy_count = configDestroyCounter(module_name);
+  const int destroyed_before = config_destroy_count();
+  EXPECT_THAT(createMonitor(makeProto(module_name, "c", "monitor")).status().message(),
+              HasSubstr("Failed to resolve symbol "
+                        "envoy_dynamic_module_on_resource_monitor_update_resource_usage"));
+  // Envoy rejects the configuration only after the module created its own, so it destroys it.
+  EXPECT_EQ(destroyed_before + 1, config_destroy_count());
 }
 
 TEST_F(DynamicModuleResourceMonitorFactoryTest, InvalidResourceMonitorConfig) {

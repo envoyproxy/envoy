@@ -1,5 +1,8 @@
 #include <limits>
+#include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "source/extensions/resource_monitors/dynamic_modules/resource_monitor.h"
 
@@ -40,6 +43,12 @@ envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr update_ho
 int destroy_count;
 envoy_dynamic_module_type_resource_monitor_config_module_ptr destroy_config_module_ptr;
 envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr destroy_hook_scheduler;
+// The pressure that testOnGetResourceUsage returns, the load shed points that testOnLoadAccepted
+// received, and the configurations that the two hooks received.
+double resource_usage;
+std::vector<std::string> accepted_load_shed_points;
+envoy_dynamic_module_type_resource_monitor_config_module_ptr get_resource_usage_config_module_ptr;
+envoy_dynamic_module_type_resource_monitor_config_module_ptr load_accepted_config_module_ptr;
 
 envoy_dynamic_module_type_resource_monitor_update_status testOnUpdateResourceUsage(
     envoy_dynamic_module_type_resource_monitor_config_envoy_ptr config_envoy_ptr,
@@ -68,6 +77,19 @@ void testOnConfigDestroy(
     envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(
         destroy_hook_scheduler);
   }
+}
+
+double testOnGetResourceUsage(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr) {
+  get_resource_usage_config_module_ptr = config_module_ptr;
+  return resource_usage;
+}
+
+void testOnLoadAccepted(
+    envoy_dynamic_module_type_resource_monitor_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer load_shed_point_name) {
+  load_accepted_config_module_ptr = config_module_ptr;
+  accepted_load_shed_points.emplace_back(load_shed_point_name.ptr, load_shed_point_name.length);
 }
 
 class DynamicModuleResourceMonitorTest : public testing::Test {
@@ -292,6 +314,92 @@ TEST_F(DynamicModuleResourceMonitorTest, DropsReportPostedBeforeDestroy) {
   envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(scheduler_);
   config_.reset();
   posted();
+}
+
+TEST_F(DynamicModuleResourceMonitorTest, EnableSynchronousFeedbackAfterCreationFails) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+      static_cast<void*>(config_.get())));
+  EXPECT_FALSE(config_->synchronous_feedback_enabled_);
+}
+
+TEST_F(DynamicModuleResourceMonitorTest, EnableSynchronousFeedbackOffMainThreadIsEnvoyBug) {
+  // The module may enable synchronous feedback while it creates its configuration, so a call off
+  // the main thread must fail even then. In builds where an Envoy bug aborts, only the bug message
+  // is checked.
+  config_->in_config_new_ = true;
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread thread([this] {
+          EXPECT_FALSE(
+              envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+                  static_cast<void*>(config_.get())));
+        });
+        thread.join();
+      },
+      "envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback must be "
+      "called on the main thread");
+  EXPECT_FALSE(config_->synchronous_feedback_enabled_);
+}
+
+class DynamicModuleSynchronousFeedbackResourceMonitorTest : public testing::Test {
+public:
+  void SetUp() override {
+    resource_usage = 0;
+    accepted_load_shed_points.clear();
+    get_resource_usage_config_module_ptr = nullptr;
+    load_accepted_config_module_ptr = nullptr;
+
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("resource_monitor_synchronous_feedback",
+                                                         "c"),
+        /*do_not_close=*/false);
+    ASSERT_OK(dynamic_module.status());
+    auto config = newDynamicModuleResourceMonitorConfig(
+        "monitor", "config", std::move(dynamic_module.value()), dispatcher_);
+    ASSERT_OK(config.status());
+    config_ = std::move(config.value());
+    config_->on_get_resource_usage_ = testOnGetResourceUsage;
+    config_->on_load_accepted_ = testOnLoadAccepted;
+    monitor_ = std::make_unique<DynamicModuleSynchronousFeedbackResourceMonitor>(config_);
+  }
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher_;
+  testing::StrictMock<MockResourceUpdateCallbacks> callbacks_;
+  DynamicModuleResourceMonitorConfigSharedPtr config_;
+  std::unique_ptr<DynamicModuleSynchronousFeedbackResourceMonitor> monitor_;
+};
+
+// The pressures that the module reports, and the pressures that Envoy acts on.
+std::vector<std::pair<double, double>> clampedPressures() {
+  const double infinity = std::numeric_limits<double>::infinity();
+  return {{0.3, 0.3},    {0, 0},    {1, 1},         {2, 1},
+          {infinity, 1}, {-0.5, 0}, {-infinity, 0}, {std::numeric_limits<double>::quiet_NaN(), 0}};
+}
+
+TEST_F(DynamicModuleSynchronousFeedbackResourceMonitorTest, ReadsLivePressure) {
+  for (const auto& [pressure, expected] : clampedPressures()) {
+    SCOPED_TRACE(pressure);
+    resource_usage = pressure;
+    EXPECT_EQ(Server::ResourceUsage{expected}, monitor_->getResourceUsage());
+    // The refresh reads the same pressure.
+    EXPECT_CALL(callbacks_, onSuccess(Server::ResourceUsage{expected}));
+    monitor_->updateResourceUsage(callbacks_);
+    testing::Mock::VerifyAndClearExpectations(&callbacks_);
+  }
+  EXPECT_EQ(config_->in_module_config_, get_resource_usage_config_module_ptr);
+}
+
+TEST_F(DynamicModuleSynchronousFeedbackResourceMonitorTest, PassesAcceptedLoad) {
+  monitor_->onLoadAccepted("envoy.load_shed_points.tcp_listener_accept");
+  EXPECT_EQ(std::vector<std::string>{"envoy.load_shed_points.tcp_listener_accept"},
+            accepted_load_shed_points);
+  EXPECT_EQ(config_->in_module_config_, load_accepted_config_module_ptr);
+}
+
+TEST_F(DynamicModuleSynchronousFeedbackResourceMonitorTest, IgnoresAcceptedLoadWithoutHook) {
+  config_->on_load_accepted_ = nullptr;
+  monitor_->onLoadAccepted("envoy.load_shed_points.tcp_listener_accept");
+  EXPECT_TRUE(accepted_load_shed_points.empty());
 }
 
 } // namespace

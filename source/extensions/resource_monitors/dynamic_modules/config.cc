@@ -38,6 +38,10 @@ DynamicModuleResourceMonitorFactory::createResourceMonitorFromProtoTyped(
       config.resource_monitor_name(), resource_monitor_config, std::move(load_result->loaded),
       context.mainThreadDispatcher());
   RETURN_IF_NOT_OK_REF(monitor_config.status());
+  if (monitor_config.value()->synchronous_feedback_enabled_) {
+    return std::make_unique<DynamicModuleSynchronousFeedbackResourceMonitor>(
+        std::move(monitor_config.value()));
+  }
   return std::make_unique<DynamicModuleResourceMonitor>(std::move(monitor_config.value()));
 }
 
