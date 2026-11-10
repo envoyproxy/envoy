@@ -38,7 +38,7 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-* `envoyproxy/envoy-build:ci` &mdash; based on Debian (trixie-slim); the compilers (Clang and GCC) and other toolchains are
+* `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian (trixie-slim); the compilers (Clang and GCC) and other toolchains are
   fetched by Bazel rather than installed in the image. Variants `devtools`, `docker`, `mobile` and `worker` add tooling for
   specific CI jobs.
 
@@ -99,13 +99,13 @@ In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the 
 invoking the build.
 
 ```bash
-ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:<variant>-<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
-ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:<variant>-<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## Resource Requirements and Troubleshooting
