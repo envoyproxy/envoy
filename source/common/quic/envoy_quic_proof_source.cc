@@ -10,12 +10,28 @@
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/cert_compression.h"
 
 #include "openssl/bytestring.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+
+// Register TLS certificate compression algorithms (RFC 8879) for QUIC server contexts: compression
+// of the server's own certificate, and decompression. Client contexts register decompression only
+// (registerClientCertDecompression() in envoy_quic_utils.h).
+void registerServerCertCompression(SSL_CTX* ssl_ctx) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+    Extensions::TransportSockets::Tls::CertCompression::registerBrotli(ssl_ctx);
+  }
+  Extensions::TransportSockets::Tls::CertCompression::registerZlib(ssl_ctx);
+}
+
+} // namespace
 
 quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
@@ -117,7 +133,7 @@ void EnvoyQuicProofSource::updateFilterChainManager(
 }
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
-  registerCertCompression(ssl_ctx);
+  registerServerCertCompression(ssl_ctx);
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.quic_keylog_support")) {
     SSL_CTX_set_keylog_callback(ssl_ctx, EnvoyTlsServerHandshaker::keylogCallback);
   }

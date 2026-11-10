@@ -136,11 +136,19 @@ public:
 protected:
   friend class ContextImplPeer;
 
+  // Registers TLS certificate compression algorithms (RFC 8879) on an SSL_CTX. Supplied by the
+  // client/server subclass so that client-only binaries need not link the certificate compressors:
+  // clients register decompression only. The constructor calls it on each SSL_CTX when the
+  // `tls_certificate_compression_brotli` runtime guard is enabled, before the handshaker's
+  // `sslctxCb` and the compliance policy run. nullptr registers nothing.
+  using CertCompressionRegistrar = void (*)(SSL_CTX*);
+
   ContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
       const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
       Server::Configuration::CommonFactoryContext& factory_context,
-      Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
+      Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status,
+      CertCompressionRegistrar register_cert_compression);
 
   /**
    * The global SSL-library index used for storing a pointer to the context

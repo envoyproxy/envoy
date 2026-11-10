@@ -25,3 +25,4 @@ source/common/formatter/http_specific_formatter.h
 source/common/formatter/stream_info_formatter.h
 source/common/tls/default_tls_certificate_selector.h
 source/common/upstream/od_cds_api_impl.h
+source/common/tls/cert_compression.h
