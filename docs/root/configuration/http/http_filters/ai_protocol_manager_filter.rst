@@ -161,6 +161,10 @@ object when unset so upstream filter chains can read the client's API.
 Other routes pass through untouched unless :ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
 is set, which parses them best-effort and forwards unparseable payloads unchanged.
+A payload that parses runs the AI filters with no API declared, so a single
+catch-all route -- a dynamic forward proxy's, say -- can leave the API to the
+:ref:`schema validation filter <config_http_filters_ai_protocol_manager_schema_validation>`
+to detect.
 
 .. code-block:: yaml
 
@@ -176,14 +180,14 @@ is set, which parses them best-effort and forwards unparseable payloads unchange
 AI filters
 ----------
 
-After a declared AI endpoint's payload is parsed, and before it is replayed,
-the filter runs the configured :ref:`AI filters
+After a request's payload is parsed, and before it is replayed, the filter
+runs the configured :ref:`AI filters
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
-Routes without a per-route request declaration, and requests without a body,
-run no AI filters.
+Requests the filter does not parse -- those passed through, those without a
+body, and best-effort payloads that fail to parse -- run no AI filters.
 
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body

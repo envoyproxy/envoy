@@ -168,16 +168,17 @@ private:
 // in `envoy.ai.llm_protocol.request` filter state; such a request is held only
 // if it can be held to end of stream (see below), since the writer may not
 // have looked at its framing. A route without either is parsed only if the
-// filter opted into parse_unconfigured_routes -- offered for compatibility with
-// chains that want a parsed body on ordinary routes, never a reason to fail a
+// filter opted into parse_unconfigured_routes -- for routes that declare no
+// API, such as a dynamic forward proxy's catch-all, where an AI filter detects
+// it; a body that fails to parse there is forwarded, never a reason to fail the
 // request -- and is otherwise untouched. That opt-in covers routes that never
 // asked for it, so it takes only a request it can hold to end of stream
 // without stalling it, which rules out gRPC and Connect streaming, upgrades,
 // and CONNECT. A route-declared endpoint carries no such gate.
 //
-// At end of payload the configured AI filters run over the parsed document
-// (filter_manager.h); payload schema validation is one of them. Normalization
-// comes later.
+// At end of payload the configured AI filters run over the parsed document,
+// however the request was taken (filter_manager.h); payload schema validation
+// is one of them, and may reject it. Normalization comes later.
 //
 // Encode (response) path: observe-only token-usage extraction. When
 // response_handling.token_usage is configured, 2xx SSE/JSON responses on
@@ -261,6 +262,9 @@ private:
   LlmBindingConstSharedPtr route_response_binding_;
 
   JsonWithExtBuf request_json_;
+  // Whether request_json_ holds the whole payload, which is what runs the AI filters: on a
+  // declared endpoint, or on any request parse_unconfigured_routes parsed.
+  bool request_parsed_{false};
   // Cleared once parsing is done with, whether it completed, was abandoned, or
   // failed the request.
   std::unique_ptr<JsonWithExtBufParser> request_parser_;
