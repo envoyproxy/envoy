@@ -86,6 +86,12 @@ struct LlmBindingRead {
   absl::flat_hash_map<std::string, nlohmann::json> written_fields;
   // The headers the binding writes, as the client sent them.
   absl::flat_hash_map<std::string, std::string> written_headers;
+  // Whether `model` is the request's: the binding carries it in the path alone, or the body named
+  // none. False when the body's own `model` stands.
+  bool model_from_path{false};
+  // The streaming mode the path decided, where its spelling names one the body does not keep;
+  // nullopt when the body's own `stream` stands.
+  std::optional<bool> stream;
 };
 
 // Reads `path` into `body` under `binding`, with `api_binding` filling the parts it leaves empty,
@@ -99,6 +105,14 @@ std::optional<LlmBindingRead>
 readClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
                absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
                nlohmann::json& body, const HeaderLookup& header);
+
+// What `readClientPath` would read, with `body` left as it is: for a filter that needs the
+// request's model or streaming mode but must not change what goes upstream, which only a
+// transcoder restores. Headers are not read.
+std::optional<LlmBindingRead>
+peekClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
+               absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
+               const nlohmann::json& body);
 
 // Renders the path for `body` under `binding`, with `api_binding` filling the parts it leaves
 // empty, and applies its mutations in order: body edits to `body`, header edits to `headers` for

@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.ai_filters.request_info"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",

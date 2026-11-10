@@ -376,6 +376,80 @@ TEST(LlmBindingReadTest, ReadsTheClientPathUnderTheFirstBindingThatMatches) {
   EXPECT_EQ(readClientPath(gateway, own, clients, "/gw/m", body, lookup())->model, "m");
 }
 
+// A read says what the path decided over the body: the model when the binding keeps it in the
+// path alone or the body named none, the streaming mode when the path's spelling named one.
+TEST(LlmBindingReadTest, SaysWhatThePathDecided) {
+  const LlmBindingConstSharedPtr claude = parseOk(VertexClaude);
+  constexpr absl::string_view claude_path =
+      "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/claude-opus-5";
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "from-body"})");
+  std::optional<LlmBindingRead> arrived =
+      read(claude, absl::StrCat(claude_path, ":streamRawPredict"), body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_TRUE(arrived->model_from_path); // The binding removes `model`: the path is its home.
+  EXPECT_EQ(arrived->stream, true);      // The body did not name it.
+  body = nlohmann::json::parse(R"({"stream": true})");
+  arrived = read(claude, absl::StrCat(claude_path, ":rawPredict"), body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_FALSE(arrived->stream.has_value()); // The body's stands under a binding that keeps it.
+
+  const LlmBindingConstSharedPtr keeps_model = parseOk("/gw/{model}/{chat|chat-stream}");
+  body = nlohmann::json::parse(R"({"model": "from-body"})");
+  arrived = read(keeps_model, "/gw/from-path/chat", body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_FALSE(arrived->model_from_path);
+  EXPECT_EQ(arrived->model, "from-path");
+  body = nlohmann::json::object();
+  arrived = read(keeps_model, "/gw/from-path/chat", body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_TRUE(arrived->model_from_path);
+  EXPECT_FALSE(arrived->stream.has_value()); // A unary spelling adds nothing to a body without it.
+}
+
+// `peekClientPath` is `readClientPath` with the body left alone: same read, same first match.
+TEST(LlmBindingReadTest, PeekReadsWithoutEditing) {
+  const LlmBindingConstSharedPtr own = parseOk(GeminiApi);
+  const std::vector<LlmBindingConstSharedPtr> clients{parseOk(VertexClaude)};
+  const nlohmann::json body = nlohmann::json::parse(
+      R"({"model": "from-body", "anthropic_version": "vertex-2023-10-16", "max_tokens": 8})");
+  const nlohmann::json original = body;
+
+  std::optional<LlmBindingRead> peeked =
+      peekClientPath(nullptr, own, clients,
+                     "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+                     "claude-opus-5:streamRawPredict",
+                     body);
+  ASSERT_TRUE(peeked.has_value());
+  EXPECT_EQ(peeked->binding, clients.front());
+  EXPECT_EQ(peeked->model, "claude-opus-5");
+  EXPECT_TRUE(peeked->model_from_path);
+  EXPECT_EQ(peeked->stream, true);
+  EXPECT_EQ(peeked->path_variables.at("location"), "us-east5");
+  EXPECT_EQ(peeked->written_fields.at("anthropic_version"), "vertex-2023-10-16");
+  EXPECT_TRUE(peeked->written_headers.empty()); // Headers are not read.
+  EXPECT_EQ(body, original);
+
+  peeked = peekClientPath(nullptr, own, clients, "/v1beta/models/g:generateContent", body);
+  ASSERT_TRUE(peeked.has_value());
+  EXPECT_EQ(peeked->binding, own);
+  EXPECT_TRUE(peeked->model_from_path);
+  EXPECT_EQ(peeked->stream, false);
+  EXPECT_EQ(body, original);
+  EXPECT_FALSE(peekClientPath(nullptr, own, clients, "/v1/messages", body).has_value());
+
+  // The same as a read would say, on the same body.
+  nlohmann::json edited = body;
+  const std::optional<LlmBindingRead> arrived =
+      readClientPath(nullptr, own, clients, "/v1beta/models/g:generateContent", edited, lookup());
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_EQ(arrived->model, peeked->model);
+  EXPECT_EQ(arrived->model_from_path, peeked->model_from_path);
+  EXPECT_EQ(arrived->stream, peeked->stream);
+  EXPECT_EQ(edited, nlohmann::json::parse(R"({"model": "g", "stream": false,)"
+                                          R"( "anthropic_version": "vertex-2023-10-16",)"
+                                          R"( "max_tokens": 8})"));
+}
+
 // `{model}` is the body's; every other variable is the client's path's, even when the body has a
 // field of that name.
 TEST(LlmBindingWriteTest, RendersTheModelFromTheBodyAndTheRestFromThePath) {
