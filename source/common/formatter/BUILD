@@ -131,7 +131,6 @@ envoy_cc_library(
     name = "stream_info_formatter_extension_lib",
     srcs = ["stream_info_formatter.cc"],
     hdrs = ["stream_info_formatter.h"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":serializer_lib",
         ":substitution_format_utility_lib",
@@ -150,6 +149,7 @@ envoy_cc_library(
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "//source/common/version:version_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],

@@ -72,7 +72,7 @@ TEST(SSLTest, test_SSL_CTX_set_select_certificate_cb) {
 
     // Install the callback.
     SSL_CTX_set_select_certificate_cb(
-        ctx.get(), [](const SSL_CLIENT_HELLO* client_hello) -> enum ssl_select_cert_result_t {
+        ctx.get(), [](const SSL_CLIENT_HELLO* client_hello)->enum ssl_select_cert_result_t {
           std::set<uint16_t>* received_ext_types = static_cast<std::set<uint16_t>*>(
               SSL_CTX_get_ex_data(SSL_get_SSL_CTX(client_hello->ssl), 0));
 
@@ -375,7 +375,6 @@ TEST(SSLTest, test_SSL_CTX_set_strict_cipher_list) {
   ASSERT_EQ(0, SSL_CTX_set_strict_cipher_list(ctx.get(), "rubbish:garbage"));
 }
 
-
 // Check that SSL_CTX_set_strict_cipher_list() accepts BoringSSL's Equal
 // Preference Group syntax (the []| characters).
 //
@@ -392,11 +391,10 @@ TEST(SSLTest, test_SSL_CTX_set_strict_cipher_list) {
 TEST(SSLTest, test_SSL_CTX_set_strict_cipher_list_equal_preference_groups) {
   bssl::UniquePtr<SSL_CTX> ctx{SSL_CTX_new(TLS_server_method())};
 
-  const std::string input =
-    "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
-    "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-    "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:";
+  const std::string input = "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
+                            "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
+                            "ECDHE-ECDSA-AES256-GCM-SHA384:"
+                            "ECDHE-RSA-AES256-GCM-SHA384:";
 
   ASSERT_EQ(1, SSL_CTX_set_strict_cipher_list(ctx.get(), input.c_str()));
 
@@ -578,7 +576,7 @@ struct Curves {
 
 class SSLTestWithCurves : public testing::TestWithParam<Curves> {};
 
-TEST_P(SSLTestWithCurves, test_SSL_get_curve_id) {
+TEST_P(SSLTestWithCurves, TestSslGetCurveId) {
   TempFile server_2_key_pem{server_2_key_pem_str};
   TempFile server_2_cert_chain_pem{server_2_cert_chain_pem_str};
 
@@ -658,11 +656,10 @@ TEST_P(SSLTestWithCurves, test_SSL_get_curve_id) {
 
 INSTANTIATE_TEST_SUITE_P(
     SSLTestWithCurves, SSLTestWithCurves,
-    ::testing::Values(
-        Curves{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
-               SN_secp521r1, SSL_CURVE_SECP521R1},
-        Curves{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
-               SN_X9_62_prime256v1, SSL_CURVE_SECP256R1}));
+    ::testing::Values(Curves{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
+                             SN_secp521r1, SSL_CURVE_SECP521R1},
+                      Curves{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
+                             SN_X9_62_prime256v1, SSL_CURVE_SECP256R1}));
 
 TEST(SSLTest, test_SSL_get_curve_name) {
   EXPECT_STREQ("P-256", SSL_get_curve_name(SSL_CURVE_SECP256R1));
@@ -688,7 +685,7 @@ struct Sigalgs {
 
 class SSLTestWithSigalgs : public testing::TestWithParam<Sigalgs> {};
 
-TEST_P(SSLTestWithSigalgs, test_SSL_get_peer_signature_algorithm) {
+TEST_P(SSLTestWithSigalgs, TestSSLGetPeerSignatureAlgorithm) {
   TempFile server_2_key_pem{server_2_key_pem_str};
   TempFile server_2_cert_chain_pem{server_2_cert_chain_pem_str};
 
@@ -986,6 +983,53 @@ TEST(SSLTest, test_SSL_set_chain_and_key) {
   server.join();
 }
 
+TEST(SSLTest, test_SSL_CTX_use_PrivateKey_rejects_mismatched_key) {
+  static const char ec_key_pem_str[] = R"""(-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYaVOdS9hbIFQie36
+RSm360v6DgYB+b/4/tEzFSYWjemhRANCAAQ5AnLARcrAxmDFO0+41L1Nw+EAXTDj
+PFQ4tz10wG0kw1Wh6tloaV+ei1ZBmdOI8igUST8Pc/FtQFDkF92E9OmK
+-----END PRIVATE KEY-----
+)""";
+
+  auto read_key = [](const char* pem_str) {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_str, strlen(pem_str)));
+    return bssl::UniquePtr<EVP_PKEY>(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  };
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_server_method()));
+  ASSERT_TRUE(ctx);
+
+  bssl::UniquePtr<BIO> cert_bio(
+      BIO_new_mem_buf(server_1_cert_pem_str, strlen(server_1_cert_pem_str)));
+  bssl::UniquePtr<X509> cert(PEM_read_bio_X509(cert_bio.get(), nullptr, nullptr, nullptr));
+  ASSERT_TRUE(cert);
+  ASSERT_EQ(1, SSL_CTX_use_certificate(ctx.get(), cert.get()));
+
+  // An EC key does not match the RSA certificate. OpenSSL would otherwise accept
+  // it into a separate slot, leaving SSL_CTX_get0_certificate() returning nullptr.
+  bssl::UniquePtr<EVP_PKEY> ec_key = read_key(ec_key_pem_str);
+  ASSERT_TRUE(ec_key);
+  EXPECT_EQ(0, SSL_CTX_use_PrivateKey(ctx.get(), ec_key.get()));
+  ASSERT_NE(nullptr, SSL_CTX_get0_certificate(ctx.get()));
+  EXPECT_EQ(0, X509_cmp(cert.get(), SSL_CTX_get0_certificate(ctx.get())));
+  ERR_clear_error();
+
+  // An RSA key that belongs to a different certificate is also rejected.
+  bssl::UniquePtr<EVP_PKEY> other_rsa_key = read_key(server_2_key_pem_str);
+  ASSERT_TRUE(other_rsa_key);
+  EXPECT_EQ(0, SSL_CTX_use_PrivateKey(ctx.get(), other_rsa_key.get()));
+  ASSERT_NE(nullptr, SSL_CTX_get0_certificate(ctx.get()));
+  EXPECT_EQ(0, X509_cmp(cert.get(), SSL_CTX_get0_certificate(ctx.get())));
+  ERR_clear_error();
+
+  // The matching key is accepted.
+  bssl::UniquePtr<EVP_PKEY> rsa_key = read_key(server_1_key_pem_str);
+  ASSERT_TRUE(rsa_key);
+  EXPECT_EQ(1, SSL_CTX_use_PrivateKey(ctx.get(), rsa_key.get()));
+  ASSERT_NE(nullptr, SSL_CTX_get0_certificate(ctx.get()));
+  EXPECT_EQ(0, X509_cmp(cert.get(), SSL_CTX_get0_certificate(ctx.get())));
+}
+
 TEST(SSLTest, test_SSL_SESSION_from_bytes) {
   TempFile root_ca_cert_pem{root_ca_cert_pem_str};
   TempFile server_2_cert_chain_pem{server_2_cert_chain_pem_str};
@@ -1123,14 +1167,13 @@ TEST(SSLTest, test_SSL_set1_curves_list) {
   struct {
     const char* curves;
     int expected_result;
-  } test_strings[]{
-      {SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1, 1},
-      {"P-521:P-256:X25519", 1},
-      {"P-521:P-25:X25519", 0},
-      {"no:valid:curves", 0},
-      {":", 0},
-      {":::", 0},
-      {"", 0}};
+  } test_strings[]{{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1, 1},
+                   {"P-521:P-256:X25519", 1},
+                   {"P-521:P-25:X25519", 0},
+                   {"no:valid:curves", 0},
+                   {":", 0},
+                   {":::", 0},
+                   {"", 0}};
 
   for (const auto& test_string : test_strings) {
     bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_server_method()));
@@ -1986,7 +2029,7 @@ TEST(SSLTest, test_SSL_CTX_set_custom_verify_alert_codes) {
     // specified TLS alert to the server and cause a handshake failure.
     SSL_CTX_set_custom_verify(
         client_ctx.get(), SSL_VERIFY_PEER,
-        [](SSL * ssl, uint8_t * out_alert) -> enum ssl_verify_result_t {
+        [](SSL * ssl, uint8_t* out_alert)->enum ssl_verify_result_t {
           *out_alert = *static_cast<uint8_t*>(SSL_get_app_data(ssl));
           return ssl_verify_invalid;
         });
@@ -2136,15 +2179,14 @@ TEST(SSLTest, test_SSL_get_all_group_names) {
   }
 }
 
-
 struct SSLFunc {
-  const char *name;
-  void (*func)(SSL *ssl);
+  const char* name;
+  void (*func)(SSL* ssl);
 };
 
 class SSLTestWithSSLFunc : public testing::TestWithParam<SSLFunc> {};
 
-TEST_P(SSLTestWithSSLFunc, test_func_clears_error_queue) {
+TEST_P(SSLTestWithSSLFunc, TestFuncClearsErrorQueue) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
 
@@ -2161,7 +2203,7 @@ TEST_P(SSLTestWithSSLFunc, test_func_clears_error_queue) {
   // none of them are our stale SSL_R_BAD_SIGNATURE error.
   while (unsigned long e = ERR_get_error()) {
     EXPECT_NE(ERR_GET_REASON(e), SSL_R_BAD_SIGNATURE)
-     << GetParam().name << " did not clear the stale error";
+        << GetParam().name << " did not clear the stale error";
   }
 }
 
@@ -2176,34 +2218,24 @@ TEST_P(SSLTestWithSSLFunc, test_func_clears_error_queue) {
 // - SSL_key_update()
 // - DTLSv1_handle_timeout()
 INSTANTIATE_TEST_SUITE_P(SSLTestWithSSLFunc, SSLTestWithSSLFunc,
-  ::testing::Values(
-    SSLFunc {
-      "SSL_do_handshake()",
-      [](SSL *ssl) {
-        SSL_do_handshake(ssl);
-      },
-    },
-    SSLFunc {
-      "SSL_read()",
-      [](SSL *ssl) {
-        char buf[1];
-        SSL_read(ssl, buf, sizeof(buf));
-      },
-    },
-    SSLFunc {
-      "SSL_write()",
-      [](SSL *ssl) {
-        char buf[1];
-        SSL_write(ssl, buf, sizeof(buf));
-      }
-    },
-    SSLFunc {
-      "SSL_shutdown()",
-      [](SSL *ssl) {
-        SSL_shutdown(ssl);
-      }
-    }
-));
+                         ::testing::Values(
+                             SSLFunc{
+                                 "SSL_do_handshake()",
+                                 [](SSL* ssl) { SSL_do_handshake(ssl); },
+                             },
+                             SSLFunc{
+                                 "SSL_read()",
+                                 [](SSL* ssl) {
+                                   char buf[1];
+                                   SSL_read(ssl, buf, sizeof(buf));
+                                 },
+                             },
+                             SSLFunc{"SSL_write()",
+                                     [](SSL* ssl) {
+                                       char buf[1];
+                                       SSL_write(ssl, buf, sizeof(buf));
+                                     }},
+                             SSLFunc{"SSL_shutdown()", [](SSL* ssl) { SSL_shutdown(ssl); }}));
 
 // A custom BIO backed by a raw fd. This mimics Envoy's io_handle_bio pattern.
 // The read callback returns 0 on EOF without setting any OpenSSL-specific EOF
@@ -2314,7 +2346,7 @@ TEST(SSLTest, test_custom_bio_eof) {
   // The error should be either SYSCALL (BoringSSL's typical EOF indication,
   // with errno 0) or ZERO_RETURN (clean shutdown).
   EXPECT_TRUE((err == SSL_ERROR_SYSCALL) || (err == SSL_ERROR_ZERO_RETURN))
-                    << "SSL_get_error returned " << err;
+      << "SSL_get_error returned " << err;
 
   // The error stack must be empty — a transport EOF is not a protocol error.
   // SSL_ERROR_SSL would push errors onto the stack; EOF should not.

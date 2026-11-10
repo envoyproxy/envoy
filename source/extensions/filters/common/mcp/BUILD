@@ -22,6 +22,5 @@ envoy_cc_library(
         "//envoy/stream_info:filter_state_interface",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
-        "//source/common/runtime:runtime_features_lib",
     ],
 )

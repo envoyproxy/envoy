@@ -1035,6 +1035,40 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_b
   callbacks->setDynamicMetadata(ns, metadata);
 }
 
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || !isValidModuleBuffer(filter_namespace) ||
+      !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
+
+  return ContextAccessor::setDynamicMetadataStruct(
+      callbacks->streamInfo(), absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_struct.ptr, serialized_struct.length));
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || !isValidModuleBuffer(filter_namespace) ||
+      !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
+
+  return ContextAccessor::setDynamicTypedMetadata(
+      callbacks->streamInfo(), absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_any.ptr, serialized_any.length));
+}
+
 size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
@@ -1301,6 +1335,22 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
     uint64_t event_id) {
   auto* scheduler = static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
   scheduler->commit(event_id);
+}
+
+// -----------------------------------------------------------------------------
+// Load Shed Point ABI Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name) {
+  auto* filter_config = static_cast<DynamicModuleListenerFilterConfig*>(filter_config_envoy_ptr);
+  if (!filter_config->load_shed_point_provider_.has_value()) {
+    return nullptr;
+  }
+  return filter_config->load_shed_point_provider_->getLoadShedPoint(
+      absl::string_view(name.ptr, name.length));
 }
 
 // -----------------------------------------------------------------------------

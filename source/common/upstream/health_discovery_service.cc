@@ -101,6 +101,9 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       // Get a grouping of hosts by locality.
       for (const auto& locality_hosts : hosts->hostsPerLocality().get()) {
+        if (locality_hosts.empty()) {
+          continue;
+        }
         // For this locality, add the response grouping.
         envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
             cluster_health->add_locality_endpoints_health();
@@ -130,6 +133,10 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           if (http_status.has_value()) {
             (*endpoint->mutable_health_metadata()->mutable_fields())["http_status_code"]
                 .set_number_value(http_status.value());
+          }
+
+          for (const auto& [key, value] : host->healthCheckMetadata()) {
+            (*endpoint->mutable_health_metadata()->mutable_fields())[key].set_string_value(value);
           }
 
           // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is

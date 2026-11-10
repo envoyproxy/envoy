@@ -1,7 +1,11 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include <algorithm>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/codes.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
@@ -9,12 +13,15 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/headers.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/server/generic_factory_context.h"
 
 namespace Envoy {
@@ -30,18 +37,44 @@ namespace {
 constexpr uint64_t kDefaultMaxReconnectBackoffMs = 30000;
 } // namespace
 
+void AttachedTunnelsRequest::resultsReady() {
+  if (admin_stream == nullptr) {
+    return;
+  }
+
+  absl::flat_hash_map<std::string, size_t> tunnels;
+  for (const auto& worker_map : active_tunnels) {
+    for (auto& [name, count] : worker_map) {
+      tunnels[std::move(name)] += count;
+    }
+  }
+
+  Buffer::OwnedImpl output;
+  for (auto& [name, count] : tunnels) {
+    output.add(std::move(name));
+    output.add(": ");
+    output.add(std::to_string(count));
+    output.add("\n");
+  }
+  admin_stream->getDecoderFilterCallbacks().encodeData(output, true);
+}
+
 ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
         DownstreamReverseConnectionSocketInterface& config)
-    : context_(context), config_(config) {
-  stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
+    : context_(context), config_(config),
+      stat_prefix_(PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator")),
+      tunnel_setup_time_(getHistogram("tunnel_setup_time", context_.scope())) {
   // Configure detailed stats flag (defaults to false).
   enable_detailed_stats_ = config.enable_detailed_stats();
   max_reconnect_backoff_ms_ =
       PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
   maintain_interval_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(
       config, maintain_interval, ReverseConnectionUtility::kDefaultMaintainIntervalMs);
+  // Deadline for receiving the handshake response. Defaults to 15s.
+  handshake_timeout_ms_ =
+      PROTOBUF_GET_MS_OR_DEFAULT(config.http_handshake(), handshake_timeout, 15000);
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
     handshake_request_path_ = config.http_handshake().request_path();
   } else {
@@ -112,6 +145,14 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& serv
   // Retain the server so the initiator can reach hotRestart() to gate dialing on the parent
   // being told to stop accepting new connections during a hot restart.
   server_ = &server;
+
+  if (auto admin = server_->admin(); admin.has_value()) {
+    const bool rc =
+        admin->addHandler("/reverse_tunnel/tunnels",
+                          "list active reverse tunnels per source cluster, node and tenant",
+                          MAKE_ADMIN_HANDLER(tunnelsHandler), true, false);
+    RELEASE_ASSERT(rc, "/reverse_tunnel/tunnels admin endpoint is taken");
+  }
 
   // Provider-backed formatters (e.g. %FILE_CONTENT%, and secret/SDS-backed formatters) resolve
   // their value through a provider whose data lives in a ThreadLocal slot. That slot is populated
@@ -477,6 +518,77 @@ void ReverseTunnelInitiatorExtension::incrementHandshakeStats(const std::string&
             "reverse_tunnel: incremented handshake stat {} with tags worker={}, cluster={}, "
             "result={}, failure_reason={}",
             base_stat_name, dispatcher_name, cluster_id, result_value, failure_reason);
+}
+
+Stats::Histogram& ReverseTunnelInitiatorExtension::getHistogram(absl::string_view name,
+                                                                Stats::Scope& stats_store) {
+  std::string stat_name = fmt::format("{}.{}", stat_prefix_, name);
+  Stats::StatNameManagedStorage stat_name_storage(stat_name, stats_store.symbolTable());
+  return stats_store.histogramFromStatName(stat_name_storage.statName(),
+                                           Stats::Histogram::Unit::Milliseconds);
+}
+
+void ReverseTunnelInitiatorExtension::activeTunnels(
+    const std::function<void()>& callback,
+    absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3>& active_tunnels) const {
+  RELEASE_ASSERT(tls_slot_, "admin handler must be initialized after the tls slot");
+
+  tls_slot_->runOnAllThreads(
+      [&active_tunnels](OptRef<DownstreamSocketThreadLocal> local) {
+        if (!local.has_value()) {
+          return;
+        }
+
+        auto index = local->index();
+        if (!index.has_value()) {
+          return;
+        }
+        local->activeTunnels(active_tunnels[index.value()]);
+      },
+      callback);
+}
+
+void DownstreamSocketThreadLocal::activeTunnels(
+    absl::flat_hash_map<std::string, size_t>& active_tunnels) const {
+  for (const auto* io_handle : io_handles_) {
+    active_tunnels[io_handle->connectionInfo()]++;
+  }
+}
+
+std::optional<size_t> DownstreamSocketThreadLocal::index() const {
+  std::string name = dispatcher_.name();
+  if (!absl::StartsWith(name, dispatcher_prefix_)) {
+    return std::nullopt;
+  }
+
+  size_t idx;
+  if (!absl::SimpleAtoi(name.substr(dispatcher_prefix_.size()), &idx)) {
+    return std::nullopt;
+  }
+
+  return idx;
+}
+
+Http::Code
+ReverseTunnelInitiatorExtension::tunnelsHandler(Http::ResponseHeaderMap& response_headers,
+                                                Buffer::Instance& response,
+                                                Server::AdminStream& admin_stream) {
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+
+  const uint32_t concurrency = context_.options().concurrency();
+  if (concurrency == 0) {
+    response.add("server concurrency is zero");
+    return Http::Code::ServiceUnavailable;
+  }
+
+  auto attached = std::make_shared<AttachedTunnelsRequest>(&admin_stream, concurrency);
+  admin_stream.setEndStreamOnComplete(false);
+
+  admin_stream.addOnDestroyCallback([attached] { attached->admin_stream = nullptr; });
+
+  activeTunnels([attached]() { attached->resultsReady(); }, attached->active_tunnels);
+
+  return Http::Code::OK;
 }
 
 } // namespace ReverseConnection

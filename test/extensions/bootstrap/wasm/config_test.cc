@@ -22,6 +22,7 @@ protected:
   WasmFactoryTest() {
     config_.mutable_config()->mutable_vm_config()->set_runtime(
         absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    config_.mutable_config()->mutable_vm_config()->set_allow_precompiled(true);
     if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
           TestEnvironment::substitute(
@@ -47,7 +48,7 @@ protected:
     EXPECT_CALL(context_, initManager()).WillRepeatedly(testing::ReturnRef(init_manager_));
     EXPECT_CALL(context_, lifecycleNotifier())
         .WillRepeatedly(testing::ReturnRef(lifecycle_notifier_));
-    extension_ = factory->createBootstrapExtension(config, context_);
+    extension_ = std::move(factory->createBootstrapExtension(config, context_).value());
     extension_->onServerInitialized(server_);
     static_cast<Bootstrap::Wasm::WasmServiceExtension*>(extension_.get())->wasmService();
     EXPECT_CALL(init_watcher_, ready());
@@ -66,7 +67,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFactoryTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::host_test_runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasm) {

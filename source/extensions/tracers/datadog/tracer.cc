@@ -35,8 +35,9 @@ std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     TimeSource& time_source) {
   config.logger = std::make_shared<Logger>(logger);
   config.agent.event_scheduler = std::make_shared<EventScheduler>(dispatcher);
-  config.agent.http_client = std::make_shared<AgentHTTPClient>(
+  auto http_client = std::make_shared<AgentHTTPClient>(
       cluster_manager, collector_cluster, collector_reference_host, tracer_stats, time_source);
+  config.agent.http_client = http_client;
 
   // Disable telemetry to avoid needing a separate HTTP client for telemetry.
   // Envoy has its own telemetry system and doesn't need dd-trace-cpp's telemetry.
@@ -51,13 +52,21 @@ std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     return std::make_shared<Tracer::ThreadLocalTracer>();
   }
 
-  return std::make_shared<Tracer::ThreadLocalTracer>(*maybe_config);
+  return std::make_shared<Tracer::ThreadLocalTracer>(*maybe_config, std::move(http_client));
 }
 
 } // namespace
 
-Tracer::ThreadLocalTracer::ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config)
-    : tracer(config) {}
+Tracer::ThreadLocalTracer::ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config,
+                                             std::shared_ptr<AgentHTTPClient> http_client)
+    : tracer(config), http_client(std::move(http_client)) {}
+
+Tracer::ThreadLocalTracer::~ThreadLocalTracer() {
+  tracer.reset();
+  if (http_client != nullptr) {
+    http_client->shutdown();
+  }
+}
 
 Tracer::Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                const datadog::tracing::TracerConfig& config,
@@ -132,10 +141,12 @@ datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tra
     // error occurred during extraction.
     //
     // Either way, we're going to create a new root span, but if an error
-    // occurred we're going to log the error.
+    // occurred we're going to count it. Clients control the trace context
+    // headers, so the error is only logged at debug level.
     if (error->code != datadog::tracing::Error::NO_SPAN_TO_EXTRACT) {
+      tracer_stats_.extraction_errors_.inc();
       ENVOY_LOG(
-          error,
+          debug,
           "Unable to extract span context. Creating a new trace instead. Error [error {}]: {}",
           int(error->code), error->message);
     }

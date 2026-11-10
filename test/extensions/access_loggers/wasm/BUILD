@@ -22,7 +22,10 @@ envoy_extension_cc_test(
         "//test/extensions/access_loggers/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.access_loggers.wasm"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/access_loggers/wasm:config",

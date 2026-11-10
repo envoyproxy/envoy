@@ -1228,8 +1228,40 @@ public:
 
   void onStreamComplete() override {
     const TimingInfo timing = handle_.getTimingInfo();
-    assertTrue(timing.start_time_unix_ns > 0, "start time");
-    assertTrue(timing.request_complete_duration_ns >= 0, "request complete duration");
+    assertTrue(timing.start_time_unix_ns.value() > 0, "start time");
+    assertTrue(timing.downstream_connection_begin_ns.has_value(), "downstream connection accepted");
+    assertTrue(!timing.downstream_handshake_start_ns.has_value(),
+               "no downstream TLS handshake start");
+    assertTrue(!timing.downstream_handshake_complete_ns.has_value(),
+               "no downstream TLS handshake completion");
+    assertTrue(timing.last_downstream_header_rx_byte_received_ns.value() >= 0,
+               "request headers received");
+    assertTrue(timing.last_downstream_rx_byte_received_ns.value() >=
+                   timing.last_downstream_header_rx_byte_received_ns.value(),
+               "request received");
+    assertTrue(timing.upstream_connect_start_ns.value() >= 0, "upstream connect start");
+    assertTrue(timing.upstream_connect_complete_ns.value() >=
+                   timing.upstream_connect_start_ns.value(),
+               "upstream connect complete");
+    assertTrue(!timing.upstream_handshake_complete_ns.has_value(), "no upstream TLS handshake");
+    assertTrue(timing.first_upstream_tx_byte_sent_ns.value() >= 0, "upstream request start");
+    assertTrue(timing.last_upstream_tx_byte_sent_ns.value() >=
+                   timing.first_upstream_tx_byte_sent_ns.value(),
+               "upstream request complete");
+    assertTrue(timing.first_upstream_rx_byte_received_ns.value() >= 0, "upstream response start");
+    assertTrue(timing.first_upstream_rx_body_byte_received_ns.value() >=
+                   timing.first_upstream_rx_byte_received_ns.value(),
+               "upstream response body start");
+    assertTrue(timing.last_upstream_rx_byte_received_ns.value() >=
+                   timing.first_upstream_rx_body_byte_received_ns.value(),
+               "upstream response complete");
+    assertTrue(timing.first_downstream_tx_byte_sent_ns.value() >= 0, "downstream response start");
+    assertTrue(timing.last_downstream_tx_byte_sent_ns.value() >=
+                   timing.first_downstream_tx_byte_sent_ns.value(),
+               "downstream response complete");
+    assertTrue(!timing.last_downstream_ack_received_ns.has_value(), "no TCP final ACK marker");
+    assertTrue(timing.request_complete_duration_ns.value() >= 0, "request complete duration");
+    assertTrue(!timing.downstream_connection_end_ns.has_value(), "connection remains open");
     assertEq(static_cast<size_t>(handle_.incrementCounterValue(timing_observed_total_, 1)),
              static_cast<size_t>(MetricsResult::Success), "timing counter");
   }
@@ -2208,6 +2240,64 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(RuntimeValuesConfigFactory, "runtime_values");
+
+// -----------------------------------------------------------------------------
+// LoadShedPoint
+// -----------------------------------------------------------------------------
+
+// Sends a local reply when the load shed point named in the filter config sheds the request.
+// Otherwise it tells the upstream in a request header whether it got the load shed point.
+class LoadShedPointFilter : public HttpFilter {
+public:
+  LoadShedPointFilter(HttpFilterHandle& handle, bool has_load_shed_point, bool shed_load)
+      : handle_(handle), has_load_shed_point_(has_load_shed_point), shed_load_(shed_load) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
+    if (!shed_load_) {
+      headers.set("x-load-shed-point", has_load_shed_point_ ? "present" : "absent");
+      return HeadersStatus::Continue;
+    }
+    handle_.sendLocalResponse(503, {}, "shed", "");
+    return HeadersStatus::StopAllAndBuffer;
+  }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  const bool has_load_shed_point_;
+  const bool shed_load_;
+};
+
+class LoadShedPointFilterFactory : public HttpFilterFactory {
+public:
+  explicit LoadShedPointFilterFactory(std::unique_ptr<LoadShedPoint> load_shed_point)
+      : load_shed_point_(std::move(load_shed_point)) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<LoadShedPointFilter>(handle, load_shed_point_ != nullptr,
+                                                 load_shed_point_ != nullptr &&
+                                                     load_shed_point_->shouldShedLoad());
+  }
+
+private:
+  const std::unique_ptr<LoadShedPoint> load_shed_point_;
+};
+
+class LoadShedPointConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    return std::make_unique<LoadShedPointFilterFactory>(handle.getLoadShedPoint(config_view));
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(LoadShedPointConfigFactory, "load_shed_point");
 
 } // namespace DynamicModules
 } // namespace Envoy

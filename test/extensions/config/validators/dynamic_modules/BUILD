@@ -1,21 +1,25 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_validator_test",
     srcs = ["config_validator_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:config_validator_test",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config.validators.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/config:decoded_resource_lib",
@@ -34,14 +38,18 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_validator_integration_test",
     size = "large",
     srcs = ["config_validator_integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:config_validator_test",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config.validators.dynamic_modules"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

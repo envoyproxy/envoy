@@ -28,6 +28,7 @@ type filter struct {
 
 	// test mode, from query parameters
 	async       bool
+	async_data  bool   // only DecodeData runs in a goroutine
 	sleep       bool   // all sleep
 	data_sleep  bool   // only sleep in data phase
 	localreplay string // send local reply
@@ -72,6 +73,9 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 	f.query_params = parseQuery(f.path)
 	if f.query_params.Get("async") != "" {
 		f.async = true
+	}
+	if f.query_params.Get("async_data") != "" {
+		f.async_data = true
 	}
 	if f.query_params.Get("sleep") != "" {
 		f.sleep = true
@@ -487,7 +491,7 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 }
 
 func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	if f.async {
+	if f.async || f.async_data {
 		go func() {
 			defer f.callbacks.DecoderFilterCallbacks().RecoverPanic()
 

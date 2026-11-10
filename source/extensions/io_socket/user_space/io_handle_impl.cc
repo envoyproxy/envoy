@@ -74,13 +74,22 @@ void IoHandleImpl::setAbortiveClose() {
 }
 
 void IoHandleImpl::onPeerDestroy() {
-  peer_handle_ = nullptr;
-  sent_eof_ = true;
+  // The peer has called close(). If this handle has already sent EOF to the peer, then this
+  // completes the half-close; otherwise, subsequent read() calls should return ECONNRESET.
+  //
   // Same guard as the abortive close path in setAbortiveClose(): both turn a peer-side
   // disconnect into a reset on the read side, so they are enabled and disabled together.
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket") &&
+      !sent_eof_) {
     receive_data_reset_after_drain_ = true;
+  }
+  peer_handle_ = nullptr;
+  sent_eof_ = true;
+  if (user_file_event_) {
+    // A connection waiting to flush may only be listening for Write. Wake it so that it can
+    // detect the closed peer and release its pending write buffer.
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
   }
 }
 

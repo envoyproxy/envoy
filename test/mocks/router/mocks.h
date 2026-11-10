@@ -167,6 +167,11 @@ public:
     return reset_headers_;
   }
   bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
+  RetryStatePtr createRetryState(Http::RequestHeaderMap& request_headers,
+                                 const Upstream::ClusterInfo& cluster,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override;
 
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
@@ -250,6 +255,7 @@ public:
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
   MOCK_METHOD(DoRetryType, doRetryType, (), (const));
+  MOCK_METHOD(bool, isAutomaticallyConfiguredForHttp3, (), (const));
 
   DoRetryCallback callback_;
 };
@@ -298,7 +304,9 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              const Http::AsyncClient::RequestOptions& options) override {
+              const Http::AsyncClient::RequestOptions& options,
+              const ShadowPolicyStatsSharedPtr& stats) override {
+    last_stats_ = stats;
     shadow_(cluster, request, options);
   }
 
@@ -308,12 +316,17 @@ public:
 
   Http::AsyncClient::OngoingRequest*
   streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& request,
-                  const Http::AsyncClient::RequestOptions& options) override {
+                  const Http::AsyncClient::RequestOptions& options,
+                  const ShadowPolicyStatsSharedPtr& stats) override {
+    last_stats_ = stats;
     return streamingShadow_(cluster, request, options);
   }
   MOCK_METHOD(Http::AsyncClient::OngoingRequest*, streamingShadow_,
               (const std::string& cluster, Http::RequestHeaderMapPtr& request,
                const Http::AsyncClient::RequestOptions& options));
+
+  // The stats passed to the last shadow() or streamingShadow() call.
+  ShadowPolicyStatsSharedPtr last_stats_;
 };
 
 class TestVirtualCluster : public VirtualCluster {
@@ -663,7 +676,8 @@ public:
   // Router::RouteSpecifier
   MOCK_METHOD(OnRouteResult, onRoute,
               (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
+               OnRouteInputStatus input_status),
               (const));
 };
 

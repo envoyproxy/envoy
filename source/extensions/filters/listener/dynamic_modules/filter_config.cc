@@ -15,8 +15,10 @@ DynamicModuleListenerFilterConfig::DynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
     Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
-    Event::Dispatcher& main_thread_dispatcher)
+    Event::Dispatcher& main_thread_dispatcher,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider)
     : cluster_manager_(cluster_manager), main_thread_dispatcher_(main_thread_dispatcher),
+      load_shed_point_provider_(load_shed_point_provider),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       metrics_(*stats_scope_), filter_name_(filter_name), filter_config_(filter_config),
       dynamic_module_(std::move(dynamic_module)) {}
@@ -37,7 +39,8 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
     Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
-    Event::Dispatcher& main_thread_dispatcher) {
+    Event::Dispatcher& main_thread_dispatcher,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider) {
 
   // Resolve the symbols for the listener filter using graceful error handling.
   auto on_config_new =
@@ -91,7 +94,7 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
 
   auto config = std::make_shared<DynamicModuleListenerFilterConfig>(
       filter_name, filter_config, metrics_namespace, std::move(dynamic_module), cluster_manager,
-      stats_scope, main_thread_dispatcher);
+      stats_scope, main_thread_dispatcher, load_shed_point_provider);
 
   // Store the resolved function pointers.
   config->on_listener_filter_config_destroy_ = on_config_destroy.value();

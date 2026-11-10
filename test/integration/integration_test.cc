@@ -8,6 +8,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/registry/registry.h"
 
+#if defined(__linux__)
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#endif
 #include "source/common/common/cpu_affinity.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -24,6 +27,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -126,6 +130,51 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
   initialize();
   test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
+
+#if defined(__linux__)
+// Entering a network namespace requires CAP_SYS_ADMIN, so setns() is faked and only counted.
+class FakeSetns : public Api::LinuxOsSysCallsImpl {
+public:
+  Api::SysCallIntResult setns(int, int) const override {
+    calls_++;
+    return {0, 0};
+  }
+
+  uint32_t calls() const { return calls_; }
+
+private:
+  mutable std::atomic<uint32_t> calls_{0};
+};
+
+// Verify that the main thread leaves the network namespace of a listener that fails to bind there.
+TEST_P(IntegrationTest, BindFailureInNetworkNamespace) {
+  FakeSetns fake_setns;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&fake_setns};
+  // The namespace file only has to exist since setns() is faked.
+  const std::string netns_path = TestEnvironment::writeStringToFileForTest("netns", "");
+  // Reserve a port without reuse_port so that the listener fails to bind it.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, false);
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* socket_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_port_value(
+        addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
+    socket_address->set_network_namespace_filepath(netns_path);
+  });
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
+  // One call enters the network namespace and one leaves it.
+  EXPECT_EQ(2, fake_setns.calls());
+  // Shut down the server before linux_os_calls and fake_setns go out of scope.
+  test_server_.reset();
+}
+#endif
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {

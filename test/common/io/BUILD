@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "io_uring_impl_test",
     srcs = ["io_uring_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
     tags = [
         "nocompdb",
         "skip_on_windows",
@@ -31,7 +30,6 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_impl_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "linux_x64_small",
     deps = [
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",
@@ -52,7 +50,6 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_impl_integration_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/api:os_sys_calls_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -71,11 +68,13 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_factory_impl_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ] + select({
         "//bazel:linux": [
             "//source/common/io:io_uring_impl_lib",

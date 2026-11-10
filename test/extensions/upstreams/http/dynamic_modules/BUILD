@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     data = [
@@ -22,7 +25,8 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_stop_and_buffer",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_terminal_response",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.upstreams.http.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -40,14 +44,18 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:upstream_http_tcp_bridge",
     ],
-    rbe_pool = "linux_x64_medium",
+    extension_names = ["envoy.upstreams.http.dynamic_modules"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     shard_count = 4,
     tags = [
         "cpu:3",

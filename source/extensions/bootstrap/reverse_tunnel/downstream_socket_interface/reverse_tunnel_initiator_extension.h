@@ -6,11 +6,13 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -20,6 +22,7 @@
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +31,18 @@ namespace ReverseConnection {
 
 // Forward declarations
 class DownstreamSocketThreadLocal;
+class DownstreamReverseConnectionIOHandle;
+
+struct AttachedTunnelsRequest {
+  AttachedTunnelsRequest(Server::AdminStream* stream, uint32_t concurrency)
+      : admin_stream(stream), active_tunnels(concurrency) {}
+
+  void resultsReady();
+
+  Server::AdminStream* admin_stream;
+  absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3> active_tunnels;
+};
+using AttachedTunnelsRequestSharedPtr = std::shared_ptr<AttachedTunnelsRequest>;
 
 struct HandshakeHeader {
   Http::LowerCaseString key;
@@ -124,6 +139,11 @@ public:
   uint64_t maintainIntervalMs() const { return maintain_interval_ms_; }
 
   /**
+   * @return the handshake response deadline in milliseconds.
+   */
+  uint64_t handshakeTimeoutMs() const { return handshake_timeout_ms_; }
+
+  /**
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
@@ -195,6 +215,13 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  void activeTunnels(
+      const std::function<void()>& callback,
+      absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3>& active_tunnels) const;
+
+  Http::Code tunnelsHandler(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                            Server::AdminStream& admin_stream);
+
   void setTestOnlyAccessLogs(AccessLog::InstanceSharedPtrVector access_logs) {
     access_logs_ = std::move(access_logs);
   }
@@ -210,11 +237,15 @@ private:
   bool enable_detailed_stats_{false};
   uint64_t max_reconnect_backoff_ms_{};
   uint64_t maintain_interval_ms_{};
+  uint64_t handshake_timeout_ms_{};
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
   HandshakeHeadersConstSharedPtr handshake_headers_;
   AccessLog::InstanceSharedPtrVector access_logs_;
+
+  // Makes a histogram with the given name and stats store.
+  Stats::Histogram& getHistogram(absl::string_view name, Stats::Scope& stats_store);
 
   /**
    * Update per-worker connection stats for debugging purposes.
@@ -227,6 +258,10 @@ private:
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
                                       const std::string& state_suffix, bool increment);
+
+public:
+  // Keep at the end as it depends on stat prefix.
+  Stats::Histogram& tunnel_setup_time_;
 };
 
 /**
@@ -248,9 +283,23 @@ public:
    */
   Stats::Scope& scope() { return scope_; }
 
+  void activeTunnels(absl::flat_hash_map<std::string, size_t>& active_tunnels) const;
+
+  void registerIoHandle(const DownstreamReverseConnectionIOHandle* io_handle) {
+    io_handles_.insert(io_handle);
+  }
+
+  void unregisterIoHandle(const DownstreamReverseConnectionIOHandle* io_handle) {
+    io_handles_.erase(io_handle);
+  }
+
+  std::optional<size_t> index() const;
+
 private:
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
+  absl::flat_hash_set<const DownstreamReverseConnectionIOHandle*> io_handles_;
+  static constexpr absl::string_view dispatcher_prefix_{"worker_"};
 };
 
 } // namespace ReverseConnection

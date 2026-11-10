@@ -89,12 +89,19 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
       scope_(createStatsScope(factory_context.scope(), stat_prefix, from_rds, route_config_name_)),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
-                   [this]() { subscription_->start({route_config_name_}); }),
+                   [this]() {
+                     // Start with no concrete subscription; virtual hosts are fetched on demand.
+                     // Accept every resource under this route configuration's namespace, so that
+                     // on-demand virtual hosts -- whose resource names are
+                     // "<route_config_name>/<vhost>" -- are routed back to this subscription's
+                     // watch without being subscribed on the wire.
+                     subscription_->accept({route_config_name_ + "/*"});
+                     subscription_->start({});
+                   }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name") {
   const auto resource_name = resource_type_helper_.getResourceName();
   Envoy::Config::SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
   absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           route_config.vhds().config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,

@@ -6,3 +6,16 @@ start_year: 2018
 ignored_cves:
 # Patch applied https://github.com/envoyproxy/envoy/pull/44565
 - CVE-2026-27135
+
+# JS-only: type confusion in Maglev/TurboFan inlining of Array.prototype.sort (polymorphic elements_kind feedback).
+# Envoy's wee8 exposes only the Wasm C-API (proxy-wasm-cpp-host src/v8/v8.cc); no JavaScript is parsed or executed,
+# so the JS JIT path and Array builtins are unreachable.
+- CVE-2026-85046
+
+# We don't use the affected feature in Envoy's context.
+- CVE-2026-58055
+
+# C-only: heap overflow in msgpack_unpacker_expand_buffer (src/unpack.c), reached via the
+# msgpack_unpacker_reserve_buffer C API. Envoy uses the header-only C++ library (msgpack-cxx)
+# and only packs (fluentd access logger/tracer); the C unpacker is neither built nor called.
+- CVE-2026-72854

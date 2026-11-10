@@ -2,6 +2,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -756,8 +758,6 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
 // Test that RBAC cannot be bypassed by sending duplicate headers.
 TEST_P(RBACIntegrationTest, MultiValueHeaderBypassPrevented) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_match_headers_individually",
-                                    "true");
   config_helper_.prependFilter(RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY);
   initialize();
 
@@ -781,35 +781,6 @@ TEST_P(RBACIntegrationTest, MultiValueHeaderBypassPrevented) {
   EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
-}
-
-// Test that duplicate headers bypass RBAC when individual matching is disabled (old behavior).
-TEST_P(RBACIntegrationTest, MultiValueHeaderConcatenatedMatchAllowsBypass) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_match_headers_individually",
-                                    "false");
-  config_helper_.prependFilter(RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY);
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Create headers with duplicate x-internal values
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "sni.lyft.com"},
-      {"x-forwarded-for", "10.0.0.1"},
-      {"x-internal", "true"},
-  };
-  headers.addCopy(Http::LowerCaseString("x-internal"), "other");
-
-  auto response = codec_client_->makeRequestWithBody(headers, 1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, RouteMetadataMatcherAllow) {
@@ -1840,6 +1811,93 @@ typed_config:
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
 #endif
+
+// The stats are identical in the legacy tag-extraction mode (IPv4) and the explicit tags mode
+// (IPv6).
+TEST_P(RBACIntegrationTest, StatsTagsAndNamesAreIdenticalInBothModes) {
+  // The mode is read during server initialization, so it must be set directly rather than with
+  // addRuntimeOverride().
+  const bool explicit_tags = version_ == Network::Address::IpVersion::v6;
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicit_tags);
+  config_helper_.prependFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules_stat_prefix: "rules_prefix_"
+  track_per_rule_stats: true
+  rules:
+    policies:
+      foo:
+        permissions:
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
+        principals:
+          - any: true
+  shadow_rules:
+    policies:
+      foo:
+        permissions:
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
+        principals:
+          - any: true
+)EOF");
+  initialize();
+
+  // Sanity check that the mode really took effect.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicit_tags);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Checks a counter's flat name, tag-extracted name and tags.
+  auto expect_stat = [this](const std::string& name, const std::string& tag_extracted_name,
+                            std::vector<std::pair<std::string, std::string>> expected_tags) {
+    const Stats::CounterSharedPtr counter = test_server_->counter(name);
+    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+    EXPECT_EQ(counter->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+    std::vector<std::pair<std::string, std::string>> actual_tags;
+    for (const Stats::Tag& tag : counter->tags()) {
+      actual_tags.emplace_back(tag.name_, tag.value_);
+    }
+    std::sort(actual_tags.begin(), actual_tags.end());
+    std::sort(expected_tags.begin(), expected_tags.end());
+    EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
+  };
+
+  expect_stat("http.config_test.rbac.rules_prefix_.allowed", "http.rbac.allowed",
+              {{"envoy.http_conn_manager_prefix", "config_test"},
+               {"envoy.rbac_http_prefix", "rules_prefix_"}});
+  expect_stat("http.config_test.rbac.rules_prefix_.policy.foo.allowed", "http.rbac.policy.allowed",
+              {{"envoy.http_conn_manager_prefix", "config_test"},
+               {"envoy.rbac_http_prefix", "rules_prefix_"},
+               {"envoy.rbac_policy_name", "foo"}});
+  // The shadow rules have an empty stat prefix.
+  expect_stat("http.config_test.rbac.shadow_allowed", "http.rbac.shadow_allowed",
+              {{"envoy.http_conn_manager_prefix", "config_test"}});
+  expect_stat(
+      "http.config_test.rbac.policy.foo.shadow_allowed", "http.rbac.policy.shadow_allowed",
+      {{"envoy.http_conn_manager_prefix", "config_test"}, {"envoy.rbac_policy_name", "foo"}});
+}
 
 } // namespace
 } // namespace Envoy

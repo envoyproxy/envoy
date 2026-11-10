@@ -8,6 +8,7 @@
 #include "source/extensions/filters/common/lua/lua.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "openssl/evp.h"
 
 namespace Envoy {
@@ -509,18 +510,23 @@ public:
 
 private:
   /**
+   * @param 1 (string): optional namespace of the metadata. The filter config name is used if it
+   *        is not set.
    * @return a handle to the metadata.
    */
   DECLARE_LUA_FUNCTION(RouteWrapper, luaMetadata);
 
-  const Protobuf::Struct& getMetadata() const;
+  const Protobuf::Struct& getMetadata(absl::string_view ns) const;
 
   // Filters::Common::Lua::BaseLuaObject
-  void onMarkDead() override { metadata_wrapper_.reset(); }
+  void onMarkDead() override { metadata_wrappers_.clear(); }
 
   const StreamInfo::StreamInfo& stream_info_;
   const absl::string_view filter_config_name_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  // The metadata wrappers keyed by the namespace. The empty key is used for the default namespace.
+  absl::flat_hash_map<std::string,
+                      Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>>
+      metadata_wrappers_;
 };
 
 /**

@@ -236,6 +236,9 @@ HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
     if (origin_data.h3_status_tracker) {
       entry_it->second.h3_status_tracker = std::move(origin_data.h3_status_tracker);
     }
+    if (origin_data.concurrent_streams != 0) {
+      entry_it->second.concurrent_streams = origin_data.concurrent_streams;
+    }
 
     return entry_it;
   }

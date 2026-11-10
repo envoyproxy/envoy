@@ -65,17 +65,11 @@ public:
       return {};
     }
 
-    std::vector<envoy_dynamic_module_type_envoy_http_header> raw(header_count);
-    size_t size_out = 0;
-    if (!envoy_dynamic_module_callback_early_header_mutation_get_headers(host_ptr_, raw.data(),
-                                                                         raw.size(), &size_out)) {
+    std::vector<HeaderView> result_headers(header_count);
+    if (!envoy_dynamic_module_callback_early_header_mutation_get_headers(
+            host_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_http_header*>(
+                           result_headers.data()))) {
       return {};
-    }
-    std::vector<HeaderView> result_headers;
-    result_headers.reserve(size_out);
-    for (size_t i = 0; i < size_out; i++) {
-      result_headers.emplace_back(raw[i].key_ptr, raw[i].key_length, raw[i].value_ptr,
-                                  raw[i].value_length);
     }
     return result_headers;
   }

@@ -8,6 +8,8 @@
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/tracers/dynamic_modules/tracer_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -37,8 +39,8 @@ Tracing::DriverSharedPtr DynamicModuleTracerFactory::createTracerDriver(
       Extensions::DynamicModules::incrementLoadFailure(
           server_context, proto_config.tracer_name(),
           Extensions::DynamicModules::ConfigInitErrorStat);
-      throw EnvoyException("Failed to parse tracer config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(
+          absl::StrCat("Failed to parse tracer config: ", config_or_error.status().message()));
     }
     tracer_config_str = std::move(config_or_error.value());
   }
@@ -55,8 +57,8 @@ Tracing::DriverSharedPtr DynamicModuleTracerFactory::createTracerDriver(
     Extensions::DynamicModules::incrementLoadFailure(
         server_context, proto_config.tracer_name(),
         Extensions::DynamicModules::ConfigInitErrorStat);
-    throw EnvoyException("Failed to create tracer config: " +
-                         std::string(tracer_config.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to create tracer config: ", tracer_config.status().message()));
   }
 
   if (Runtime::runtimeFeatureEnabled(

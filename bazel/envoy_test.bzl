@@ -18,18 +18,22 @@ load(
     "tcmalloc_external_deps",
 )
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":envoy_rbe.bzl", _envoy_exec_properties = "envoy_exec_properties")
 load(":envoy_select.bzl", "deprecate_repository")
 
 _APPLE = Label("//bazel:apple")
 _ASAN_BUILD = Label("//bazel:asan_build")
+_TSAN_BUILD = Label("//bazel:tsan_build")
+_MSAN_BUILD = Label("//bazel:msan_build")
 _BENCHMARK_MAIN_LIB = Label("//test/benchmark:main_lib")
 _BENCHMARK_MAIN_SRC = Label("//test/benchmark:main.cc")
 _ENABLE_EXPORTED_SYMBOLS = Label("//bazel:enable_exported_symbols")
-_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
 _EXPORTED_SYMBOLS = Label("//bazel:exported_symbols.txt")
 _EXPORTED_SYMBOLS_APPLE = Label("//bazel:exported_symbols_apple.txt")
 _EXPORTED_SYMBOLS_WINDOWS = Label("//bazel:exported_symbols_windows.def")
 _FUZZING_ENGINE = Label("//bazel:fuzzing_engine")
+
+envoy_exec_properties = _envoy_exec_properties
 _LIBFUZZER = Label("//bazel:libfuzzer")
 _LIBFUZZER_COVERAGE = Label("//bazel:libfuzzer_coverage")
 _LINUX = Label("//bazel:linux")
@@ -128,10 +132,8 @@ def envoy_cc_fuzz_test(
         deps = [],
         tags = [],
         **kwargs):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    lib_exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus_files"
         native.filegroup(
@@ -144,12 +146,12 @@ def envoy_cc_fuzz_test(
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        exec_properties = exec_properties,
+        exec_properties = lib_exec_properties,
         deps = deps + envoy_stdlib_deps() + [
             Label("//test/fuzz:fuzz_runner_lib"),
             _TEST_VERSION_LINKSTAMP,
         ],
-        tags = tags,
+        tags = tags + ["skip_on_windows"],
         **kwargs
     )
 
@@ -180,7 +182,7 @@ def envoy_cc_fuzz_test(
             ],
         }) + deprecate_repository("envoy_cc_fuzz_test", repository),
         size = size,
-        tags = ["fuzz_target"] + tags,
+        tags = ["fuzz_target"] + tags + ["skip_on_windows"],
     )
 
     fuzzing_decoration(
@@ -191,6 +193,14 @@ def envoy_cc_fuzz_test(
         dicts = dictionaries,
         define_regression_test = False,
     )
+
+def envoy_test_env(env = {}):
+    return env | select({
+        _ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+        _TSAN_BUILD: {"TSAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+        _MSAN_BUILD: {"MSAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
+        "//conditions:default": {},
+    })
 
 # Envoy C++ test targets should be specified with this function.
 def envoy_cc_test(
@@ -213,17 +223,17 @@ def envoy_cc_test(
         flaky = False,
         env = {},
         rbe_pool = None,
-        exec_properties = {}):
+        exec_properties = {},
+        target_compatible_with = []):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     cc_test(
         name = name,
         srcs = srcs,
         data = data + select({
             _ASAN_BUILD: ["@llvm_toolchain_llvm//:symbolizer"],
+            _TSAN_BUILD: ["@llvm_toolchain_llvm//:symbolizer"],
+            _MSAN_BUILD: ["@llvm_toolchain_llvm//:symbolizer"],
             "//conditions:default": [],
         }),
         copts = envoy_copts(test = True) + copts + envoy_pch_copts(_TEST_PCH),
@@ -244,11 +254,9 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
-        env = env | select({
-            _ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
-            "//conditions:default": {},
-        }),
+        env = envoy_test_env(env),
         exec_properties = exec_properties,
+        target_compatible_with = target_compatible_with,
     )
 
 # Envoy C++ test targets loading dynamic modules should be specified with this macro.
@@ -278,10 +286,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
     disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
@@ -370,10 +375,7 @@ def envoy_benchmark_test(
         tags = [],
         repository = "",
         **kargs):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     sh_test(
         name = name,
         srcs = [Label("//bazel:test_for_benchmark_wrapper.sh")],

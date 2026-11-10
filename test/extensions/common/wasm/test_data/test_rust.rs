@@ -7,6 +7,7 @@
 // tools/wee8_compile/wee8_compile_tool test_rust.wasm test_rust.wasm
 
 // Import functions exported from the host environment.
+#[link(wasm_import_module = "env")]
 extern "C" {
   fn pong(value: u32);
   fn random() -> u32;

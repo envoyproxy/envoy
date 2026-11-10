@@ -1,3 +1,10 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
+#include "source/common/common/base64.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
@@ -46,6 +53,35 @@ public:
 
   std::string testDataDir(const std::string& subdir) {
     return TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/" + subdir);
+  }
+
+  // Starts Envoy with the bootstrap_cluster_writer_test module, which writes startup_cluster at
+  // startup when it is not empty.
+  void initializeWithClusterWriter(const std::string& startup_cluster) {
+    TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir("rust"), 1);
+    config_helper_.addBootstrapExtension(
+        fmt::format(R"EOF(
+      name: envoy.bootstrap.dynamic_modules
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+        dynamic_module_config:
+          name: bootstrap_cluster_writer_test
+        extension_name: writer
+        extension_config:
+          "@type": type.googleapis.com/google.protobuf.BytesValue
+          value: "{}"
+    )EOF",
+                    Base64::encode(startup_cluster.data(), startup_cluster.size())));
+    HttpIntegrationTest::initialize();
+  }
+
+  // Sends an action to the admin endpoint of the bootstrap_cluster_writer_test module.
+  std::string clusterWriterRequest(absl::string_view action, const std::string& body) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "POST", absl::StrCat("/cluster_writer?", action), body,
+        Http::CodecType::HTTP1, version_);
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return response->body();
   }
 };
 
@@ -164,6 +200,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
 // This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint
 // and respond to admin requests.
 TEST_P(DynamicModulesBootstrapIntegrationTest, AdminHandlerRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   EXPECT_LOG_CONTAINS(
       "info", "Admin handler registered: true",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_admin_handler_test"));
@@ -327,6 +364,526 @@ typed_config:
     // No x-routed-to header should be present.
     EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-routed-to")).empty());
   }
+}
+
+// Verifies a Rust bootstrap extension can enumerate active resource names by kind via
+// active_resource_names() and check that a set of expected names is present.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  // Name the default listener's filter chain so the module observes it by name.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_filter_chains(0)->set_name("chain_0");
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The static upstream cluster and the named filter chain are observed, and the subset check
+  // passes.
+  EXPECT_THAT(response->body(), testing::HasSubstr("cluster_0"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("chain_0"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("present=true"));
+}
+
+// Verifies the FilterChain accessor enumerates FCDS filter chains. The listener uses fcds_config,
+// so its filter chain (`fc_a`) is delivered as a standalone FilterChain xDS resource and lives in
+// the shared FCDS manager, not the listener's inline FilterChainManager. It must still be observed
+// (this fails when the accessor only reads inline chains).
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesFcdsRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  // A file-based FCDS resource carrying one filter chain named `fc_a` (HCM -> cluster_0).
+  const std::string fcds_yaml = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.FilterChain
+  name: fc_a
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: fc_a
+      route_config:
+        name: fcds_route
+        virtual_hosts:
+        - name: fcds_vhost
+          domains: ["*"]
+          routes:
+          - match: {prefix: "/"}
+            route: {cluster: cluster_0}
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF";
+  const std::string fcds_path =
+      TestEnvironment::writeStringToFileForTest("fcds_fc_a.yaml", fcds_yaml);
+
+  config_helper_.addConfigModifier([fcds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    // Move the listener to FCDS: drop the inline chain, point fcds_config at the file, and select
+    // `fc_a` for every connection via the matcher's on_no_match.
+    listener->mutable_filter_chains()->Clear();
+    auto* config_source = listener->mutable_fcds_config()->mutable_config_source();
+    config_source->mutable_path_config_source()->set_path(fcds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    const std::string matcher_yaml = R"EOF(
+      on_no_match:
+        action:
+          name: filter-chain-name
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: fc_a
+    )EOF";
+    TestUtility::loadFromYaml(matcher_yaml, *listener->mutable_filter_chain_matcher());
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The FCDS-delivered filter chain is observed under the FilterChain kind.
+  EXPECT_THAT(response->body(), testing::HasSubstr("fc_a"));
+}
+
+// Verifies the accessors reflect resource removal: a dynamic cluster delivered via file-based CDS
+// is observed, then removed by rewriting the CDS file. Once the cluster manager applies the removal
+// the module no longer reports it, while the static cluster remains. Guards the "drained resource
+// disappears from the getter" path.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesClusterRemovalRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  const std::string cds_with = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_dyn
+    endpoints: []
+)EOF";
+  const std::string cds_empty = R"EOF(
+version_info: "2"
+resources: []
+)EOF";
+  const std::string cds_readd = R"EOF(
+version_info: "3"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_dyn
+    endpoints: []
+)EOF";
+  const std::string cds_path =
+      TestEnvironment::writeStringToFileForTest("config_names_cds.yaml", cds_with);
+  config_helper_.addConfigModifier([cds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+    cds->mutable_path_config_source()->set_path(cds_path);
+    cds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  // The dynamic cluster is observed alongside the static one.
+  BufferingStreamDecoderPtr before = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", before->headers().getStatusValue());
+  EXPECT_THAT(before->body(), testing::HasSubstr("cluster_dyn"));
+  EXPECT_THAT(before->body(), testing::HasSubstr("cluster_0"));
+
+  // Remove the dynamic cluster by atomically replacing the CDS file, then wait for the cluster
+  // manager to apply the removal (deterministic, no sleep).
+  const std::string cds_empty_path =
+      TestEnvironment::writeStringToFileForTest("config_names_cds_empty.yaml", cds_empty);
+  TestEnvironment::renameFile(cds_empty_path, cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
+
+  // The drained cluster is gone from the accessor; the static cluster remains.
+  BufferingStreamDecoderPtr after = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", after->headers().getStatusValue());
+  EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("cluster_dyn")));
+  EXPECT_THAT(after->body(), testing::HasSubstr("cluster_0"));
+
+  // Re-add the dynamic cluster: the accessor observes it again, so the getter tracks churn both
+  // ways (added -> removed -> added), not just the initial state.
+  const std::string cds_readd_path =
+      TestEnvironment::writeStringToFileForTest("config_names_cds_readd.yaml", cds_readd);
+  TestEnvironment::renameFile(cds_readd_path, cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_added", testing::Ge(2));
+  BufferingStreamDecoderPtr readded = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", readded->headers().getStatusValue());
+  EXPECT_THAT(readded->body(), testing::HasSubstr("cluster_dyn"));
+}
+
+namespace {
+
+// Appends a STATIC cluster named `name`; for each entry in `match_names` it adds a transport socket
+// match of that name backed by a raw_buffer socket, so the cluster's transportSocketMatcher reports
+// exactly those match names.
+void addClusterWithTransportSocketMatches(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                          const std::string& name,
+                                          const std::vector<std::string>& match_names) {
+  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+connect_timeout: 0.25s
+type: STATIC
+load_assignment:
+  cluster_name: {}
+  endpoints: []
+)EOF",
+                                        name, name),
+                            *cluster);
+  for (const std::string& match_name : match_names) {
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+match:
+  stage: "{}"
+transport_socket:
+  name: envoy.transport_sockets.raw_buffer
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+)EOF",
+                                          match_name, match_name),
+                              *cluster->add_transport_socket_matches());
+  }
+}
+
+} // namespace
+
+// The TransportSocketMatch accessor reports the intersection over clusters that have matches:
+// `cluster_tsm_a` carries {m1, m2} and `cluster_tsm_b` carries {m1}, so only m1 (present in both)
+// is reported.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchIntersectionRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_a", {"m1", "m2"});
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_b", {"m1"});
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("transport_socket_matches=[m1]"));
+  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("m2")));
+}
+
+// A cluster with no transport socket matches does not empty the intersection: `cluster_tsm_a`
+// carries {m1, m2} and `cluster_tsm_bare` carries none, so both m1 and m2 remain reported.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchEmptyClusterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_a", {"m1", "m2"});
+    addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_bare", {});
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("transport_socket_matches=[m1,m2]"));
+}
+
+// A transport socket match drops from the reported set once it is no longer present in every
+// matched cluster. A dynamic cluster is delivered with {m1, m2}; rewriting it to carry only {m1}
+// shrinks the reported set to {m1}, so m2 is no longer reported.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchRemovalRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  const std::string cds_two_matches = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_tsm_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_tsm_dyn
+    endpoints: []
+  transport_socket_matches:
+  - name: m1
+    match:
+      stage: "m1"
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+  - name: m2
+    match:
+      stage: "m2"
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+)EOF";
+  const std::string cds_one_match = R"EOF(
+version_info: "2"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cluster_tsm_dyn
+  connect_timeout: 0.25s
+  type: STATIC
+  load_assignment:
+    cluster_name: cluster_tsm_dyn
+    endpoints: []
+  transport_socket_matches:
+  - name: m1
+    match:
+      stage: "m1"
+    transport_socket:
+      name: envoy.transport_sockets.raw_buffer
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+)EOF";
+  const std::string cds_path =
+      TestEnvironment::writeStringToFileForTest("config_names_tsm_cds.yaml", cds_two_matches);
+  config_helper_.addConfigModifier([cds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+    cds->mutable_path_config_source()->set_path(cds_path);
+    cds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr before = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", before->headers().getStatusValue());
+  EXPECT_THAT(before->body(), testing::HasSubstr("transport_socket_matches=[m1,m2]"));
+
+  // Rewrite the CDS file so the cluster carries only m1, then wait for the update to apply.
+  const std::string cds_one_path =
+      TestEnvironment::writeStringToFileForTest("config_names_tsm_cds_one.yaml", cds_one_match);
+  TestEnvironment::renameFile(cds_one_path, cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_modified", testing::Ge(1));
+
+  BufferingStreamDecoderPtr after = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", after->headers().getStatusValue());
+  EXPECT_THAT(after->body(), testing::HasSubstr("transport_socket_matches=[m1]"));
+  EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("m2")));
+}
+
+// A filter chain is reported only while it is committed in an active listener. `fc_a` is delivered
+// via FCDS and observed; removing it from the FCDS resource set drops it from the reported names.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesFcdsRemovalRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  const std::string fcds_with_fc_a = R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.FilterChain
+  name: fc_a
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      stat_prefix: fc_a
+      route_config:
+        name: fcds_route
+        virtual_hosts:
+        - name: fcds_vhost
+          domains: ["*"]
+          routes:
+          - match: {prefix: "/"}
+            route: {cluster: cluster_0}
+      http_filters:
+      - name: envoy.filters.http.router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF";
+  const std::string fcds_empty = R"EOF(
+version_info: "2"
+resources: []
+)EOF";
+  const std::string fcds_path =
+      TestEnvironment::writeStringToFileForTest("fcds_removal_fc_a.yaml", fcds_with_fc_a);
+
+  config_helper_.addConfigModifier([fcds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_filter_chains()->Clear();
+    auto* config_source = listener->mutable_fcds_config()->mutable_config_source();
+    config_source->mutable_path_config_source()->set_path(fcds_path);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    const std::string matcher_yaml = R"EOF(
+      on_no_match:
+        action:
+          name: filter-chain-name
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: fc_a
+    )EOF";
+    TestUtility::loadFromYaml(matcher_yaml, *listener->mutable_filter_chain_matcher());
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_names_test");
+
+  BufferingStreamDecoderPtr before = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", before->headers().getStatusValue());
+  EXPECT_THAT(before->body(), testing::HasSubstr("fc_a"));
+
+  // Remove `fc_a` from FCDS and wait for the removal update to apply, then confirm it is no longer
+  // reported (first delivery bumps update_success to 1; the removal update bumps it to 2).
+  const std::string fcds_empty_path =
+      TestEnvironment::writeStringToFileForTest("fcds_removal_empty.yaml", fcds_empty);
+  TestEnvironment::renameFile(fcds_empty_path, fcds_path);
+  test_server_->waitForCounter("filter_chain_manager.fc_a.update_success", testing::Ge(2));
+
+  BufferingStreamDecoderPtr after = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_names", "", Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("200", after->headers().getStatusValue());
+  EXPECT_THAT(after->body(), testing::Not(testing::HasSubstr("fc_a")));
+}
+
+// Verifies that a module adds, fails and removes clusters through the cluster writer, that
+// requests reach a written cluster, and that its worker event runs on every worker.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  concurrency_ = 2;
+  // Route the requests to a cluster that only exists once the module writes it.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        route_config->mutable_validate_clusters()->set_value(false);
+        route_config->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route()->set_cluster(
+            "writer.a");
+      });
+  initializeWithClusterWriter("");
+
+  envoy::config::cluster::v3::Cluster cluster =
+      ConfigHelper::buildStaticCluster("writer.a", fake_upstreams_[0]->localAddress()->ip()->port(),
+                                       Network::Test::getLoopbackAddressString(version_));
+  // The fake upstream speaks HTTP/1.
+  cluster.clear_typed_extension_protocol_options();
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  EXPECT_EQ("Success 1", clusterWriterRequest("add=writer.a", serialized_cluster));
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+  EXPECT_EQ(1,
+            test_server_->gauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer")
+                ->value());
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(1));
+  EXPECT_THAT(clusterWriterRequest("outcomes", ""), testing::HasSubstr("1 writer.a Active"));
+
+  // Once the worker event completed, every worker routes to the written cluster.
+  EXPECT_EQ("true", clusterWriterRequest("run_on_all_workers=7", ""));
+  test_server_->waitForGauge("dynamicmodulescustom.last_done_event_id", testing::Eq(7));
+  EXPECT_EQ(2, test_server_->counter("dynamicmodulescustom.worker_events_total")->value());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+
+  // A cluster whose configuration has another name fails.
+  EXPECT_EQ("Success 2", clusterWriterRequest("add=writer.b", serialized_cluster));
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_failed.config_name.writer",
+                               testing::Eq(1));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
+  EXPECT_THAT(clusterWriterRequest("outcomes", ""),
+              testing::HasSubstr("2 writer.b Failed cluster writer.b is named writer.a"));
+
+  EXPECT_EQ("Success", clusterWriterRequest("remove=writer.a", ""));
+  test_server_->waitForGauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer",
+                             testing::Eq(0));
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
+}
+
+// Verifies that CDS keeps a written cluster that its updates leave out, and that the writer gives
+// up a cluster that CDS replaces.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterWithCdsRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  const std::string cds_path = TestEnvironment::writeStringToFileForTest("cluster_writer_cds.yaml",
+                                                                         R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: cds_cluster
+  connect_timeout: 0.25s
+  type: STATIC
+)EOF");
+  config_helper_.addConfigModifier([cds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+    cds->mutable_path_config_source()->set_path(cds_path);
+    cds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  });
+  initializeWithClusterWriter("");
+
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("writer.a");
+  cluster.mutable_connect_timeout()->set_seconds(1);
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  EXPECT_EQ("Success 1", clusterWriterRequest("add=writer.a", serialized_cluster));
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+
+  // A CDS update without the written cluster removes only the CDS cluster.
+  TestEnvironment::renameFile(TestEnvironment::writeStringToFileForTest(
+                                  "cluster_writer_cds_empty.yaml", "version_info: \"2\""),
+                              cds_path);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
+  BufferingStreamDecoderPtr clusters = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/clusters", "", Http::CodecType::HTTP1, version_);
+  EXPECT_THAT(clusters->body(), testing::HasSubstr("writer.a::"));
+  EXPECT_THAT(clusters->body(), testing::Not(testing::HasSubstr("cds_cluster::")));
+
+  // A CDS update that replaces the written cluster takes it over, so later writes of it fail.
+  TestEnvironment::renameFile(TestEnvironment::writeStringToFileForTest("cluster_writer_cds_a.yaml",
+                                                                        R"EOF(
+version_info: "3"
+resources:
+- "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  name: writer.a
+  connect_timeout: 2s
+  type: STATIC
+)EOF"),
+                              cds_path);
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.ownership_lost.config_name.writer",
+                               testing::Eq(1));
+  test_server_->waitForGauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer",
+                             testing::Eq(0));
+  EXPECT_EQ("Success 2", clusterWriterRequest("add=writer.a", serialized_cluster));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
+  EXPECT_THAT(
+      clusterWriterRequest("outcomes", ""),
+      testing::HasSubstr("2 writer.a Failed cluster writer.a exists and is not owned by this "
+                         "extension"));
+  EXPECT_EQ("NotFound", clusterWriterRequest("remove=writer.a", ""));
+}
+
+// Verifies that a worker event posted while Envoy starts, before the main dispatcher runs, runs on
+// every worker when the module signals that its initialization is complete from a later scheduler
+// event.
+TEST_P(DynamicModulesBootstrapIntegrationTest, RunOnAllWorkersAtStartupC) {
+  concurrency_ = 2;
+  initializeWithBootstrapExtension(testDataDir("c"), "bootstrap_optional_hooks", "test",
+                                   "run_on_all_workers_at_startup");
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_total", testing::Eq(2));
+}
+
+// Verifies that a write from a scheduler event that the module commits in config_new is applied.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterStartupRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("writer.startup");
+  cluster.mutable_connect_timeout()->set_seconds(1);
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  initializeWithClusterWriter(serialized_cluster);
+  test_server_->waitForCounter("dynamic_modules.cluster_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/clusters", "", Http::CodecType::HTTP1, version_);
+  EXPECT_THAT(response->body(), testing::HasSubstr("writer.startup::"));
 }
 
 } // namespace DynamicModules

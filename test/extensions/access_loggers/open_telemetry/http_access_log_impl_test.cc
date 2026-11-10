@@ -21,7 +21,6 @@ namespace AccessLoggers {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -118,35 +117,34 @@ TEST_F(HttpAccessLoggerImplTest, CreateExporterAndExportLog) {
                     Http::AsyncClient::RequestOptions()
                         .setTimeout(std::chrono::milliseconds(250))
                         .setDiscardResponseBody(true)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            // Verify OTLP HTTP spec compliance: POST method and protobuf content-type.
-            EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
-            EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
-                      message->headers().getContentTypeValue());
+        // Verify OTLP HTTP spec compliance: POST method and protobuf content-type.
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
+                  message->headers().getContentTypeValue());
 
-            EXPECT_EQ("/otlp/v1/logs", message->headers().getPathValue());
-            EXPECT_EQ("some-o11y.com", message->headers().getHostValue());
+        EXPECT_EQ("/otlp/v1/logs", message->headers().getPathValue());
+        EXPECT_EQ("some-o11y.com", message->headers().getHostValue());
 
-            // Verify User-Agent follows OTLP spec.
-            EXPECT_TRUE(absl::StartsWith(message->headers().getUserAgentValue(),
-                                         "OTel-OTLP-Exporter-Envoy/"));
+        // Verify User-Agent follows OTLP spec.
+        EXPECT_TRUE(
+            absl::StartsWith(message->headers().getUserAgentValue(), "OTel-OTLP-Exporter-Envoy/"));
 
-            // Custom headers provided in the configuration.
-            EXPECT_EQ("auth-token", message->headers()
-                                        .get(Http::LowerCaseString("authorization"))[0]
-                                        ->value()
-                                        .getStringView());
-            EXPECT_EQ("custom-value", message->headers()
-                                          .get(Http::LowerCaseString("x-custom-header"))[0]
-                                          ->value()
-                                          .getStringView());
+        // Custom headers provided in the configuration.
+        EXPECT_EQ("auth-token", message->headers()
+                                    .get(Http::LowerCaseString("authorization"))[0]
+                                    ->value()
+                                    .getStringView());
+        EXPECT_EQ("custom-value", message->headers()
+                                      .get(Http::LowerCaseString("x-custom-header"))[0]
+                                      ->value()
+                                      .getStringView());
 
-            return &request;
-          }));
+        return &request;
+      });
 
   opentelemetry::proto::logs::v1::LogRecord log_record;
   log_record.set_severity_number(opentelemetry::proto::logs::v1::SEVERITY_NUMBER_INFO);
@@ -208,12 +206,11 @@ TEST_F(HttpAccessLoggerImplTest, ExportLogsNonSuccessStatusCode) {
   Http::AsyncClient::Callbacks* callback;
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
+        return &request;
+      });
 
   opentelemetry::proto::logs::v1::LogRecord log_record;
   log_record.set_severity_number(opentelemetry::proto::logs::v1::SEVERITY_NUMBER_ERROR);
@@ -246,12 +243,11 @@ TEST_F(HttpAccessLoggerImplTest, ExportLogsHttpFailure) {
   Http::AsyncClient::Callbacks* callback;
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
+        return &request;
+      });
 
   opentelemetry::proto::logs::v1::LogRecord log_record;
   log_record.set_severity_number(opentelemetry::proto::logs::v1::SEVERITY_NUMBER_INFO);
@@ -332,12 +328,11 @@ TEST_F(HttpAccessLoggerImplTest, BufferOverflowTriggersFlush) {
 
   // Expect a flush triggered by buffer overflow (not timer).
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
+        return &request;
+      });
 
   opentelemetry::proto::logs::v1::LogRecord log_record;
   log_record.set_severity_number(opentelemetry::proto::logs::v1::SEVERITY_NUMBER_INFO);
@@ -439,22 +434,21 @@ TEST_F(HttpAccessLoggerImplTest, LogWithResourceDetectors) {
   setupWithConfig(http_service, config);
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
-            EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
-            EXPECT_EQ(1, request_msg.resource_logs_size());
-            const auto& resource = request_msg.resource_logs(0).resource();
-            bool found_service_name = false;
-            for (const auto& attr : resource.attributes()) {
-              if (attr.key() == "service.name" && attr.value().string_value() == "http-service") {
-                found_service_name = true;
-              }
-            }
-            EXPECT_TRUE(found_service_name);
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
+        EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
+        EXPECT_EQ(1, request_msg.resource_logs_size());
+        const auto& resource = request_msg.resource_logs(0).resource();
+        bool found_service_name = false;
+        for (const auto& attr : resource.attributes()) {
+          if (attr.key() == "service.name" && attr.value().string_value() == "http-service") {
+            found_service_name = true;
+          }
+        }
+        EXPECT_TRUE(found_service_name);
+        return nullptr;
+      });
 
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity");
@@ -486,24 +480,23 @@ TEST_F(HttpAccessLoggerImplTest, LogWithCustomResourceProvider) {
   setupWithConfig(http_service, config, resource_provider);
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
-            EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
-            EXPECT_EQ(1, request_msg.resource_logs_size());
-            EXPECT_EQ("https://opentelemetry.io/schemas/1.24.0",
-                      request_msg.resource_logs(0).schema_url());
-            const auto& res = request_msg.resource_logs(0).resource();
-            bool found_custom_attr = false;
-            for (const auto& attr : res.attributes()) {
-              if (attr.key() == "custom.key" && attr.value().string_value() == "custom.value") {
-                found_custom_attr = true;
-              }
-            }
-            EXPECT_TRUE(found_custom_attr);
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
+        EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
+        EXPECT_EQ(1, request_msg.resource_logs_size());
+        EXPECT_EQ("https://opentelemetry.io/schemas/1.24.0",
+                  request_msg.resource_logs(0).schema_url());
+        const auto& res = request_msg.resource_logs(0).resource();
+        bool found_custom_attr = false;
+        for (const auto& attr : res.attributes()) {
+          if (attr.key() == "custom.key" && attr.value().string_value() == "custom.value") {
+            found_custom_attr = true;
+          }
+        }
+        EXPECT_TRUE(found_custom_attr);
+        return nullptr;
+      });
 
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity");

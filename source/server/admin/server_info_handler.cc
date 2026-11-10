@@ -20,9 +20,9 @@ Http::Code ServerInfoHandler::handlerCerts(Http::ResponseHeaderMap& response_hea
   envoy::admin::v3::Certificates certificates;
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
     envoy::admin::v3::Certificate& certificate = *certificates.add_certificates();
-    if (context.getCaCertInformation() != nullptr) {
+    for (const auto& ca_cert_details : context.getCaCertInformation()) {
       envoy::admin::v3::CertificateDetails* ca_certificate = certificate.add_ca_cert();
-      *ca_certificate = *context.getCaCertInformation();
+      *ca_certificate = *ca_cert_details;
     }
     for (const auto& cert_details : context.getCertChainInformation()) {
       envoy::admin::v3::CertificateDetails* cert_chain = certificate.add_cert_chain();

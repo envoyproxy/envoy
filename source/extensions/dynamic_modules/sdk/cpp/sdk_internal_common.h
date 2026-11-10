@@ -4,8 +4,10 @@
 #include <exception>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -14,6 +16,21 @@
 
 namespace Envoy {
 namespace DynamicModules {
+
+// HeaderView is cast to and from the ABI header structs in place, which avoids copying the headers
+// into a second array, so it must keep the layout of those structs.
+static_assert(std::is_standard_layout_v<HeaderView>);
+static_assert(sizeof(HeaderView) == sizeof(envoy_dynamic_module_type_envoy_http_header));
+static_assert(alignof(HeaderView) == alignof(envoy_dynamic_module_type_envoy_http_header));
+static_assert(sizeof(HeaderView) == sizeof(envoy_dynamic_module_type_module_http_header));
+static_assert(alignof(HeaderView) == alignof(envoy_dynamic_module_type_module_http_header));
+// The member order is checked where the compiler can, since it does not change the size.
+#if defined(__has_builtin)
+#if __has_builtin(__is_layout_compatible)
+static_assert(__is_layout_compatible(HeaderView, envoy_dynamic_module_type_envoy_http_header));
+static_assert(__is_layout_compatible(HeaderView, envoy_dynamic_module_type_module_http_header));
+#endif
+#endif
 
 // Logs an exception caught at the ABI boundary at error level so a failure inside a module hook
 // stays visible.
@@ -128,6 +145,35 @@ private:
   uint64_t next_task_id_{1}; // 0 is reserved.
   std::map<uint64_t, std::function<void()>> tasks_;
 };
+
+/**
+ * Implements LoadShedPoint against the C ABI.
+ */
+class LoadShedPointImpl : public LoadShedPoint {
+public:
+  explicit LoadShedPointImpl(envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point)
+      : load_shed_point_(load_shed_point) {}
+
+  bool shouldShedLoad() override {
+    return envoy_dynamic_module_callback_load_shed_point_should_shed_load(load_shed_point_);
+  }
+
+private:
+  envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point_;
+};
+
+/**
+ * Wraps a load shed point that a get_load_shed_point callback returned.
+ * @param load_shed_point The load shed point, which is null when there is none.
+ * @return The load shed point, or nullptr if there is none.
+ */
+inline std::unique_ptr<LoadShedPoint>
+newLoadShedPoint(envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point) {
+  if (load_shed_point == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<LoadShedPointImpl>(load_shed_point);
+}
 
 } // namespace DynamicModules
 } // namespace Envoy

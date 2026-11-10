@@ -1373,8 +1373,8 @@ TEST(DefaultCertValidatorTest, SharesCaCertsAcrossContexts) {
   // Both validators reference the same parsed CA certificates, cached exactly
   // once, and each still reports the CA it was configured with.
   EXPECT_EQ(getCaCertCache(context.singletonManager())->size(), 1);
-  EXPECT_NE(validator1.getCaCertInformation(), nullptr);
-  EXPECT_NE(validator2.getCaCertInformation(), nullptr);
+  EXPECT_FALSE(validator1.getCaCertInformation().empty());
+  EXPECT_FALSE(validator2.getCaCertInformation().empty());
 
   // A validator using different CA content adds a second cache entry.
   const std::string other_ca_cert = TestEnvironment::readFileToStringForTest(

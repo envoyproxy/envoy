@@ -102,6 +102,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
     "envoy.matching.matchers.dynamic_modules":           "//source/extensions/matching/input_matchers/dynamic_modules:config",
     "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
+    "envoy.matching.matchers.uri_template":             "//source/extensions/matching/input_matchers/uri_template:config",
 
     #
     # Network Matchers
@@ -219,6 +220,7 @@ EXTENSIONS = {
     "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
+    "envoy.filters.http.priority_load_shed":            "//source/extensions/filters/http/priority_load_shed:config",
     "envoy.filters.http.proto_message_extraction":      "//source/extensions/filters/http/proto_message_extraction:config",
     "envoy.filters.http.proto_api_scrubber":            "//source/extensions/filters/http/proto_api_scrubber:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
@@ -309,6 +311,7 @@ EXTENSIONS = {
     "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
     "envoy.resource_monitors.cpu_utilization":          "//source/extensions/resource_monitors/cpu_utilization:config",
     "envoy.resource_monitors.cgroup_memory":          "//source/extensions/resource_monitors/cgroup_memory:config",
+    "envoy.resource_monitors.dynamic_modules":        "//source/extensions/resource_monitors/dynamic_modules:config",
 
     #
     # Stat sinks
@@ -456,6 +459,12 @@ EXTENSIONS = {
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
+    # TLS handshakers
+    #
+
+    "envoy.tls.handshakers.dynamic_modules":             "//source/extensions/transport_sockets/tls/handshakers/dynamic_modules:config",
+
+    #
     # HTTP header formatters
     #
 
@@ -497,7 +506,16 @@ EXTENSIONS = {
     #
     # AI filters
     #
+    "envoy.http.ai_filters.model_router":               "//source/extensions/http/ai_filters/model_router:config",
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
+    "envoy.http.ai_filters.route_selector":             "//source/extensions/http/ai_filters/route_selector:config",
+    "envoy.http.ai_filters.schema_validation":          "//source/extensions/http/ai_filters/schema_validation:config",
+    "envoy.http.ai_filters.transcoder":                 "//source/extensions/http/ai_filters/transcoder:config",
+
+    #
+    # AI Protocol Manager External Buffer
+    #
+    "envoy.ai_protocol_manager.external_buffer.in_memory": "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
 
     #
     # Injected credentials
@@ -618,6 +636,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
+    "envoy.load_balancing_policies.host_allowlist":    "//source/extensions/load_balancing_policies/host_allowlist:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
     "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 
@@ -676,6 +695,7 @@ EXTENSIONS = {
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 
     # Certificate selectors
+    "envoy.tls.certificate_selectors.dynamic_modules":                   "//source/extensions/transport_sockets/tls/cert_selectors/dynamic_modules:config",
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
@@ -689,6 +709,7 @@ EXTENSIONS = {
     #
     # Queue policy
     #
+    "envoy.queue_policy.adaptive_lifo": "//source/extensions/queue_policy/adaptive_lifo:adaptive_lifo_queue_policy_impl",
     "envoy.queue_policy.fifo":   "//source/extensions/queue_policy/fifo:fifo_queue_policy_impl",
 }
 

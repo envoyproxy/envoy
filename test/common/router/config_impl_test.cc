@@ -20,6 +20,8 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 
@@ -2763,6 +2765,114 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, VirtualHostExists) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact_vhost
+  domains: ["example.com", "foo.bar.com"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+- name: wildcard_suffix_vhost
+  domains: ["*.wildcard-suffix.com"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+- name: wildcard_prefix_vhost
+  domains: ["wildcard-prefix.*"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+  factory_context_.cluster_manager_.initializeClusters({"dummy"}, {});
+
+  // Without default virtual host and with ignore_port_in_host_matching = false
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+    // Exact domain match (returns true)
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_TRUE(config.virtualHostExists("foo.bar.com"));
+
+    // Case-insensitive match (returns true)
+    EXPECT_TRUE(config.virtualHostExists("EXAMPLE.COM"));
+    EXPECT_TRUE(config.virtualHostExists("Foo.Bar.Com"));
+
+    // Non-existent domain (returns false when no default virtual host is configured)
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+    EXPECT_FALSE(config.virtualHostExists("example.org"));
+
+    // Wildcard domain match (suffix and prefix)
+    EXPECT_TRUE(config.virtualHostExists("sub.wildcard-suffix.com"));
+    EXPECT_TRUE(config.virtualHostExists("wildcard-prefix.net"));
+    EXPECT_FALSE(config.virtualHostExists("wildcard-suffix.com"));
+    EXPECT_FALSE(config.virtualHostExists("other-prefix.com"));
+
+    // Port in domain with ignore_port_in_host_matching = false (returns false)
+    EXPECT_FALSE(config.virtualHostExists("example.com:8080"));
+    EXPECT_FALSE(config.virtualHostExists("sub.wildcard-suffix.com:443"));
+  }
+
+  // Set ignore_port_in_host_matching to true
+  route_configuration.set_ignore_port_in_host_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+    // Port in domain with ignore_port_in_host_matching = true (returns true)
+    EXPECT_TRUE(config.virtualHostExists("example.com:8080"));
+    EXPECT_TRUE(config.virtualHostExists("EXAMPLE.COM:8080"));
+    EXPECT_TRUE(config.virtualHostExists("sub.wildcard-suffix.com:443"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com:8080"));
+  }
+
+  // Default virtual host ("*") returns true for arbitrary domains
+  const std::string default_vhost_yaml = R"EOF(
+virtual_hosts:
+- name: default_vhost
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+  )EOF";
+  auto default_route_configuration = parseRouteConfigurationFromYaml(default_vhost_yaml);
+  {
+    TestConfigImpl config(default_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_TRUE(config.virtualHostExists("any.random.domain.org"));
+    EXPECT_TRUE(config.virtualHostExists(""));
+  }
+
+  // Empty virtual_hosts returns false for all domains
+  {
+    envoy::config::route::v3::RouteConfiguration empty_route_configuration;
+    TestConfigImpl config(empty_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_FALSE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists(""));
+  }
+
+  // Alternate vhost_header does not affect direct domain matching in virtualHostExists
+  {
+    auto vhost_header_route_configuration = route_configuration;
+    vhost_header_route_configuration.set_vhost_header("alternate");
+    TestConfigImpl config(vhost_header_route_configuration, factory_context_, true,
+                          creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+  }
+}
+
 TEST_F(RouteMatcherTest, Priority) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -4166,7 +4276,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4183,7 +4293,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -4245,7 +4355,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4262,7 +4372,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -4894,6 +5004,50 @@ virtual_hosts:
   EXPECT_EQ(1, bar_shadow_policies.size());
   EXPECT_EQ("some_cluster", bar_shadow_policies[0]->cluster());
   EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesStatPrefix) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          stat_prefix: foo_mirror
+        - cluster: some_cluster
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  ShadowPolicyStatsSharedPtr stats;
+  {
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+    const auto& shadow_policies =
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+    ASSERT_EQ(2, shadow_policies.size());
+    EXPECT_EQ(nullptr, shadow_policies[1]->stats());
+    stats = shadow_policies[0]->stats();
+    ASSERT_NE(nullptr, stats);
+  }
+
+  // The stats outlive the route configuration so that in-flight mirrors can still record them.
+  stats->rq_sampled_.inc();
+  stats->rq_no_cluster_.inc();
+  stats->rq_started_.inc();
+  stats->rq_success_.inc();
+  stats->rq_failure_.inc();
+  stats->rq_cancelled_.inc();
+  for (const std::string name :
+       {"rq_sampled", "rq_no_cluster", "rq_started", "rq_success", "rq_failure", "rq_cancelled"}) {
+    EXPECT_EQ(1U, factory_context_.store_.counterFromString("mirror.foo_mirror." + name).value())
+        << name;
+  }
 }
 
 // Test for request mirror policies with headers - verifies header mutations are applied correctly.
@@ -10636,6 +10790,33 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "Cannot use prefix_rewrite with matcher extension");
 }
 
+TEST_F(RouteConfigurationV2, RouteMatcherExtensionAndRedirectPrefixRewrite) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/bar/{country}/{hang}"
+        redirect:
+          prefix_rewrite: "!"
+
+  )EOF";
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.disallow_redirect_prefix_rewrite_with_path_match_policy",
+        "true"}});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Cannot use redirect.prefix_rewrite with path_match_policy");
+}
+
 TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -12996,6 +13177,87 @@ virtual_hosts:
   EXPECT_EQ(334U, route->requestBodyBufferLimit());
 }
 
+TEST_F(RouteMatcherTest, StatsAreTagged) {
+  // The fixture's isolated store deliberately drops scope tags, so the tags are only observable
+  // with a real store in explicit-tags mode.
+  Stats::AllocatorImpl allocator(factory_context_.store_.symbolTable());
+  Stats::ThreadLocalStoreImpl store(allocator);
+  store.setUseExplicitTags(true);
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*store.rootScope()));
+
+  // The tags of a stat as (name, value) pairs.
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2
+    stat_prefix: "foo_prefix"
+  virtual_clusters:
+  - name: ride_request
+    headers:
+    - name: ":path"
+      string_match:
+        prefix: "/rides"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  ASSERT_TRUE(creation_status_.ok()) << creation_status_.message();
+
+  // A configured virtual cluster.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/rides", "POST");
+    const RouteConstSharedPtr route = config.route(headers, 0).route;
+    const Stats::Counter& counter =
+        route->virtualHost().virtualCluster(headers)->stats().upstream_rq_total_;
+    EXPECT_EQ("vhost.www2.vcluster.ride_request.upstream_rq_total", counter.name());
+    EXPECT_EQ("vhost.vcluster.upstream_rq_total", counter.tagExtractedName());
+    EXPECT_THAT(tags_of(counter),
+                UnorderedElementsAre(testing::Pair("envoy.virtual_host", "www2"),
+                                     testing::Pair("envoy.virtual_cluster", "ride_request")));
+  }
+
+  // The catch-all virtual cluster.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/other", "GET");
+    const RouteConstSharedPtr route = config.route(headers, 0).route;
+    const Stats::Counter& counter =
+        route->virtualHost().virtualCluster(headers)->stats().upstream_rq_total_;
+    EXPECT_EQ("vhost.www2.vcluster.other.upstream_rq_total", counter.name());
+    EXPECT_EQ("vhost.vcluster.upstream_rq_total", counter.tagExtractedName());
+    EXPECT_THAT(tags_of(counter),
+                UnorderedElementsAre(testing::Pair("envoy.virtual_host", "www2"),
+                                     testing::Pair("envoy.virtual_cluster", "other")));
+  }
+
+  // The route stats.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    const RouteStatsContextOptRef route_stats =
+        config.route(headers, 0)->routeEntry()->routeStatsContext();
+    ASSERT_TRUE(route_stats.has_value());
+    const Stats::Counter& counter = route_stats->stats().upstream_rq_retry_;
+    EXPECT_EQ("vhost.www2.route.foo_prefix.upstream_rq_retry", counter.name());
+    EXPECT_EQ("vhost.route.upstream_rq_retry", counter.tagExtractedName());
+    EXPECT_THAT(tags_of(counter), UnorderedElementsAre(testing::Pair("envoy.virtual_host", "www2"),
+                                                       testing::Pair("envoy.route", "foo_prefix")));
+  }
+}
+
 TEST_F(RouteMatcherTest, DeferredVirtualHostCreationDisabled) {
   factory_context_.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
       false);
@@ -13330,8 +13592,8 @@ virtual_hosts:
   // (a) Eager entry (evictIfIdle == false)
   absl::Status vhost_creation_status = absl::OkStatus();
   auto eager_vhost = std::make_shared<VirtualHostImpl>(
-      valid_route_config.virtual_hosts(0), valid_global_route_config, factory_context_,
-      *vhost_scope, ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false,
+      valid_route_config.virtual_hosts(0), valid_global_route_config, factory_context_, vhost_scope,
+      ProtobufMessage::getStrictValidationVisitor(), local_init_manager, false,
       vhost_creation_status);
   EXPECT_OK(vhost_creation_status);
   DomainEntry eager_entry(eager_vhost);
@@ -13697,7 +13959,7 @@ TEST_F(RouteMatcherTest, DeferredVirtualHostFastPathSafetyInvariant) {
     auto vhost_scope = factory_context_.scope().scopeFromStatName(
         factory_context_.routerContext().virtualClusterStatNames().vhost_);
     absl::Status vhost_creation_status = absl::OkStatus();
-    VirtualHostImpl vhost(vhost_proto, global_route_config, factory_context_, *vhost_scope,
+    VirtualHostImpl vhost(vhost_proto, global_route_config, factory_context_, vhost_scope,
                           ProtobufMessage::getStrictValidationVisitor(), local_init_manager, true,
                           vhost_creation_status);
     EXPECT_OK(vhost_creation_status);
@@ -14142,7 +14404,7 @@ virtual_hosts:
 
   auto common_vhost_or_error = CommonVirtualHostImpl::create(
       route_config.virtual_hosts(0), global_route_config_or_error.value(), factory_context_,
-      *vhost_scope, ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
+      vhost_scope, ProtobufMessage::getStrictValidationVisitor(), local_init_manager);
   EXPECT_OK(common_vhost_or_error.status());
   auto common_vhost = common_vhost_or_error.value();
 

@@ -67,6 +67,11 @@ if [[ -n "$RUST_TARGETS" ]]; then
         -- $RUST_TARGETS
 fi
 
+CURRENT=dynamic_modules_bindings
+# The Rust SDK's ABI bindings are generated from abi.h and checked in; `bazel run
+# //tools/dynamic_modules/bindgen:fix` regenerates them.
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //tools/dynamic_modules/bindgen:abi_bindings_test
+
 CURRENT=check_format
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff
 
@@ -75,8 +80,8 @@ if [[ "${#FAILED[@]}" -ne "0" ]]; then
     for failed in "${FAILED[@]}"; do
         echo "${BASH_ERR_PREFIX} $failed" >&2
     done
-    if [[ $(git status --porcelain -- . ":(exclude,glob)**/MODULE.bazel.lock") ]]; then
-        git diff -- . ":(exclude,glob)**/MODULE.bazel.lock" > "$DIFF_OUTPUT"
+    if [[ $("${GIT_BIN}" status --porcelain -- . ":(exclude,glob)**/MODULE.bazel.lock") ]]; then
+        "${GIT_BIN}" diff -- . ":(exclude,glob)**/MODULE.bazel.lock" > "$DIFF_OUTPUT"
         echo >&2
         echo "Applying the following diff should fix (some) problems" >&2
         echo >&2

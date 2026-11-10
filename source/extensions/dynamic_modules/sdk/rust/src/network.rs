@@ -1,17 +1,29 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::{read_buffer_chunks, EnvoyBuffer};
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  wrap_into_c_void_ptr, ClusterHostCount, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
-  NewNetworkFilterConfigFunction, NEW_NETWORK_FILTER_CONFIG_FUNCTION,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  new_load_shed_point,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  ClusterHostCount,
+  EnvoyCounterId,
+  EnvoyGaugeId,
+  EnvoyHistogramId,
+  EnvoyLoadShedPoint,
+  NewNetworkFilterConfigFunction,
+  NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::num::NonZero;
 
 /// The trait that represents the Envoy network filter configuration.
 /// This is used in [`NewNetworkFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -74,6 +86,14 @@ pub trait EnvoyNetworkFilterConfig {
   ///
   /// This allows scheduling events to be delivered on the main thread.
   fn new_config_scheduler(&self) -> impl EnvoyNetworkFilterConfigScheduler + 'static;
+
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the connection processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name or the listener
+  /// of the filter bypasses the overload manager. Filters of a filter chain that FCDS delivers do
+  /// not see the bypass and get the load shed point.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
 }
 
 /// The trait that represents the configuration for an Envoy network filter configuration.
@@ -156,7 +176,8 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
   ) {
   }
 
-  /// This is called when an HTTP callout response is received.
+  /// This is called when an HTTP callout response is received. Envoy reports a failure of a
+  /// callout in flight from a later callback on the same thread.
   ///
   /// @param _callout_id is the ID of the callout returned by send_http_callout.
   /// @param _result is the result of the callout.
@@ -202,7 +223,7 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyNetworkFilter {
   /// Get the read buffer chunks. This is valid after the first on_read callback for the lifetime
@@ -356,6 +377,21 @@ pub trait EnvoyNetworkFilter {
     namespace: &'a str,
     entries: &'a [(&'a str, &'a str)],
   );
+
+  /// Merge a serialized `google.protobuf.Struct` into a dynamic metadata namespace. Existing
+  /// entries with the same key are overwritten. An empty struct is a no-op and does not create
+  /// the namespace.
+  ///
+  /// Returns true if the struct was merged, false if the buffer does not parse as a
+  /// `google.protobuf.Struct`.
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) -> bool;
+
+  /// Set the `typed_filter_metadata` entry of a namespace from a serialized `google.protobuf.Any`,
+  /// replacing an existing entry.
+  ///
+  /// Returns true if the entry was set, false if the buffer does not parse as a
+  /// `google.protobuf.Any` with a type URL.
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool;
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
@@ -612,7 +648,7 @@ pub trait EnvoyNetworkFilter {
 /// the [`Box<dyn EnvoyNetworkFilterScheduler>`] can be sent across threads.
 ///
 /// It is also safe to be called concurrently, so it is marked as `Sync` as well.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`NetworkFilter`] is running.
   ///
@@ -664,7 +700,7 @@ impl EnvoyNetworkFilterScheduler for Box<dyn EnvoyNetworkFilterScheduler> {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy network filter config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
@@ -866,6 +902,15 @@ impl EnvoyNetworkFilterConfig for EnvoyNetworkFilterConfigImpl {
         raw_ptr: scheduler_ptr,
       }
     }
+  }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+        self.raw,
+        str_to_module_buffer(name),
+      )
+    })
   }
 }
 
@@ -1338,6 +1383,26 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
         str_to_module_buffer(namespace),
         entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
         entries.len(),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+        self.raw,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+        self.raw,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_any),
       )
     }
   }

@@ -335,20 +335,20 @@ pub struct DownstreamWireBytes {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum AccessLogType {
-  NotSet = 0,
+  NotSet               = 0,
   TcpUpstreamConnected = 1,
-  TcpPeriodic = 2,
-  TcpConnectionEnd = 3,
-  DownstreamStart = 4,
-  DownstreamPeriodic = 5,
-  DownstreamEnd = 6,
-  UpstreamPoolReady = 7,
-  UpstreamPeriodic = 8,
-  UpstreamEnd = 9,
+  TcpPeriodic          = 2,
+  TcpConnectionEnd     = 3,
+  DownstreamStart      = 4,
+  DownstreamPeriodic   = 5,
+  DownstreamEnd        = 6,
+  UpstreamPoolReady    = 7,
+  UpstreamPeriodic     = 8,
+  UpstreamEnd          = 9,
   DownstreamTunnelSuccessfullyEstablished = 10,
   UdpTunnelUpstreamConnected = 11,
-  UdpPeriodic = 12,
-  UdpSessionEnd = 13,
+  UdpPeriodic          = 12,
+  UdpSessionEnd        = 13,
 }
 
 impl AccessLogType {
@@ -528,29 +528,14 @@ impl LogContext {
 
   /// Get timing information.
   pub fn timing_info(&self) -> TimingInfo {
-    let mut info = abi::envoy_dynamic_module_type_timing_info {
-      start_time_unix_ns: 0,
-      request_complete_duration_ns: -1,
-      first_upstream_tx_byte_sent_ns: -1,
-      last_upstream_tx_byte_sent_ns: -1,
-      first_upstream_rx_byte_received_ns: -1,
-      last_upstream_rx_byte_received_ns: -1,
-      first_downstream_tx_byte_sent_ns: -1,
-      last_downstream_tx_byte_sent_ns: -1,
-    };
+    let mut info = crate::timing::unavailable_timing_info();
     unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_timing_info(self.envoy_ptr, &mut info);
+      abi::envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+        self.envoy_ptr,
+        &mut info,
+      );
     }
-    TimingInfo {
-      start_time_unix_ns: info.start_time_unix_ns,
-      request_complete_duration_ns: info.request_complete_duration_ns,
-      first_upstream_tx_byte_sent_ns: info.first_upstream_tx_byte_sent_ns,
-      last_upstream_tx_byte_sent_ns: info.last_upstream_tx_byte_sent_ns,
-      first_upstream_rx_byte_received_ns: info.first_upstream_rx_byte_received_ns,
-      last_upstream_rx_byte_received_ns: info.last_upstream_rx_byte_received_ns,
-      first_downstream_tx_byte_sent_ns: info.first_downstream_tx_byte_sent_ns,
-      last_downstream_tx_byte_sent_ns: info.last_downstream_tx_byte_sent_ns,
-    }
+    info.into()
   }
 
   /// Get byte count information.
@@ -1292,16 +1277,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
-        self.envoy_ptr,
-        header_type,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.
@@ -1351,6 +1336,63 @@ impl LogContext {
     }
     buffers.retain(|buf| !buf.as_slice().is_empty());
     buffers
+  }
+}
+
+impl abi::envoy_dynamic_module_type_response_flag {
+  /// Returns the single bit this flag occupies in a response-flag bitmask.
+  //
+  /// Returns `u64` to match [`LogContext::response_flags`].
+  pub const fn to_bitmask(self) -> u64 {
+    1u64 << (self as u32)
+  }
+
+  /// Returns an iterator over every known flag set in `bitmask`, lowest bit first.
+  pub fn iter_from_bitmask(bitmask: u64) -> ResponseFlagBitmaskIter {
+    ResponseFlagBitmaskIter {
+      remaining: bitmask & Self::VALID_RESPONSE_FLAG_MASK,
+    }
+  }
+
+  const VALID_RESPONSE_FLAG_MASK: u64 = {
+    let variants = <Self as strum::VariantArray>::VARIANTS;
+    let mut mask = 0u64;
+    let mut i = 0;
+    while i < variants.len() {
+      mask |= variants[i].to_bitmask();
+      i += 1;
+    }
+    mask
+  };
+}
+
+/// [Iterator] over the known response flags set in a bitmask.
+#[derive(Copy, Clone, Debug)]
+pub struct ResponseFlagBitmaskIter {
+  remaining: u64,
+}
+
+impl Iterator for ResponseFlagBitmaskIter {
+  type Item = abi::envoy_dynamic_module_type_response_flag;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.remaining == 0 {
+      return None;
+    }
+    let bit = self.remaining.trailing_zeros(); // Always < 64, so fits in a u32 bit index.
+    self.remaining &= self.remaining - 1; // Clear the lowest set bit.
+    abi::envoy_dynamic_module_type_response_flag::from_repr(bit)
+  }
+
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    let len = self.len();
+    (len, Some(len))
+  }
+}
+
+impl ExactSizeIterator for ResponseFlagBitmaskIter {
+  fn len(&self) -> usize {
+    self.remaining.count_ones() as usize
   }
 }
 
@@ -1558,7 +1600,7 @@ ffi_export! {
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       fn __single_access_logger_factory(
         ctx: &$crate::access_log::ConfigContext,

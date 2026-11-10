@@ -7,9 +7,18 @@
 
 pub use crate::cluster_specifier::ResourcePriority;
 use crate::{
-  abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
-  EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  abi,
+  ffi_export,
+  ClusterHostCount,
+  EnvoyBuffer,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::c_void;
 use std::mem::MaybeUninit;
@@ -17,16 +26,20 @@ use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// The decision a route specifier returns for a request.
+/// The decision a route specifier records for a request with
+/// [`RouteSpecifierContext::set_decision`]. It selects how Envoy builds the route.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RouteDecision {
-  /// Use the route the specifier was given, unchanged. Recorded overrides are ignored.
+  /// The default behavior, in effect when the module records no decision: Envoy generates a new
+  /// route based on what the setter methods of [`RouteSpecifierContext`] recorded. The base is
+  /// the template recorded with [`RouteSpecifierContext::select_template`], evaluated against
+  /// the request like a configured route, or the route the specifier was given when no template
+  /// was recorded, and the recorded overrides are applied on top of it. With nothing recorded
+  /// the route the specifier was given is used unchanged.
+  Unspecified,
+  /// Use the route the specifier was given, unchanged. The recorded template and overrides are
+  /// ignored.
   PassThrough,
-  /// Use the route the specifier was given with the recorded overrides applied.
-  Override,
-  /// Use the template recorded with [`RouteSpecifierContext::select_template`], evaluated against
-  /// the request like a configured route, with the recorded overrides applied.
-  SelectTemplate,
   /// Use no route, so the request is handled as if nothing had matched.
   NoRoute,
   /// The module could not reach a decision, so Envoy applies the configured failure policy.
@@ -34,44 +47,43 @@ pub enum RouteDecision {
   /// Use the previous route of the stream unchanged, without building a new route. Valid only when
   /// a previous route exists, otherwise Envoy applies the failure policy.
   ReusePrevious,
-  /// Skip the route the specifier was given and let route matching carry on with the next route.
-  /// The recorded overrides and the returned route are ignored.
-  ContinueMatching,
 }
 
 impl RouteDecision {
   fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_decision {
     match self {
+      Self::Unspecified => abi::envoy_dynamic_module_type_route_specifier_decision::Unspecified,
       Self::PassThrough => abi::envoy_dynamic_module_type_route_specifier_decision::PassThrough,
-      Self::Override => abi::envoy_dynamic_module_type_route_specifier_decision::Override,
-      Self::SelectTemplate => {
-        abi::envoy_dynamic_module_type_route_specifier_decision::SelectTemplate
-      },
       Self::NoRoute => abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute,
       Self::Error => abi::envoy_dynamic_module_type_route_specifier_decision::Error,
       Self::ReusePrevious => abi::envoy_dynamic_module_type_route_specifier_decision::ReusePrevious,
-      Self::ContinueMatching => {
-        abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching
-      },
     }
   }
 }
 
-/// Whether the route specifiers configured after this one run for the request.
+/// The status a route specifier returns from [`RouteSpecifierConfig::on_route`]: whether the
+/// route specifiers configured after this one run for the request, and whether route matching
+/// accepts the route the decision produced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChainStatus {
-  /// The chain continues.
+pub enum OnRouteStatus {
+  /// The chain continues: the route the decision produced is handed to the next specifier.
   Continue,
-  /// The chain stops and the result of this specifier is the final route.
+  /// The chain stops and the route the decision produced is the final route.
   StopIteration,
+  /// The chain stops, the route is turned down, and route matching carries on with the next route
+  /// of the list being evaluated. The recorded decision, template and overrides are ignored.
+  StopIterationAndSkipRoute,
 }
 
-impl ChainStatus {
-  fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_chain_status {
+impl OnRouteStatus {
+  fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_on_route_status {
     match self {
-      Self::Continue => abi::envoy_dynamic_module_type_route_specifier_chain_status::Continue,
+      Self::Continue => abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue,
       Self::StopIteration => {
-        abi::envoy_dynamic_module_type_route_specifier_chain_status::StopIteration
+        abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIteration
+      },
+      Self::StopIterationAndSkipRoute => {
+        abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIterationAndSkipRoute
       },
     }
   }
@@ -127,6 +139,67 @@ impl HeaderAppendAction {
       },
       Self::OverwriteIfExists => {
         abi::envoy_dynamic_module_type_route_specifier_header_append_action::OverwriteIfExists
+      },
+    }
+  }
+}
+
+/// The part of the request path a rule recorded with
+/// [`RouteSpecifierContext::set_prefix_rewrite_rule`] replaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RewriteSpan {
+  /// A literal prefix of the path, which is what a prefix or a path route replaces with its
+  /// `prefix_rewrite`.
+  Literal,
+  /// The whole path without its query string and fragment, which is what a regex route replaces
+  /// with its `prefix_rewrite`.
+  WholePath,
+}
+
+impl RewriteSpan {
+  fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_rewrite_span {
+    match self {
+      Self::Literal => abi::envoy_dynamic_module_type_route_specifier_rewrite_span::Literal,
+      Self::WholePath => abi::envoy_dynamic_module_type_route_specifier_rewrite_span::WholePath,
+    }
+  }
+}
+
+/// What [`RouteSpecifierContext::lookup_built_route`] finds for a request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltRouteLookupResult {
+  /// The cache is not in effect, for example because the specifier configures none, no template
+  /// is selected, the match of the selected template did not hold, or the template resolves its
+  /// cluster per request. The module records the route as usual.
+  Disabled,
+  /// No route cached for the key serves the request. The module records the route as usual, and
+  /// Envoy caches the route the decision builds unless a route is already cached for the key.
+  Miss,
+  /// A route cached for the key serves the request, which Envoy uses when the decision is left
+  /// [`RouteDecision::Unspecified`]. The module records nothing more, since Envoy ignores the
+  /// overrides it records and hands its user data to
+  /// [`RouteSpecifierConfig::on_user_data_discard`].
+  Hit,
+  /// A route cached for the key serves the request, and the module records the route exactly as
+  /// on a miss. When the decision is left [`RouteDecision::Unspecified`], Envoy uses the route the
+  /// recording builds, and evicts the cached route when the decision fails or its recording
+  /// depends on the path of the current request through Envoy or differs from the one the cached
+  /// route was built from.
+  HitVerify,
+}
+
+impl BuiltRouteLookupResult {
+  fn from_abi(
+    value: abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result,
+  ) -> Self {
+    match value {
+      abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Disabled => {
+        Self::Disabled
+      },
+      abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Miss => Self::Miss,
+      abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Hit => Self::Hit,
+      abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::HitVerify => {
+        Self::HitVerify
       },
     }
   }
@@ -260,46 +333,26 @@ impl RouteSpecifierContext {
     }
   }
 
-  // Fills buf with the request headers, growing it once when it is too small. On success buf holds
-  // the header count and every entry is initialized. Returns Unavailable when the header map is
-  // absent, which never happens during on_route but is handled for safety.
+  // Fills buf with the request headers. On success buf holds the header count and every entry is
+  // initialized. The size and fill callbacks are paired by the shared helper, so the buffer always
+  // has room for what Envoy writes. Returns Unavailable when the header map is absent, which never
+  // happens during on_route but is handled for safety.
   fn fill_request_headers(
     &self,
     buf: &mut Vec<MaybeUninit<abi::envoy_dynamic_module_type_envoy_http_header>>,
   ) -> Result<(), FillError> {
-    let mut size_out: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
-        self.envoy_ptr,
-        buf.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-        buf.capacity(),
-        &mut size_out,
-      )
-    };
-    if !ok {
-      if size_out == 0 {
-        return Err(FillError::Unavailable);
-      }
-      // The buffer was too small. Grow it to the required count and retry once. The length is zero
-      // here, so reserve leaves the capacity at least size_out.
-      buf.reserve(size_out);
-      let ok = unsafe {
+    crate::utility::fill_headers(
+      buf,
+      || self.get_request_headers_count(),
+      |headers| unsafe {
         abi::envoy_dynamic_module_callback_route_specifier_get_request_headers(
           self.envoy_ptr,
-          buf.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-          buf.capacity(),
-          &mut size_out,
+          headers,
         )
-      };
-      if !ok {
-        return Err(FillError::Unavailable);
-      }
-    }
-    // Safety: Envoy initialized size_out entries starting at index zero.
-    unsafe {
-      buf.set_len(size_out);
-    }
-    Ok(())
+      },
+    )
+    .map(|_| ())
+    .ok_or(FillError::Unavailable)
   }
 
   /// Fills the caller owned buffer with the request headers and returns a [`HeaderView`] over it.
@@ -781,9 +834,14 @@ impl RouteSpecifierContext {
     }
   }
 
-  /// Select the route template the [`RouteDecision::SelectTemplate`] decision uses.
+  /// Select the route template Envoy generates the final route from, in place of the route the
+  /// specifier was given, when the decision is left [`RouteDecision::Unspecified`].
   ///
   /// Returns `false` when the identifier is not declared in the route specifier configuration.
+  /// A failed selection is handled by the failure policy when no template ends up selected and
+  /// the decision is left [`RouteDecision::Unspecified`], rather than silently falling back to
+  /// the route the specifier was given. A module that wants to probe for a template without
+  /// committing checks the configuration getters instead.
   pub fn select_template(&mut self, template_id: &str) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_template(
@@ -793,12 +851,65 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Revert a [`RouteSpecifierContext::select_template`] call with the same identifier, so the
+  /// route the specifier was given becomes the base of the final route again. The recorded
+  /// overrides stay in effect.
+  ///
+  /// Returns `false` when the identifier does not name the selected template, in which case
+  /// nothing changes.
+  pub fn unselect_template(&mut self, template_id: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_unset_route_template(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(template_id),
+      )
+    }
+  }
+
+  /// Look up the route a previous request on this worker built for the key and the selected
+  /// template, so that a module whose routes are a function of a key builds each route once per
+  /// worker.
+  ///
+  /// It is called after [`RouteSpecifierContext::select_template`] and returns
+  /// [`BuiltRouteLookupResult::Disabled`] when no template is selected. A later call replaces the
+  /// lookup, and selecting or unsetting a template discards it. The cache is configured with the
+  /// `built_route_cache` field of the route specifier.
+  ///
+  /// On a miss Envoy caches the route the decision builds, unless a route is already cached for
+  /// the key, the decision fails or its recording depends on the path of the current request
+  /// through Envoy. A recording depends on it once the module calls
+  /// [`RouteSpecifierContext::set_prefix_rewrite`], or once
+  /// [`RouteSpecifierContext::set_prefix_rewrite_rule`] rejects a rule or replaces one it accepted.
+  /// A cached route that carries a rule serves only the paths the rule applies to. For a decision
+  /// the cache looks up, the regex rewrite of a selected route override applies when the request
+  /// headers are finalized, so that the route serves later requests, and records
+  /// `x-envoy-original-path` the way a configured route does.
+  ///
+  /// The route built for a key must be a function of the key, since it serves the later requests
+  /// that look the key up, including those for other routes of a virtual host that shares the
+  /// specifier. The key therefore covers whatever else the module reads to decide, and identifies
+  /// the route exactly, since a collision serves the route of one key for the other. A module whose
+  /// routes for a key change over time folds a version of what they depend on into the key.
+  ///
+  /// On a hit a decision other than [`RouteDecision::Unspecified`] and a skip still apply, while
+  /// the overrides the module records are ignored and its user data goes to
+  /// [`RouteSpecifierConfig::on_user_data_discard`]. A verified hit uses the route its recording
+  /// builds instead, so the user data a miss or a verified hit records stays on a route of its own
+  /// whenever the decision builds one, for which [`RouteSpecifierConfig::on_route_destroy`] fires
+  /// once neither the cache nor a stream holds it.
+  pub fn lookup_built_route(&mut self, key: u64) -> BuiltRouteLookupResult {
+    BuiltRouteLookupResult::from_abi(unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_lookup_built_route(self.envoy_ptr, key)
+    })
+  }
+
   /// Record a u64 on the route this decision produces.
   ///
   /// It forces the produced route to be wrapped even with no other override, so that
   /// [`RouteSpecifierConfig::on_route_destroy`] fires for it with this value when the route is
-  /// destroyed. It is effective for the [`RouteDecision::Override`] and
-  /// [`RouteDecision::SelectTemplate`] decisions.
+  /// destroyed. It is effective when the decision is left [`RouteDecision::Unspecified`]. A later
+  /// call replaces the value, and the last value goes to
+  /// [`RouteSpecifierConfig::on_user_data_discard`] instead when no route ends up carrying it.
   pub fn set_route_user_data(&mut self, user_data: u64) {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_user_data(
@@ -808,12 +919,68 @@ impl RouteSpecifierContext {
     }
   }
 
-  /// Select whether the route specifiers configured after this one run for the request.
-  pub fn set_chain_status(&mut self, status: ChainStatus) {
+  /// Record a prefix rewrite of the request path sent upstream.
+  ///
+  /// `matched` must be a case insensitive prefix of the current path without its query string,
+  /// which is replaced by `replacement` while the query string is preserved. Returns `false` when
+  /// `matched` is not such a prefix or the rewritten path exceeds the configured maximum.
+  pub fn set_prefix_rewrite(&mut self, matched: &str, replacement: &str) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_route_specifier_set_chain_status(
+      abi::envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
         self.envoy_ptr,
-        status.to_abi(),
+        crate::str_to_module_buffer(matched),
+        crate::str_to_module_buffer(replacement),
+      )
+    }
+  }
+
+  /// Record a prefix rewrite of the request path sent upstream as a rule.
+  ///
+  /// Envoy applies the rule to the path the request carries when the request headers are
+  /// finalized, the way it applies the `prefix_rewrite` of a configured route, so the produced
+  /// route is not specific to the current request. With [`RewriteSpan::Literal`], `matched` must
+  /// be a case insensitive prefix of the current path without its query string and fragment. With
+  /// [`RewriteSpan::WholePath`], `matched` must be empty and the query string and fragment are
+  /// kept. The replacement starts with a slash
+  /// and carries no query string or fragment of its own.
+  ///
+  /// A path recorded with [`RouteSpecifierContext::set_path`] or
+  /// [`RouteSpecifierContext::set_prefix_rewrite`] takes precedence over the rule, and the rule
+  /// takes precedence over the regex rewrite of a selected route override and the rewrites of the
+  /// route, whatever the call order. With a rule recorded, the regex rewrite applies when the
+  /// request headers are finalized rather than when the decision resolves. A rule that does not
+  /// apply to the path when the request headers are finalized leaves the next of these in effect.
+  /// A later call replaces the rule of an earlier one.
+  ///
+  /// Returns `false`, recording nothing, when `matched` does not fit the span, the replacement does
+  /// not start with a slash, carries a query string or fragment or is not a valid header value, or
+  /// the rule does not apply to the current path within the configured maximum.
+  pub fn set_prefix_rewrite_rule(
+    &mut self,
+    span: RewriteSpan,
+    matched: &str,
+    replacement: &str,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+        self.envoy_ptr,
+        span.to_abi(),
+        crate::str_to_module_buffer(matched),
+        crate::str_to_module_buffer(replacement),
+      )
+    }
+  }
+
+  /// Record the decision that tells Envoy how to build the route.
+  ///
+  /// [`RouteDecision::Unspecified`] is in effect when the module records none, under which Envoy
+  /// generates a new route based on what the setter methods of [`RouteSpecifierContext`]
+  /// recorded. A later call replaces the decision of an earlier one.
+  pub fn set_decision(&mut self, decision: RouteDecision) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_decision(
+        self.envoy_ptr,
+        decision.to_abi(),
       )
     }
   }
@@ -904,6 +1071,21 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Revert a [`RouteSpecifierContext::set_route_override`] call with the same identifier, so
+  /// nothing of the override applies to the final route. The values the module recorded itself
+  /// stay in effect.
+  ///
+  /// Returns `false` when the identifier does not name the selected override, in which case
+  /// nothing changes.
+  pub fn unset_route_override(&mut self, override_id: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_unset_route_override(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(override_id),
+      )
+    }
+  }
+
   /// Record the string value of a route metadata entry.
   pub fn set_route_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
     unsafe {
@@ -986,6 +1168,43 @@ impl RouteSpecifierContext {
       abi::envoy_dynamic_module_callback_route_specifier_set_host(
         self.envoy_ptr,
         crate::str_to_module_buffer(host),
+      )
+    }
+  }
+
+  /// Record the name of the route the decision produces. The name is what the `%ROUTE_NAME%` access
+  /// log command operator reports, so a module built route carries an identity of its own in access
+  /// logs and other route name consumers.
+  ///
+  /// Returns `false` when the name is empty.
+  pub fn set_route_name(&mut self, route_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_route_name(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(route_name),
+      )
+    }
+  }
+
+  /// Select the virtual cluster of the request by one of the names that the
+  /// `virtual_cluster_override` of the route specifier declares, or none with an empty name. The
+  /// `virtual_cluster_override` configures how the router uses the selection. A later call
+  /// replaces the selection.
+  ///
+  /// Like the recorded overrides, the selection takes effect only when the decision is left
+  /// [`RouteDecision::Unspecified`]. It is dropped without failing the decision when there is no
+  /// route or when the route answers the request directly, and a selected virtual cluster is also
+  /// dropped when the route belongs to a virtual host other than `virtual_host_name`. A route the
+  /// built route cache holds keeps the selection it was built with, so the key the route is looked
+  /// up with must also determine the selection.
+  ///
+  /// Returns `false`, leaving the selection unchanged, when the route specifier declares no virtual
+  /// clusters or the name is not empty and not one of them.
+  pub fn set_virtual_cluster(&mut self, virtual_cluster_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(virtual_cluster_name),
       )
     }
   }
@@ -1080,13 +1299,30 @@ pub trait RouteSpecifierConfig: Send + Sync {
   /// This is called while the route is being resolved, and again whenever the route is recomputed,
   /// so it must be able to reach a decision from the request and the stream info alone. The call
   /// is synchronous and cannot be time boxed, so it must not block or perform I/O.
-  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision;
+  ///
+  /// The decision that tells Envoy how to build the route is recorded with
+  /// [`RouteSpecifierContext::set_decision`], with [`RouteDecision::Unspecified`] in effect when
+  /// none is recorded. The returned status tells Envoy whether the route specifiers configured
+  /// after this one run and whether route matching accepts the produced route.
+  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus;
 
   /// Called when a route built with [`RouteSpecifierContext::set_route_user_data`] is destroyed,
   /// with the value recorded on it. It may run on any thread, concurrently with other hooks, and
   /// possibly after the stream that installed the route is gone. It must not block or call back
   /// into Envoy. The default is a no op.
   fn on_route_destroy(&self, user_data: u64) {
+    let _ = user_data;
+  }
+
+  /// Called with the value last recorded by [`RouteSpecifierContext::set_route_user_data`] when the
+  /// decision builds no route to carry it. That is the case for a decision other than
+  /// [`RouteDecision::Unspecified`], a skip, a decision Envoy cannot honor, and a
+  /// [`BuiltRouteLookupResult::Hit`]. It runs on the thread that resolves the route, concurrently
+  /// with other hooks, before the route specifier returns. The last value recorded for a decision
+  /// reaches either this hook or [`RouteSpecifierConfig::on_route_destroy`], never both, so that a
+  /// module can release what it leased for the route in either. It must not block or call back into
+  /// Envoy. The default is a no op.
+  fn on_user_data_discard(&self, user_data: u64) {
     let _ = user_data;
   }
 }
@@ -1101,7 +1337,7 @@ pub trait RouteSpecifierConfig: Send + Sync {
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads. The
 /// handle borrows the Envoy side configuration, so a module must drop it together with the
 /// [`RouteSpecifierConfig`] it was created for and must not keep it alive elsewhere.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyRouteSpecifierConfig: Send + Sync {
   /// The identifiers of the declared route templates, in configuration order.
@@ -1118,13 +1354,17 @@ pub trait EnvoyRouteSpecifierConfig: Send + Sync {
   ///
   /// Envoy builds and validates it while the configuration is created, and the module selects it
   /// later with [`RouteSpecifierContext::select_template`]. Returns `false` when called outside
-  /// configuration creation, when the route specifier is configured on a route configuration with no
-  /// virtual host to build routes in, when the identifier is empty or already used, when the bytes do
-  /// not parse, or when the route is invalid.
+  /// configuration creation, when the route specifier is configured on a route configuration with
+  /// no virtual host to build routes in, when the identifier is empty or already used, when the
+  /// bytes do not parse, or when the route is invalid.
   fn register_route_template(&self, template_id: &str, serialized_route: &[u8]) -> bool;
 
   /// The specifier_instance_id of this configuration, empty when it is unset.
   fn specifier_instance_id(&self) -> String;
+
+  /// Whether the configuration sets `built_route_cache`, so that a module whose routes rely on the
+  /// cache can reject a configuration without it.
+  fn has_built_route_cache(&self) -> bool;
 
   /// Define a new counter with the given name and no labels.
   fn define_counter(
@@ -1265,7 +1505,7 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
       abi::envoy_dynamic_module_callback_route_specifier_config_get_template_count(self.raw)
     };
     let mut ids = Vec::with_capacity(count);
-    for index in 0..count {
+    for index in 0 .. count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: ptr::null_mut(),
         length: 0,
@@ -1325,6 +1565,12 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
       EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length)
     };
     String::from_utf8_lossy(buffer.as_slice()).into_owned()
+  }
+
+  fn has_built_route_cache(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(self.raw)
+    }
   }
 
   fn define_counter(
@@ -1676,14 +1922,23 @@ ffi_export! {
   unsafe fn envoy_dynamic_module_on_route_specifier_on_route(
     config_ptr: abi::envoy_dynamic_module_type_route_specifier_config_module_ptr,
     context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-  ) -> abi::envoy_dynamic_module_type_route_specifier_decision {
+  ) -> abi::envoy_dynamic_module_type_route_specifier_on_route_status {
     let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
     let mut ctx = unsafe { RouteSpecifierContext::new(context_envoy_ptr) };
     config.on_route(&mut ctx).to_abi()
   }
-  // A panic during resolution must not look like a decision, so fail closed and let Envoy apply
-  // the configured failure policy.
-  on_panic = abi::envoy_dynamic_module_type_route_specifier_decision::Error
+  // A panic during resolution must not look like a decision, so record the Error decision, which
+  // replaces whatever the module recorded before panicking, and let Envoy apply the configured
+  // failure policy. The returned status is then not acted on.
+  on_panic = {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_decision(
+        context_envoy_ptr,
+        abi::envoy_dynamic_module_type_route_specifier_decision::Error,
+      );
+    }
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue
+  }
 }
 
 ffi_export! {
@@ -1697,5 +1952,19 @@ ffi_export! {
   ) {
     let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
     config.on_route_destroy(user_data);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_route_specifier_user_data_discard(
+    config_ptr: abi::envoy_dynamic_module_type_route_specifier_config_module_ptr,
+    user_data: u64,
+  ) {
+    let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
+    config.on_user_data_discard(user_data);
   }
 }

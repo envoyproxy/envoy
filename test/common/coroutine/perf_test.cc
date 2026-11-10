@@ -38,6 +38,7 @@
 #include "source/common/coroutine/task.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/test_common/utility.h"
@@ -83,10 +84,22 @@ constexpr uint64_t ThrottleUnit = 65536;
 struct SocketPair {
   SocketPair() {
     os_fd_t fds[2];
+#ifdef WIN32
+    // The Windows socketpair() emulation only supports AF_INET/AF_INET6 (over loopback).
+    constexpr int domain = AF_INET;
+#else
+    constexpr int domain = AF_UNIX;
+#endif
     Api::SysCallIntResult rc =
-        Api::OsSysCallsSingleton::get().socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
+        Api::OsSysCallsSingleton::get().socketpair(domain, SOCK_STREAM, 0, fds);
     RELEASE_ASSERT(rc.return_value_ == 0, "socketpair() failed");
+#ifdef WIN32
+    // Windows uses emulated edge-triggered file events, which are only re-armed by the Win32
+    // socket handle when an operation would block.
+    server_handle = std::make_unique<Network::Win32SocketHandleImpl>(fds[0]);
+#else
     server_handle = std::make_unique<Network::IoSocketHandleImpl>(fds[0]);
+#endif
     server_handle->setBlocking(false);
     client_fd = fds[1]; // Left blocking; driven by the Driver threads.
   }
@@ -207,7 +220,7 @@ public:
       : io_(io), high_(high) {
     io_.initializeFileEvent(
         dispatcher, [this](uint32_t events) { return onReady(events); },
-        Event::FileTriggerType::Edge, Read | Write);
+        Event::PlatformDefaultTriggerType, Read | Write);
   }
 
   // Re-arm for a fresh iteration (the socketpair is reused across iterations).
@@ -306,7 +319,7 @@ public:
           onReady(events);
           return absl::OkStatus();
         },
-        Event::FileTriggerType::Edge, Read | Write);
+        Event::PlatformDefaultTriggerType, Read | Write);
     cb_for_yield_ = dispatcher.createSchedulableCallback([this] { resumeFromYield(); });
   }
 

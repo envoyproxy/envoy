@@ -1,9 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -16,7 +19,7 @@ envoy_cc_test_library(
     deps = ["//test/mocks/stats:stats_mocks"],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -27,6 +30,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_histogram_complete",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/stat_sinks/dynamic_modules:config",
@@ -38,7 +43,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "sink_test",
     srcs = ["sink_test.cc"],
     data = [
@@ -46,6 +51,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":test_util_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -59,9 +66,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":test_util_lib",
         "//source/common/stats:histogram_lib",
@@ -70,12 +79,13 @@ envoy_cc_test(
         "//source/extensions/stat_sinks/dynamic_modules:sink_config_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@libcircllhist",
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -85,6 +95,11 @@ envoy_cc_dyn_module_test(
     ],
     env = {
         "GODEBUG": "cgocheck=0",
+    },
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

@@ -10,6 +10,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
@@ -77,21 +79,21 @@ DynamicModuleDataInputFactory::createDataInputFactoryCb(
   auto on_config_new = dynamic_module->getFunctionPointer<OnDataInputConfigNewType>(
       "envoy_dynamic_module_on_matcher_data_input_config_new");
   if (!on_config_new.ok()) {
-    throw EnvoyException("Failed to resolve symbol: " +
-                         std::string(on_config_new.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to resolve symbol: ", on_config_new.status().message()));
   }
 
   auto on_config_destroy = dynamic_module->getFunctionPointer<OnDataInputConfigDestroyType>(
       "envoy_dynamic_module_on_matcher_data_input_config_destroy");
   if (!on_config_destroy.ok()) {
-    throw EnvoyException("Failed to resolve symbol: " +
-                         std::string(on_config_destroy.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to resolve symbol: ", on_config_destroy.status().message()));
   }
 
   auto on_get = dynamic_module->getFunctionPointer<OnDataInputGetType>(
       "envoy_dynamic_module_on_matcher_data_input_get");
   if (!on_get.ok()) {
-    throw EnvoyException("Failed to resolve symbol: " + std::string(on_get.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to resolve symbol: ", on_get.status().message()));
   }
 
   // Parse the data input config.
@@ -99,8 +101,8 @@ DynamicModuleDataInputFactory::createDataInputFactoryCb(
   if (proto_config.has_input_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.input_config());
     if (!config_or_error.ok()) {
-      throw EnvoyException("Failed to parse data input config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(
+          absl::StrCat("Failed to parse data input config: ", config_or_error.status().message()));
     }
     input_config_str = std::move(config_or_error.value());
   }

@@ -5,10 +5,10 @@ and an image based on Windows2019.
 
 ## Ubuntu Envoy image
 
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build-ubuntu:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
-where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
-may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8)
-repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
+The Debian based Envoy Docker image at [`envoyproxy/envoy-build:<variant>-<tag>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
+pinned by digest in [`.github/config.yml`](https://github.com/envoyproxy/envoy/blob/main/.github/config.yml) and resolved by
+[`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers can use the pinned image
+to provide a self-contained environment for building Envoy binaries and running tests that matches CI.
 Moreover, the Docker image at [`envoyproxy/envoy:dev-<hash>`](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) is an image that has an Envoy binary at `/usr/local/bin/envoy`.
 The `<hash>` corresponds to the main commit at which the binary was compiled. Lastly, `envoyproxy/envoy:dev` contains an Envoy
 binary built from the latest tip of main that passed tests.
@@ -38,36 +38,60 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 22 compiler.
+* `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian (trixie-slim); the compilers (Clang and GCC) and other toolchains are
+  fetched by Bazel rather than installed in the image. Variants `devtools`, `docker`, `mobile` and `worker` add tooling for
+  specific CI jobs.
 
-The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+`./ci/run_envoy_docker.sh` picks the variant itself: `devtools` by default, `ci` under GitHub Actions or with
+`ENVOY_DOCKER_CI` set, `devtools` with `ENVOY_DOCKER_DEVTOOLS`, and `docker` with `ENVOY_DOCKER_IN_DOCKER`. Set
+`ENVOY_BUILD_IMAGE` to use a different image altogether.
+
+The source for these images is located in the [envoyproxy/toolshed](https://github.com/envoyproxy/toolshed/tree/main/docker/build)
 repository.
 
-The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
+The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC, configured with `--config=gcc`, which builds the binary and runs the tests
+(`ci/do_ci.sh gcc`; `gcc.server_only` and `gcc.test_only` run just one of the two).
 
 # Supported compiler configurations
 
-Envoy supports two compiler toolchain configurations:
-* `--config=clang` - Clang compiler with libc++ standard library (default for CI)
-* `--config=gcc` - GCC compiler with libstdc++ standard library
+Envoy supports the following compiler toolchain configurations:
+* No configuration flag - Clang compiler with libc++ standard library (default)
+* `--config=gcc` - Hermetic GCC compiler with libstdc++ standard library (Linux x86_64 only)
 
 # C++ standard library
 
 As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859) the official released binary is
 [linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#linking-against-libc-on-linux).
 
-The standard library is tied to the compiler toolchain:
-* `--config=clang` - Uses libc++ (LLVM standard library)
-* `--config=gcc` - Uses libstdc++ (GNU standard library)
+The standard library is derived from the compiler toolchain:
+* Clang uses libc++ (LLVM standard library)
+* GCC uses libstdc++ (GNU standard library)
 
-These are the only supported configurations. If you need a different toolchain configuration, you must set it up in your `user.bazelrc` file.
+These are the only supported configurations. Other combinations, such as Clang with libstdc++, are not supported or tested;
+if you need one, you will need to set up your own `cc_toolchain`.
+
+# Hermetic git
+
+CI does not use a `git` installed in the build image. `ci/do_ci.sh` resolves toolshed's prebuilt
+git toolchain (`//tools/git:bin`) once and exports it as `GIT_BIN`, which the CI scripts and
+`bazel/get_workspace_status` use. On macOS, where no prebuilt is published, it uses the host's
+`git` from `PATH`.
+
+To use your own git instead, set `GIT_BIN` before running `ci/do_ci.sh` (inside the container
+when using `ci/run_envoy_docker.sh`, eg `./ci/run_envoy_docker.sh 'GIT_BIN=/usr/bin/git ./ci/do_ci.sh format-api'`).
+Outside `ci/do_ci.sh`, `bazel/get_workspace_status` and `tools/git/*` fall back to `git` on `PATH`
+when `GIT_BIN` is unset.
+
+Bazel actions that need git (eg the `proto_format` genrules) use the git toolchain
+(`@envoy_toolshed//git:toolchain_type`), not `GIT_BIN`. To use a different git there, register
+your own `git_toolchain` (from `@envoy_toolshed//git:defs.bzl`) with `--extra_toolchains`.
 
 # Building and running tests as a developer
 
 The `./ci/run_envoy_docker.sh` script can be used to set up a Docker container on Linux and Windows
 to build an Envoy static binary and run tests.
 
-The build image defaults to `envoyproxy/envoy-build-ubuntu` on Linux and
+The build image defaults to `envoyproxy/envoy-build` on Linux and
 `envoyproxy/envoy-build-windows2019` on Windows, but you can choose build image by setting
 `ENVOY_BUILD_IMAGE` in the environment.
 
@@ -75,13 +99,13 @@ In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the 
 invoking the build.
 
 ```bash
-ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:<variant>-<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
-ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:<variant>-<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## Resource Requirements and Troubleshooting
@@ -192,12 +216,16 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.
-* `lockfiles`/`lockfiles.regenerate` &mdash; regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
-* `lockfiles.check` &mdash; regenerate all `MODULE.bazel.lock` files and fail with a diff summary if any lockfile changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
-* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, and dependabot configuration.
-* `registry` &mdash; update the Envoy bazel-registry hash in `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to use a specific hash, `ENVOY_REGISTRY_REPO` to override the repository used for `git ls-remote`, or `ENVOY_REGISTRY_BRANCH` to override the branch used for the bump and checked by `deps`/`registry.check`.
-* `registry.check` &mdash; verify the pinned bazel-registry commit exists, is an ancestor of the target branch (`ENVOY_REGISTRY_BRANCH`, default `main`), and (for non-`-dev` versions) is tagged.
+* `lockfiles`/`lockfiles.regenerate` &mdash; repin `Cargo.Bazel.envoy.lock` from `Cargo.toml` and `Cargo.lock` with `CARGO_BAZEL_REPIN=true`, then regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
+* `lockfiles.check` &mdash; regenerate the lockfiles as `lockfiles` does and fail with a diff summary if any lockfile, including `Cargo.lock`, changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
+* `modules.version` &mdash; set the `module()` version, and the `bazel_dep` versions of in-repo modules (`envoy`, `envoy_api`, `envoy-docs`, `envoy_mobile`, `envoy_build_config`), in all `MODULE.bazel` files to match `VERSION.txt`, then regenerate the lockfiles as `lockfiles` does.
+* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, and dependabot configuration.
+* `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does.
+* `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate the lockfiles as `lockfiles` does. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
+* `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
+* `execution_context` &mdash; build and run the execution_context-enabled test (`//test/common/common:execution_context_enabled_test`) via the `//bazel:execution_context` build setting transition.
 
 ## On Windows
 
@@ -233,10 +261,9 @@ Docker host.
 
 # Testing changes to the build image as a developer
 
-The base build image used in the CI flows here lives in the [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
-repository. If you need to make and/or test changes to the build image, instructions to do so can be found in
-the [docker](https://github.com/envoyproxy/envoy-build-tools/blob/main/docker/README.md) folder.
-See the Dockerfiles and build scripts there for building a new image.
+The base build image used in the CI flows here lives in the [envoyproxy/toolshed](https://github.com/envoyproxy/toolshed)
+repository, under [docker/build](https://github.com/envoyproxy/toolshed/tree/main/docker/build). See the Dockerfile and
+build scripts there for building a new image; the pins used by Envoy are in `.github/config.yml`.
 
 # macOS Build Flow
 

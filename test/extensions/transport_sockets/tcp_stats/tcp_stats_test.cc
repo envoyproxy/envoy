@@ -41,11 +41,11 @@ public:
     config_ = std::make_shared<Config>(proto_config, *store_.rootScope());
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     ON_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
-        .WillByDefault(Invoke([this](int, int, void* optval, socklen_t* optlen) {
+        .WillByDefault([this](int, int, void* optval, socklen_t* optlen) {
           ASSERT(*optlen == sizeof(tcp_info_));
           memcpy(optval, &tcp_info_, sizeof(tcp_info_));
           return Api::SysCallIntResult{0, 0};
-        }));
+        });
     createTcpStatsSocket(enable_periodic, timer_, inner_socket_, tcp_stats_socket_);
   }
 

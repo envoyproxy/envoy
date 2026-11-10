@@ -86,17 +86,17 @@ xds_matcher:
 
   // Delegating filter will be created for this match wrapper.
   EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(factory_callbacks, addStreamFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Http::StreamFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
   cb(factory_callbacks);
 }
@@ -240,17 +240,17 @@ matcher:
 
   // Delegating filter will be created for this match wrapper.
   EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Http::StreamDecoderFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Http::StreamEncoderFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(factory_callbacks, addStreamFilter(_))
-      .WillOnce(Invoke([](Envoy::Http::StreamFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Http::StreamFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingStreamFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
   cb(factory_callbacks);
 }
@@ -606,7 +606,7 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillOnce(Invoke([&](auto&, bool) -> Envoy::Http::FilterHeadersStatus {
+      .WillOnce([&](auto&, bool) -> Envoy::Http::FilterHeadersStatus {
         Envoy::Http::ResponseHeaderMapPtr headers{new Envoy::Http::TestResponseHeaderMapImpl{
             {":status", "200"}, {"match-header", "match"}, {"content-type", "application/grpc"}}};
         filter->decoder_callbacks_->encodeHeaders(std::move(headers), false, "details");
@@ -620,29 +620,29 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionRequestAndResponseHeaders) {
         filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
 
         return Envoy::Http::FilterHeadersStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
         // All the following encoding callbacks will be skipped.
         EXPECT_CALL(*filter, encodeHeaders(_, _)).Times(0);
         delegating_filter->encodeHeaders(headers, end_stream);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
+      .WillOnce([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_CALL(*filter, encodeData(_, _)).Times(0);
         delegating_filter->encodeData(data, end_stream);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeMetadata_(_))
-      .WillOnce(Invoke([&](Envoy::Http::MetadataMapPtr metadata) {
+      .WillOnce([&](Envoy::Http::MetadataMapPtr metadata) {
         // All the following encoding callbacks will be skipped.
         EXPECT_CALL(*filter, encodeMetadata(_)).Times(0);
         delegating_filter->encodeMetadata(*metadata);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeTrailers_(_))
-      .WillOnce(Invoke([&](Envoy::Http::ResponseTrailerMap& trailers) {
+      .WillOnce([&](Envoy::Http::ResponseTrailerMap& trailers) {
         EXPECT_CALL(*filter, encodeTrailers(_)).Times(0);
         delegating_filter->encodeTrailers(trailers);
-      }));
+      });
   // The decodeComplete will be skipped because the match tree is evaluated.
   EXPECT_CALL(*filter, decodeComplete()).Times(0);
 
@@ -748,7 +748,7 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillOnce(Invoke([&](auto&, bool) -> Envoy::Http::FilterHeadersStatus {
+      .WillOnce([&](auto&, bool) -> Envoy::Http::FilterHeadersStatus {
         Envoy::Http::ResponseHeaderMapPtr headers{new Envoy::Http::TestResponseHeaderMapImpl{
             {":status", "200"}, {"content-type", "application/grpc"}}};
         filter->decoder_callbacks_->encodeHeaders(std::move(headers), false, "details");
@@ -762,29 +762,29 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
         filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
 
         return Envoy::Http::FilterHeadersStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
         EXPECT_CALL(*filter, encodeHeaders(_, _));
         delegating_filter->encodeHeaders(headers, end_stream);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
+      .WillOnce([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_CALL(*filter, encodeData(_, _));
         delegating_filter->encodeData(data, end_stream);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeMetadata_(_))
-      .WillOnce(Invoke([&](Envoy::Http::MetadataMapPtr metadata) {
+      .WillOnce([&](Envoy::Http::MetadataMapPtr metadata) {
         // All the following encoding callbacks will be skipped.
         EXPECT_CALL(*filter, encodeMetadata(_));
         delegating_filter->encodeMetadata(*metadata);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks, encodeTrailers_(_))
-      .WillOnce(Invoke([&](Envoy::Http::ResponseTrailerMap& trailers) {
+      .WillOnce([&](Envoy::Http::ResponseTrailerMap& trailers) {
         EXPECT_CALL(*filter, onMatchCallback(_));
         EXPECT_CALL(*filter, encodeTrailers(_));
         delegating_filter->encodeTrailers(trailers);
-      }));
+      });
   EXPECT_CALL(*filter, decodeComplete());
 
   Envoy::Http::RequestHeaderMapPtr request_headers{

@@ -1,0 +1,443 @@
+#!/usr/bin/env bash
+
+# Function library for bzlmod module/registry/deps/lockfile operations, sourced by
+# ci/do_ci.sh and not meant to be executed directly. This expects _realpath to be
+# defined before sourcing and relies on BAZEL_STARTUP_OPTIONS, BAZEL_BUILD_OPTIONS,
+# and BAZEL_GLOBAL_OPTIONS from ci/build_setup.sh when the helpers are used.
+
+ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
+ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
+LOCKFILES_DIFF_OUTPUT="${LOCKFILES_DIFF_OUTPUT:-/build/fix_lockfiles.diff}"
+readonly -a LOCKFILE_PATHSPECS=(':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock)
+readonly -a REGISTRY_BAZELRC_FILES=(
+    ".bazelrc"
+    "api/.bazelrc"
+    "bazel/tests/codeql/.bazelrc"
+    "bazel/tests/external/.bazelrc"
+)
+# shellcheck disable=SC2034
+readonly -a MODULE_DIRS=(. "$ENVOY_DOCS_PATH" api mobile bazel/tests/codeql bazel/tests/external)
+# shellcheck disable=SC2034
+readonly -a REGISTRY_MODULE_DIRS=(. api bazel/tests/codeql bazel/tests/external)
+# In-repo modules whose versions track VERSION.txt.
+readonly -a VERSIONED_MODULES=(envoy envoy_api envoy-docs envoy_mobile envoy_build_config)
+
+run_in_mods() {
+    local -n _mod_dirs="$1"
+    local fn="$2"
+    shift 2
+    local module_dir status
+
+    declare -F "$fn" > /dev/null || {
+        echo "FAIL: no such function: ${fn}" >&2
+        return 1
+    }
+    for module_dir in "${_mod_dirs[@]}"; do
+        status=0
+        echo "Updating .. $module_dir" >&2
+        pushd "$module_dir" > /dev/null || return 1
+        "$fn" "$module_dir" "$@" || status=$?
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
+        popd > /dev/null || return 1
+        (( status == 0 )) || return "$status"
+    done
+}
+
+run_in_nested_mods() {
+    run_in_mods MODULE_DIRS "$@"
+}
+
+run_in_registry_mods() {
+    run_in_mods REGISTRY_MODULE_DIRS "$@"
+}
+
+workspace_name() {
+    local module_dir="${1%/}"
+
+    case "$module_dir" in
+        .) echo "root" ;;
+        "$ENVOY_DOCS_PATH") echo "docs" ;;
+        api) echo "api" ;;
+        mobile) echo "mobile" ;;
+        bazel/tests/external) echo "bazel/tests/external" ;;
+        *) echo "$module_dir" ;;
+    esac
+}
+
+workspace_target() {
+    local module_dir="${1%/}"
+    local target_name="$2"
+
+    case "$module_dir" in
+        .) echo "//bazel/dependency:${target_name}" ;;
+        "$ENVOY_DOCS_PATH") echo "//:${target_name}" ;;
+        api) echo "//bazel:${target_name}" ;;
+        mobile) echo "//bazel:${target_name}" ;;
+        bazel/tests/codeql) echo "//:${target_name}" ;;
+        bazel/tests/external) echo "//:${target_name}" ;;
+        *)
+            echo "FAIL: Unknown workspace: ${module_dir}" >&2
+            return 1
+            ;;
+    esac
+}
+
+workspace_bazel_run() {
+    local module_dir="$1"
+    local target_name="$2"
+    local target
+    shift 2
+
+    target="$(workspace_target "$module_dir" "$target_name")" || return 1
+    bazel run "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci "$target" "$@"
+}
+
+lockfiles_check() {
+    lockfiles_generate
+    if [[ -z "$("${GIT_BIN}" status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
+        return 0
+    fi
+    "${GIT_BIN}" --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
+    echo >&2
+    echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
+    if { "${GIT_BIN}" --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
+        echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
+    fi
+    echo >&2
+    exit 1
+}
+
+lockfiles_generate() {
+    cargo_lockfile_generate
+    run_in_nested_mods _lockfiles_generate_mod
+}
+
+# Bazel never compares the crate_universe lockfile with Cargo.toml and Cargo.lock, so it is always
+# repinned. The crate extension does not track CARGO_BAZEL_REPIN, so a new server must evaluate it.
+cargo_lockfile_generate() {
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
+    CARGO_BAZEL_REPIN=true bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci --repo=@envoy_rust_crate_index
+}
+
+_lockfiles_generate_mod() {
+    bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --config=ci --lockfile_mode=update
+}
+
+# Set the `module()` version, and the `bazel_dep` versions of in-repo modules, in every
+# MODULE.bazel file to match VERSION.txt.
+module_versions_update() {
+    local module_file modules version
+
+    version="$(cat VERSION.txt)"
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev)?$ ]]; then
+        echo "FAIL: Unexpected version in VERSION.txt: ${version}" >&2
+        return 1
+    fi
+    modules="$(IFS='|'; echo "${VERSIONED_MODULES[*]}")"
+    while read -r module_file; do
+        sed -i -E \
+            -e "/^module\($/,/^\)$/ s/^(    version = )\"[^\"]*\"/\1\"${version}\"/" \
+            -e "s/^(bazel_dep\(name = \"(${modules})\", version = )\"[^\"]*\"/\1\"${version}\"/" \
+            "$module_file"
+        if ! "${GIT_BIN}" diff --quiet -- "$module_file"; then
+            echo "${module_file}: ${version}"
+        fi
+    done < <("${GIT_BIN}" ls-files ':(glob)**/MODULE.bazel')
+}
+
+registry_current_hash() {
+    local bazelrc
+    local hash
+    local current_hash=""
+
+    for bazelrc in "${REGISTRY_BAZELRC_FILES[@]}"; do
+        hash="$(sed -n -E \
+            's#^common --registry=https://raw\.githubusercontent\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\1#p' \
+            "$bazelrc")"
+        if [[ -z "${hash}" ]]; then
+            echo "FAIL: Failed to determine current registry hash from ${bazelrc}" >&2
+            return 1
+        fi
+        if [[ -n "${current_hash}" && "${current_hash}" != "${hash}" ]]; then
+            echo "FAIL: Registry hash mismatch: ${bazelrc} has ${hash}, expected ${current_hash}" >&2
+            return 1
+        fi
+        current_hash="${hash}"
+    done
+
+    echo "${current_hash}"
+}
+
+# Print the absolute path of a hermetic, Bazel-provided executable (eg `@jq//:jq`), so CI
+# scripts outside Bazel do not depend on tools installed in the build image.
+bazel_tool_path() {
+    local target="$1"
+    local path
+    local root
+    # Leave the `bazel-bin` etc convenience symlinks pointing at the caller's build, which may
+    # use different options (eg `-c opt`), and skip workspace status: it needs git, which may be
+    # the tool being resolved.
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
+        --remote_download_toplevel --experimental_convenience_symlinks=ignore \
+        --workspace_status_command=/bin/true "$target" >&2
+    path="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" cquery "${BAZEL_BUILD_OPTIONS[@]}" \
+        --output=files "$target" 2>/dev/null)"
+    if [[ -z "$path" || "$path" == *$'\n'* ]]; then
+        echo "FAIL: Unable to resolve a single executable for ${target}" >&2
+        return 1
+    fi
+    # Source files of external repos live under the output base. The execroot only gets
+    # `external/<repo>` symlinks planted when a local action consumes them, which never
+    # happens with remote execution. Generated files are under the execution root.
+    if [[ "$path" == external/* ]]; then
+        root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    else
+        root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" execution_root)"
+    fi
+    echo "${root}/${path}"
+}
+
+# Resolve the LLVM toolchain's `llvm-strip` as `STRIP_BIN` (it strips GCC-built binaries too),
+# rather than relying on binutils in the build image.
+hermetic_strip() {
+    if [[ -z "${STRIP_BIN:-}" ]]; then
+        STRIP_BIN="$(bazel_tool_path @llvm_toolchain_llvm//:strip)"
+        export STRIP_BIN
+    fi
+}
+
+# Resolve the hermetic git toolchain as `GIT_BIN`, for CI scripts and Bazel's workspace status.
+# CI must not depend on a `git` installed in the build image. There is no prebuilt git for macOS,
+# where `do_ci.sh` only runs locally (CI uses `ci/mac_ci_steps.sh`), so use the host's git there
+# rather than resolving through Bazel.
+hermetic_git() {
+    if [[ -n "${GIT_BIN:-}" ]]; then
+        return
+    fi
+    if [[ "${OSTYPE}" == darwin* ]]; then
+        GIT_BIN="$(command -v git)" || {
+            echo "FAIL: git not found on PATH" >&2
+            return 1
+        }
+    else
+        GIT_BIN="$(bazel_tool_path //tools/git:bin)"
+    fi
+    export GIT_BIN
+}
+
+hermetic_jq() {
+    if [[ -z "${JQ_BIN:-}" ]]; then
+        JQ_BIN="$(bazel_tool_path @jq//:jq)"
+        export JQ_BIN
+    fi
+}
+
+registry_check() {
+    local version
+    local registry_hash=""
+
+    hermetic_jq
+    version="$(cat VERSION.txt)"
+    if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
+        run_in_registry_mods _registry_check_mod \
+            "--@envoy_toolshed//dependency:registry_allow_unsafe=true"
+        return
+    fi
+    run_in_registry_mods _registry_check_mod
+}
+
+_registry_check_mod() {
+    local module_dir="$1"
+    local markdown_path
+    local sha
+    local sha_path
+    local status_path
+    local tags
+    local workspace
+    shift
+
+    workspace="$(workspace_name "$module_dir")"
+    status_path="$(mktemp)"
+    markdown_path="$(mktemp)"
+    sha_path="$(mktemp)"
+    # shellcheck disable=SC2064
+    trap "rm -f '${status_path}' '${markdown_path}' '${sha_path}'" RETURN
+
+    workspace_bazel_run "$module_dir" update_registry.check "$@" -- \
+        "--json-out=${status_path}" \
+        "--markdown-out=${markdown_path}" \
+        "--sha-out=${sha_path}" || {
+        echo "FAIL: ${workspace}: bazel registry check failed" >&2
+        return 1
+    }
+
+    sha="$(cat "${sha_path}")"
+    tags="$("${JQ_BIN}" -r '.tags | join(" ")' "${status_path}")"
+    if [[ -z "${sha}" || "${sha}" == "null" ]]; then
+        echo "FAIL: Failed to determine registry hash for ${workspace}" >&2
+        return 1
+    fi
+    if [[ -n "${registry_hash}" && "${registry_hash}" != "${sha}" ]]; then
+        echo "FAIL: Registry hash mismatch: ${workspace} has ${sha}, expected ${registry_hash}" >&2
+        return 1
+    fi
+    registry_hash="${sha}"
+
+    echo "${workspace}: $(cat "${markdown_path}")"
+    if [[ -n "${tags}" ]]; then
+        echo "${workspace}: registry commit ${sha} is tagged: ${tags}"
+        return
+    fi
+    if [[ "${version}" == *-dev ]]; then
+        echo "WARNING: ${workspace}: registry commit ${sha} is not a tagged version (ok for ${version})" >&2
+        return
+    fi
+    echo "FAIL: ${workspace}: registry commit ${sha} is not a tagged version, required for release ${version}" >&2
+    return 1
+}
+
+deps_report() {
+    run_in_nested_mods _deps_report_mod
+}
+
+_deps_report_mod() {
+    local module_dir="$1"
+    local markdown_path
+    local report_path
+    local workspace
+
+    workspace="$(workspace_name "$module_dir")"
+    report_path="$(mktemp)"
+    markdown_path="$(mktemp)"
+    # shellcheck disable=SC2064
+    trap "rm -f '${report_path}' '${markdown_path}'" RETURN
+
+    workspace_bazel_run "$module_dir" update_module -- \
+        --report \
+        "--json-out=${report_path}" \
+        "--markdown-out=${markdown_path}" || return
+
+    echo "== ${workspace} =="
+    cat "${markdown_path}"
+    echo
+}
+
+# Update the given `name[=version]` modules in every nested MODULE.bazel that declares them.
+deps_update() {
+    local dep
+
+    for dep in "$@"; do
+        run_in_nested_mods _deps_update_mod "$dep"
+    done
+    lockfiles_generate
+}
+
+_deps_update_mod() {
+    local module_dir="$1"
+    local dep="$2"
+    local dep_name="${dep%%=*}"
+    local output
+    local status=0
+    local workspace
+
+    workspace="$(workspace_name "$module_dir")"
+    output="$(workspace_bazel_run "$module_dir" update_module -- "${dep}" 2>&1)" || status=$?
+    if [[ ${status} -eq 0 ]]; then
+        printf '%s: %s\n' "${workspace}" "${output}"
+        return
+    fi
+    if grep -q "Dependency ${dep_name} not found" <<< "${output}"; then
+        echo "${workspace}: ${dep_name} not declared, skipping"
+        return
+    fi
+    echo "${output}" >&2
+    return "${status}"
+}
+
+# Bump the bazel-registry pin, then optionally apply module updates: `registry_update [all|*]`
+# bumps every module with a newer version in the envoy registry, `registry_update name[=version]...`
+# applies each spec (see deps_update). `all`/`*` cannot be combined with other specs.
+registry_update() {
+    local -a registry_args=()
+    local -a updates=("$@")
+    local update
+
+    for update in "${updates[@]}"; do
+        if [[ ("$update" == "all" || "$update" == "*") && ${#updates[@]} -gt 1 ]]; then
+            echo "FAIL: \`${update}\` cannot be combined with other update specs" >&2
+            return 1
+        fi
+    done
+
+    if [[ -n "${ENVOY_REGISTRY_HASH:-}" ]]; then
+        registry_args+=("--@envoy_toolshed//dependency:registry_sha=${ENVOY_REGISTRY_HASH}")
+    fi
+    if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
+        registry_args+=("--@envoy_toolshed//dependency:registry_allow_unsafe=true")
+    fi
+
+    run_in_registry_mods _registry_update_mod "${registry_args[@]}"
+    registry_current_hash > /dev/null
+    if (( ${#updates[@]} )); then
+        # The module updater takes each dependency's current registry from MODULE.bazel.lock,
+        # which still names the old pin, so re-resolve the lockfiles against the new pin first.
+        # Otherwise nothing is "available" on the (old) current registry and updates fail or
+        # are skipped.
+        run_in_nested_mods _lockfiles_generate_mod
+        registry_modules_update "${updates[@]}"
+    fi
+    lockfiles_generate
+}
+
+registry_modules_update() {
+    local update
+
+    if [[ "$1" == "all" || "$1" == "*" ]]; then
+        # Resolve jq from the root workspace before descending into the nested modules.
+        hermetic_jq
+        run_in_nested_mods _registry_modules_update_all_mod
+        return
+    fi
+    for update in "$@"; do
+        run_in_nested_mods _deps_update_mod "$update"
+    done
+}
+
+# Bump every module in this workspace that has a newer version in the envoy registry, as
+# reported by the module updater (`update_available` on the module's current registry).
+_registry_modules_update_all_mod() {
+    local module_dir="$1"
+    local dep
+    local report_path
+    local -a deps=()
+
+    report_path="$(mktemp)"
+    # A RETURN trap is not scoped to the function that sets it, so clear it once it has fired.
+    # shellcheck disable=SC2064
+    trap "rm -f '${report_path}'; trap - RETURN" RETURN
+
+    workspace_bazel_run "$module_dir" update_module -- --report "--json-out=${report_path}" \
+        > /dev/null || return
+    while read -r dep; do
+        [[ -n "$dep" ]] && deps+=("$dep")
+    done < <("${JQ_BIN}" -r \
+        'to_entries[]
+         | select(.value.update_available == true
+                  and ((.value.current_registry // "") | test("envoyproxy/bazel-registry")))
+         | .key' \
+        "$report_path")
+    if (( ${#deps[@]} == 0 )); then
+        echo "$(workspace_name "$module_dir"): no registry updates available"
+        return
+    fi
+    for dep in "${deps[@]}"; do
+        _deps_update_mod "$module_dir" "$dep" || return
+    done
+}
+
+_registry_update_mod() {
+    local module_dir="$1"
+    shift
+
+    workspace_bazel_run "$module_dir" update_registry "$@"
+}

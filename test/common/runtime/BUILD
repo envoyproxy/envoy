@@ -9,8 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-exports_files(["filesystem_setup.sh"])
-
 filegroup(
     name = "filesystem_test_data",
     srcs = glob(["test_data/**"]),
@@ -19,7 +17,6 @@ filegroup(
 envoy_cc_test(
     name = "runtime_protos_test",
     srcs = ["runtime_protos_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -32,8 +29,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
-    data = glob(["test_data/**"]) + ["filesystem_setup.sh"],
-    rbe_pool = "linux_x64_small",
+    data = glob(["test_data/**"]),
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -49,8 +46,10 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -69,7 +68,6 @@ envoy_cc_test(
         "--envoy_reloadable_features_test_feature_true=false",
     ],
     coverage = False,
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_lib",
     ],
@@ -83,7 +81,6 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_false",
     ],
     coverage = False,
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/runtime:runtime_lib",
     ],

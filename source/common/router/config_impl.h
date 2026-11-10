@@ -369,7 +369,7 @@ public:
   static absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>>
   create(const envoy::config::route::v3::VirtualHost& virtual_host,
          const CommonConfigSharedPtr& global_route_config,
-         Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+         Server::Configuration::ServerFactoryContext& factory_context, Stats::ScopeSharedPtr scope,
          ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager);
 
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
@@ -420,12 +420,13 @@ public:
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return virtualClusterFromEntries(headers);
   }
+  const Stats::ScopeSharedPtr& statsScope() const { return stats_scope_; }
 
 private:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                         const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
-                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                        Stats::ScopeSharedPtr scope, ProtobufMessage::ValidationVisitor& validator,
                         Init::Manager& init_manager, absl::Status& creation_status);
   struct StatNameProvider {
     StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
@@ -436,9 +437,10 @@ private:
   struct VirtualClusterBase : public VirtualCluster {
   public:
     VirtualClusterBase(const std::optional<std::string>& name, Stats::StatName stat_name,
-                       Stats::ScopeSharedPtr&& scope, const VirtualClusterStatNames& stat_names)
-        : name_(name), stat_name_(stat_name), scope_(std::move(scope)),
-          stats_(generateStats(*scope_, stat_names)) {}
+                       Stats::Scope& scope, const VirtualClusterStatNames& stat_names,
+                       Stats::StatName vhost_stat_name)
+        : name_(name), stat_name_(stat_name),
+          stats_(createVclusterStats(scope, stat_names, vhost_stat_name, stat_name_)) {}
 
     // Router::VirtualCluster
     // name_ and stat_name_ are two different representations for the same string, retained in
@@ -448,28 +450,35 @@ private:
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
+    // Creates the stats of one virtual cluster directly in the shared vhost scope, with the
+    // virtual host and the virtual cluster attached as tags.
+    static VirtualClusterStats createVclusterStats(Stats::Scope& scope,
+                                                   const VirtualClusterStatNames& stat_names,
+                                                   Stats::StatName vhost_stat_name,
+                                                   Stats::StatName vcluster_stat_name);
+
     const std::optional<std::string> name_;
     const Stats::StatName stat_name_;
-    Stats::ScopeSharedPtr scope_;
     mutable VirtualClusterStats stats_;
   };
 
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
                         Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context,
-                        const VirtualClusterStatNames& stat_names);
+                        const VirtualClusterStatNames& stat_names, Stats::StatName vhost_stat_name);
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
-    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(std::nullopt, stat_names.other_,
-                             scope.scopeFromStatName(stat_names.other_), stat_names) {}
+    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names,
+                           Stats::StatName vhost_stat_name);
   };
 
   const std::string name_;
   const Stats::StatNameManagedStorage stat_name_storage_;
-  Stats::ScopeSharedPtr vcluster_scope_;
+  // Owns the unprefixed scope that the virtual cluster and route stats are created in. A route
+  // keeps its virtual host alive, and with it this scope, across config swaps.
+  Stats::ScopeSharedPtr stats_scope_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
@@ -512,9 +521,10 @@ class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
 public:
   VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                   const CommonConfigSharedPtr& global_route_config,
-                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-                  ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-                  bool validate_clusters, absl::Status& creation_status);
+                  Server::Configuration::ServerFactoryContext& factory_context,
+                  Stats::ScopeSharedPtr scope, ProtobufMessage::ValidationVisitor& validator,
+                  Init::Manager& init_manager, bool validate_clusters,
+                  absl::Status& creation_status);
 
   VirtualHostMatchResult getRouteFromEntries(const RouteCallback& cb,
                                              const Http::RequestHeaderMap& headers,
@@ -732,8 +742,16 @@ public:
   }
   const Http::HeaderEvaluator& headerEvaluator() const override;
   absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
+  const ShadowPolicyStatsSharedPtr& stats() const override { return stats_; }
 
 private:
+  struct ShadowPolicyStatsHolder {
+    explicit ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope);
+
+    const Stats::ScopeSharedPtr scope_;
+    const ShadowPolicyStats stats_;
+  };
+
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
                             Server::Configuration::CommonFactoryContext& factory_context,
                             absl::Status& creation_status);
@@ -746,6 +764,7 @@ private:
   const bool disable_shadow_host_suffix_append_;
   const std::string host_rewrite_literal_;
   HeaderMutationsPtr request_headers_mutations_;
+  ShadowPolicyStatsSharedPtr stats_;
 };
 
 /**
@@ -799,6 +818,11 @@ private:
 class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
+
+  // Builds a RouteTracingImpl, returning an error instead of throwing when an operation formatter
+  // is invalid, so a caller that must not throw can validate the configuration.
+  static absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+  create(const envoy::config::route::v3::Tracing& tracing);
 
   // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
@@ -1522,6 +1546,7 @@ public:
                          const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
+  const VirtualHostImpl* findVirtualHost(absl::string_view host) const;
 
   /**
    * Periodically called to evict idle virtual hosts that have exceeded the idle TTL, inspecting up
@@ -1560,12 +1585,19 @@ private:
                                              const WildcardDomainEntries& wildcard_domain_entries,
                                              SubstringFunction substring_function) const;
   const DomainEntry* findDomainEntry(absl::string_view host_header_value) const;
+  bool hasOnlyDefaultVirtualHost() const {
+    return exact_domain_entries_.empty() && wildcard_domain_suffixes_.empty() &&
+           wildcard_domain_prefixes_.empty();
+  }
+  const VirtualHostImpl* findVirtualHostInternal(absl::string_view host) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   TimeSource& time_source_;
   // Keeps the shared part of the route config alive and gives access to the route configuration
   // level extensions, which run even when no virtual host matches.
   const CommonConfigSharedPtr global_route_config_;
+  // Unprefixed scope that only bounds the lifetime of the virtual cluster stats; see the
+  // constructor.
   Stats::ScopeSharedPtr vhost_scope_;
   std::vector<DomainEntrySharedPtr> all_domain_entries_;
   absl::flat_hash_map<std::string, DomainEntrySharedPtr> exact_domain_entries_;
@@ -1669,8 +1701,8 @@ public:
          ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
          bool validate_clusters_default);
 
-  bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
-    return route_matcher_->findVirtualHost(headers) != nullptr;
+  bool virtualHostExists(absl::string_view domain) const {
+    return route_matcher_->findVirtualHost(domain) != nullptr;
   }
 
   // Router::Config

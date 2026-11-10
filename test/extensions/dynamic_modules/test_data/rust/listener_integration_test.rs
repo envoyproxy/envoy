@@ -27,6 +27,10 @@ fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListen
     "filter_chain_selector" => Some(Box::new(FilterChainSelectorFilterConfig {
       selection: config.to_vec(),
     })),
+    "load_shed_point" => Some(Box::new(LoadShedPointFilterConfig {
+      load_shed_point: envoy_filter_config
+        .get_load_shed_point(std::str::from_utf8(config).unwrap()),
+    })),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -94,7 +98,7 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for BufferReadFilter {
     let chunk = envoy_filter
       .get_buffer_chunk()
       .expect("expected buffer chunk");
-    assert_eq!(&chunk.as_slice()[..4], b"ping");
+    assert_eq!(&chunk.as_slice()[.. 4], b"ping");
     assert_eq!(envoy_filter.max_read_bytes(), 4);
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
@@ -163,8 +167,8 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter
 // =============================================================================
 
 // Issues an HTTP callout on accept and increments a counter from on_http_callout_done. The unit
-// tests complete the callout inline, so the gate must keep on_http_callout_done from running and the
-// counter must stay at zero.
+// tests complete the callout inline, so the gate must keep on_http_callout_done from running and
+// the counter must stay at zero.
 struct HttpCalloutReentrancyProbeFilterConfig {
   callout_done_total: EnvoyCounterId,
 }
@@ -227,7 +231,8 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutReentrancyProb
 
 // Sets several string entries under one namespace via the batch setter on accept, then reads them
 // back to prove the batch and the getter round trip through the ABI. An empty batch must not create
-// a namespace.
+// a namespace. It also sets a namespace from a serialized google.protobuf.Struct and a typed
+// namespace from a serialized google.protobuf.Any.
 struct DynamicMetadataFilterConfig;
 
 impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for DynamicMetadataFilterConfig {
@@ -280,6 +285,28 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for DynamicMetadataFilter {
         .map(|value| value.as_slice().to_vec()),
       Some(vec![0xff, 0x00, 0xfe])
     );
+
+    // A serialized google.protobuf.Struct with "k" set to "v".
+    assert!(envoy_filter.set_dynamic_metadata_struct(
+      "dynamic_modules.struct",
+      &[0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76],
+    ));
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.struct", "k")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"v".to_vec())
+    );
+
+    // A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+    assert!(envoy_filter.set_dynamic_typed_metadata(
+      "dynamic_modules.typed",
+      &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02],
+    ));
+
+    // A struct that does not parse and an Any without a type URL are rejected.
+    assert!(!envoy_filter.set_dynamic_metadata_struct("dynamic_modules.struct", &[0x0f]));
+    assert!(!envoy_filter.set_dynamic_typed_metadata("dynamic_modules.typed", &[]));
 
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
@@ -393,5 +420,43 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for FilterChainSelectorFilter
   ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
     assert!(envoy_filter.set_filter_state_typed(SELECTOR_KEY, &self.selection));
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Load Shed Point Test Filter
+// =============================================================================
+
+// Creates filters that close an accepted socket when the load shed point named in the filter
+// config sheds it.
+struct LoadShedPointFilterConfig {
+  load_shed_point: Option<Box<dyn EnvoyLoadShedPoint>>,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for LoadShedPointFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(LoadShedPointFilter {
+      shed_load: self
+        .load_shed_point
+        .as_ref()
+        .is_some_and(|load_shed_point| load_shed_point.should_shed_load()),
+    })
+  }
+}
+
+struct LoadShedPointFilter {
+  shed_load: bool,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for LoadShedPointFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    if !self.shed_load {
+      return abi::envoy_dynamic_module_type_on_listener_filter_status::Continue;
+    }
+    envoy_filter.close_socket(Some("load_shed"));
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
   }
 }

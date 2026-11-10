@@ -13,6 +13,7 @@
 #include "source/common/quic/scone_state.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/types/span.h"
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
 namespace Envoy {
@@ -90,7 +91,8 @@ public:
   // quic::QuicSpdySession
   // Overridden to flush WebTransport CONNECT requests that were deferred until the peer's HTTP/3
   // SETTINGS arrived. See registerStreamWaitingForSettings().
-  bool OnSettingsFrame(const quic::SettingsFrame& frame) override;
+  bool OnSettingsFrame(const quic::SettingsFrame& frame,
+                       absl::Span<const uint64_t> wire_order) override;
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Registers/unregisters a client stream that buffered a WebTransport CONNECT request in

@@ -1,7 +1,6 @@
 #include "source/extensions/filters/udp/dynamic_modules/factory.h"
 
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/dynamic_modules/worker_index.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -28,7 +27,11 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
   auto dynamic_module = std::move(load_result->loaded);
 
   auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-      proto_config, std::move(dynamic_module), context.scope());
+      proto_config, std::move(dynamic_module), context.scope(),
+      context.shouldBypassOverloadManager()
+          ? OptRef<Server::LoadShedPointProvider>()
+          : makeOptRef<Server::LoadShedPointProvider>(
+                context.serverFactoryContext().overloadManager()));
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
   // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
@@ -45,8 +48,7 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {
-    const uint32_t worker_index = Extensions::DynamicModules::parseWorkerIndexFromDispatcherName(
-        callbacks.udpListener().dispatcher().name());
+    const uint32_t worker_index = callbacks.udpListener().dispatcher().workerId().value_or(0);
     filter_manager.addReadFilter(
         std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config, worker_index));
   };

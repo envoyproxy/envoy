@@ -137,6 +137,49 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
+// Verifies that when header_forwarding is not set on a backend, the resulting policy is
+// secure-by-default: forward_all is false and no headers beyond the router's own synthesized
+// ones are forwarded. Core behavioral requirement of issue #46525.
+TEST_F(McpRouterConfigTest, HeaderForwardingDefaultsToSecurePolicyWhenUnset) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+
+  const McpBackendConfig* backend = config.findBackend("test");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_FALSE(backend->header_forwarding.forward_all);
+  EXPECT_TRUE(backend->header_forwarding.allowed_headers.empty());
+  EXPECT_TRUE(backend->header_forwarding.disallowed_headers.empty());
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
+}
+
+// Verifies forward_all and allowed/disallowed_headers on McpRouter.McpBackend are parsed into
+// the backend's HeaderForwardingPolicy correctly.
+TEST_F(McpRouterConfigTest, HeaderForwardingParsesForwardAllAndMatchers) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+  auto* header_forwarding = server->mutable_header_forwarding();
+  header_forwarding->set_forward_all(true);
+  header_forwarding->mutable_disallowed_headers()->add_patterns()->set_exact("authorization");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+
+  const McpBackendConfig* backend = config.findBackend("test");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_TRUE(backend->header_forwarding.forward_all);
+  EXPECT_TRUE(headerCanBeForwarded("x-anything", backend->header_forwarding));
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
+}
+
 // Verifies McpRouterClusterConfigImpl parses ClusterConfig proto correctly.
 TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig proto_config;
@@ -161,6 +204,33 @@ TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   EXPECT_EQ(backend->cluster_name, "target_cluster");
   EXPECT_EQ(backend->path, "/custom_mcp");
   EXPECT_EQ(backend->timeout, std::chrono::milliseconds(10000));
+  // Same secure-by-default requirement applies to mcp_multicluster's independent
+  // ClusterConfig.McpBackend.HeaderForwarding message.
+  EXPECT_FALSE(backend->header_forwarding.forward_all);
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
+}
+
+// Verifies forward_all and allowed/disallowed_headers on mcp_multicluster's
+// ClusterConfig.McpBackend are parsed into the backend's HeaderForwardingPolicy correctly --
+// this is a separate proto message from McpRouter.McpBackend's, so needs its own coverage.
+TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesHeaderForwarding) {
+  envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("cluster_backend");
+  server->mutable_mcp_cluster()->set_cluster("target_cluster");
+  auto* header_forwarding = server->mutable_header_forwarding();
+  header_forwarding->mutable_allowed_headers()->add_patterns()->set_exact("x-trace-id");
+
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
+
+  McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
+
+  const McpBackendConfig* backend = cluster_config.findBackend("cluster_backend");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_TRUE(headerCanBeForwarded("x-trace-id", backend->header_forwarding));
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
 }
 
 class BackendStreamCallbacksTest : public testing::Test {};
@@ -421,6 +491,32 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
 }
 
+// Verifies the session signing key is read from an inline DataSource.
+TEST_F(McpRouterConfigTest, SessionSigningKeyInline) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+  proto_config.mutable_session_signing_key()->set_inline_string("test-key");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_, "test-key");
+  EXPECT_EQ(config.sessionSigningKey(), "test-key");
+}
+
+// Verifies the signing key is empty when not configured, preserving the legacy unsigned session
+// behavior.
+TEST_F(McpRouterConfigTest, SessionSigningKeyEmptyByDefault) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+  EXPECT_TRUE(config.sessionSigningKey().empty());
+}
+
 // Test fixture for McpRouterFilter runtime behavior tests.
 class McpRouterFilterTest : public testing::Test {
 protected:
@@ -559,9 +655,9 @@ TEST_F(McpRouterFilterTest, UsingClusterConfigForListOfServers) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+      .WillRepeatedly([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_NE("403", headers.getStatusValue());
-      }));
+      });
 
   filter.decodeHeaders(headers, false);
 
@@ -618,9 +714,9 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionSuccess) {
   // Subject extraction should succeed - verify no 403 is returned.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, testing::_))
       .Times(AnyNumber())
-      .WillRepeatedly(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+      .WillRepeatedly([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_NE("403", headers.getStatusValue());
-      }));
+      });
 
   filter.decodeHeaders(headers, false);
 
@@ -656,9 +752,9 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionNotFound) {
 
   // Expect 403 due to missing subject in ENFORCE mode.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("403", headers.getStatusValue());
-      }));
+      });
 
   filter.decodeHeaders(headers, false);
 
@@ -696,9 +792,9 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionNotString) {
 
   // Expect 403 due to non-string subject value in ENFORCE mode.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("403", headers.getStatusValue());
-      }));
+      });
 
   filter.decodeHeaders(headers, false);
 
@@ -733,9 +829,9 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionDisabledModeProceeds) {
   // DISABLED mode should proceed with anonymous session - verify no 403 is returned.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, testing::_))
       .Times(AnyNumber())
-      .WillRepeatedly(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+      .WillRepeatedly([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_NE("403", headers.getStatusValue());
-      }));
+      });
 
   filter.decodeHeaders(headers, false);
 
@@ -915,12 +1011,12 @@ TEST_F(McpRouterFilterTest, LazyInitializeRespondsImmediately) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         auto session_header = headers.get(Http::LowerCaseString("mcp-session-id"));
         EXPECT_FALSE(session_header.empty());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   filter.decodeHeaders(headers, false);
@@ -985,10 +1081,10 @@ TEST_F(McpRouterFilterTest, LazyInitToolsCallInitializesBackend) {
   // Simulate tools/call response.
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string tool_response =
@@ -1051,10 +1147,10 @@ TEST_F(McpRouterFilterTest, LazyInitToolsListInitializesAllBackends) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string time_tools =
@@ -1093,11 +1189,11 @@ TEST_F(McpRouterFilterTest, LazyInitNotificationNoBackends) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         EXPECT_EQ("202", headers.getStatusValue());
         EXPECT_TRUE(end_stream);
         response_sent = true;
-      }));
+      });
 
   filter->decodeHeaders(headers, false);
 
@@ -1195,10 +1291,10 @@ TEST_F(McpRouterFilterTest, LazyInitPromptsGetInitializesBackend) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string prompt_response =
@@ -1256,10 +1352,10 @@ TEST_F(McpRouterFilterTest, LazyInitPromptsListInitializesBackends) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string prompts_response =
@@ -1317,10 +1413,10 @@ TEST_F(McpRouterFilterTest, LazyInitResourcesListInitializesBackends) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string resources_response =
@@ -1376,10 +1472,10 @@ TEST_F(McpRouterFilterTest, LazyInitResourcesTemplatesListInitializesBackends) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string templates_response =
@@ -1436,10 +1532,10 @@ TEST_F(McpRouterFilterTest, LazyInitLoggingSetLevelInitializesBackends) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string logging_response = R"({"jsonrpc":"2.0","id":8,"result":{}})";
@@ -1500,10 +1596,10 @@ TEST_F(McpRouterFilterTest, LazyInitResourcesReadInitializesBackend) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string resource_response =
@@ -1567,10 +1663,10 @@ TEST_F(McpRouterFilterTest, LazyInitCompletionCompleteInitializesBackend) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string completion_response =
@@ -1621,10 +1717,10 @@ TEST_F(McpRouterFilterTest, LazyInitToolsCallInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1672,10 +1768,10 @@ TEST_F(McpRouterFilterTest, LazyInitToolsListInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1728,10 +1824,10 @@ TEST_F(McpRouterFilterTest, LazyInitPromptsGetInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1779,10 +1875,10 @@ TEST_F(McpRouterFilterTest, LazyInitPromptsListInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1830,10 +1926,10 @@ TEST_F(McpRouterFilterTest, LazyInitResourcesListInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1886,10 +1982,10 @@ TEST_F(McpRouterFilterTest, LazyInitResourcesReadInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1944,10 +2040,10 @@ TEST_F(McpRouterFilterTest, LazyInitCompletionCompleteInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -1995,10 +2091,10 @@ TEST_F(McpRouterFilterTest, LazyInitResourcesTemplatesListInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -2046,10 +2142,10 @@ TEST_F(McpRouterFilterTest, LazyInitLoggingSetLevelInitFailure) {
 
   bool error_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("500", headers.getStatusValue());
         error_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   simulateBackendError(http_callbacks[0]);
@@ -2109,10 +2205,10 @@ TEST_F(McpRouterFilterTest, LazyInitBuffersMultiChunkData) {
 
   bool response_sent = false;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("200", headers.getStatusValue());
         response_sent = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string tool_response =
@@ -2180,9 +2276,9 @@ TEST_F(McpRouterFilterTest, GatewayCapabilitiesIncludeElicitation) {
 
   std::string response_body;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
-  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
-      .WillOnce(
-          testing::Invoke([&](Buffer::Instance& data, bool) { response_body = data.toString(); }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true)).WillOnce([&](Buffer::Instance& data, bool) {
+    response_body = data.toString();
+  });
 
   filter.decodeHeaders(headers, false);
   const std::string body =
@@ -2227,9 +2323,9 @@ TEST_F(McpRouterFilterTest, HandleServerResponseRoutesToBackend) {
 
   std::string forwarded_body;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
-  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
-      .WillOnce(
-          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true)).WillOnce([&](Buffer::Instance& data, bool) {
+    forwarded_body = data.toString();
+  });
 
   filter->decodeData(buffer, true);
 
@@ -2263,9 +2359,9 @@ TEST_F(McpRouterFilterTest, HandleServerResponseInvalidId) {
   filter.decodeHeaders(headers, false);
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ("400", headers.getStatusValue());
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   const std::string body = R"({"jsonrpc":"2.0","id":"unknown__42","result":{"action":"accept"}})";
@@ -2302,9 +2398,9 @@ TEST_F(McpRouterFilterTest, HandleServerResponseSingleBackend) {
 
   std::string forwarded_body;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
-  EXPECT_CALL(decoder_callbacks_, encodeData(_, true))
-      .WillOnce(
-          testing::Invoke([&](Buffer::Instance& data, bool) { forwarded_body = data.toString(); }));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true)).WillOnce([&](Buffer::Instance& data, bool) {
+    forwarded_body = data.toString();
+  });
 
   filter->decodeData(buffer, true);
 

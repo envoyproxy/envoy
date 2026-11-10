@@ -33,6 +33,7 @@ class StatNameSet;
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagSpan = absl::Span<const StatNameTag>;
+using StatNameSpan = absl::Span<const StatName>;
 
 /**
  * Holds a range of indexes indicating which parts of a stat-name are
@@ -78,6 +79,8 @@ using SymbolVec = std::vector<Symbol>;
  * same string is re-encoded, it may or may not encode to the same underlying
  * symbol.
  */
+class WellKnownStatNames;
+
 class SymbolTable final {
 public:
   /**
@@ -302,6 +305,13 @@ public:
   ~SymbolTable();
 
   /**
+   * @return the pre-encoded StatNames for well-known stat tokens and tag names, encoded at
+   * construction so that they occupy the first, single-byte symbols. Use these instead of
+   * encoding well-known names into a local pool. See well_known_stat_names.h.
+   */
+  const WellKnownStatNames& wellKnownStatNames() const { return *well_known_stat_names_; }
+
+  /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
    * decoding fails on any part of the symbol_vec, we release_assert and crash,
    * since this should never happen, and we don't want to continue running
@@ -331,7 +341,8 @@ public:
   size_t serializeToBuffer(const StatName& stat_name, char* buffer, size_t buffer_size) const;
 
   /**
-   * @return uint64_t the number of symbols in the symbol table.
+   * @return uint64_t the number of symbols in the symbol table, including the pre-encoded
+   * well-known names, which stay interned for the lifetime of the table.
    */
   uint64_t numSymbols() const;
 
@@ -648,6 +659,10 @@ private:
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ ABSL_GUARDED_BY(lock_);
   RecentLookups recent_lookups_ ABSL_GUARDED_BY(lock_);
+
+  // Created in the constructor and released explicitly at the start of the destructor, before
+  // the symbol-leak check runs.
+  std::unique_ptr<WellKnownStatNames> well_known_stat_names_;
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived

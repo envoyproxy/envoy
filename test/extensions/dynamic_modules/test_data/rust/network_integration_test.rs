@@ -13,7 +13,7 @@ fn init() -> bool {
 fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
   envoy_filter_config: &mut EC,
   name: &str,
-  _config: &[u8],
+  config: &[u8],
 ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
   match name {
     "flow_control" => Some(Box::new(FlowControlFilterConfig)),
@@ -34,6 +34,10 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "http_callout_reentrancy_probe" => Some(Box::new(HttpCalloutReentrancyProbeFilterConfig::new(
       envoy_filter_config,
     ))),
+    "load_shed_point" => Some(Box::new(LoadShedPointFilterConfig {
+      load_shed_point: envoy_filter_config
+        .get_load_shed_point(std::str::from_utf8(config).unwrap()),
+    })),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -324,7 +328,8 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for BufferLimitsFilter {
 
 // Sets several string entries under one namespace via the batch setter, then reads them back to
 // prove the batch and the getter round trip through the ABI. An empty batch must not create a
-// namespace.
+// namespace. It also sets a namespace from a serialized google.protobuf.Struct and a typed
+// namespace from a serialized google.protobuf.Any.
 struct DynamicMetadataFilterConfig;
 
 impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for DynamicMetadataFilterConfig {
@@ -377,6 +382,28 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for DynamicMetadataFilter {
         .map(|value| value.as_slice().to_vec()),
       Some(vec![0xff, 0x00, 0xfe])
     );
+
+    // A serialized google.protobuf.Struct with "k" set to "v".
+    assert!(envoy_filter.set_dynamic_metadata_struct(
+      "dynamic_modules.struct",
+      &[0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76],
+    ));
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.struct", "k")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"v".to_vec())
+    );
+
+    // A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+    assert!(envoy_filter.set_dynamic_typed_metadata(
+      "dynamic_modules.typed",
+      &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02],
+    ));
+
+    // A struct that does not parse and an Any without a type URL are rejected.
+    assert!(!envoy_filter.set_dynamic_metadata_struct("dynamic_modules.struct", &[0x0f]));
+    assert!(!envoy_filter.set_dynamic_typed_metadata("dynamic_modules.typed", &[]));
 
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
@@ -498,5 +525,43 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for HttpCalloutReentrancyProbeF
     _body_chunks: Vec<EnvoyBuffer>,
   ) {
     let _ = envoy_filter.increment_counter(self.callout_done_total, 1);
+  }
+}
+
+// =============================================================================
+// Load Shed Point Test Filter
+// =============================================================================
+
+// Creates filters that close a new connection when the load shed point named in the filter config
+// sheds it.
+struct LoadShedPointFilterConfig {
+  load_shed_point: Option<Box<dyn EnvoyLoadShedPoint>>,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for LoadShedPointFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(LoadShedPointFilter {
+      shed_load: self
+        .load_shed_point
+        .as_ref()
+        .is_some_and(|load_shed_point| load_shed_point.should_shed_load()),
+    })
+  }
+}
+
+struct LoadShedPointFilter {
+  shed_load: bool,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for LoadShedPointFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    if !self.shed_load {
+      return abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue;
+    }
+    envoy_filter.close(abi::envoy_dynamic_module_type_network_connection_close_type::NoFlush);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
   }
 }

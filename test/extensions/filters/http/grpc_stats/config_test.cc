@@ -394,6 +394,30 @@ TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMatch) {
                      .value());
 }
 
+// Test that replace_dots_in_grpc_service_name is applied to allowlisted methods.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMatchReplaceDotsInGrpcServiceName) {
+  auto* service = config_.mutable_individual_method_stats_allowlist()->mutable_services()->Add();
+  service->set_name("lyft.users.BadCompanions");
+  *service->mutable_method_names()->Add() = "GetBadCompanions";
+  config_.set_replace_dots_in_grpc_service_name(true);
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counterFromString("grpc.lyft_users_BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counterFromString("grpc.lyft_users_BadCompanions.GetBadCompanions.total")
+                     .value());
+}
+
 // Test that an allowlist method mismatch results in going to the generic stat.
 TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchMethod) {
   addAllowlistEntry();

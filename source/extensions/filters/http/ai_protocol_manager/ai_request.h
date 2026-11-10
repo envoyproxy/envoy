@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "nlohmann/json.hpp"
 
@@ -18,7 +19,8 @@ namespace AiProtocolManager {
 // ownership transfer across the filter pipeline is expressed via std::unique_ptr<AiRequest>.
 class AiRequest {
 public:
-  explicit AiRequest(JsonWithExtBuf request_index) : request_index_(std::move(request_index)) {}
+  explicit AiRequest(JsonWithExtBuf request_index, LLMProtocol protocol = LLMProtocol::Unspecified)
+      : request_index_(std::move(request_index)), protocol_(protocol) {}
   ~AiRequest() = default;
 
   AiRequest(const AiRequest&) = delete;
@@ -36,11 +38,17 @@ public:
   // Hands the index to the sink once the filters are done with the request.
   JsonWithExtBuf takeRequestIndex() { return std::move(request_index_); }
 
+  // The payload's wire API, seeded with the declared one. A filter that identifies it sets it for
+  // the filters after it.
+  LLMProtocol protocol() const { return protocol_; }
+  void setProtocol(LLMProtocol protocol) { protocol_ = protocol; }
+
   // TODO(penguingao): Implement field streaming (AiRequest::stream, FieldStreamingSpec,
   // and FieldStreamingSession).
 
 private:
   JsonWithExtBuf request_index_;
+  LLMProtocol protocol_;
 };
 
 using AiRequestPtr = std::unique_ptr<AiRequest>;
