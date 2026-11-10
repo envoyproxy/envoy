@@ -599,7 +599,8 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateCancelledWhenTheClientGoes
                                                  {":scheme", "http"},
                                                  {":authority", "vhost_1"},
                                                  {"x-lyft-user-id", "123"}};
-  codec_client_->makeHeaderOnlyRequest(request_headers);
+  // The decoder must outlive the close below, which resets the request it belongs to.
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {},
                                            vhds_stream_.get()));
