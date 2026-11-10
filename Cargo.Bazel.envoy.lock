@@ -1,5 +1,5 @@
 {
-  "checksum": "2c8af5bd2e761046c32ca13a01d2fb20c7b5dd3e26b12383c83234028c6fdade",
+  "checksum": "e90ec3d33710f71609a514ee4eb2717be7728e514c7dba4f097daee2474afce8",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -1228,6 +1228,26 @@
       ],
       "version": "1.15.0"
     },
+    "envoy-dynamic-modules-bindgen 0.1.0": {
+      "common_attrs": {
+        "deps": [
+          {
+            "id": "bindgen 0.73.2",
+            "target": "bindgen"
+          }
+        ],
+        "edition": "2021"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "name": "envoy-dynamic-modules-bindgen",
+      "package_url": "https://github.com/envoyproxy/envoy",
+      "repository": null,
+      "targets": [],
+      "version": "0.1.0"
+    },
     "envoy-dynamic-modules-builtin-extensions 0.1.0": {
       "common_attrs": {
         "deps": [
@@ -1277,14 +1297,7 @@
       "version": "0.1.0"
     },
     "envoy-proxy-dynamic-modules-rust-sdk 0.1.0": {
-      "build_script_attrs": {
-        "deps": [
-          {
-            "id": "bindgen 0.73.2",
-            "target": "bindgen"
-          }
-        ]
-      },
+      "build_script_attrs": {},
       "common_attrs": {
         "crate_features": [
           "default",
@@ -4952,10 +4965,28 @@
     "quote 1.0.45": {
       "build_script_attrs": {},
       "common_attrs": {
-        "crate_features": [
-          "default",
-          "proc-macro"
-        ],
+        "crate_features": {
+          "common": [
+            "proc-macro"
+          ],
+          "selects": {
+            "aarch64-apple-darwin": [
+              "default"
+            ],
+            "aarch64-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-pc-windows-msvc": [
+              "default"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-unknown-nixos-gnu": [
+              "default"
+            ]
+          }
+        },
         "deps": [
           {
             "id": "proc-macro2 1.0.106",
@@ -6424,19 +6455,41 @@
     },
     "syn 2.0.117": {
       "common_attrs": {
-        "crate_features": [
-          "clone-impls",
-          "default",
-          "derive",
-          "extra-traits",
-          "fold",
-          "full",
-          "parsing",
-          "printing",
-          "proc-macro",
-          "visit",
-          "visit-mut"
-        ],
+        "crate_features": {
+          "common": [
+            "clone-impls",
+            "default",
+            "derive",
+            "extra-traits",
+            "full",
+            "parsing",
+            "printing",
+            "proc-macro",
+            "visit-mut"
+          ],
+          "selects": {
+            "aarch64-apple-darwin": [
+              "fold",
+              "visit"
+            ],
+            "aarch64-unknown-linux-gnu": [
+              "fold",
+              "visit"
+            ],
+            "x86_64-pc-windows-msvc": [
+              "fold",
+              "visit"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "fold",
+              "visit"
+            ],
+            "x86_64-unknown-nixos-gnu": [
+              "fold",
+              "visit"
+            ]
+          }
+        },
         "deps": [
           {
             "id": "proc-macro2 1.0.106",
@@ -9628,6 +9681,7 @@
   ],
   "direct_dev_deps": [],
   "workspace_members": {
+    "envoy-dynamic-modules-bindgen 0.1.0": "tools/dynamic_modules/bindgen",
     "envoy-dynamic-modules-builtin-extensions 0.1.0": "source/extensions/dynamic_modules/builtin_extensions",
     "envoy-proxy-dynamic-modules-rust-sdk 0.1.0": "source/extensions/dynamic_modules/sdk/rust",
     "test-programs 0.1.0": "test/extensions/dynamic_modules/test_data/rust"
