@@ -11,6 +11,10 @@ class HealthCheckIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
+    // Exercise graceful draining without waiting for the default five-second HTTP drain period.
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+      *hcm.mutable_drain_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(100);
+    });
     HttpProtocolIntegrationTest::initialize();
   }
   absl::string_view request(const std::string port_key, const std::string method,
