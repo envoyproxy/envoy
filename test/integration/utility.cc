@@ -72,19 +72,40 @@ RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data)
   };
 }
 
-} // namespace
-
-bool IntegrationUtil::runDispatcherUntil(Event::Dispatcher& dispatcher,
-                                         const std::function<bool()>& condition,
-                                         std::chrono::milliseconds timeout) {
+testing::AssertionResult runDispatcherUntilImpl(Event::Dispatcher& dispatcher,
+                                                const std::function<bool()>& condition,
+                                                absl::string_view description,
+                                                std::chrono::milliseconds timeout,
+                                                bool advance_time) {
+  const auto deadline = timeout * TIMEOUT_FACTOR;
   Event::GlobalTimeSystem time_system;
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (!condition() && (timeout == std::chrono::milliseconds::zero() || bound.withinBound())) {
-    time_system.advanceTimeForIo();
+  Event::TestTimeSystem::RealTimeBound bound(deadline);
+  while (!condition()) {
+    if (!bound.withinBound()) {
+      return testing::AssertionFailure() << "Timed out after " << deadline.count()
+                                         << "ms of real time waiting for " << description;
+    }
+    if (advance_time) {
+      time_system.advanceTimeForIo();
+    }
     dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     std::this_thread::yield();
   }
-  return condition();
+  return testing::AssertionSuccess();
+}
+} // namespace
+
+testing::AssertionResult IntegrationUtil::runDispatcherUntil(Event::Dispatcher& dispatcher,
+                                                             const std::function<bool()>& condition,
+                                                             absl::string_view description,
+                                                             std::chrono::milliseconds timeout) {
+  return runDispatcherUntilImpl(dispatcher, condition, description, timeout, false);
+}
+
+testing::AssertionResult IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+    Event::Dispatcher& dispatcher, const std::function<bool()>& condition,
+    absl::string_view description, std::chrono::milliseconds timeout) {
+  return runDispatcherUntilImpl(dispatcher, condition, description, timeout, true);
 }
 
 void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
@@ -231,8 +252,8 @@ sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& 
 
   Event::GlobalTimeSystem time_system;
   if (time_system.ioDispatcher() != nullptr) {
-    EXPECT_TRUE(IntegrationUtil::runDispatcherUntil(dispatcher,
-                                                    [&response] { return response->complete(); }));
+    EXPECT_TRUE(IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+        dispatcher, [&response] { return response->complete(); }, "HTTP response completion"));
   } else {
     dispatcher.run(Event::Dispatcher::RunType::Block);
   }
@@ -316,9 +337,12 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                options);
   // Quic connection needs to finish handshake.
   if (time_system.ioDispatcher() != nullptr) {
-    EXPECT_TRUE(runDispatcherUntil(*dispatcher, [&connection_callbacks] {
-      return connection_callbacks.connected() || connection_callbacks.closed();
-    }));
+    EXPECT_TRUE(runDispatcherUntilWithTimeAdvance(
+        *dispatcher,
+        [&connection_callbacks] {
+          return connection_callbacks.connected() || connection_callbacks.closed();
+        },
+        "QUIC connection establishment"));
   } else {
     dispatcher->run(Event::Dispatcher::RunType::Block);
   }

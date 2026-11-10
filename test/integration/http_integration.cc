@@ -102,10 +102,9 @@ IntegrationCodecClient::IntegrationCodecClient(
   if (wait_till_connected) {
     Event::GlobalTimeSystem time_system;
     if (time_system.ioDispatcher() != nullptr) {
-      RELEASE_ASSERT(IntegrationUtil::runDispatcherUntil(
-                         dispatcher, [this] { return connected_ || disconnected_; },
-                         TestUtility::DefaultTimeout),
-                     "Timed out waiting for connection");
+      const auto result = IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+          dispatcher, [this] { return connected_ || disconnected_; }, "connection establishment");
+      RELEASE_ASSERT(result, result.message());
     } else {
       dispatcher.run(Event::Dispatcher::RunType::Block);
     }
@@ -197,43 +196,8 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
 }
 
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
-  if (disconnected_) {
-    return AssertionSuccess();
-  }
-  Event::GlobalTimeSystem time_system;
-  if (time_system.ioDispatcher() != nullptr) {
-    if (IntegrationUtil::runDispatcherUntil(
-            dispatcher_, [this] { return disconnected_; }, time_to_wait)) {
-      return AssertionSuccess();
-    }
-    return AssertionFailure() << "Timed out waiting for disconnect";
-  }
-  Event::TimerPtr wait_timer;
-  bool wait_timer_triggered = false;
-  if (time_to_wait.count()) {
-    wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
-      connection_->dispatcher().exit();
-      wait_timer_triggered = true;
-    });
-    wait_timer->enableTimer(time_to_wait);
-  }
-
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  // Disable the timer if it was created. This call is harmless if the timer already triggered.
-  if (wait_timer) {
-    wait_timer->disableTimer();
-  }
-
-  if (wait_timer_triggered && !disconnected_) {
-    if (time_to_wait == TestUtility::DefaultTimeout) {
-      ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
-    }
-    return AssertionFailure() << "Timed out waiting for disconnect";
-  }
-  EXPECT_TRUE(disconnected_);
-
-  return AssertionSuccess();
+  return IntegrationUtil::runDispatcherUntil(
+      dispatcher_, [this] { return disconnected_; }, "downstream disconnect", time_to_wait);
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {

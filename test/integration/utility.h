@@ -184,10 +184,18 @@ private:
  */
 class IntegrationUtil {
 public:
-  // Wait using a real-time bound while allowing registered simulated-time I/O to make progress.
-  static bool runDispatcherUntil(Event::Dispatcher& dispatcher,
-                                 const std::function<bool()>& condition,
-                                 std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  // Run network I/O without advancing simulated time. The real-time timeout is scaled by
+  // TIMEOUT_FACTOR for sanitizer and coverage builds.
+  static testing::AssertionResult
+  runDispatcherUntil(Event::Dispatcher& dispatcher, const std::function<bool()>& condition,
+                     absl::string_view description,
+                     std::chrono::milliseconds timeout = std::chrono::seconds(5));
+
+  // Also advance simulated time to drive QUIC pacing and delayed ACKs when needed. The real-time
+  // timeout is scaled by TIMEOUT_FACTOR as above.
+  static testing::AssertionResult runDispatcherUntilWithTimeAdvance(
+      Event::Dispatcher& dispatcher, const std::function<bool()>& condition,
+      absl::string_view description, std::chrono::milliseconds timeout = std::chrono::seconds(5));
 
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
