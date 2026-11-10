@@ -519,6 +519,48 @@ typed_config:
   }
 }
 
+// Same chain as AddedEncodedTrailersReachStoppedEncoderFilter with the runtime guard off: the
+// added trailers are dropped, so the buffering filter is never resumed and the response stays open
+// after the upstream has finished.
+TEST_P(FilterIntegrationTest, AddedEncodedTrailersDroppedOnStoppedEncoderFilterWithoutGuard) {
+  // Upstream HTTP filters do not observe the downstream stream staying open in the same way, and
+  // the stat-based checks below are specific to the downstream HCM.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration", "false");
+  prependFilter(R"EOF(
+name: add-trailers-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+)EOF");
+  prependFilter(R"EOF(
+name: encoder-decoder-buffer-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(128, true);
+
+  // The router finishes the upstream request before handing the final data frame to the encoder
+  // filters, so once it is gone the downstream stream has had its chance to complete.
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", testing::Eq(0));
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ(1, test_server_->gauge("http.config_test.downstream_rq_active")->value());
+
+  codec_client_->sendReset(encoder);
+  ASSERT_TRUE(response->waitForReset());
+  codec_client_->close();
+}
+
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(FilterIntegrationTest, DownstreamRequestWithFaultyFilter) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
