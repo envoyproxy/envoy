@@ -961,9 +961,15 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
+    if (shadow_policy.timeout().has_value()) {
+      // With respect_expected_rq_timeout, the mirror's router would take its timeout from the
+      // headers of the primary request instead of the mirror timeout.
+      shadow_headers->removeEnvoyExpectedRequestTimeoutMs();
+      shadow_headers->removeEnvoyUpstreamRequestTimeoutMs();
+    }
     auto options =
         Http::AsyncClient::RequestOptions()
-            .setTimeout(timeout_.global_timeout_)
+            .setTimeout(shadow_policy.timeout().value_or(timeout_.global_timeout_))
             .setParentSpan(callbacks_->activeSpan())
             .setChildSpanName("mirror")
             .setSampled(shadow_policy.traceSampled())
@@ -980,6 +986,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
+    if (shadow_policy.retryPolicy() != nullptr) {
+      options.setRetryPolicy(shadow_policy.retryPolicy()).setBufferBodyForRetry(true);
+    }
 
     // The last policy can move the metadata since no later policy needs it.
     if (shadow_metadata.has_value()) {

@@ -895,7 +895,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing doesn't support HTTP CONNECT and upgrades.
-  // [#next-free-field: 10]
+  // [#next-free-field: 12]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -977,6 +977,31 @@ message RouteAction {
     //
     // If empty, no per policy statistics are emitted.
     string stat_prefix = 9;
+
+    // Specifies the retry policy of the mirrored requests. The route and virtual host :ref:`retry
+    // policies <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` never apply to
+    // mirrored requests. Retry statistics are emitted on the mirror cluster.
+    //
+    // The body of a mirrored request is buffered for retries up to the request buffer limit of the
+    // primary request. Once the limit is exceeded, the mirrored request is sent in full but is no
+    // longer retried.
+    //
+    // .. note::
+    //
+    //   A :ref:`cluster-level retry policy
+    //   <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.retry_policy>` of the
+    //   mirror cluster overrides this policy entirely, as it does for route-level retry policies.
+    //   Without either, mirrored requests are not retried.
+    RetryPolicy retry_policy = 10;
+
+    // Specifies the timeout of the mirrored requests, including all retries. If not set, the
+    // timeout of the primary request is used. A value of 0 disables the timeout.
+    //
+    // When set, the ``x-envoy-expected-rq-timeout-ms`` and ``x-envoy-upstream-rq-timeout-ms``
+    // headers of the primary request are not copied to the mirrored requests, so that the mirror
+    // timeout also applies with :ref:`respect_expected_rq_timeout
+    // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.respect_expected_rq_timeout>`.
+    google.protobuf.Duration timeout = 11;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer

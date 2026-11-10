@@ -385,7 +385,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
                                    absl::Status& creation_status)
     : cluster_(config.cluster()), cluster_header_(config.cluster_header()),
       disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()),
-      host_rewrite_literal_(config.host_rewrite_literal()) {
+      host_rewrite_literal_(config.host_rewrite_literal()),
+      timeout_(PROTOBUF_GET_OPTIONAL_MS(config, timeout)) {
   SET_AND_RETURN_IF_NOT_OK(validateMirrorClusterSpecifier(config), creation_status);
 
   if (config.has_runtime_fraction()) {
@@ -421,6 +422,13 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
             absl::StrCat("mirror.", config.stat_prefix())));
     // Share ownership with the holder so that the scope outlives in-flight mirror requests.
     stats_ = ShadowPolicyStatsSharedPtr(holder, &holder->stats_);
+  }
+
+  if (config.has_retry_policy()) {
+    auto policy_or_error = RetryPolicyImpl::create(
+        config.retry_policy(), factory_context.messageValidationVisitor(), factory_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(policy_or_error.value());
   }
 }
 
