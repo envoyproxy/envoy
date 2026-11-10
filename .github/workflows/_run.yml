@@ -56,7 +56,7 @@ on:
         description: Check out this pull request's merge ref instead of the request's sha.
       checkout-ref:
         type: string
-        description: Check out this ref (sha, branch, tag or refs/pull/N/head) instead of the request's sha.
+        description: Check out this ref (full sha, branch, tag or refs/pull/N/head) instead of the request's sha.
       checkout-repository:
         type: string
         description: Repository (owner/name) to fetch checkout-ref from. Defaults to this repository, and is not used for checkout-pr.
@@ -317,9 +317,20 @@ jobs:
         ssh-key: ${{ inputs.trusted && secrets.ssh-key || '' }}
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
     - name: Checkout requested ref
-      if: ${{ inputs.checkout-ref || inputs.checkout-pr }}
+      if: inputs.checkout-ref || inputs.checkout-pr || inputs.checkout-repository
       shell: bash
       run: |
+        # The requested code is not this branch's, so it must not run with the app token, deploy
+        # key (both persisted in .git/config by the checkout) or signing keys of a trusted job.
+        # Enforced here rather than left to each caller.
+        if [[ "${{ inputs.trusted }}" == "true" ]]; then
+            echo "checkout-ref/checkout-pr can only be used with trusted: false" >&2
+            exit 1
+        fi
+        if [[ -z "$REF" ]]; then
+            echo "checkout-repository needs checkout-ref or checkout-pr" >&2
+            exit 1
+        fi
         git fetch --no-tags "$REPOSITORY" "$REF"
         git checkout --force FETCH_HEAD
         git log -1 --format='%H %s'

@@ -51,9 +51,7 @@ jobs:
 
   deflake:
     secrets:
-      # No secrets for an untrusted (pull request, ref or fork branch) run; the build image is
-      # normally restored from the Actions cache rather than pulled.
-      dockerhub-token: ${{ !(inputs.pr || inputs.ref) && secrets.DOCKERHUB_TOKEN || '' }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
