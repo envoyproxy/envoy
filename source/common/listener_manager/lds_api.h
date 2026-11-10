@@ -16,6 +16,8 @@
 #include "source/common/config/resource_type_helper.h"
 #include "source/common/init/target_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -50,6 +52,9 @@ private:
   Stats::ScopeSharedPtr scope_;
   const Config::ResourceTypeHelper<envoy::config::listener::v3::Listener> resource_type_helper_;
   Init::TargetImpl init_target_;
+  // The names of the listeners that the last SotW update delivered, without the ones whose TTL
+  // expired since.
+  absl::flat_hash_set<std::string> sotw_listener_names_;
 };
 
 } // namespace Server
