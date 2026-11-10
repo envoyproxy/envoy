@@ -359,7 +359,11 @@ envoy_cc_test(
         "conn_manager_impl_test_3.cc",
     ],
     rbe_pool = {
-        "default": "linux_x64_medium",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "msan": "linux_x64_small",
         "gcc": {
             "build": "linux_x64_large",
             "test": "linux_x64_medium",
