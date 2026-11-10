@@ -19,6 +19,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "instance_profile_credentials_provider_test",
     srcs = ["instance_profile_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -31,6 +32,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "webidentity_credentials_provider_test",
     srcs = ["webidentity_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
@@ -47,6 +49,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "assume_role_credentials_provider_test",
     srcs = ["assume_role_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
@@ -62,6 +65,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "container_credentials_provider_test",
     srcs = ["container_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
@@ -86,6 +90,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "inline_credentials_provider_test",
     srcs = ["inline_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -97,6 +102,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "credentials_file_credentials_provider_test",
     srcs = ["credentials_file_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
@@ -109,6 +115,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "iam_roles_anywhere_credentials_provider_test",
     srcs = ["iam_roles_anywhere_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/common:logger",
         "//source/extensions/common/aws:utility_lib",
@@ -129,6 +136,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "iam_roles_anywhere_x509_credentials_provider_test",
     srcs = ["iam_roles_anywhere_x509_credentials_provider_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",

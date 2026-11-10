@@ -30,6 +30,7 @@ envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]),
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",

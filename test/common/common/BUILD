@@ -16,7 +16,6 @@ envoy_package()
 envoy_cc_benchmark_binary(
     name = "fine_grain_logger_benchmark",
     srcs = ["fine_grain_logger_benchmark.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:minimal_logger_lib",
         "@benchmark",
@@ -118,6 +117,7 @@ envoy_cc_fuzz_test(
     name = "base64_differential_fuzz_test",
     srcs = ["base64_differential_fuzz_test.cc"],
     corpus = "base64_differential_corpus",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = [
@@ -216,6 +216,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
@@ -239,6 +240,7 @@ envoy_cc_test(
     name = "fine_grain_log_macros_test",
     srcs = ["log_macros_test.cc"],
     args = ["--enable-fine-grain-logging"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
@@ -251,7 +253,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "logger_speed_test",
     srcs = ["logger_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:minimal_logger_lib",
         "@benchmark",
@@ -266,6 +267,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "logger_test",
     srcs = ["logger_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/common:logger",
         "//source/common/common:minimal_logger_lib",
@@ -288,6 +290,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
@@ -406,7 +409,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "persistent_hash_map_speed_test",
     srcs = ["persistent_hash_map_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:persistent_hash_map_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
@@ -486,7 +488,6 @@ envoy_cc_test_library(
 envoy_cc_benchmark_binary(
     name = "base64_speed_test",
     srcs = ["base64_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":base64_legacy_lib",
         "//source/common/buffer:buffer_lib",
@@ -498,7 +499,6 @@ envoy_cc_benchmark_binary(
 envoy_cc_benchmark_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -515,7 +515,6 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "radix_tree_speed_test",
     srcs = ["radix_tree_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:radix_tree_lib",
         "@abseil-cpp//absl/strings",
@@ -531,7 +530,6 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "prefix_matching_benchmark",
     srcs = ["prefix_matching_benchmark.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:radix_tree_lib",
         "//source/common/http:headers_lib",
@@ -548,7 +546,6 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "shared_pointer_speed_test",
     srcs = ["shared_pointer_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:assert_lib",
         "@benchmark",
@@ -643,6 +640,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scope_tracked_object_stack_test",
     srcs = ["scope_tracked_object_stack_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
@@ -677,7 +675,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "inline_map_speed_test",
     srcs = ["inline_map_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:inline_map",
         "@benchmark",
@@ -692,7 +689,6 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "linked_object_speed_test",
     srcs = ["linked_object_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:linked_object",
         "@benchmark",
@@ -707,6 +703,7 @@ envoy_benchmark_test(
 execution_context_dual_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/common:execution_context",
         "//source/common/api:api_lib",

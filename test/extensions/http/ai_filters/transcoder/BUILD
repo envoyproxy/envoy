@@ -43,6 +43,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.transcoder"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -64,6 +65,10 @@ envoy_extension_cc_test(
         "envoy.http.ai_filters.transcoder",
         "envoy.filters.http.ai_protocol_manager",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/set_filter_state:config",

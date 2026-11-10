@@ -34,6 +34,7 @@ envoy_cc_dyn_module_test(
     ],
     # This is to test dlopen with the current working directory (rundir in Bazel).
     env = {"LD_LIBRARY_PATH": "."},
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":util",
         "//source/common/buffer:buffer_lib",
@@ -74,6 +75,7 @@ envoy_cc_test(
     srcs = ["abi_impl_test.cc"],
     # ~780 cases, most of them death tests that each re-exec the binary: ~13 minutes serially
     # under asan on a single-core worker.
+    rbe_pool = {"build": "linux_x64_small"},
     shard_count = 8,
     deps = [
         "//source/common/common:minimal_logger_lib",

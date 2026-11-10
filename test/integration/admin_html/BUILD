@@ -13,7 +13,10 @@ envoy_package()
 envoy_cc_test_binary(
     name = "test_server",
     srcs = ["test_server.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",

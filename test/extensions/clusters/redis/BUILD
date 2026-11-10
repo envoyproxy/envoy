@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     name = "redis_cluster_test",
     srcs = ["redis_cluster_test.cc"],
     extension_names = ["envoy.clusters.redis"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -55,6 +56,10 @@ envoy_extension_cc_test(
     name = "redis_cluster_lb_test",
     srcs = ["redis_cluster_lb_test.cc"],
     extension_names = ["envoy.clusters.redis"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/event:dispatcher_lib",
@@ -90,6 +95,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.redis"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",

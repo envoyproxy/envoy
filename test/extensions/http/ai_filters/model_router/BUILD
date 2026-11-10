@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.model_router"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -59,6 +60,10 @@ envoy_extension_cc_test(
         "envoy.http.ai_filters.schema_validation",
         "envoy.http.ai_filters.transcoder",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/http/ai_filters/model_router:config",

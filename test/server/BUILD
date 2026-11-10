@@ -19,6 +19,7 @@ envoy_package()
 envoy_cc_test(
     name = "api_listener_test",
     srcs = ["api_listener_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":utility_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -51,6 +52,10 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "msan": "linux_x64_small",
+    },
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
@@ -80,6 +85,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_handler_test",
     srcs = ["connection_handler_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
@@ -104,6 +110,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_tcp_listener_test",
     srcs = ["active_tcp_listener_test.cc"],
+    rbe_pool = {
+        "asan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
@@ -123,6 +133,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_udp_listener_test",
     srcs = ["active_udp_listener_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -140,6 +151,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "drain_manager_impl_test",
     srcs = ["drain_manager_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/server:drain_manager_lib",
         "//test/mocks/event:event_mocks",
@@ -151,6 +163,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -170,6 +183,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
@@ -185,6 +199,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hot_restarting_child_test",
     srcs = envoy_select_hot_restart(["hot_restarting_child_test.cc"]),
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
@@ -202,6 +217,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
@@ -226,6 +242,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hot_restarting_base_test",
     srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_base",
@@ -363,6 +380,10 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {"build": "linux_x64_large"},
+    },
     deps = [
         "//source/common/thread_local:thread_local_lib",
         "//source/server:server_lib",
@@ -404,6 +425,10 @@ envoy_cc_test(
         ":static_validation_test_data",
         "//test/common/tls/ocsp/test_data:certs",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         "//envoy/common:logger",
         "//source/common/common:notification_lib",
@@ -468,6 +493,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "worker_impl_test",
     srcs = ["worker_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
@@ -486,7 +512,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "server_stats_flush_benchmark",
     srcs = ["server_stats_flush_benchmark_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/stats:stats_interface",
         "//source/common/stats:thread_local_store_lib",

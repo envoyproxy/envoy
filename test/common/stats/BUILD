@@ -33,6 +33,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -44,6 +45,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "histogram_impl_test",
     srcs = ["histogram_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:histogram_lib",
         "//source/common/stats:symbol_table_lib",
@@ -88,7 +90,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "recent_lookups_benchmark",
     srcs = ["recent_lookups_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
@@ -154,6 +155,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -195,6 +197,7 @@ envoy_cc_fuzz_test(
     name = "stat_merger_fuzz_test",
     srcs = ["stat_merger_fuzz_test.cc"],
     corpus = "stat_merger_corpus",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/stats:symbol_table_lib",
@@ -206,6 +209,7 @@ envoy_cc_fuzz_test(
     name = "symbol_table_fuzz_test",
     srcs = ["symbol_table_fuzz_test.cc"],
     corpus = "symbol_table_corpus",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":stat_test_utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -235,7 +239,6 @@ envoy_cc_benchmark_binary(
         "make_elements_helper.cc",
         "symbol_table_speed_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":make_elements_helper_lib",
         ":stat_test_utility_lib",
@@ -268,7 +271,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "deferred_creation_stats_benchmark",
     srcs = ["deferred_creation_stats_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":real_thread_test_base",
         "//source/common/common:random_generator_lib",
@@ -298,7 +300,7 @@ envoy_cc_benchmark_binary(
     srcs = [
         "stats_matcher_impl_speed_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -344,7 +346,6 @@ envoy_cc_benchmark_binary(
     srcs = [
         "tag_extractor_impl_speed_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:tag_producer_lib",
         "@benchmark",
@@ -370,6 +371,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":real_thread_test_base",
         ":stat_test_utility_lib",
@@ -394,7 +396,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "thread_local_store_speed_test",
     srcs = ["thread_local_store_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":stat_test_utility_lib",
         "//source/common/common:thread_lib",
@@ -420,7 +422,6 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "thread_local_store_merge_speed_test",
     srcs = ["thread_local_store_merge_speed_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/stats:thread_local_store_lib",
         "@benchmark",
@@ -435,7 +436,6 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "dec_ref_count_speed_test",
     srcs = ["dec_ref_count_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/stats:allocator_lib",

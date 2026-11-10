@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "lua_test",
     srcs = ["lua_test.cc"],
     extension_names = ["envoy.string_matcher.lua"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/string_matcher/lua:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -28,6 +29,10 @@ envoy_extension_cc_test(
     name = "lua_integration_test",
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.string_matcher.lua"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/string_matcher/lua:config",
         "//test/integration:http_integration_lib",

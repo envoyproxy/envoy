@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stream_info:filter_state_lib",
@@ -40,6 +41,7 @@ envoy_extension_cc_test(
     name = "engine_impl_test",
     srcs = ["engine_impl_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
@@ -61,6 +63,7 @@ envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stats:isolated_store_lib",

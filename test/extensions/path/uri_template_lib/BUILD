@@ -41,6 +41,7 @@ envoy_cc_fuzz_test(
     name = "uri_template_fuzz_test",
     srcs = ["uri_template_fuzz_test.cc"],
     corpus = "uri_template_corpus",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/common:statusor_lib",
         "//source/extensions/path/uri_template_lib",

@@ -51,6 +51,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":grpc_subscription_test_harness",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -141,6 +142,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
@@ -185,6 +187,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "config_provider_impl_test",
     srcs = ["config_provider_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
@@ -211,6 +214,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
@@ -268,6 +272,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "custom_config_validators_impl_test",
     srcs = ["custom_config_validators_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/config:resource_name_lib",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -279,6 +284,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_manager_impl_test",
     srcs = ["xds_manager_impl_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "msan": "linux_x64_small",
+    },
     deps = [
         "//source/common/config:xds_manager_lib",
         "//test/mocks/api:api_mocks",
@@ -319,7 +328,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "xds_resource_decoder_benchmark",
     srcs = ["xds_resource_decoder_benchmark.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:opaque_resource_decoder_lib",
         "//source/common/protobuf:arena_wrapped_proto_lib",

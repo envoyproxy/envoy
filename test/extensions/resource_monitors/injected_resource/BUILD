@@ -16,6 +16,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["injected_resource_monitor_integration_test.cc"],
     extension_names = ["envoy.resource_monitors.injected_resource"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [

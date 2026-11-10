@@ -9,6 +9,7 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -41,6 +42,10 @@ envoy_cc_test(
         "//test/config_test:configs_test_setup.sh",
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//envoy/common:logger",
         "//source/extensions/access_loggers/stream:config",
@@ -89,6 +94,10 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {"build": "linux_x64_large"},
+    },
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
@@ -142,7 +151,7 @@ envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
@@ -163,6 +172,10 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",

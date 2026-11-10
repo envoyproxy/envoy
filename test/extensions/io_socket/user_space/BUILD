@@ -46,6 +46,7 @@ envoy_extension_cc_test(
     name = "connection_compatibility_test",
     srcs = ["connection_compatibility_test.cc"],
     extension_names = ["envoy.io_socket.user_space"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:utility_lib",

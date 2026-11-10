@@ -36,6 +36,10 @@ envoy_extension_cc_test(
         "preserve_case_formatter_integration_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
@@ -56,6 +60,10 @@ envoy_extension_cc_test(
         "preserve_case_formatter_reason_phrase_integration_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
@@ -71,6 +79,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/common:utility_lib",

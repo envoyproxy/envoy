@@ -41,7 +41,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "inputs_speed_test",
     srcs = ["inputs_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",

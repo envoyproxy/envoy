@@ -71,7 +71,6 @@ envoy_cc_test_library(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/stats:isolated_store_lib",
@@ -89,6 +88,10 @@ envoy_cc_test(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -108,6 +111,10 @@ envoy_cc_test(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -123,6 +130,10 @@ envoy_cc_test(
     name = "extra_extensions_test",
     size = "large",
     srcs = ["extra_extensions_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {"build": "linux_x64_large"},
+    },
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
@@ -163,6 +174,10 @@ envoy_cc_test(
         },
         "//conditions:default": {},
     }),
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {"build": "linux_x64_large"},
+    },
     deps = [
         "//source/common/version:version_lib",
         "//test/test_common:environment_lib",

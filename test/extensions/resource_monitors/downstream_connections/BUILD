@@ -42,6 +42,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["cx_limit_overload_integration_test.cc"],
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     tags = [
         "cpu:3",
     ],

@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "matcher_cluster_specifier_test",
     srcs = ["matcher_cluster_specifier_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/router/cluster_specifiers/matcher:config",
         "//source/extensions/router/cluster_specifiers/matcher:matcher_cluster_specifier_lib",
@@ -29,6 +30,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/router/cluster_specifiers/matcher:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -40,6 +42,10 @@ envoy_extension_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/router/cluster_specifiers/matcher:config",

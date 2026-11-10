@@ -27,6 +27,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",

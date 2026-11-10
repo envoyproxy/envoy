@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.matching.matchers.uri_template"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/matching/input_matchers/uri_template:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -37,6 +38,10 @@ envoy_extension_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.matching.matchers.uri_template"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/match_delegate:config",
         "//source/extensions/matching/input_matchers/uri_template:config",

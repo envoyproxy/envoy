@@ -31,7 +31,7 @@ envoy_cc_test_library(
     name = "buffer_fuzz_lib",
     srcs = ["buffer_fuzz.cc"],
     hdrs = ["buffer_fuzz.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         ":buffer_fuzz_proto_cc_proto",
@@ -46,6 +46,7 @@ envoy_cc_fuzz_test(
     name = "buffer_fuzz_test",
     srcs = ["buffer_fuzz_test.cc"],
     corpus = "buffer_corpus",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [":buffer_fuzz_lib"],
 )
 
@@ -120,7 +121,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "buffer_speed_test",
     srcs = ["buffer_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",

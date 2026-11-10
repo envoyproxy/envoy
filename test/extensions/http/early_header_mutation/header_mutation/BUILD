@@ -17,6 +17,7 @@ envoy_extension_cc_test(
         "header_mutation_test.cc",
     ],
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/http/early_header_mutation/header_mutation:header_mutation_lib",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
         "envoy.http.early_header_mutation.header_mutation",
         "envoy.formatter.cel",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -50,6 +52,7 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/config:utility_lib",
@@ -67,6 +70,10 @@ envoy_extension_cc_test(
         "header_mutation_integration_test.cc",
     ],
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/http/early_header_mutation/header_mutation:config",

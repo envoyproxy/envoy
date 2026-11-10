@@ -93,7 +93,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "perf_test",
     srcs = ["perf_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

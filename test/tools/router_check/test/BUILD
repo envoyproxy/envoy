@@ -26,6 +26,7 @@ envoy_cc_test(
     data = [
         ":configs",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//test/tools/router_check:router_check_main_lib",
     ],

@@ -16,6 +16,7 @@ envoy_cc_fuzz_test(
     name = "json_fuzz_test",
     srcs = ["json_fuzz_test.cc"],
     corpus = "json_corpus",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -82,6 +83,7 @@ envoy_cc_fuzz_test(
     name = "json_sanitizer_fuzz_test",
     srcs = ["json_sanitizer_fuzz_test.cc"],
     corpus = ":json_sanitizer_corpus_files",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":json_sanitizer_test_util_lib",
         "//source/common/json:json_sanitizer_lib",

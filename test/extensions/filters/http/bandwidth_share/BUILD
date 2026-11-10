@@ -18,6 +18,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.bandwidth_share",
         "envoy.formatter.cel",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/filters/http/bandwidth_share:config",
         "//source/extensions/formatter/cel:config",
@@ -58,6 +59,10 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     srcs = ["filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.bandwidth_share"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/bandwidth_share:config",
         "//test/integration:http_protocol_integration_lib",

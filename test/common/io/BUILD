@@ -68,6 +68,7 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_worker_factory_impl_test.cc"],
         "//conditions:default": [],
     }),
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",

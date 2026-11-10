@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "alternate_protocols_cache_impl_test",
     srcs = ["alternate_protocols_cache_impl_test.cc"],
     extension_names = ["envoy.key_value.file_based"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/common:key_value_store_lib",
         "//source/common/http:http_server_properties_cache",

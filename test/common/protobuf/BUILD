@@ -68,6 +68,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":utility_test_protos_cc_proto",
         "//source/common/config:api_version_lib",
@@ -106,7 +107,6 @@ envoy_cc_fuzz_test(
     name = "value_util_fuzz_test",
     srcs = ["value_util_fuzz_test.cc"],
     corpus = "value_util_corpus",
-    rbe_pool = "linux_x64_small",
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = ["//source/common/protobuf:utility_lib"],
@@ -115,7 +115,6 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":deterministic_hash_test_proto_cc_proto",
         "//source/common/protobuf:utility_lib",

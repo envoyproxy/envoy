@@ -17,6 +17,10 @@ envoy_extension_cc_test(
         "router_test.cc",
     ],
     extension_names = ["envoy.filters.generic.router"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
@@ -35,6 +39,7 @@ envoy_extension_cc_test(
         "upstream_test.cc",
     ],
     extension_names = ["envoy.filters.generic.router"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
@@ -54,6 +59,7 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.filters.generic.router"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/filters/network/generic_proxy/router:config",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",

@@ -17,6 +17,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":test_common",
         "//source/common/tls/cert_validator:cert_validator_lib",
@@ -55,6 +56,7 @@ envoy_cc_test(
     srcs = [
         "san_matcher_test.cc",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
@@ -80,6 +82,10 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
         "//test/config/integration/certs",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         ":default_validator_integration_test_lib",
         "//test/integration:http_integration_lib",
