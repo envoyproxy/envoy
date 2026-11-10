@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -241,7 +242,7 @@ public:
 
 private:
   MonotonicTime now() const;
-  // The request's DiscoveryState, created on first use.
+  // The request's DiscoveryState, looked up or created on first use and cached.
   DiscoveryState& discoveryState();
   void startRouteDiscovery(MonotonicTime start);
   void finishRouteDiscovery(bool route_exists);
@@ -259,6 +260,7 @@ private:
   bool downstream_end_stream_{false};
   // Only valid during decodeHeaders(), which is where a route discovery is started.
   Http::RequestHeaderMap* request_headers_{};
+  std::shared_ptr<DiscoveryState> discovery_state_;
   // Set when the route config update callback ran inside decodeHeaders(), i.e. no asynchronous
   // discovery was started.
   bool route_update_completed_sync_{false};

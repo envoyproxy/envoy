@@ -395,16 +395,20 @@ MonotonicTime OnDemandRouteUpdate::now() const {
 }
 
 DiscoveryState& OnDemandRouteUpdate::discoveryState() {
-  auto& filter_state = callbacks_->streamInfo().filterState();
-  if (auto* state = filter_state->getDataMutable<DiscoveryState>(DiscoveryState::key());
-      state != nullptr) {
-    return *state;
+  if (discovery_state_ != nullptr) {
+    return *discovery_state_;
   }
-  auto state = std::make_shared<DiscoveryState>();
-  auto& ref = *state;
-  filter_state->setData(DiscoveryState::key(), std::move(state),
-                        StreamInfo::FilterState::LifeSpan::Request);
-  return ref;
+  // The state is request scoped, so a stream recreated after a discovery finds the one that the
+  // original stream created.
+  auto& filter_state = callbacks_->streamInfo().filterState();
+  discovery_state_ = std::dynamic_pointer_cast<DiscoveryState>(
+      filter_state->getDataSharedMutableGeneric(DiscoveryState::key()));
+  if (discovery_state_ == nullptr) {
+    discovery_state_ = std::make_shared<DiscoveryState>();
+    filter_state->setData(DiscoveryState::key(), discovery_state_,
+                          StreamInfo::FilterState::LifeSpan::Request);
+  }
+  return *discovery_state_;
 }
 
 namespace {
