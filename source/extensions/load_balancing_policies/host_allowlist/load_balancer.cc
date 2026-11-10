@@ -326,21 +326,22 @@ bool anyHealthyHosts(const PrioritySet& priority_set) {
   return false;
 }
 
-bool anyAllowlistedHost(const PrioritySet& priority_set, const HostAllowlistLbConfig& config,
-                        const PassedCandidates& passed) {
+HostConstSharedPtr firstAllowlistedHost(const PrioritySet& priority_set,
+                                        const HostAllowlistLbConfig& config,
+                                        const PassedCandidates& passed) {
   for (const auto& host_set : priority_set.hostSetsPerPriority()) {
     for (const auto& host : host_set->healthyHosts()) {
       if (hostOnAllowlist(*host, config, passed)) {
-        return true;
+        return host;
       }
     }
     for (const auto& host : host_set->degradedHosts()) {
       if (hostOnAllowlist(*host, config, passed)) {
-        return true;
+        return host;
       }
     }
   }
-  return false;
+  return nullptr;
 }
 
 } // namespace
@@ -483,7 +484,9 @@ HostAllowlistLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* con
     return child_picker_lb_->chooseHost(context);
   }
 
-  if (anyHealthyHosts(priority_set_) && !anyAllowlistedHost(priority_set_, config_, *passed)) {
+  const HostConstSharedPtr first_allowlisted =
+      firstAllowlistedHost(priority_set_, config_, *passed);
+  if (anyHealthyHosts(priority_set_) && first_allowlisted == nullptr) {
     stats_->rq_lb_attempt_exhausted_.inc();
     return lbAttemptExhausted();
   }
@@ -491,11 +494,14 @@ HostAllowlistLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* con
   HostAllowlistExclusionContext wrapped(*context, config_, *passed, priority_set_);
   HostSelectionResponse response = child_picker_lb_->chooseHost(&wrapped);
   if (response.host != nullptr && !hostOnAllowlist(*response.host, config_, *passed)) {
+    // Child locality-EDF can miss a low-weight allowlisted host; return it rather than 429.
+    if (first_allowlisted != nullptr) {
+      return {first_allowlisted};
+    }
     stats_->rq_lb_attempt_exhausted_.inc();
     return lbAttemptExhausted();
   }
-  if (response.host == nullptr && anyHealthyHosts(priority_set_) &&
-      !anyAllowlistedHost(priority_set_, config_, *passed)) {
+  if (response.host == nullptr && anyHealthyHosts(priority_set_) && first_allowlisted == nullptr) {
     stats_->rq_lb_attempt_exhausted_.inc();
     return lbAttemptExhausted();
   }

@@ -1,0 +1,17 @@
+config {
+  server_info {
+    max_supported_protocol_version { value: "2026-07-28" }
+  }
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "mcp-protocol-version" value: "2027-06-30" }
+    headers { key: "mcp-method" value: "tools/list" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":10,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2027-06-30","io.modelcontextprotocol/clientCapabilities":{}}}}'
+  }
+}

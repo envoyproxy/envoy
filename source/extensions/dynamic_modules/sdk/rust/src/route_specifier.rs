@@ -1186,6 +1186,29 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Select the virtual cluster of the request by one of the names that the
+  /// `virtual_cluster_override` of the route specifier declares, or none with an empty name. The
+  /// `virtual_cluster_override` configures how the router uses the selection. A later call
+  /// replaces the selection.
+  ///
+  /// Like the recorded overrides, the selection takes effect only when the decision is left
+  /// [`RouteDecision::Unspecified`]. It is dropped without failing the decision when there is no
+  /// route or when the route answers the request directly, and a selected virtual cluster is also
+  /// dropped when the route belongs to a virtual host other than `virtual_host_name`. A route the
+  /// built route cache holds keeps the selection it was built with, so the key the route is looked
+  /// up with must also determine the selection.
+  ///
+  /// Returns `false`, leaving the selection unchanged, when the route specifier declares no virtual
+  /// clusters or the name is not empty and not one of them.
+  pub fn set_virtual_cluster(&mut self, virtual_cluster_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(virtual_cluster_name),
+      )
+    }
+  }
+
   /// Record a header added to the request sent upstream.
   ///
   /// Returns `false` when the key is not a valid header name, is a pseudo header, or the value is

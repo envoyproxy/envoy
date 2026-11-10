@@ -33,6 +33,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod resource_monitor;
 pub mod route_specifier;
 pub mod stats_sink;
 pub mod timing;
@@ -360,6 +361,50 @@ pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
   } else {
     None
   }
+}
+
+/// A load shed point of the overload manager, which a filter configuration returns from
+/// `get_load_shed_point`, for example [`EnvoyHttpFilterConfig::get_load_shed_point`].
+///
+/// The module can check it in the event hooks of the filter configuration that returned it and of
+/// its filters, but not while the configuration is dropped or on threads of its own, since Envoy
+/// can destroy the overload manager before the configuration when it shuts down. A module typically
+/// gets it once while its configuration is created and keeps it in its own configuration.
+#[cfg_attr(any(test, feature = "mock"), mockall::automock)]
+pub trait EnvoyLoadShedPoint: Send + Sync {
+  /// Decides whether to shed one unit of load, such as one request.
+  ///
+  /// It returns true with the probability that the triggers of the load shed point give, and counts
+  /// shed load in the `shed_load_count` statistic of the load shed point. It reads the pressure of
+  /// the synchronous feedback resource monitors of the triggers and reports accepted load to them
+  /// on the calling thread. Checking a load shed point that Envoy also checks counts the same load
+  /// twice.
+  fn should_shed_load(&self) -> bool;
+}
+
+struct EnvoyLoadShedPointImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+}
+
+// SAFETY: Envoy allows the filters on all worker threads to check a load shed point concurrently.
+unsafe impl Send for EnvoyLoadShedPointImpl {}
+unsafe impl Sync for EnvoyLoadShedPointImpl {}
+
+impl EnvoyLoadShedPoint for EnvoyLoadShedPointImpl {
+  fn should_shed_load(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_load_shed_point_should_shed_load(self.raw_ptr) }
+  }
+}
+
+/// Wraps a load shed point that a `get_load_shed_point` callback returned, which is null when
+/// there is none.
+pub(crate) fn new_load_shed_point(
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+  if raw_ptr.is_null() {
+    return None;
+  }
+  Some(Box::new(EnvoyLoadShedPointImpl { raw_ptr }))
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -822,6 +867,10 @@ macro_rules! declare_network_filter_init_functions {
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
+/// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
+/// - `synchronous_feedback_resource_monitor:` —
+///   [`NewSynchronousFeedbackResourceMonitorConfigFunction`] for resource monitors with synchronous
+///   feedback
 ///
 /// # Examples
 ///
@@ -1082,6 +1131,20 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION,
       $fn,
       "NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register resource_monitor : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_RESOURCE_MONITOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register synchronous_feedback_resource_monitor : $fn:expr) => {
+    $crate::set_factory_once!(
+      $crate::NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -2003,8 +2066,12 @@ macro_rules! declare_cert_validator_init_functions {
 /// The `name` is the value of `selector_name` from the `dynamic_modules` TLS certificate selector
 /// configuration, allowing a single module to dispatch to different implementations. The `config`
 /// is the raw bytes from the `selector_config` field. `is_upstream` is true when the configuration
-/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics and provides
-/// the dynamic certificates. Returning `None` causes Envoy to reject the TLS context configuration.
+/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics, provides
+/// the dynamic certificates and signals the end of the initialization, which the listeners and
+/// clusters that use the TLS context wait for. Dynamic certificates provided during this call, or
+/// before `signal_init_complete`, are available to the first handshake, unless the TLS context
+/// waits for its SDS validation context. Returning `None` causes Envoy to reject the TLS context
+/// configuration.
 pub type NewTlsCertificateSelectorConfigFunction =
   fn(
     name: &str,
@@ -2016,6 +2083,46 @@ pub type NewTlsCertificateSelectorConfigFunction =
 /// Global function for creating TLS certificate selector configurations.
 pub static NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION: OnceLock<
   NewTlsCertificateSelectorConfigFunction,
+> = OnceLock::new();
+
+// =================================================================================================
+// Resource Monitor Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new resource monitor.
+///
+/// The `name` is the value of `resource_monitor_name` from the `dynamic_modules` resource monitor
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `resource_monitor_config` field. The `envoy_config` handle creates a
+/// [`resource_monitor::EnvoyResourceMonitorConfigScheduler`] while the configuration is being
+/// created. Returning `None` causes Envoy to fail to start.
+pub type NewResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: &mut resource_monitor::EnvoyResourceMonitorConfig,
+  ) -> Option<Box<dyn resource_monitor::ResourceMonitor>>;
+
+/// The global factory function for resource monitors. This is set via the `resource_monitor:` arm
+/// of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<NewResourceMonitorConfigFunction> =
+  OnceLock::new();
+
+/// The function signature for creating a new resource monitor with synchronous feedback.
+///
+/// The `name` and `config` are the same as for [`NewResourceMonitorConfigFunction`]. The SDK calls
+/// this factory first, and calls the `resource_monitor:` factory only when it returns `None`.
+pub type NewSynchronousFeedbackResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>>;
+
+/// The global factory function for resource monitors with synchronous feedback. This is set via
+/// the `synchronous_feedback_resource_monitor:` arm of [`declare_all_init_functions!`] and is not
+/// intended to be set directly.
+pub static NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<
+  NewSynchronousFeedbackResourceMonitorConfigFunction,
 > = OnceLock::new();
 
 // =============================================================================

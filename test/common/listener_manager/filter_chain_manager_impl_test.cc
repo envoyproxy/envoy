@@ -13,6 +13,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/init/target_impl.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
@@ -34,6 +35,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -467,6 +469,25 @@ public:
               (override));
 };
 
+// A transport socket whose factory adds an init target to the init manager of its context.
+class InitTargetTransportSocketConfigFactory
+    : public Configuration::DownstreamTransportSocketConfigFactory {
+public:
+  std::string name() const override { return "envoy.transport_sockets.init_target_for_test"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::BoolValue>();
+  }
+  absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Configuration::TransportSocketFactoryContext& context,
+                               const std::vector<std::string>&) override {
+    context.initManager().add(init_target_);
+    return std::make_unique<NiceMock<Network::MockDownstreamTransportSocketFactory>>();
+  }
+
+  Init::TargetImpl init_target_{"transport socket", [] {}};
+};
+
 TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
 
@@ -623,6 +644,51 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionHandleIsActive) {
   handle.reset();
   EXPECT_FALSE(fcds_shared_manager->isFilterChainActive(filter_chain_name));
   EXPECT_EQ(fcds_shared_manager->activeFilterChain(filter_chain_name), nullptr);
+}
+
+// A filter chain from FCDS warms until the init targets of its transport socket are ready. The
+// server init manager does not get them, since it has completed once the server serves.
+TEST_P(FilterChainManagerImplTest, FcdsFilterChainWarmsOnTransportSocketInitTargets) {
+  InitTargetTransportSocketConfigFactory transport_socket_config_factory;
+  Registry::InjectFactory<Configuration::DownstreamTransportSocketConfigFactory>
+      registered_transport_socket_config_factory(transport_socket_config_factory);
+  NiceMock<MockListenerComponentFactory> listener_component_factory;
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
+  setupFcdsUpdateMocks(listener_component_factory);
+
+  envoy::config::core::v3::ConfigSource config_source;
+  config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::GRPC);
+  config_source.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+  testing::StrictMock<MockFcdsClientCallbacks> callbacks;
+  auto handle_or_status =
+      fcds_shared_manager->subscribe(config_source, "chain", callbacks, init_manager_);
+  ASSERT_TRUE(handle_or_status.ok());
+  auto handle = std::move(handle_or_status).value();
+  ASSERT_EQ(fcds_subscription_callbacks_.size(), 1);
+  Init::ExpectableWatcherImpl init_watcher;
+  EXPECT_CALL(init_watcher, ready());
+  init_manager_.initialize(init_watcher);
+
+  EXPECT_CALL(parent_context_.server_factory_context_.init_manager_, add(_)).Times(0);
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("chain");
+  auto* transport_socket = filter_chain.mutable_transport_socket();
+  transport_socket->set_name(transport_socket_config_factory.name());
+  ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(Protobuf::BoolValue()));
+  const auto decoded_resources = TestUtility::decodeResources({filter_chain});
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_OK(fcds_subscription_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_,
+                                                            removed_resources, "v1"));
+  flushFcdsTlsUpdate();
+  EXPECT_FALSE(handle->isActive());
+  EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain("chain"), nullptr);
+
+  transport_socket_config_factory.init_target_.ready();
+  EXPECT_TRUE(handle->isActive());
+  flushFcdsTlsUpdate();
+  EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain("chain"), nullptr);
 }
 
 // Warming a batch of filter chains in one event loop iteration publishes to workers only once.

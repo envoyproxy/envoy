@@ -26,6 +26,7 @@
 //!   `x-set-path`       the path of the request sent upstream.
 //!   `x-set-host`       the authority of the request sent upstream.
 //!   `x-set-route-name` the name recorded for the route the decision produces.
+//!   `x-virtual-cluster` the name of the virtual cluster to select, none when it is empty.
 //!   `x-prefix-rewrite` a `matched=replacement` pair recorded as a prefix rewrite of the path.
 //!   `x-prefix-rewrite-rule` a `matched=replacement` pair recorded as a prefix rewrite rule, over
 //!                      the whole path when `matched` is empty.
@@ -519,6 +520,10 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     }
     if let Some(name) = ctx.get_request_header("x-set-route-name") {
       let _ = ctx.set_route_name(&buffer_to_string(name));
+    }
+    if let Some(name) = ctx.get_request_header("x-virtual-cluster") {
+      // Tests also pass names that are not declared, so a rejection is expected here.
+      let _ = ctx.set_virtual_cluster(&buffer_to_string(name));
     }
     if let Some(pair) = ctx.get_request_header("x-prefix-rewrite") {
       let pair = buffer_to_string(pair);

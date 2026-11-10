@@ -235,7 +235,9 @@ TEST_F(UdpConnPoolTest, ApplySocketOptionsFailure) {
   EXPECT_CALL(*mock_thread_local_cluster_.lb_.host_->cluster_.upstream_local_address_selector_,
               getUpstreamLocalAddressImpl)
       .WillOnce(Return(upstream_local_address));
-  EXPECT_CALL(mock_callback_, onPoolFailure);
+  EXPECT_CALL(mock_callback_,
+              onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                            "Failed to apply socket option for UDP upstream", _));
   // Mock syscall to make the setsockopt call fail.
   NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_sys_calls(
@@ -246,7 +248,9 @@ TEST_F(UdpConnPoolTest, ApplySocketOptionsFailure) {
 }
 
 TEST_F(UdpConnPoolTest, BindFailure) {
-  EXPECT_CALL(mock_callback_, onPoolFailure);
+  EXPECT_CALL(mock_callback_,
+              onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                            "Failed to bind for UDP upstream", _));
   // Mock syscall to make the bind call fail.
   NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_sys_calls(

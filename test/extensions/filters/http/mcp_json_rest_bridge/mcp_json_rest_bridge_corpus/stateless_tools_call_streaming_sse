@@ -1,0 +1,36 @@
+config {
+  server_info {
+    max_supported_protocol_version { value: "2026-07-28" }
+  }
+  tool_config {
+    tools {
+      name: "stream_logs"
+      http_rule { get: "/v1/logs" }
+      text_content_streaming_enabled: true
+    }
+  }
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "mcp-protocol-version" value: "2026-07-28" }
+    headers { key: "mcp-method" value: "tools/call" }
+    headers { key: "mcp-name" value: "stream_logs" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"stream_logs","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+  }
+}
+upstream_response {
+  headers {
+    headers { key: ":status" value: "200" }
+    headers { key: "content-type" value: "text/event-stream; charset=utf-8" }
+  }
+  http_body {
+    data: 'data: {"line":1}\r\n\r\ndata: {"li'
+    data: 'ne":2}\n\n: comment\n\n'
+    data: 'event: end\ndata: done\n\n'
+  }
+}

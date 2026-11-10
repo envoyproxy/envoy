@@ -1,0 +1,18 @@
+config {
+  tool_config {
+    tools {
+      name: "create_note"
+      http_rule { post: "/v1/notes" body: "*" }
+    }
+  }
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"fuzz","version":"1"}}}'
+  }
+}

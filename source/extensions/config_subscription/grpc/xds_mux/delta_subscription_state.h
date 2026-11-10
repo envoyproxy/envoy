@@ -47,6 +47,10 @@ private:
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
   void handleGoodResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
+  // Updates internal state when a resource is removed by the server or expires via TTL: resets
+  // an explicitly requested resource back to waitingForServer, or erases the resource from the
+  // wildcard and ambiguous state maps. Returns true if the resource was tracked in any state map.
+  bool removeResourceStateFromServer(absl::string_view resource_name);
 
   class ResourceState {
   public:

@@ -71,6 +71,19 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "stats_prefix_filter_config_lib",
+    srcs = ["stats_prefix_filter.cc"],
+    deps = [
+        ":test_filters_proto_cc_proto",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+    alwayslink = 1,
+)
+
+envoy_cc_test_library(
     name = "add_header_filter_config_lib",
     srcs = ["add_header_filter.cc"],
     deps = [

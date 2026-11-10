@@ -22,6 +22,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -1365,6 +1366,93 @@ TEST(ABIImpl, metadata_bool) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
       {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
       &result_bool));
+}
+
+// The batch and bool setters replace the whole value under each key they write, whatever kind of
+// value the key held, and leave every other key in the namespace as it was.
+TEST(ABIImpl, metadata_setters_replace_values_of_every_kind) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  Protobuf::Struct seed;
+  TestUtility::loadFromYaml(R"EOF(
+struct: {inner: old}
+list: [old]
+number: 7
+string: old
+bool: true
+none: null
+untouched: {keep: me}
+)EOF",
+                            seed);
+  ASSERT_EQ(seed.fields().at("bool").kind_case(), Protobuf::Value::kBoolValue);
+  ASSERT_EQ(seed.fields().at("none").kind_case(), Protobuf::Value::kNullValue);
+  std::string serialized;
+  ASSERT_TRUE(seed.SerializeToString(&serialized));
+  const std::string batch_ns = "batch_ns";
+  const std::string bool_ns = "bool_ns";
+  for (const std::string& ns : {batch_ns, bool_ns}) {
+    envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+        &filter, {ns.data(), ns.size()}, {serialized.data(), serialized.size()});
+  }
+
+  // The second entry for "struct" wins over the first.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"struct", 6, "first", 5}, {"list", 4, "l1", 2}, {"number", 6, "n1", 2},
+      {"string", 6, "s1", 2},    {"bool", 4, "b1", 2}, {"none", 4, "z1", 2},
+      {"struct", 6, "last", 4},  {"new", 3, "v1", 2},
+  };
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {batch_ns.data(), batch_ns.size()}, entries.data(), entries.size());
+  Protobuf::Struct expected_batch;
+  TestUtility::loadFromYaml(R"EOF(
+struct: last
+list: l1
+number: n1
+string: s1
+bool: b1
+none: z1
+new: v1
+untouched: {keep: me}
+)EOF",
+                            expected_batch);
+  EXPECT_THAT(metadata.filter_metadata().at(batch_ns), ProtoEq(expected_batch));
+
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"struct", 6}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"list", 4}, false);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"number", 6}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"string", 6}, false);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"bool", 4}, false);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"none", 4}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"new", 3}, true);
+  Protobuf::Struct expected_bool;
+  TestUtility::loadFromYaml(R"EOF(
+struct: true
+list: false
+number: true
+string: false
+bool: false
+none: true
+new: true
+untouched: {keep: me}
+)EOF",
+                            expected_bool);
+  EXPECT_THAT(metadata.filter_metadata().at(bool_ns), ProtoEq(expected_bool));
 }
 
 TEST(ABIImpl, metadata_keys) {
@@ -3770,6 +3858,35 @@ TEST_F(ABIImplGenericSecretTest, ReadUnknownId) {
   // 0 is never a valid ID, and IDs past the end are unknown.
   EXPECT_EQ(getSecret(0), std::nullopt);
   EXPECT_EQ(getSecret(id + 1), std::nullopt);
+}
+
+TEST(ABIImpl, GetLoadShedPoint) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context,
+      std::nullopt, overload_manager);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                                  filter_config.get(), {name.data(), name.size()}));
+}
+
+TEST(ABIImpl, GetLoadShedPointWithoutProvider) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context);
+
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                         filter_config.get(), {name.data(), name.size()}));
 }
 
 TEST(ABIImpl, Stats) {

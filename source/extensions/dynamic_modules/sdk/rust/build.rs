@@ -142,7 +142,8 @@ macro_rules! __export_name_impl {{
     })
     .derive_partialeq(true)
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-    .parse_callbacks(Box::new(TrimEnumNameFromVariantName));
+    .parse_callbacks(Box::new(TrimEnumNameFromVariantName))
+    .parse_callbacks(Box::new(StrumDerivesForResponseFlag));
 
   // Set when building the SDK for a dynamic module DLL on Windows. See src/windows_delay_load.rs.
   println!("cargo:rustc-check-cfg=cfg(envoy_dynamic_module_dll)");
@@ -194,5 +195,24 @@ impl bindgen::callbacks::ParseCallbacks for TrimEnumNameFromVariantName {
       None => original_variant_name,
     };
     Some(variant_name.to_string())
+  }
+}
+
+#[derive(Debug)]
+// Derives strum_macros::{FromRepr,VariantArray} for envoy_dynamic_module_type_response_flag:
+// FromRepr gives a bit-index -> flag lookup and VariantArray gives Self::VARIANTS, both generated
+// from the bindgen-derived enum definition itself to prevent version skew issues.
+struct StrumDerivesForResponseFlag;
+
+impl bindgen::callbacks::ParseCallbacks for StrumDerivesForResponseFlag {
+  fn add_derives(&self, info: &bindgen::callbacks::DeriveInfo<'_>) -> Vec<String> {
+    if info.name == "envoy_dynamic_module_type_response_flag" {
+      vec![
+        "strum_macros::FromRepr".to_string(),
+        "strum_macros::VariantArray".to_string(),
+      ]
+    } else {
+      vec![]
+    }
   }
 }

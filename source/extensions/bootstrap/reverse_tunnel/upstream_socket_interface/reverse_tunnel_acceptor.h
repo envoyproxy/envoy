@@ -85,9 +85,9 @@ public:
    * Create a bootstrap extension for this socket interface.
    * @param config the config.
    * @param context the server factory context.
-   * @return BootstrapExtensionPtr for the socket interface extension.
+   * @return BootstrapExtensionCreationResult for the socket interface extension, or an error.
    */
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
 

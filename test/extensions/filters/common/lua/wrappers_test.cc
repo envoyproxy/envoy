@@ -211,6 +211,34 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
 }
 
 // Iterate over the (unordered) underlying map.
+class LuaMetadataMapWrapperOwnershipTest : public LuaMetadataMapWrapperTest,
+                                           public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(CopyOrBorrow, LuaMetadataMapWrapperOwnershipTest, testing::Bool());
+
+// A wrapper built from a plain reference holds its own copy, and one built from `std::cref()` reads
+// the caller's struct.
+TEST_P(LuaMetadataMapWrapperOwnershipTest, SeesChangesOnlyWhenBorrowed) {
+  const bool borrow = GetParam();
+  setup(R"EOF(
+    function callMe(object)
+      testPrint(object:get("key"))
+    end
+  )EOF");
+
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["key"].set_string_value("at create");
+  if (borrow) {
+    MetadataMapWrapper::create(coroutine_->luaState(), std::cref(metadata));
+  } else {
+    MetadataMapWrapper::create(coroutine_->luaState(), metadata);
+  }
+  (*metadata.mutable_fields())["key"].set_string_value("after create");
+
+  EXPECT_CALL(printer_, testPrint(borrow ? "after create" : "at create"));
+  EXPECT_OK(start("callMe"));
+}
+
 TEST_F(LuaMetadataMapWrapperTest, Iterators) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)

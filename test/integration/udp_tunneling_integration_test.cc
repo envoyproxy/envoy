@@ -202,6 +202,17 @@ TEST_P(ConnectUdpTerminationIntegrationTest, ExchangeCapsulesWithoutCapsuleProto
   exchangeValidCapsules();
 }
 
+TEST_P(ConnectUdpTerminationIntegrationTest, InvalidCapsuleReset) {
+  initialize();
+  setUpConnection();
+
+  // Sends an invalid capsule (ADDRESS_REQUEST with truncated payload).
+  const std::string invalid_capsule_fragment = absl::HexStringToBytes("020100");
+  codec_client_->sendData(*request_encoder_, invalid_capsule_fragment, false);
+
+  ASSERT_TRUE(response_->waitForReset());
+}
+
 TEST_P(ConnectUdpTerminationIntegrationTest, StreamIdleTimeout) {
   enable_timeout_ = true;
   initialize();

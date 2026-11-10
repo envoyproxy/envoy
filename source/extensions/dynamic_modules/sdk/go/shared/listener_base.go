@@ -111,6 +111,15 @@ type ListenerFilterHandle interface {
 	SetDynamicMetadataNumber(metadataNamespace, key string, value float64)
 	// GetDynamicMetadataNumber returns a numeric dynamic metadata value, if present.
 	GetDynamicMetadataNumber(metadataNamespace, key string) (float64, bool)
+	// SetDynamicMetadataStruct merges a serialized google.protobuf.Struct into a dynamic metadata
+	// namespace. Existing entries with the same key are overwritten. An empty struct is a no-op and
+	// does not create the namespace. It returns false if the buffer does not parse as a
+	// google.protobuf.Struct.
+	SetDynamicMetadataStruct(metadataNamespace string, serializedStruct []byte) bool
+	// SetDynamicTypedMetadata sets the typed_filter_metadata entry of a namespace from a serialized
+	// google.protobuf.Any, replacing an existing entry. It returns false if the buffer does not
+	// parse as a google.protobuf.Any with a type URL.
+	SetDynamicTypedMetadata(metadataNamespace string, serializedAny []byte) bool
 
 	// SetFilterState stores a raw bytes filter state value under key.
 	SetFilterState(key string, value []byte) bool
@@ -175,6 +184,11 @@ type ListenerFilterConfigHandle interface {
 
 	// GetScheduler returns a scheduler bound to the config context.
 	GetScheduler() Scheduler
+	// GetLoadShedPoint returns a load shed point of the overload manager by name, to shed load at
+	// the plugin's own point of the connection processing. It returns nil if the overload manager
+	// has no load shed point with the name or the listener of the filter bypasses the overload
+	// manager.
+	GetLoadShedPoint(name string) LoadShedPoint
 	// Log writes a formatted message through Envoy's logging subsystem.
 	Log(level LogLevel, format string, args ...any)
 }

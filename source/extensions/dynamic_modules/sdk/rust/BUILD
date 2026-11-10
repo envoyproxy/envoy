@@ -60,17 +60,31 @@ _WINDOWS_ENV = {
 
 _WINDOWS_DATA = ["//source/extensions/dynamic_modules/abi:abi.h"]
 
+_LINUX_ENV = {
+    "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
+    "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
+    "ENVOY_LLVM_MAJOR": LLVM_MAJOR,
+}
+
+_LINUX_DATA = [
+    "@llvm_toolchain_llvm//:include",
+    "@llvm_toolchain_llvm//:lib/libclang.so",
+    "@llvm_toolchain_llvm//:lib_legacy",
+]
+
+# Only the target's sysroot: build.rs uses just the one matching TARGET, and listing both would
+# fetch and stage the other arch's sysroot in every build.
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
     build_script_env = select({
-        "@platforms//os:linux": {
-            "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
-            "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
-            "ENVOY_LLVM_MAJOR": LLVM_MAJOR,
+        "//bazel:linux_x86_64": _LINUX_ENV | {
             "ENVOY_SYSROOT_AMD64_ANCHOR": "$(location @sysroot_linux_amd64//sysroot)",
+        },
+        "//bazel:linux_aarch64": _LINUX_ENV | {
             "ENVOY_SYSROOT_ARM64_ANCHOR": "$(location @sysroot_linux_arm64//sysroot)",
         },
+        "@platforms//os:linux": _LINUX_ENV,
         "@platforms//os:windows": _WINDOWS_ENV,
         "//conditions:default": {},
     }),
@@ -78,13 +92,9 @@ cargo_build_script(
     data = [
         ":abi/abi.h",
     ] + select({
-        "@platforms//os:linux": [
-            "@llvm_toolchain_llvm//:include",
-            "@llvm_toolchain_llvm//:lib/libclang.so",
-            "@llvm_toolchain_llvm//:lib_legacy",
-            "@sysroot_linux_amd64//sysroot",
-            "@sysroot_linux_arm64//sysroot",
-        ],
+        "//bazel:linux_x86_64": _LINUX_DATA + ["@sysroot_linux_amd64//sysroot"],
+        "//bazel:linux_aarch64": _LINUX_DATA + ["@sysroot_linux_arm64//sysroot"],
+        "@platforms//os:linux": _LINUX_DATA,
         "@platforms//os:windows": _WINDOWS_DATA,
         "//conditions:default": [],
     }),
@@ -105,7 +115,11 @@ rust_library(
     # isolating Rust-mangled factory state as well as the exported C hooks.
     compile_data = [":symbol_prefix_env"],
     edition = "2021",
-    deps = crate_deps(["smallvec"]) + [":build_script"],
+    proc_macro_deps = crate_deps(["strum_macros"]),
+    deps = crate_deps([
+        "smallvec",
+        "strum",
+    ]) + [":build_script"],
     alwayslink = select({
         ":unprefixed": False,
         "//conditions:default": True,
@@ -122,6 +136,10 @@ rust_library(
     crate_features = ["mock"],
     crate_name = "envoy_proxy_dynamic_modules_rust_sdk",
     edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -132,6 +150,10 @@ rust_test(
     name = "envoy_proxy_dynamic_modules_rust_sdk_test",
     crate = ":envoy_proxy_dynamic_modules_rust_sdk_mock",
     edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,

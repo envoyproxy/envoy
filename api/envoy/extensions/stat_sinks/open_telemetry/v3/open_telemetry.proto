@@ -31,11 +31,60 @@ message SinkConfig {
   // used to create the metric. This can be used to rename a
   // stat, add static labels, and aggregate multiple stats into a single metric.
   message ConversionAction {
-    // The metric name to use for the stat.
+    // The metric name to use for the stat. If empty, the metric is named as if the stat matched no
+    // conversion, see :ref:`use_tag_extracted_name
+    // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.use_tag_extracted_name>`
+    // and :ref:`prefix <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.prefix>`,
+    // instead of with an empty name, which is not a valid OTLP metric name. This lets a conversion
+    // without a metric name apply to many stats, e.g. to report them under a resource of their own,
+    // without merging them into a single metric.
     string metric_name = 2;
 
     // Static metric labels to use for the metric.
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
+
+    // If set, the metric is reported under the OTLP resource that this defines, instead of the
+    // resource built from :ref:`resource_detectors
+    // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.resource_detectors>`.
+    ResourceConversion resource_conversion = 4;
+  }
+
+  // ResourceConversion defines the OTLP resource that a converted metric is reported under. It
+  // lets one sink report metrics on behalf of several entities, e.g. a gateway that reports the
+  // metrics of each workload that it serves under that workload's resource.
+  //
+  // Each attribute of the resource is either static or set from a stat tag. The resource doesn't
+  // inherit the attributes of the resource built from :ref:`resource_detectors
+  // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.resource_detectors>`.
+  // The config is rejected if an attribute is set more than once.
+  //
+  // If a stat lacks one of the tags in ``tags_to_resource_attributes``, or has it with an empty
+  // value, the stat is reported as if the action had no resource conversion: under the resource
+  // built from ``resource_detectors``, with its tags as data point attributes. The metric name and
+  // the static metric labels of the action still apply.
+  //
+  // Within an export request, the metrics whose resources have the same attributes are reported
+  // under the same ``ResourceMetrics``. This includes the metrics that are reported under the
+  // resource built from ``resource_detectors``, if it has the same attributes.
+  message ResourceConversion {
+    // Sets a resource attribute to the value of a stat tag.
+    message TagToResourceAttribute {
+      // The name of the stat tag.
+      string tag_name = 1 [(validate.rules).string = {min_len: 1}];
+
+      // The key of the resource attribute that the tag sets. If empty, ``tag_name`` is used.
+      string resource_attribute_key = 2;
+    }
+
+    // Static attributes of the resource. Their keys must not be empty, and their values must be
+    // strings.
+    repeated opentelemetry.proto.common.v1.KeyValue static_resource_attributes = 1;
+
+    // The stat tags that set the other attributes of the resource. A tag may be listed more than
+    // once to set several attributes. These tags are reported as resource attributes instead of
+    // data point attributes, unless the stat is reported as if the action had no resource
+    // conversion, see above.
+    repeated TagToResourceAttribute tags_to_resource_attributes = 2;
   }
 
   // DropAction is an action that, when matched, will prevent the stat from being converted to an OTLP metric and flushed.
