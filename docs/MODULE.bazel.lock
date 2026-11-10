@@ -1531,6 +1531,23 @@
         }
       }
     },
+    "@@envoy_toolshed+//coverage/lcov:extensions.bzl%lcov_merge_extension": {
+      "general": {
+        "bzlTransitiveDigest": "bkoHecb3QIoPMxjqTOlhSXfMnZP20IGfq+fNXbmO448=",
+        "usagesDigest": "4prIJ/PRIxRgbqplBRnEW9c0e2vR8CGjhpvvSxsYFAg=",
+        "recordedInputs": [
+          "REPO_MAPPING:envoy_toolshed+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "lcov_merge": {
+            "repoRuleId": "@@envoy_toolshed+//coverage/lcov:lcov_merge_repository.bzl%_lcov_merge_repo",
+            "attributes": {
+              "bins_release_version": "0.2.32"
+            }
+          }
+        }
+      }
+    },
     "@@envoy_toolshed+//git:extensions.bzl%git_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "GtPjEPNivXAyDZDs9NOtLHpg7F77NU55clXf8bLYKh4=",
