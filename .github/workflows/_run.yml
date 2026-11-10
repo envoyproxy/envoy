@@ -40,6 +40,8 @@ on:
           - src: /mnt/runner
             target: RUNNER_TEMP/container/bazel_root
             chown: "runner:runner"
+      # The build image is no longer cached (it is pulled in seconds); these are accepted so
+      # callers need not change, and ignored.
       cache-build-image:
         type: string
       cache-build-image-key-suffix:
@@ -279,21 +281,6 @@ jobs:
               . + {"ipv6": true, "fixed-cidr-v6": "2001:db8:1::/64"}
             else . end
           | "${{ inputs.template-docker-configure }}"
-
-    # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
-    - if: ${{ inputs.cache-build-image }}
-      id: cache-lookup
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
-    - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
-      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/actions/docker/cache/restore@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
-      with:
-        image-tag: ${{ inputs.cache-build-image }}
-        key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
     - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: appauth
