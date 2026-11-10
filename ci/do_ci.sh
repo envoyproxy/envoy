@@ -260,17 +260,21 @@ function build_openssl() {
 # Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
 # code on failure, so a broken query fails the job instead of silently selecting
 # no tests. Results go to stdout as plain labels.
+# Prints the labels matching a cquery expression, one per line, leaving out targets that are
+# incompatible with the target platform (e.g. Windows-only tests): cquery still returns those,
+# and Bazel only skips them for wildcard patterns, not when they are passed as explicit labels.
 function run_bazel_cquery() {
     local err out rc=0
     err="$(mktemp)"
-    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" \
-                 --output=starlark --starlark:expr=target.label "$1" 2>"$err")" || rc=$?
+    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" --output=starlark \
+                 --starlark:expr='target.label if "IncompatiblePlatformProvider" not in providers(target) else ""' \
+                 "$1" 2>"$err")" || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "ERROR: bazel cquery failed (exit ${rc}): $1" >&2
         cat "$err" >&2
     fi
     rm -f "$err"
-    printf '%s' "$out" | sed 's|^@@||'
+    printf '%s' "$out" | sed '/^$/d; s|^@@||'
     return "$rc"
 }
 
@@ -374,7 +378,7 @@ function build_openssl_presubmit() {
 
     echo "Testing affected targets with OpenSSL (${#test_targets[@]} targets):"
     printf '  %s\n' "${test_targets[@]}"
-    # --keep_going so one broken/incompatible target can't abort the whole run.
+    # --keep_going so one broken target can't abort the whole run.
     bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --keep_going "${test_targets[@]}"
 }
 
