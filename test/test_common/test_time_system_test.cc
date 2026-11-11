@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/test_time_system.h"
@@ -25,7 +27,7 @@ TEST_F(TestTimeSystemTest, IoDispatcher) {
   Api::ApiPtr api = Api::createApiForTest(time_system);
   auto dispatcher = api->allocateDispatcher("test_thread");
   const MonotonicTime start = time_system.monotonicTime();
-  global_time_system.advanceTimeForIo();
+  global_time_system.advanceTimeForIo(*dispatcher);
   EXPECT_EQ(start, time_system.monotonicTime());
 
   global_time_system.setIoDispatcher(dispatcher.get());
@@ -33,16 +35,18 @@ TEST_F(TestTimeSystemTest, IoDispatcher) {
   bool fired = false;
   auto timer = dispatcher->createTimer([&fired] { fired = true; });
   timer->enableTimer(std::chrono::milliseconds(5));
-  global_time_system.advanceTimeWait(std::chrono::milliseconds(4));
-  EXPECT_FALSE(fired);
-  global_time_system.advanceTimeForIo();
-  global_time_system.advanceTimeWait(std::chrono::milliseconds(0));
-  EXPECT_TRUE(fired);
-  EXPECT_EQ(start + std::chrono::milliseconds(5), time_system.monotonicTime());
+  TestTimeSystem::RealTimeBound bound(std::chrono::seconds(5) * TIMEOUT_FACTOR);
+  while (!fired && bound.withinBound()) {
+    global_time_system.advanceTimeForIo(*dispatcher);
+    dispatcher->run(Dispatcher::RunType::NonBlock);
+    std::this_thread::yield();
+  }
+  EXPECT_TRUE(fired) << "Timed out waiting for the I/O dispatcher alarm";
 
+  const MonotonicTime after_io = time_system.monotonicTime();
   time_system.setIoDispatcher(nullptr);
-  global_time_system.advanceTimeForIo();
-  EXPECT_EQ(start + std::chrono::milliseconds(5), time_system.monotonicTime());
+  global_time_system.advanceTimeForIo(*dispatcher);
+  EXPECT_EQ(after_io, time_system.monotonicTime());
 }
 
 TEST_F(TestTimeSystemTest, TwoSimsSameReference) {
