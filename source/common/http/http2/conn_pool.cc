@@ -74,11 +74,11 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return std::make_unique<ActiveClient>(*pool, makeOptRef(data));
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(
-            CodecType::HTTP2, std::move(data.connection_), data.host_description_,
-            pool->dispatcher(), pool->randomGenerator(),
-            data.transport_socket_options_ ? data.transport_socket_options_
-                                           : pool->transportSocketOptions())};
+        CodecClientPtr codec{
+            new CodecClientProd(CodecType::HTTP2, std::move(data.connection_),
+                                data.host_description_, pool->dispatcher(), pool->randomGenerator(),
+                                data.transport_socket_options_ ? data.transport_socket_options_
+                                                               : pool->transportSocketOptions())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http2}, overload_manager, origin, cache);
