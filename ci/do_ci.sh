@@ -55,12 +55,13 @@ fi
 # The options every `cto.*` target builds with.
 read -ra CTO_OPTIONS <<< "${CTO_OPTIONS:---config=compile-time-options -c fastbuild}"
 
-# The options their test runs add. They build only what the tests depend on: targets under test/
-# that no test uses (benchmark, fuzz and tool binaries) are built by the rest of CI, and leaving
-# them out here takes about a third off the analysis.
+# The options their test runs add. They build only what the tests depend on. Targets under test/
+# that no test uses (benchmark, fuzz and tool binaries) are no longer built with these options,
+# only with the defaults by the rest of CI: leaving them out takes about a third off the analysis.
 read -ra CTO_TEST_OPTIONS <<< "${CTO_TEST_OPTIONS:---build_tests_only}"
 
-# The tests run by the targets whose option only reaches part of the tree.
+# The tests run by the targets whose option only reaches part of the tree, unless tests are given
+# on the command line.
 
 # The wasm engine is exercised by the wasm extensions, and has to link and run with the rest of
 # Envoy: the server and the tests that link every extension, the other Rust code (dynamic modules),
@@ -134,17 +135,15 @@ function cto_subtask() {
             ;;
         cto.asserts)
             # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
-            # these tests under "-c opt" to save time in CI.
+            # these tests under "-c opt" (which replaces any "-c" in CTO_OPTIONS) to save time in CI.
             bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                --config=compile-time-options \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
                 -c opt \
                 @envoy//test/common/common:assert_test \
                 @envoy//test/server:server_test
             # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
             bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                --config=compile-time-options \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
                 -c opt \
                 @envoy//test/common/common:assert_test \
                 --define log_fast_debug_assert_in_release=enabled \
@@ -643,6 +642,11 @@ case $CI_TARGET in
 
     compile_time_options|cto*)
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
+        if [[ $# -ge 1 ]]; then
+            # Tests given on the command line replace the lists of the subtasks that have one.
+            CTO_WASM_TARGETS=("${TEST_TARGETS[@]}")
+            CTO_ALLOCATOR_TEST_TARGETS=("${TEST_TARGETS[@]}")
+        fi
         case "$CI_TARGET" in
             compile_time_options|cto|cto.all)
                 for subtask in cto.asserts cto.base cto.gperftools cto.noadmin cto.nolog cto.wamr cto.wasmtime; do

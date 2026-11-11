@@ -212,7 +212,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `cto.base` &mdash; run tests with the compile-time options that can be set together (`--config=compile-time-options`) toggled to their non-default state, and jemalloc.
 * `cto.<option>` &mdash; the same with one further option, on the tests it can affect: `cto.noadmin` (admin disabled, all tests), `cto.gperftools`, `cto.wamr`, `cto.wasmtime`, `cto.asserts` (release-mode asserts), `cto.nolog` (builds the server with logging disabled).
 * `compile_time_options` (or `cto`) &mdash; run all of the `cto.*` targets.
-* `cto.base <test>` &mdash; run a specified test or test dir with the compile-time options.
+* `cto.<option> <test>` &mdash; run a specified test or test dir with that target's options (`cto.asserts` and `cto.nolog` have fixed targets).
 * `clang-tidy <targets>` &mdash; build and run clang-tidy on the specified Bazel targets. If no targets are provided, it uses `CLANG_TIDY_TARGETS` when set, otherwise the default target set.
 * `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.

@@ -200,19 +200,16 @@ run:
     - MODULE.bazel
     - MODULE.bazel.lock
     - VERSION.txt
+    - api/**/*
     - bazel/**/*
     - ci.bazelrc
     - ci/bazel_fun.sh
     - ci/build_setup.sh
     - ci/do_ci.sh
-    - source/common/common/BUILD
-    - source/common/common/assert.cc
-    - source/common/common/assert.h
-    - source/server/**/*
-    - test/common/common/BUILD
-    - test/common/common/assert_test.cc
-    - test/server/BUILD
-    - test/server/server_test.cc
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
     - tools/api_versioning/**/*
     - tools/base/requirements.txt
     - tools/dev/requirements.txt
