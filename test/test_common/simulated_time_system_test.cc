@@ -288,7 +288,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::milliseconds(1)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(0)), time_system_.monotonicTime());
+  EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
 
   // Fire the timeout by advancing time and then verify that waitFor() returns without any timeout.
   time_system_.advanceTimeWait(std::chrono::seconds(60));
@@ -297,7 +297,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
     EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::seconds(60), time_system_.monotonicTime());
   thread->join();
 
   // Waiting a third time, with no pending timeouts, will just sleep out for
@@ -308,7 +308,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::seconds(60), time_system_.monotonicTime());
 }
 
 TEST_F(SimulatedTimeSystemTest, Monotonic) {

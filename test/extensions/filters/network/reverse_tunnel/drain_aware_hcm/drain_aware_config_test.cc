@@ -341,6 +341,26 @@ shutdown_notice_delay: 5s
                 HasSubstr("shutdown_notice_delay must be less than hcm_config.drain_timeout")));
 }
 
+// An hcm_config the base HCM rejects surfaces the HCM's own error. The drain delays are invalid as
+// well (shutdown_notice_delay is not below the 5s default drain_timeout), but they are only
+// validated once the base config is known to be valid.
+TEST_F(DrainAwareConfigTest, InvalidBaseHcmConfigErrorTakesPrecedence) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+enable_drain_with_goaway: true
+shutdown_notice_delay: 5s
+)EOF"));
+  proto_config.mutable_hcm_config()->mutable_max_request_headers_kb()->set_value(64);
+  proto_config.mutable_hcm_config()
+      ->mutable_http2_protocol_options()
+      ->mutable_max_header_field_size_kb()
+      ->set_value(128);
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(proto_config, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                HasSubstr("max_header_field_size_kb must not exceed max_request_headers_kb")));
+}
+
 TEST_F(DrainAwareConfigTest, ZeroDrainTimeoutWithoutDelaysIsValid) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);

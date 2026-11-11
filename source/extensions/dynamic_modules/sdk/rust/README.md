@@ -2,6 +2,10 @@
 
 This directory contains the Rust SDK for the Dynamic Modules feature. This directory is organized in the way that it can be used as a standalone Rust crate. The SDK is basically the high-level abstraction layer for the Dynamic Modules ABI defined in the [abi.h](../../abi.h).
 
+The bindings of the ABI, [src/abi.rs](src/abi.rs), are generated from the header by
+`//tools/dynamic_modules/bindgen` and checked in; after changing `abi.h`, regenerate them with
+`bazel run //tools/dynamic_modules/bindgen:fix` (the format check fails while they are out of date).
+
 Note that this crate references the local ABI header files, so this is intended to be used as
 ```
 [dependencies]

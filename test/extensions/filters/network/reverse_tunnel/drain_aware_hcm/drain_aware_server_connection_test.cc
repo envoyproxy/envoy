@@ -263,6 +263,30 @@ TEST_F(DrainAwareServerConnectionTest, LocalDrainFiresAtMostOnce) {
   destroyConnection(conn);
 }
 
+// During a listener drain the HCM also drains on its own (on responses and proactively), so it can
+// call shutdownNotice() after the wrapper has already started the drain. That second notice must
+// not redial again, re-arm the drain timers or send the soft GOAWAY early.
+TEST_F(DrainAwareServerConnectionTest, HcmShutdownNoticeAfterListenerDrainIsNoop) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  int redials = 0;
+  auto conn = makeConnection([&redials]() { ++redials; }, delayConfig());
+
+  ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
+  EXPECT_CALL(*metadata_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  EXPECT_CALL(*shutdown_notice_timer_, enableTimer(std::chrono::milliseconds(3000), _));
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  timer_->invokeCallback();
+  EXPECT_EQ(1, redials);
+
+  EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
+  EXPECT_CALL(*metadata_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(*shutdown_notice_timer_, enableTimer(_, _)).Times(0);
+  conn->shutdownNotice();
+  EXPECT_EQ(1, redials) << "a second drain notice must not dial another replacement tunnel";
+  destroyConnection(conn);
+}
+
 // Drain with delays: redial immediately, then the metadata frame, the soft GOAWAY and the final
 // GOAWAY fire in order.
 TEST_F(DrainAwareServerConnectionTest, DrainSendsMetadataThenShutdownNoticeThenGoAway) {

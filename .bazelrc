@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b1d19aace9b2b8cc2d183a9b3441c4bc14c15b2e
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -204,8 +204,17 @@ build:coverage --strategy=TestRunner=remote,sandboxed,local
 build:coverage --strategy=CoverageReport=local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
-build:coverage --experimental_split_coverage_postprocessing
+# The per-test lcov is produced inside the test action: the raw profile (~140MB per test, mostly
+# a copy of the binary's symbol table) never leaves the worker, and there is no second action
+# per test to queue, stage and run.
+build:coverage --noexperimental_split_coverage_postprocessing
 build:coverage --experimental_fetch_all_coverage_outputs
+# toolshed's llvm-cov exports line coverage for workspace sources only, and its lcov merger
+# strips function and branch records (unused by the report) and removes the coverage
+# directory's intermediates before the test's outputs are uploaded.
+build:coverage --coverage_support=@envoy_toolshed//coverage:llvm_support
+build:coverage --test_env=LLVM_COV=external/envoy_toolshed+/coverage/llvm/llvm-cov.sh
+build:coverage --coverage_output_generator=@envoy_toolshed//coverage:lcov_merger
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
 build:coverage --remote_download_minimal

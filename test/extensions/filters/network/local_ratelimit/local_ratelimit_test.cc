@@ -61,6 +61,8 @@ token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
 )EOF");
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   InSequence s;
   ActiveFilter active_filter(config_);
@@ -78,6 +80,8 @@ token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
 )EOF");
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   // First connection is OK.
   InSequence s;
@@ -95,8 +99,9 @@ token_bucket:
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 
-  // Refill the bucket.
-  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  // Tokens are (time_now - time_old) * fill_rate_; refill just past the floating-point boundary.
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200) +
+                                                 std::chrono::microseconds(1));
 
   // Third connection is OK.
   ActiveFilter active_filter3(config_);
@@ -114,6 +119,8 @@ runtime_enabled:
   default_value: true
   runtime_key: foo_key
 )EOF");
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   // First connection is OK.
   InSequence s;

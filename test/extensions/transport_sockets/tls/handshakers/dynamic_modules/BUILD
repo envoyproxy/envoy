@@ -31,7 +31,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:tls_handshaker_no_op",
         "//test/extensions/dynamic_modules/test_data/c:tls_handshaker_provides_certificates",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/ssl:handshaker_interface",
         "//source/common/tls:ssl_handshaker_lib",
@@ -59,7 +59,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:tls_handshaker_no_op",
     ],
     extension_names = ["envoy.tls.handshakers.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/tls:context_lib",
         "//source/extensions/transport_sockets/tls:config",
