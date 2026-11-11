@@ -171,7 +171,7 @@ or with `bazel` and the same `--config` on the failing targets:
 | Prechecks: deps | `deps` | |
 | Prechecks: publish | `release.test_only`, `config` | |
 | Prechecks: external | `external` | downstream bzlmod build in `bazel/tests/external` |
-| Checks: build | `api`, `compile_time_options`, `execution_context`, `gcc` | `--config=gcc`, `--config=compile-time-options` |
+| Checks: build | `api`, `cto.*` (one job per option), `execution_context`, `gcc` | `--config=gcc`, `--config=compile-time-options` |
 | Checks: openssl | `openssl.presubmit` (PRs), `openssl` (post-submit) | `--config=openssl`; allowed to fail |
 | Checks: coverage | `coverage`, `fuzz_coverage` | `--config=coverage`; limits in `test/coverage.yaml` |
 | Checks: runtime | `cpu-detection` | |
