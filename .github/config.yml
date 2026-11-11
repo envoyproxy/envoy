@@ -35,8 +35,8 @@ checks:
     on-run:
     - check-build
     - check-build-cto-asserts
-    - check-build-cto-base
     - check-build-cto-gperftools
+    - check-build-cto-jemalloc
     - check-build-cto-noadmin
     - check-build-cto-nolog
     - check-build-cto-wamr
@@ -157,7 +157,7 @@ run:
     - tools/api_versioning/**/*
     - tools/base/requirements.txt
     - tools/dev/requirements.txt
-  check-build-cto-base:
+  check-build-cto-gperftools:
     paths:
     - .bazelrc
     - .bazelversion
@@ -186,7 +186,7 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  check-build-cto-gperftools:
+  check-build-cto-jemalloc:
     paths:
     - .bazelrc
     - .bazelversion
