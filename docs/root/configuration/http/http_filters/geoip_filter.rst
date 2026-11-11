@@ -32,7 +32,8 @@ By default, Envoy rejects the configuration when a configured MaxMind database c
 startup. Set :ref:`allow_missing_database
 <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.allow_missing_database>` to
 allow startup without an unavailable database. Lookups return no data from that database until the
-file appears and the provider's file watcher loads it.
+file appears and the provider's file watcher loads it. The directory containing the configured
+database file must exist at startup so Envoy can register the watcher.
 
 .. _config_geoip_providers_common:
 

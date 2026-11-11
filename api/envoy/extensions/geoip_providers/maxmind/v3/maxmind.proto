@@ -63,7 +63,8 @@ message MaxMindConfig {
   // If ``true``, allows Envoy to start when a configured database file cannot be opened. Lookups
   // that require an unavailable database return no geolocation data until the file appears and is
   // loaded by the provider's file watcher. The provider logs a warning and increments the
-  // ``db_load_error`` counter for each unavailable database at startup.
+  // ``db_load_error`` counter for each unavailable database at startup. The directory containing
+  // the configured database file must exist at startup so Envoy can register the file watcher.
   //
   // Defaults to ``false`` to preserve fail-closed startup behavior.
   bool allow_missing_database = 7;
