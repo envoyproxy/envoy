@@ -63,6 +63,9 @@ private:
   const ZstdDDictManagerPtr& ddict_manager_;
   const ZstdDecompressorStats stats_;
   bool is_dictionary_set_{false};
+  // A zstd block can emit output while processing a later input chunk.
+  uint64_t compressed_bytes_{0};
+  uint64_t decompressed_bytes_{0};
 };
 
 } // namespace Decompressor

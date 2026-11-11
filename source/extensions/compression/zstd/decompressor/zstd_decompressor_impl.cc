@@ -24,7 +24,8 @@ ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::strin
 
 void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
-  uint64_t limit = MaxInflateRatio * input_buffer.length();
+  compressed_bytes_ += input_buffer.length();
+  const uint64_t limit = MaxInflateRatio * compressed_bytes_;
 
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     if (input_slice.len_ > 0) {
@@ -61,16 +62,17 @@ bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t lim
       return false;
     }
 
+    decompressed_bytes_ += output_.pos;
     getOutput(output_buffer);
 
     // Check bomb protection after every decompression step, not after the
     // entire slice is drained. This matches gzip and brotli behavior.
-    if (output_buffer.length() > limit) {
+    if (decompressed_bytes_ > limit) {
       stats_.zstd_generic_error_.inc();
       ENVOY_LOG(trace,
                 "excessive decompression ratio detected: output "
                 "size {} for limit {}",
-                output_buffer.length(), limit);
+                decompressed_bytes_, limit);
       return false;
     }
   }

@@ -63,6 +63,36 @@ TEST_F(ZstdDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   EXPECT_EQ(0, stats_store.counterFromString("test.zstd_generic_error").value());
 }
 
+// Network chunk boundaries must not reset the expansion budget of a stream.
+// In particular, a low-ratio request can have a highly compressible tail.
+TEST_F(ZstdDecompressorImplTest, CompressionRatioIncludesEarlierInputChunks) {
+  Buffer::OwnedImpl buffer;
+  TestUtility::feedBufferWithRandomCharacters(buffer, 32768, 42);
+  buffer.add(std::string(262144, 'a') + "END");
+  const std::string expected = buffer.toString();
+  Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
+                                                  default_enable_checksum_, default_strategy_,
+                                                  default_cdict_manager_, 4096};
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  const std::string compressed = buffer.toString();
+  ASSERT_LT(expected.size(), 100 * compressed.size());
+
+  Stats::IsolatedStoreImpl stats_store{};
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_,
+                                    131072};
+  std::string actual;
+  for (size_t offset = 0; offset < compressed.size(); offset += 1024) {
+    Buffer::OwnedImpl input(compressed.substr(offset, 1024));
+    Buffer::OwnedImpl decoded;
+    decompressor.decompress(input, decoded);
+    actual.append(decoded.toString());
+  }
+
+  EXPECT_EQ(0, stats_store.counterFromString("test.zstd_generic_error").value());
+  ASSERT_EQ(expected.size(), actual.size());
+  EXPECT_EQ(expected, actual);
+}
+
 TEST_F(ZstdDecompressorImplTest, WrongInput) {
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl output_buffer;
@@ -169,6 +199,39 @@ TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatio) {
   ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
   decompressor.decompress(buffer, output_buffer);
   ASSERT_EQ(stats_store.counterFromString("test.zstd_generic_error").value(), 1);
+}
+
+// Earlier incompressible input must not disable the expansion limit. The
+// decompressor still stops within one output chunk of the stream-wide budget.
+TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatioAcrossInputChunks) {
+  Buffer::OwnedImpl buffer;
+  TestUtility::feedBufferWithRandomCharacters(buffer, 256, 42);
+  buffer.add(std::string(65536, 'a'));
+  Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
+                                                  default_enable_checksum_, default_strategy_,
+                                                  default_cdict_manager_, 4096};
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  const std::string compressed = buffer.toString();
+  ASSERT_GT(256 + 65536, 100 * compressed.size());
+
+  Stats::IsolatedStoreImpl stats_store{};
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
+  uint64_t input_size = 0;
+  uint64_t output_size = 0;
+  for (size_t offset = 0; offset < compressed.size(); offset += 64) {
+    Buffer::OwnedImpl input(compressed.substr(offset, 64));
+    Buffer::OwnedImpl decoded;
+    input_size += input.length();
+    decompressor.decompress(input, decoded);
+    output_size += decoded.length();
+    if (stats_store.counterFromString("test.zstd_generic_error").value() != 0) {
+      break;
+    }
+  }
+
+  EXPECT_EQ(1, stats_store.counterFromString("test.zstd_generic_error").value());
+  EXPECT_GT(output_size, 100 * input_size);
+  EXPECT_LE(output_size, 100 * input_size + 16);
 }
 
 } // namespace

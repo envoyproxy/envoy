@@ -21,6 +21,10 @@ Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compressio
 and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`
 compression only. Other compression libraries can be supported as extensions.
 
+The zstd decompressor checks the expansion ratio after each decompression step. It compares total
+decompressed output with the compressed input received so far and stops the current call if that output
+exceeds 100 times the input. A small chunk can complete a block started in an earlier chunk.
+
 An example configuration of the filter may look like the following:
 
 .. code-block:: yaml
