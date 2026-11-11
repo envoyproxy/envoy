@@ -6,6 +6,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -14,6 +15,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::An;
+using testing::DoDefault;
+using testing::ElementsAre;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -708,31 +712,333 @@ TEST_F(OnDemandFilterStatsTest, NoDiscoveryNoStats) {
                          DiscoveryState::key()));
 }
 
+// A mirror policy for the tests: names a static cluster, or selects it with a header.
+class TestShadowPolicy : public Router::ShadowPolicy {
+public:
+  explicit TestShadowPolicy(std::string cluster, std::string cluster_header = "")
+      : cluster_(std::move(cluster)), cluster_header_(cluster_header), runtime_key_("shadow_key") {}
+
+  const std::string& cluster() const override { return cluster_; }
+  const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
+  const std::string& runtimeKey() const override { return runtime_key_; }
+  const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
+  std::optional<bool> traceSampled() const override { return std::nullopt; }
+  bool disableShadowHostSuffixAppend() const override { return false; }
+  const Http::HeaderEvaluator& headerEvaluator() const override { return evaluator_; }
+  absl::string_view hostRewriteLiteral() const override { return ""; }
+
+private:
+  class NoopEvaluator : public Http::HeaderEvaluator {
+  public:
+    void evaluateHeaders(Http::HeaderMap&, const Formatter::Context&,
+                         const StreamInfo::StreamInfo&) const override {}
+  };
+
+  const std::string cluster_;
+  const Http::LowerCaseString cluster_header_;
+  const std::string runtime_key_;
+  envoy::type::v3::FractionalPercent default_value_;
+  NoopEvaluator evaluator_;
+};
+
+// Tests of the discovery of the clusters that a request is mirrored to. It must stay best-effort
+// and never delay the request.
+class OnDemandFilterShadowDiscoveryTest : public OnDemandFilterTest {
+public:
+  static constexpr absl::string_view Prefix = "http.test.on_demand.";
+
+  void SetUp() override {
+    OnDemandFilterTest::SetUp();
+    // Every cluster is missing, unless a test says otherwise.
+    ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
+    ON_CALL(decoder_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef<Http::RequestHeaderMap>(headers_)));
+    ON_CALL(decoder_callbacks_, streamId()).WillByDefault(Return(7));
+    // The mirror policies are sampled in.
+    ON_CALL(runtime_.snapshot_,
+            featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>(), _))
+        .WillByDefault(Return(true));
+    setupWithShadowDiscovery(std::chrono::milliseconds(5000));
+  }
+
+  void setupWithShadowDiscovery(std::chrono::milliseconds timeout) {
+    auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
+    odcds_ = mock_odcds.get();
+    captureRequests(*odcds_);
+    setupWithConfig(std::make_shared<OnDemandFilterConfig>(
+        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), timeout,
+                                      ShadowDiscoveryOptions{cm_, runtime_}),
+        *store_.rootScope(), "http.test."));
+  }
+
+  // Records the discovery requests, and keeps their callbacks to complete them later.
+  void captureRequests(Upstream::MockOdCdsApiHandle& odcds) {
+    EXPECT_CALL(odcds, requestOnDemandClusterDiscovery(_, _, _))
+        .WillRepeatedly([this](absl::string_view name, Upstream::ClusterDiscoveryCallbackPtr cb,
+                               std::chrono::milliseconds timeout)
+                            -> Upstream::ClusterDiscoveryCallbackHandlePtr {
+          requested_.emplace_back(name);
+          timeouts_.push_back(timeout);
+          callbacks_.push_back(std::move(cb));
+          return nullptr;
+        });
+  }
+
+  void addRoutePolicy(const std::string& cluster, const std::string& cluster_header = "") {
+    decoder_callbacks_.route_->route_entry_.shadow_policies_.push_back(
+        std::make_shared<TestShadowPolicy>(cluster, cluster_header));
+  }
+  void addClusterPolicy(const std::string& cluster) {
+    decoder_callbacks_.cluster_info_->shadow_policies_.push_back(
+        std::make_shared<TestShadowPolicy>(cluster));
+  }
+
+  uint64_t counter(absl::string_view name) {
+    return store_.counter(absl::StrCat(Prefix, name)).value();
+  }
+  uint64_t pending(absl::string_view name) {
+    return store_.gauge(absl::StrCat(Prefix, name), Stats::Gauge::ImportMode::Accumulate).value();
+  }
+
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  Stats::TestUtil::TestStore store_;
+  Http::TestRequestHeaderMapImpl headers_{{":method", "GET"}};
+  std::vector<std::string> requested_;
+  std::vector<std::chrono::milliseconds> timeouts_;
+  std::vector<Upstream::ClusterDiscoveryCallbackPtr> callbacks_;
+};
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, DiscoversMissingMirrorClusterWithoutPausingTheRequest) {
+  addRoutePolicy("shadow");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("shadow"));
+  EXPECT_EQ(std::chrono::milliseconds(5000), timeouts_[0]);
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_requested"));
+  EXPECT_EQ(1UL, pending("shadow_cluster_discovery_pending"));
+  // The discovery of the request's own cluster, and its filter state, are not involved.
+  EXPECT_EQ(0UL, counter("cluster_discovery_requested"));
+  EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
+  EXPECT_EQ(nullptr, decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
+                         DiscoveryState::key()));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, CompletionOnlyRecordsStats) {
+  addRoutePolicy("available");
+  addRoutePolicy("missing");
+  addRoutePolicy("timeout");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  ASSERT_THAT(requested_, ElementsAre("available", "missing", "timeout"));
+  EXPECT_EQ(3UL, pending("shadow_cluster_discovery_pending"));
+
+  // Nothing is resumed or recreated: the request is long gone by the time this happens.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, recreateClusterInfo()).Times(0);
+  (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Available);
+  (*callbacks_[1])(Upstream::ClusterDiscoveryStatus::Missing);
+  (*callbacks_[2])(Upstream::ClusterDiscoveryStatus::Timeout);
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_available"));
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_missing"));
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_timeout"));
+  EXPECT_EQ(0UL, pending("shadow_cluster_discovery_pending"));
+  EXPECT_EQ(0UL, counter("shadow_cluster_discovery_cancelled"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, CancelledWhenTheStreamEndsFirst) {
+  addRoutePolicy("shadow");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  filter_->onStreamComplete();
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("shadow_cluster_discovery_pending"));
+
+  // A completion that still arrives is not counted twice, and the stream stays untouched.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_EQ(0UL, counter("shadow_cluster_discovery_available"));
+  EXPECT_EQ(0UL, pending("shadow_cluster_discovery_pending"));
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_cancelled"));
+  filter_->onDestroy();
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, ExistingMirrorClusterIsNotRequested) {
+  addRoutePolicy("shadow");
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  EXPECT_CALL(cm_, getThreadLocalCluster(absl::string_view("shadow"))).WillOnce(Return(&cluster));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_TRUE(requested_.empty());
+  EXPECT_EQ(0UL, counter("shadow_cluster_discovery_requested"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, ClusterLevelPoliciesTakePrecedenceOverRouteLevelOnes) {
+  addRoutePolicy("route-shadow");
+  addClusterPolicy("cluster-shadow");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("cluster-shadow"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, PoliciesThatAreSampledOutAreNotDiscovered) {
+  addRoutePolicy("sampled-in");
+  addRoutePolicy("sampled-out");
+  // The router would not mirror to the second one for this request.
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>(), 7))
+      .WillOnce(Return(true))
+      .WillOnce(Return(false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("sampled-in"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, PoliciesSelectingTheClusterWithAHeaderAreIgnored) {
+  addRoutePolicy("", "x-shadow-cluster");
+  headers_.addCopy("x-shadow-cluster", "client-chosen");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_TRUE(requested_.empty());
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, ConnectRequestsAreNotDiscovered) {
+  // The router does not mirror CONNECT requests.
+  addRoutePolicy("shadow");
+  headers_.setMethod("CONNECT");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_TRUE(requested_.empty());
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, ClusterSharedByPoliciesIsRequestedOnce) {
+  addRoutePolicy("shadow");
+  addRoutePolicy("shadow");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("shadow"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, NoMirrorPoliciesNoDiscovery) {
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_TRUE(requested_.empty());
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, DisabledWithoutShadowClusterDiscoveryConfig) {
+  addRoutePolicy("shadow");
+  auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
+  odcds_ = mock_odcds.get();
+  captureRequests(*odcds_);
+  setupWithConfig(std::make_shared<OnDemandFilterConfig>(
+      DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)),
+      *store_.rootScope(), "http.test."));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_TRUE(requested_.empty());
+}
+
+// The cluster of the request is discovered first, and pauses the request as usual. Its mirror
+// clusters are only discovered once it is known, since cluster-level policies depend on it.
+TEST_F(OnDemandFilterShadowDiscoveryTest, MirrorClustersAreDiscoveredAfterTheRequestsOwnCluster) {
+  addRoutePolicy("shadow");
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}))
+      .WillRepeatedly(DoDefault());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
+  ASSERT_THAT(requested_, ElementsAre(decoder_callbacks_.route_->route_entry_.cluster_name_));
+  EXPECT_EQ(1UL, counter("cluster_discovery_requested"));
+  EXPECT_EQ(0UL, counter("shadow_cluster_discovery_requested"));
+
+  // The mirror cluster is requested before the request resumes.
+  size_t requested_when_resumed = 0;
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).WillOnce([&]() {
+    requested_when_resumed = requested_.size();
+  });
+  (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_EQ(2UL, requested_when_resumed);
+  EXPECT_EQ("shadow", requested_[1]);
+  EXPECT_EQ(1UL, counter("shadow_cluster_discovery_requested"));
+  // The request's own discovery is accounted for on its own.
+  EXPECT_EQ(1UL, counter("cluster_discovery_available"));
+  EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, NoMirrorDiscoveryWhenTheRequestsClusterIsNotFound) {
+  addRoutePolicy("shadow");
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}))
+      .WillRepeatedly(DoDefault());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Missing);
+  // The router has no cluster to mirror from, so there is nothing to discover.
+  EXPECT_THAT(requested_, ElementsAre(decoder_callbacks_.route_->route_entry_.cluster_name_));
+  EXPECT_EQ(0UL, counter("shadow_cluster_discovery_requested"));
+}
+
+// The discovery settings of the route override the ones of the filter, like the rest of the
+// config: the source and timeout of the route's own odcds are used for the mirror clusters.
+TEST_F(OnDemandFilterShadowDiscoveryTest, PerRouteConfigProvidesTheDiscoverySettings) {
+  addRoutePolicy("shadow");
+  auto per_route_odcds = Upstream::MockOdCdsApiHandle::create();
+  auto* per_route_odcds_ptr = per_route_odcds.get();
+  captureRequests(*per_route_odcds_ptr);
+  OnDemandFilterConfig per_route(
+      DecodeHeadersBehavior::cdsRds(std::move(per_route_odcds), std::chrono::milliseconds(1234),
+                                    ShadowDiscoveryOptions{cm_, runtime_}));
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig()).WillByDefault(Return(&per_route));
+  // The filter-level odcds is not used.
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("shadow"));
+  EXPECT_EQ(std::chrono::milliseconds(1234), timeouts_[0]);
+}
+
+// A per-route config replaces the filter's one entirely, also for the mirror clusters: it must
+// enable the discovery of its own.
+TEST_F(OnDemandFilterShadowDiscoveryTest, PerRouteConfigWithoutShadowDiscoveryDisablesIt) {
+  addRoutePolicy("shadow");
+  auto per_route_odcds = Upstream::MockOdCdsApiHandle::create();
+  captureRequests(*per_route_odcds);
+  OnDemandFilterConfig per_route(
+      DecodeHeadersBehavior::cdsRds(std::move(per_route_odcds), std::chrono::milliseconds(1234)));
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig()).WillByDefault(Return(&per_route));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_TRUE(requested_.empty());
+}
+
 TEST(OnDemandConfigTest, Basic) {
   NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Runtime::MockLoader> runtime;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::extensions::filters::http::on_demand::v3::OnDemand config;
 
   absl::Status status1 = absl::OkStatus();
-  OnDemandFilterConfig config1(config, cm, visitor, status1);
+  OnDemandFilterConfig config1(config, cm, runtime, visitor, status1);
   EXPECT_THAT(status1, IsOk());
 
   config.mutable_odcds();
   absl::Status status2 = absl::OkStatus();
-  OnDemandFilterConfig config2(config, cm, visitor, status2);
+  OnDemandFilterConfig config2(config, cm, runtime, visitor, status2);
   EXPECT_THAT(status2, IsOk());
 
   config.mutable_odcds()->set_resources_locator("foo");
   absl::Status status3 = absl::OkStatus();
-  OnDemandFilterConfig config3(config, cm, visitor, status3);
+  OnDemandFilterConfig config3(config, cm, runtime, visitor, status3);
   EXPECT_THAT(status3, HasStatus(absl::StatusCode::kInvalidArgument,
                                  "foo does not have a xdstp:, http: or file: scheme"));
 
   // A valid xdstp resources_locator is decoded and an OdCds API is allocated with it.
   config.mutable_odcds()->set_resources_locator("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
   absl::Status status4 = absl::OkStatus();
-  OnDemandFilterConfig config4(config, cm, visitor, status4);
+  OnDemandFilterConfig config4(config, cm, runtime, visitor, status4);
   EXPECT_THAT(status4, IsOk());
+
+  // Discovery of mirror clusters is accepted, on the filter and on the per-route config.
+  config.mutable_odcds()->clear_resources_locator();
+  config.mutable_odcds()->mutable_shadow_cluster_discovery();
+  absl::Status status5 = absl::OkStatus();
+  OnDemandFilterConfig config5(config, cm, runtime, visitor, status5);
+  EXPECT_THAT(status5, IsOk());
+
+  envoy::extensions::filters::http::on_demand::v3::PerRouteConfig per_route_config;
+  per_route_config.mutable_odcds()->mutable_shadow_cluster_discovery();
+  absl::Status status6 = absl::OkStatus();
+  OnDemandFilterConfig config6(per_route_config, cm, runtime, visitor, status6);
+  EXPECT_THAT(status6, IsOk());
 }
 
 } // namespace OnDemand

@@ -26,6 +26,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration of on-demand CDS.
 message OnDemandCds {
+  // Configuration of on-demand discovery of request mirror (shadow) clusters. Only mirror policies
+  // that name a static :ref:`cluster
+  // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster>` trigger
+  // discovery. Policies that select the cluster with a :ref:`cluster_header
+  // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` do not,
+  // because that name is controlled by the client.
+  message ShadowClusterDiscovery {
+  }
+
   // A configuration source for the service that will be used for
   // on-demand cluster discovery.
   config.core.v3.ConfigSource source = 1;
@@ -35,6 +44,22 @@ message OnDemandCds {
 
   // The timeout for on demand cluster lookup. If not set, defaults to 5 seconds.
   google.protobuf.Duration timeout = 3;
+
+  // If set, the filter also discovers the clusters that the request's active
+  // :ref:`mirror policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
+  // (route level or :ref:`cluster level
+  // <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`)
+  // send mirrored requests to.
+  //
+  // Unlike discovery of the request's own cluster, this discovery is best-effort and never pauses
+  // or delays the request. A mirrored request whose cluster is not yet available is dropped by the
+  // router, as it is without this field. Once the cluster has been discovered, later requests are
+  // mirrored normally. The first requests to a cluster that has not been discovered yet are
+  // therefore not mirrored.
+  //
+  // A mirror policy only triggers discovery for the requests the router would mirror, i.e. after
+  // its ``runtime_fraction`` has been applied.
+  ShadowClusterDiscovery shadow_cluster_discovery = 4;
 }
 
 // On Demand Discovery filter config.

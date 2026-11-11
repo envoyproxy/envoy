@@ -18,6 +18,8 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
+        "//envoy/router:router_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
@@ -28,6 +30,7 @@ envoy_cc_library(
         "//source/common/config:xds_resource_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
         "//source/common/upstream:od_cds_api_lib",
         "//source/extensions/filters/http:well_known_names",
         "@abseil-cpp//absl/container:flat_hash_map",

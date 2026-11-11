@@ -34,6 +34,38 @@ the on demand CDS for requests using this virtual host or route. Conversely,
 if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
 on demand CDS is enabled for requests using this virtual host or route.
 
+.. _config_http_filters_on_demand_shadow:
+
+Mirror clusters
+---------------
+
+A :ref:`request mirror policy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>` can only mirror to a
+cluster that already exists. If the cluster is only available through on-demand CDS, set
+:ref:`shadow_cluster_discovery <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemandCds.shadow_cluster_discovery>`
+next to the ``odcds`` source. The filter then also requests the clusters that the mirror policies of a request
+send mirrored requests to, using that same ``odcds`` source and timeout. This works for the mirror policies of the route and for the
+:ref:`cluster level ones <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`,
+which take precedence like they do in the router.
+
+This discovery never delays or fails the request. Unlike the discovery of the cluster of the request, the filter does not wait for it:
+it only asks for the cluster and carries on. The router drops a mirrored request whose cluster is not available yet, as it does without
+this field, so the first requests to a cluster that has not been discovered are not mirrored. Once the cluster is available,
+later requests are mirrored normally. A mirror policy is only discovered for the requests that the router would mirror, i.e.
+after its ``runtime_fraction`` has been applied. These discoveries are tracked by the ``shadow_cluster_discovery_*``
+statistics below, apart from the ones of the cluster of the request, and they are not part of the filter state.
+
+Some limits apply:
+
+* Only mirror policies with a static ``cluster`` are discovered. Policies that select the cluster with a ``cluster_header``
+  are not, because that name is controlled by the client.
+* The settings are taken from the same configuration as the discovery of the cluster of the request, so a
+  :ref:`per route config <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` replaces the filter's one
+  entirely, and has to set ``shadow_cluster_discovery`` itself to keep discovering the mirror clusters of its routes.
+* The discovery of the mirror cluster and the one of the cluster of the request share the same on-demand CDS subscription,
+  so a control plane that is slow to answer one can also be slow to answer the other.
+* A discovery that is still in flight when the request ends is counted as cancelled, but it is not stopped:
+  the cluster still becomes available for later requests.
+
 Statistics
 ----------
 
@@ -63,6 +95,12 @@ counts as found when the virtual host (or scoped route configuration) was delive
   cluster_discovery_cancelled, Counter, Cluster discoveries abandoned because the stream was destroyed before they completed.
   cluster_discovery_pending, Gauge, Cluster discoveries currently in flight.
   cluster_discovery_duration, Histogram, Time from request to completion of successful (available) cluster discoveries in milliseconds.
+  shadow_cluster_discovery_requested, Counter, Total on-demand discoveries of mirror clusters started. See :ref:`mirror clusters <config_http_filters_on_demand_shadow>`.
+  shadow_cluster_discovery_available, Counter, Mirror cluster discoveries that completed with the cluster available.
+  shadow_cluster_discovery_missing, Counter, Mirror cluster discoveries where on-demand CDS reported that the cluster does not exist.
+  shadow_cluster_discovery_timeout, Counter, Mirror cluster discoveries that timed out before any reply.
+  shadow_cluster_discovery_cancelled, Counter, Mirror cluster discoveries still in flight when the stream ended.
+  shadow_cluster_discovery_pending, Gauge, Mirror cluster discoveries currently in flight.
 
 The duration histograms only record successful discoveries. A timed out cluster discovery always lasts
 about the configured timeout, so including it would make the high percentiles meaningless; use the

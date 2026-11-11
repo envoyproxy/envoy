@@ -15,8 +15,8 @@ absl::StatusOr<Http::FilterFactoryCb> OnDemandFilterFactory::createHttpFilterFac
     Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
-      proto_config, context.clusterManager(), extra_context.visitor, creation_status,
-      extra_context.statsPrefixScopeOr(context), extra_context.statsPrefixOr());
+      proto_config, context.clusterManager(), context.runtime(), extra_context.visitor,
+      creation_status, extra_context.statsPrefixScopeOr(context), extra_context.statsPrefixOr());
   RETURN_IF_NOT_OK_REF(creation_status);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<OnDemandRouteUpdate>(config));
@@ -30,7 +30,8 @@ OnDemandFilterFactory::createRouteSpecificFilterConfigTyped(
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   absl::Status creation_status = absl::OkStatus();
   auto config = std::make_shared<const OnDemandFilterConfig>(proto_config, context.clusterManager(),
-                                                             validation_visitor, creation_status);
+                                                             context.runtime(), validation_visitor,
+                                                             creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return config;
 }
