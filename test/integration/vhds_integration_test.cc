@@ -654,7 +654,14 @@ public:
           {warmingBlocksUnmatchedRequestsRdsConfig()}, "1");
     }
 
-    waitForListenerToServe();
+    test_server_->waitUntilListenersReady();
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+        "listener_manager.listener_create_success", 1);
+    absl::Notification main_thread_done;
+    test_server_->server().dispatcher().post([&main_thread_done] { main_thread_done.Notify(); });
+    main_thread_done.WaitForNotification();
+    ASSERT_TRUE(workersStarted());
+    registerTestServerPorts({"http"});
   }
 
   // Deterministically synchronizes until Envoy's worker and main dispatchers have processed the
@@ -797,6 +804,7 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
 
 TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
        InitialVhdsFetchTimeoutWakesHeldRequestTo404) {
+  const MonotonicTime start_sim_time = timeSystem().monotonicTime();
   route_config_modifier_ = [](envoy::config::route::v3::RouteConfiguration& config) {
     config.mutable_vhds()->mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(1);
   };
@@ -813,6 +821,7 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
   waitForHeldRequests(2);
   EXPECT_FALSE(response->complete());
 
+  EXPECT_EQ(start_sim_time, timeSystem().monotonicTime());
   timeSystem().advanceTimeWaitImpl(std::chrono::seconds(1));
   test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
       vhdsStatPrefix() + "init_fetch_timeout", 1);
@@ -832,6 +841,7 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
 
 TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
        RejectedInitialVhdsUpdateWakesHeldRequestTo404) {
+  const MonotonicTime start_sim_time = timeSystem().monotonicTime();
   initialize();
   startVhdsStreamAndExpectInitialWildcardRequest();
 
@@ -856,7 +866,8 @@ routes:
   EXPECT_TRUE(compareDeltaDiscoveryRequest(
       Config::TestTypeUrl::get().VirtualHost, {}, {}, vhds_stream_.get(),
       Grpc::Status::WellKnownGrpcStatus::Internal, "Duplicate entry of domain sni.lyft.com"));
-  test_server_->waitForCounter(vhdsStatPrefix() + "update_rejected", testing::Eq(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+      vhdsStatPrefix() + "update_rejected", 1);
 
   // 3. Rejection ends initial VHDS waiting and wakes held request to 404.
   ASSERT_TRUE(response->waitForEndStream());
@@ -869,6 +880,7 @@ routes:
   ASSERT_TRUE(unknown_response->waitForEndStream());
   EXPECT_EQ("404", unknown_response->headers().getStatusValue());
 
+  EXPECT_EQ(start_sim_time, timeSystem().monotonicTime());
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
