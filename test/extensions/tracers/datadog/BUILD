@@ -51,6 +51,7 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@dd-trace-cpp//:dd_trace_cpp",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",

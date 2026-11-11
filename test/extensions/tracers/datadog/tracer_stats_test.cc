@@ -15,18 +15,22 @@ TEST(DatadogTracerTracerStatsTest, TracerStats) {
   TracerStats stats = makeTracerStats(*store.rootScope());
 
   // Verify the names.
+  EXPECT_EQ(stats.extraction_errors_.name(), "tracing.datadog.extraction_errors");
   EXPECT_EQ(stats.reports_skipped_no_cluster_.name(), "tracing.datadog.reports_skipped_no_cluster");
   EXPECT_EQ(stats.reports_sent_.name(), "tracing.datadog.reports_sent");
   EXPECT_EQ(stats.reports_dropped_.name(), "tracing.datadog.reports_dropped");
   EXPECT_EQ(stats.reports_failed_.name(), "tracing.datadog.reports_failed");
 
   // Counters begin at zero.
+  EXPECT_EQ(0, store.counter("tracing.datadog.extraction_errors").value());
   EXPECT_EQ(0, store.counter("tracing.datadog.reports_skipped_no_cluster").value());
   EXPECT_EQ(0, store.counter("tracing.datadog.reports_sent").value());
   EXPECT_EQ(0, store.counter("tracing.datadog.reports_dropped").value());
   EXPECT_EQ(0, store.counter("tracing.datadog.reports_failed").value());
 
   // Increments are reflected in the value.
+  stats.extraction_errors_.inc();
+  EXPECT_EQ(1, store.counter("tracing.datadog.extraction_errors").value());
   stats.reports_skipped_no_cluster_.inc();
   EXPECT_EQ(1, store.counter("tracing.datadog.reports_skipped_no_cluster").value());
   stats.reports_sent_.inc();
@@ -37,6 +41,8 @@ TEST(DatadogTracerTracerStatsTest, TracerStats) {
   EXPECT_EQ(1, store.counter("tracing.datadog.reports_failed").value());
 
   // And again.
+  stats.extraction_errors_.inc();
+  EXPECT_EQ(2, store.counter("tracing.datadog.extraction_errors").value());
   stats.reports_skipped_no_cluster_.inc();
   EXPECT_EQ(2, store.counter("tracing.datadog.reports_skipped_no_cluster").value());
   stats.reports_sent_.inc();

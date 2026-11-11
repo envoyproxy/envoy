@@ -218,6 +218,71 @@ TEST_F(ExtensionTest, ShutdownCallbackAfterDestroy) {
   EXPECT_TRUE(completion_called);
 }
 
+// Test that the shutdown callback without a completion stops the configuration.
+TEST_F(ExtensionTest, ShutdownCallbackStopsTheConfiguration) {
+  Server::ServerLifecycleNotifier::StageCallback captured_shutdown_cb;
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
+  EXPECT_TRUE(config.value()->runOnAllWorkers(1));
+
+  captured_shutdown_cb();
+  EXPECT_FALSE(config.value()->runOnAllWorkers(2));
+}
+
+// Test that a server that shut down before it initialized its extensions stops the configuration.
+TEST_F(ExtensionTest, ShutdownBeforeServerInitializationStopsTheConfiguration) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  NiceMock<Server::MockInstance> instance;
+  ON_CALL(instance, isShutdown()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_)).Times(0);
+  extension->onServerInitialized(instance);
+  EXPECT_FALSE(config.value()->runOnAllWorkers(1));
+  EXPECT_FALSE(config.value()->enableClusterLifecycle());
+}
+
+// Test that destroying the extension stops the configuration, since the server can go away without
+// a shutdown.
+TEST_F(ExtensionTest, DestroyingTheExtensionStopsTheConfiguration) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
+  EXPECT_TRUE(config.value()->runOnAllWorkers(1));
+
+  extension.reset();
+  EXPECT_FALSE(config.value()->runOnAllWorkers(2));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

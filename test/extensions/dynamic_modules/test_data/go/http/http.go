@@ -24,6 +24,7 @@ func init() {
 		"send_response":                    &sendResponseConfigFactory{},
 		"dynamic_metadata_callbacks":       &dynamicMetadataCallbacksConfigFactory{},
 		"filter_state_callbacks":           &filterStateCallbacksConfigFactory{},
+		"filter_state_object_callbacks":    &filterStateObjectCallbacksConfigFactory{},
 		"body_callbacks":                   &bodyCallbacksConfigFactory{},
 		"config_init_failure":              &configInitFailureConfigFactory{},
 	})
@@ -854,6 +855,107 @@ func (p *filterStateCallbacksFilter) testFilterState(key, value string) {
 	if _, ok := p.handle.GetFilterState("key"); ok {
 		panic("filter state key found")
 	}
+}
+
+// --- filter_state_object_callbacks ---
+type filterStateObjectCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+type filterStateObjectCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+	configHandle shared.HttpFilterConfigHandle
+}
+
+func (f *filterStateObjectCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &filterStateObjectCallbacksFactory{configHandle: handle}, nil
+}
+
+type filterStateObjectCallbacksFilter struct {
+	handle       shared.HttpFilterHandle
+	configHandle shared.HttpFilterConfigHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *filterStateObjectCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	filter := &filterStateObjectCallbacksFilter{handle: handle, configHandle: f.configHandle}
+	// No stream info yet, so the store fails.
+	rejected := filter.newTracked("rejected")
+	if handle.SetFilterStateObject("go_object", rejected, shared.FilterStateLifeSpanRequest) {
+		panic("store without stream info unexpectedly succeeded")
+	}
+	if !rejected.destroyed {
+		panic("rejected filter state object not destroyed")
+	}
+	return filter
+}
+
+type trackedObject struct {
+	name         string
+	destroyed    bool
+	configHandle shared.HttpFilterConfigHandle
+}
+
+func (o *trackedObject) OnFilterStateObjectDestroy() {
+	if o.destroyed {
+		panic(fmt.Sprintf("filter state object %s destroyed twice", o.name))
+	}
+	o.destroyed = true
+	o.configHandle.Log(shared.LogLevelInfo, "filter state object %s destroyed", o.name)
+}
+
+type panickingObject struct{}
+
+func (panickingObject) OnFilterStateObjectDestroy() {
+	panic("filter state object destructor panic")
+}
+
+func (p *filterStateObjectCallbacksFilter) newTracked(name string) *trackedObject {
+	return &trackedObject{name: name, configHandle: p.configHandle}
+}
+
+func (p *filterStateObjectCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if _, ok := p.handle.GetFilterStateObject("go_object"); ok {
+		panic("unexpected filter state object before store")
+	}
+
+	first := p.newTracked("first")
+	if !p.handle.SetFilterStateObject("go_object", first, shared.FilterStateLifeSpanRequest) {
+		panic("failed to store first filter state object")
+	}
+	if got, ok := p.handle.GetFilterStateObject("go_object"); !ok || got != any(first) {
+		panic(fmt.Sprintf("filter state object mismatch after store: ok=%v got=%v", ok, got))
+	}
+
+	second := p.newTracked("second")
+	if !p.handle.SetFilterStateObject("go_object", second, shared.FilterStateLifeSpanRequest) {
+		panic("failed to overwrite filter state object")
+	}
+	if !first.destroyed {
+		panic("first filter state object not destroyed on overwrite")
+	}
+	if got, ok := p.handle.GetFilterStateObject("go_object"); !ok || got != any(second) {
+		panic(fmt.Sprintf("filter state object mismatch after overwrite: ok=%v got=%v", ok, got))
+	}
+
+	if !p.handle.SetFilterStateObject("go_plain_object", "plain", shared.FilterStateLifeSpanRequest) {
+		panic("failed to store plain filter state object")
+	}
+	if got, ok := p.handle.GetFilterStateObject("go_plain_object"); !ok || got != "plain" {
+		panic(fmt.Sprintf("plain filter state object mismatch: ok=%v got=%v", ok, got))
+	}
+
+	if !p.handle.SetFilterStateObject("go_panicking_object", panickingObject{},
+		shared.FilterStateLifeSpanFilterChain) {
+		panic("failed to store panicking filter state object")
+	}
+
+	p.handle.SetFilterState("go_bytes", []byte("bytes"))
+	if _, ok := p.handle.GetFilterStateObject("go_bytes"); ok {
+		panic("bytes filter state returned as an object")
+	}
+	return shared.HeadersStatusContinue
 }
 
 // --- body_callbacks ---

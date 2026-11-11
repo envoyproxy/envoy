@@ -125,7 +125,10 @@ FcdsFilterChainFactoryContextImpl::FcdsFilterChainFactoryContextImpl(
     : server_context_(server_context), scope_(server_context_.scope().createScope("")),
       prefixed_scope_(server_context_.scope().createScope(
           absl::StrCat("filter_chain.", filter_chain.name(), "."))),
-      init_manager_(absl::StrCat("fcds_filter_chain ", filter_chain.name())) {}
+      init_manager_(absl::StrCat("fcds_filter_chain ", filter_chain.name())),
+      transport_socket_factory_context_(
+          server_context_, server_context_.serverScope(),
+          server_context_.messageValidationContext().dynamicValidationVisitor(), init_manager_) {}
 
 void FcdsFilterChainFactoryContextImpl::initialize(std::function<void()> completion) {
   ASSERT(init_watcher_ == nullptr);

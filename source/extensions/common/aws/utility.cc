@@ -94,9 +94,9 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
     const auto parts = StringUtil::splitToken(authority_header, ":");
     if (parts.size() > 1 && (parts[1] == "80" || parts[1] == "443")) {
       // Has default port, so use only the host part
-      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(parts[0]));
+      out.emplace(Http::Headers::get().HostLegacy.get(), parts[0]);
     } else {
-      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(authority_header));
+      out.emplace(Http::Headers::get().HostLegacy.get(), authority_header);
     }
   }
   return out;

@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/server/overload:load_shed_point_interface",
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",
@@ -60,6 +61,7 @@ envoy_cc_extension(
         ":filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

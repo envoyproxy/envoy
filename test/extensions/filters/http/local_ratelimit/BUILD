@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
@@ -52,8 +53,10 @@ envoy_extension_cc_test(
         "cpu:3",
     ],
     deps = [
+        "//source/common/config:well_known_names",
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration:utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

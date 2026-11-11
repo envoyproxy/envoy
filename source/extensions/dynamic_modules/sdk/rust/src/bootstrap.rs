@@ -2,6 +2,7 @@ use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
   abi,
+  bytes_to_module_buffer,
   drop_wrapped_c_void_ptr,
   ffi_export,
   str_to_module_buffer,
@@ -54,10 +55,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This returns a tuple of (status, callout_id):
   ///   * Success + valid callout_id: The callout was started successfully. The callout ID can be
   ///     used to correlate the response in [`BootstrapExtensionConfig::on_http_callout_done`].
-  ///   * ClusterNotFound: The cluster does not exist.
+  ///   * ClusterNotFound: The cluster does not exist, the server is not initialized yet, or the
+  ///     extension is destroyed.
   ///   * MissingRequiredHeaders: The headers are missing required headers.
   ///   * CannotCreateRequest: The request could not be created, e.g., there's no healthy upstream
-  ///     host in the cluster.
+  ///     host in the cluster, or this was called off the main thread.
   ///
   /// The callout result will be delivered to the [`BootstrapExtensionConfig::on_http_callout_done`]
   /// method.
@@ -81,6 +83,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// The module must call this exactly once during or after `new_bootstrap_extension_config` to
   /// unblock Envoy. If the module does not require asynchronous initialization, it should call
   /// this immediately during config creation.
+  ///
+  /// When this completes the initialization of Envoy, it can run other hooks and start the workers
+  /// before it returns, and it waits until every worker ran the worker events posted before it. Do
+  /// not hold a lock across this call that those hooks take.
   ///
   /// This must be called on the main thread. To call from other threads, use the scheduler
   /// mechanism to post an event to the main thread first.
@@ -234,7 +240,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///   [`EnvoyBootstrapExtensionConfig::remove_admin_handler`].
   /// * `mutates_server_state` if true, indicates the handler mutates server state.
   ///
-  /// Returns `true` if the handler was successfully registered, `false` otherwise.
+  /// Returns `true` if the handler was successfully registered, `false` otherwise, for example
+  /// once the extension is destroyed.
   ///
   /// This must be called on the main thread.
   fn register_admin_handler(
@@ -249,7 +256,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// * `path_prefix` is the URL prefix of the handler to remove.
   ///
-  /// Returns `true` if the handler was successfully removed, `false` otherwise.
+  /// Returns `true` if the handler was successfully removed, `false` otherwise, for example once
+  /// the extension is destroyed.
   ///
   /// This must be called on the main thread.
   fn remove_admin_handler(&self, path_prefix: &str) -> bool;
@@ -262,7 +270,9 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread, typically during or after `on_server_initialized`,
   /// since the ClusterManager is not available until that point.
   ///
-  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down and when Envoy runs with
+  /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
 
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
@@ -273,12 +283,87 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread, typically during or after `on_server_initialized`,
   /// since the ListenerManager is not available until that point.
   ///
-  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down and when Envoy runs with
+  /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See
-  /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread.
+  /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
+  /// returns nothing before the server is initialized and once the extension is destroyed.
   fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String>;
+
+  /// Run [`BootstrapExtensionConfig::on_worker_event`] on every worker thread, followed by
+  /// [`BootstrapExtensionConfig::on_run_on_all_workers_done`] on the main thread. The main thread
+  /// does not run the worker event.
+  ///
+  /// A worker runs the event after it applied every cluster and host change that Envoy posted to
+  /// it before this call. Host health, weight and metadata changes merged by the
+  /// `update_merge_window` of a cluster may reach the workers later. The workers start only after
+  /// initialization completes, so do not wait for the done hook before calling
+  /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`]. That call can wait for the workers to
+  /// run these events, so do not hold a lock across it that the worker event hook takes.
+  ///
+  /// Returns `false` when called off the main thread, before
+  /// [`BootstrapExtension::on_server_initialized`], or after shutdown began. A call off the main
+  /// thread also reports an Envoy bug.
+  fn run_on_all_workers(&self, event_id: u64) -> bool;
+
+  /// Enable the cluster writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_cluster_writer(&self) -> bool;
+
+  /// Queue a write of a cluster. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_writer`] first.
+  ///
+  /// * `cluster_name` is the name of the cluster. Only write clusters that no other component
+  ///   writes. A write of a cluster that exists and that this extension does not own completes as
+  ///   `Failed`.
+  /// * `cluster` is the serialized `envoy.config.cluster.v3.Cluster`, whose name must equal
+  ///   `cluster_name`.
+  /// * `version_info` is stored with the cluster when the write changes it, and shown in the config
+  ///   dump.
+  ///
+  /// This returns a tuple of (result, update_id). When the result is `Success`, the outcome
+  /// arrives in [`BootstrapExtensionConfig::on_cluster_writer_update_done`] with the same update
+  /// ID. Otherwise the update ID is 0.
+  ///
+  /// Envoy does not wait for written clusters before it finishes initializing. To serve them from
+  /// the first request, call [`EnvoyBootstrapExtensionConfig::signal_init_complete`] only after
+  /// their writes completed as active. While Envoy applies a burst of writes, it holds back the
+  /// EDS, LEDS and SDS requests on the ADS stream and the xDS-TP authority streams, including their
+  /// ACKs, for about one second.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn cluster_writer_add_or_update(
+    &self,
+    cluster_name: &str,
+    cluster: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result,
+    u64,
+  );
+
+  /// Queue the removal of a cluster that this extension owns. A queued write of the cluster
+  /// completes as `Removed`. Returns `NotFound` when the extension neither owns nor has queued a
+  /// cluster with this name. A removal has no outcome of its own, and the workers can use the
+  /// cluster until Envoy applies it and each worker processes the removal.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn cluster_writer_remove(
+    &self,
+    cluster_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -344,7 +429,8 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// This is called when an HTTP callout response is received.
+  /// This is called when an HTTP callout response is received. Envoy reports a failure of a
+  /// callout in flight from a later callback on the main thread.
   ///
   /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
   /// * `callout_id` is the ID of the callout returned by
@@ -467,6 +553,57 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _listener_name: &str,
   ) {
   }
+
+  /// This is called on every worker thread for an event posted with
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`]. The worker threads call it
+  /// concurrently.
+  ///
+  /// Only update metrics or commit events to a scheduler here, and return quickly.
+  ///
+  /// * `envoy_extension_config` can be used to update metrics.
+  /// * `event_id` is the ID passed to [`EnvoyBootstrapExtensionConfig::run_on_all_workers`].
+  fn on_worker_event(
+    &self,
+    _envoy_extension_config: &dyn EnvoyBootstrapExtensionConfig,
+    _event_id: u64,
+  ) {
+  }
+
+  /// This is called on the main thread once every worker thread ran the event posted with
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`]. Events complete in the order they
+  /// were posted, and none completes after shutdown began.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `event_id` is the ID passed to [`EnvoyBootstrapExtensionConfig::run_on_all_workers`].
+  fn on_run_on_all_workers_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _event_id: u64,
+  ) {
+  }
+
+  /// This is called on the main thread with the outcome of a write accepted by
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_add_or_update`]. Envoy calls it at most once
+  /// per update ID, never from inside a call into Envoy, and not after shutdown began. It is called
+  /// exactly once unless shutdown began first, the cluster never finishes warming, or Envoy never
+  /// finishes initializing its clusters. To end a write that stays warming, write the cluster again
+  /// or remove it. Outcomes can arrive out of update ID order.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `update_id` is the ID returned by the write.
+  /// * `cluster_name` is the name of the cluster.
+  /// * `status` is the outcome of the write.
+  /// * `error_details` describes the problem when the status is `Failed` or `OwnershipLost`, and is
+  ///   empty otherwise.
+  fn on_cluster_writer_update_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update_id: u64,
+    _cluster_name: &str,
+    _status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    _error_details: &str,
+  ) {
+  }
 }
 
 /// A completion callback that must be invoked exactly once to signal that an asynchronous
@@ -527,10 +664,9 @@ pub trait BootstrapExtension: Send + Sync {
   /// external services, initializing global state, or registering singleton resources.
   fn on_server_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 
-  /// Called when a worker thread is initialized.
-  ///
-  /// This is called once per worker thread when it starts. You can use this to perform
-  /// per-worker-thread initialization like setting up thread-local storage.
+  /// Called once on the main thread after Envoy creates its workers and before it starts their
+  /// threads. To run code on every worker thread, call
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] after the server is initialized.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 
   /// Called when Envoy begins draining.
@@ -548,6 +684,12 @@ pub trait BootstrapExtension: Send + Sync {
   ///
   /// If the [`CompletionCallback`] is dropped without calling `done`, it will automatically signal
   /// completion to prevent Envoy from hanging.
+  ///
+  /// Shutdown has begun when Envoy calls this, so
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] returns false, the cluster writer calls
+  /// return `NotAllowed`, and Envoy drops the done hooks of pending worker events and the pending
+  /// cluster writer outcomes. A worker can still run the worker event hook of an event posted
+  /// before shutdown began, until the workers stop.
   fn on_shutdown(
     &mut self,
     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
@@ -1233,6 +1375,52 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
     names
   }
+
+  fn run_on_all_workers(&self, event_id: u64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(self.raw, event_id)
+    }
+  }
+
+  fn enable_cluster_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(self.raw)
+    }
+  }
+
+  fn cluster_writer_add_or_update(
+    &self,
+    cluster_name: &str,
+    cluster: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result,
+    u64,
+  ) {
+    let mut update_id: u64 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+        bytes_to_module_buffer(cluster),
+        str_to_module_buffer(version_info),
+        &mut update_id,
+      )
+    };
+    (result, update_id)
+  }
+
+  fn cluster_writer_remove(
+    &self,
+    cluster_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+      )
+    }
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -1794,6 +1982,67 @@ ffi_export! {
     extension_config.on_listener_removal(
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy on every worker thread for an event posted by a bootstrap
+  /// extension with `run_on_all_workers`.
+  fn envoy_dynamic_module_on_bootstrap_extension_worker_event(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    event_id: u64,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+    extension_config.on_worker_event(&EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr), event_id);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy on the main thread once every worker thread ran an event posted
+  /// by a bootstrap extension with `run_on_all_workers`.
+  fn envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    event_id: u64,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+    extension_config.on_run_on_all_workers_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      event_id,
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy with the outcome of a cluster write by a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    update_id: u64,
+    cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let cluster_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(cluster_name.ptr as *const u8, cluster_name.length)
+    };
+    let error_details_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr as *const u8, error_details.length)
+    };
+
+    extension_config.on_cluster_writer_update_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      update_id,
+      cluster_name_str.as_ref(),
+      status,
+      error_details_str.as_ref(),
     );
   }
 }

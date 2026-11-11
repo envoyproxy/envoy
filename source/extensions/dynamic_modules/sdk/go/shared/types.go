@@ -281,6 +281,21 @@ type Scheduler interface {
 	Schedule(func())
 }
 
+// LoadShedPoint is a load shed point of the overload manager, which a filter config handle returns
+// from GetLoadShedPoint. The plugin can check it in the callbacks of the filter config that
+// returned it and of its filters, but not while the config is destroyed or on goroutines of its
+// own, since Envoy can destroy the overload manager before the config when it shuts down. A plugin
+// typically gets it once while its config is created and keeps it in its own config.
+type LoadShedPoint interface {
+	// ShouldShedLoad decides whether to shed one unit of load, such as one request. It returns true
+	// with the probability that the triggers of the load shed point give, and counts shed load in
+	// the shed_load_count statistic of the load shed point. It reads the pressure of the
+	// synchronous feedback resource monitors of the triggers and reports accepted load to them on
+	// the calling goroutine. Checking a load shed point that Envoy also checks counts the same load
+	// twice.
+	ShouldShedLoad() bool
+}
+
 // SocketOptionState represents the socket state at which an option should be applied.
 // This corresponds to envoy_dynamic_module_type_socket_option_state in the dynamic module ABI.
 type SocketOptionState uint32

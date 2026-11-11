@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -61,6 +62,8 @@ public:
    * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
    * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
+   * @param load_shed_point_provider the provider of the load shed points the module can check, if
+   * any.
    */
   DynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
@@ -68,7 +71,8 @@ public:
                                    DynamicModulePtr dynamic_module,
                                    Envoy::Upstream::ClusterManager& cluster_manager,
                                    Stats::Scope& stats_scope,
-                                   Event::Dispatcher& main_thread_dispatcher);
+                                   Event::Dispatcher& main_thread_dispatcher,
+                                   OptRef<Server::LoadShedPointProvider> load_shed_point_provider);
 
   ~DynamicModuleNetworkFilterConfig();
 
@@ -105,6 +109,10 @@ public:
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
 
+  // The provider of the load shed points that the module can check. It is empty when the factory
+  // context of the filter bypasses the overload manager.
+  const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
+
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
   Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
@@ -121,13 +129,12 @@ public:
 private:
   // Allow the factory function to access private members for initialization.
   friend absl::StatusOr<std::shared_ptr<DynamicModuleNetworkFilterConfig>>
-  newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
-                                      const absl::string_view filter_config,
-                                      const absl::string_view metrics_namespace,
-                                      DynamicModulePtr dynamic_module,
-                                      Envoy::Upstream::ClusterManager& cluster_manager,
-                                      Stats::Scope& stats_scope,
-                                      Event::Dispatcher& main_thread_dispatcher);
+  newDynamicModuleNetworkFilterConfig(
+      const absl::string_view filter_name, const absl::string_view filter_config,
+      const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+      Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+      Event::Dispatcher& main_thread_dispatcher,
+      OptRef<Server::LoadShedPointProvider> load_shed_point_provider);
 
   // The name of the filter passed in the constructor.
   const std::string filter_name_;
@@ -177,6 +184,8 @@ private:
  * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
  * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
+ * @param load_shed_point_provider the provider of the load shed points the module can check, if
+ * any.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetworkFilterConfig(
@@ -184,7 +193,8 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
-    Event::Dispatcher& main_thread_dispatcher);
+    Event::Dispatcher& main_thread_dispatcher,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider = {});
 
 } // namespace NetworkFilters
 } // namespace DynamicModules

@@ -92,8 +92,7 @@ std::string AwsIamAuthenticatorImpl::getAuthToken(
   auto status = signer_->sign(message, true,
                               !aws_iam_config.region().empty() ? aws_iam_config.region() : region_);
 
-  auth_token_ =
-      std::string(aws_iam_config.cache_name()) + std::string(message.headers().getPathValue());
+  auth_token_ = absl::StrCat(aws_iam_config.cache_name(), message.headers().getPathValue());
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
 
