@@ -91,7 +91,8 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   absl::string_view auth_value = auth_header[0]->value().getStringView();
 
-  // RFC 9110 section 11.1: the authentication scheme is case-insensitive.
+  // The authentication scheme is case-insensitive. See
+  // https://www.rfc-editor.org/rfc/rfc9110.html#section-11.1.
   if (!absl::StartsWithIgnoreCase(auth_value, "Basic ")) {
     if (config_->allowMissing()) {
       return Http::FilterHeadersStatus::Continue;
