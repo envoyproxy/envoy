@@ -54,11 +54,39 @@ jobs:
         include:
         - target: api
           name: API
-        - target: compile_time_options
-          name: Compile time options
-          docker-ci: true
         - target: execution_context
           name: Execution context
           skip: ${{ fromJSON(inputs.request).run.check-build-execution-context != true }}
-        - target: gcc
-          name: GCC
+
+  # The compile-time options and gcc jobs are set by the `check-build-cto-*` and `check-build-gcc-*`
+  # run flags in the target branch's .github/config.yml, which _request.yml turns into this matrix.
+  options:
+    if: fromJSON(inputs.request).config.ci.check-build[0] && true || false
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name }}
+    with:
+      bazel-extra: '--config=rbe'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      docker-ci: ${{ matrix.docker-ci || false }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+        FAILED
+        FAIL:
+      rbe: true
+      request: ${{ inputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 180
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.request).config.ci.check-build }}
