@@ -1,0 +1,404 @@
+diff --git a/src/include/grpc_transcoding/request_weaver.h b/src/include/grpc_transcoding/request_weaver.h
+index 589351d..2a36a23 100644
+--- a/src/include/grpc_transcoding/request_weaver.h
++++ b/src/include/grpc_transcoding/request_weaver.h
+@@ -103,10 +103,19 @@ class RequestWeaver : public google::protobuf::util::converter::ObjectWriter {
+   //   messages: list of non-leaf children nodes.
+   //   bindings: list of binding values (leaf nodes) in this node.
+   struct WeaveInfo {
++    struct Binding {
++      const google::protobuf::Field* field;
++      std::string value;
++      bool done = false;
++    };
++
+     // NOTE: using list instead of map/unordered_map as the number of keys is
+     // going to be small.
+     std::list<std::pair<const google::protobuf::Field*, WeaveInfo>> messages;
+-    std::list<std::pair<const google::protobuf::Field*, std::string>> bindings;
++    std::list<Binding> bindings;
++
++    // Returns true if this node or any descendant has an un-weaved binding.
++    bool HasPendingBindings() const;
+ 
+     // Find the entry for the speciied field in messages list .
+     WeaveInfo* FindWeaveMsg(absl::string_view field_name);
+diff --git a/src/request_stream_translator.cc b/src/request_stream_translator.cc
+index 176f2d3..c0faac6 100644
+--- a/src/request_stream_translator.cc
++++ b/src/request_stream_translator.cc
+@@ -229,6 +229,10 @@ void RequestStreamTranslator::StartMessageTranslator() {
+   RequestInfo request_info;
+   request_info.message_type = request_info_.message_type;
+   request_info.body_field_path = request_info_.body_field_path;
++  request_info.reject_binding_body_field_collisions =
++      request_info_.reject_binding_body_field_collisions;
++  request_info.case_insensitive_enum_parsing =
++      request_info_.case_insensitive_enum_parsing;
+   // As we need to weave the variable bindings only for the first message, we
+   // can use vector::swap() to avoid copying and to clear the bindings from
+   // request_info_, s.t. the subsequent messages don't use them.
+diff --git a/src/request_weaver.cc b/src/request_weaver.cc
+index 33fb2fb..a1dd101 100644
+--- a/src/request_weaver.cc
++++ b/src/request_weaver.cc
+@@ -41,7 +41,20 @@ namespace pbconv = google::protobuf::util::converter;
+ 
+ namespace {
+ 
+-bool AlmostEquals(float a, float b) { return fabs(a - b) < 32 * FLT_EPSILON; }
++bool AlmostEquals(float a, float b) {
++  if (a == b) return true;
++  return std::fabs(a - b) < 32 * FLT_EPSILON;
++}
++
++bool AlmostEquals(double a, double b) {
++  if (a == b) return true;
++  return std::fabs(a - b) < 32 * DBL_EPSILON;
++}
++
++bool FieldMatchesName(const pb::Field* field, absl::string_view name) {
++  return name == field->name() ||
++         (!field->json_name().empty() && name == field->json_name());
++}
+ 
+ absl::Status bindingFailureStatus(absl::string_view field_name,
+                                   absl::string_view type,
+@@ -68,7 +81,7 @@ absl::Status isEqual(absl::string_view field_name,
+       break;
+     }
+     case pbconv::DataPiece::TYPE_INT64: {
+-      absl::StatusOr<uint32_t> status = value_in_binding.ToInt64();
++      absl::StatusOr<int64_t> status = value_in_binding.ToInt64();
+       if (!status.ok()) {
+         return bindingFailureStatus(field_name, "int64", value_in_binding);
+       }
+@@ -88,7 +101,7 @@ absl::Status isEqual(absl::string_view field_name,
+       break;
+     }
+     case pbconv::DataPiece::TYPE_UINT64: {
+-      absl::StatusOr<uint32_t> status = value_in_binding.ToUint64();
++      absl::StatusOr<uint64_t> status = value_in_binding.ToUint64();
+       if (!status.ok()) {
+         return bindingFailureStatus(field_name, "uint64", value_in_binding);
+       }
+@@ -327,58 +340,78 @@ void RequestWeaver::Bind(std::vector<const pb::Field*> field_path,
+   }
+ 
+   if (!field_path.empty()) {
+-    current->bindings.emplace_back(field_path.back(), std::move(value));
++    current->bindings.push_back(
++        WeaveInfo::Binding{field_path.back(), std::move(value), false});
+   }
+ }
+ 
+ void RequestWeaver::WeaveTree(RequestWeaver::WeaveInfo* info) {
+-  for (const auto& data : info->bindings) {
+-    pbconv::ObjectWriter::RenderDataPieceTo(
+-        pbconv::DataPiece(absl::string_view(data.second), true),
+-        absl::string_view(data.first->name()), ow_);
++  for (auto& data : info->bindings) {
++    if (!data.done) {
++      pbconv::ObjectWriter::RenderDataPieceTo(
++          pbconv::DataPiece(absl::string_view(data.value), true),
++          absl::string_view(data.field->name()), ow_);
++      data.done = true;
++    }
+   }
+-  info->bindings.clear();
+   for (auto& msg : info->messages) {
+-    // Enter into the message only if there are bindings or submessages left
+-    if (!msg.second.bindings.empty() || !msg.second.messages.empty()) {
++    // Enter into the message only if there are pending bindings left in its
++    // subtree.
++    if (msg.second.HasPendingBindings()) {
+       ow_->StartObject(msg.first->name());
+       WeaveTree(&msg.second);
+       ow_->EndObject();
+     }
+   }
+-  info->messages.clear();
+ }
+ 
+ void RequestWeaver::CollisionCheck(absl::string_view name,
+                                    const pbconv::DataPiece& value_in_body) {
+   if (current_.empty()) return;
+ 
+-  for (auto it = current_.top()->bindings.begin();
+-       it != current_.top()->bindings.end();) {
+-    if (name == it->first->name()) {
+-      if (it->first->cardinality() == pb::Field::CARDINALITY_REPEATED) {
+-        pbconv::ObjectWriter::RenderDataPieceTo(
+-            pbconv::DataPiece(absl::string_view(it->second), true), name, ow_);
+-      } else if (report_collisions_) {
+-        pbconv::DataPiece value_in_binding =
+-            pbconv::DataPiece(absl::string_view(it->second), true);
+-        absl::Status compare_status =
+-            isEqual(name, value_in_body, value_in_binding);
+-        if (!compare_status.ok()) {
+-          error_listener_->set_status(compare_status);
++  for (auto& binding : current_.top()->bindings) {
++    if (FieldMatchesName(binding.field, name)) {
++      if (binding.field->cardinality() == pb::Field::CARDINALITY_REPEATED) {
++        if (!binding.done) {
++          pbconv::ObjectWriter::RenderDataPieceTo(
++              pbconv::DataPiece(absl::string_view(binding.value), true), name,
++              ow_);
++          binding.done = true;
++        }
++      } else {
++        if (report_collisions_) {
++          pbconv::DataPiece value_in_binding =
++              pbconv::DataPiece(absl::string_view(binding.value), true);
++          absl::Status compare_status =
++              isEqual(name, value_in_body, value_in_binding);
++          if (!compare_status.ok()) {
++            error_listener_->set_status(compare_status);
++          }
+         }
++        binding.done = true;
+       }
+-      it = current_.top()->bindings.erase(it);
+-      continue;
+     }
+-    ++it;
+   }
+ }
+ 
++bool RequestWeaver::WeaveInfo::HasPendingBindings() const {
++  for (const auto& b : bindings) {
++    if (!b.done) {
++      return true;
++    }
++  }
++  for (const auto& msg : messages) {
++    if (msg.second.HasPendingBindings()) {
++      return true;
++    }
++  }
++  return false;
++}
++
+ RequestWeaver::WeaveInfo* RequestWeaver::WeaveInfo::FindWeaveMsg(
+     const absl::string_view field_name) {
+   for (auto& msg : messages) {
+-    if (field_name == msg.first->name()) {
++    if (FieldMatchesName(msg.first, field_name)) {
+       return &msg.second;
+     }
+   }
+diff --git a/test/request_stream_translator_test.cc b/test/request_stream_translator_test.cc
+index c1d10ec..36c9f3a 100644
+--- a/test/request_stream_translator_test.cc
++++ b/test/request_stream_translator_test.cc
+@@ -39,17 +39,24 @@ class RequestStreamTranslatorTest : public RequestTranslatorTestBase {
+     return *translator_;
+   }
+ 
++  void SetRejectBindingBodyFieldCollisions(bool v) {
++    reject_binding_body_field_collisions_ = v;
++  }
++
+  private:
+   // RequestTranslatorTestBase::Create()
+   virtual MessageStream* Create(
+       google::protobuf::util::TypeResolver& type_resolver,
+       bool output_delimiters, RequestInfo request_info) {
++    request_info.reject_binding_body_field_collisions =
++        reject_binding_body_field_collisions_;
+     translator_.reset(new RequestStreamTranslator(
+         type_resolver, output_delimiters, std::move(request_info)));
+     return translator_.get();
+   }
+ 
+   std::unique_ptr<RequestStreamTranslator> translator_;
++  bool reject_binding_body_field_collisions_ = false;
+ };
+ 
+ TEST_F(RequestStreamTranslatorTest, One) {
+@@ -574,6 +581,22 @@ TEST_F(RequestStreamTranslatorTest, Error6) {
+   Tester().ExpectNextEq<Shelf>(R"( theme : "Russian" )");
+ }
+ 
++TEST_F(RequestStreamTranslatorTest, BindingBodyFieldCollisionRejected) {
++  LoadService("bookstore_service.pb.txt");
++  SetMessageType("Shelf");
++  AddVariableBinding("name", "1");
++  SetRejectBindingBodyFieldCollisions(true);
++  Build();
++  Input()
++      .StartList("")
++      ->StartObject("")
++      ->RenderInt64("name", 2)
++      ->RenderString("theme", "History")
++      ->EndObject()
++      ->EndList();
++  Tester().ExpectStatusEq(absl::StatusCode::kInvalidArgument);
++}
++
+ }  // namespace
+ }  // namespace testing
+ }  // namespace transcoding
+diff --git a/test/request_weaver_test.cc b/test/request_weaver_test.cc
+index 9fc71ff..8818be3 100644
+--- a/test/request_weaver_test.cc
++++ b/test/request_weaver_test.cc
+@@ -71,6 +71,31 @@ class RequestWeaverTest : public ::testing::Test {
+   std::list<Field> fields_;
+   StatusErrorListener error_listener_;
+ 
++  static std::string ToLowerCamelCase(absl::string_view name) {
++    std::string result;
++    bool cap_next = false;
++    for (size_t i = 0; i < name.size(); ++i) {
++      char c = name[i];
++      if (c == '_') {
++        if (i > 0) {
++          cap_next = true;
++        } else {
++          result.push_back(c);
++        }
++      } else if (cap_next) {
++        if (c >= 'a' && c <= 'z') {
++          result.push_back(static_cast<char>(c - 'a' + 'A'));
++        } else {
++          result.push_back(c);
++        }
++        cap_next = false;
++      } else {
++        result.push_back(c);
++      }
++    }
++    return result;
++  }
++
+   Field CreateField(std::string name) {
+     Field::Cardinality card;
+     if (absl::EndsWith(name, "*")) {
+@@ -82,6 +107,7 @@ class RequestWeaverTest : public ::testing::Test {
+     }
+     Field field;
+     field.set_name(name);
++    field.set_json_name(ToLowerCamelCase(name));
+     field.set_kind(Field::TYPE_STRING);
+     field.set_cardinality(card);
+     field.set_number(1);  // dummy number
+@@ -744,6 +770,118 @@ TEST_F(RequestWeaverTest, IgnoreListTest) {
+   EXPECT_EQ(w->Status().code(), absl::StatusCode::kOk);
+ }
+ 
++TEST_F(RequestWeaverTest, CollisionReportedCamelCaseJsonName) {
++  Bind("author_info.first_name", "Leo");
++
++  expect_.StartObject("");
++  expect_.StartObject("authorInfo");
++  expect_.RenderString("firstName", "Fyodor");
++  expect_.EndObject();  // "authorInfo"
++  expect_.EndObject();  // ""
++
++  auto w = Create(true);
++
++  w->StartObject("");
++  w->StartObject("authorInfo");
++  w->RenderString("firstName", "Fyodor");
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kInvalidArgument);
++  EXPECT_THAT(w->Status().ToString(),
++              HasSubstr("The binding value \"Leo\" of the field firstName is "
++                        "conflicting with the value \"Fyodor\" in the body."));
++  w->EndObject();  // "authorInfo"
++  w->EndObject();  // ""
++}
++
++TEST_F(RequestWeaverTest, CollisionReportedDuplicateKeys) {
++  Bind("A.id", "5");
++
++  expect_.StartObject("");
++  expect_.StartObject("A");
++  expect_.RenderInt64("id", 5);
++  expect_.RenderInt64("id", 100);
++  expect_.EndObject();  // "A"
++  expect_.EndObject();  // ""
++
++  auto w = Create(true);
++
++  w->StartObject("");
++  w->StartObject("A");
++  w->RenderInt64("id", 5);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kOk);
++  w->RenderInt64("id", 100);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kInvalidArgument);
++  EXPECT_THAT(w->Status().ToString(),
++              HasSubstr("The binding value \"5\" of the field id is "
++                        "conflicting with the value 100 in the body."));
++  w->EndObject();  // "A"
++  w->EndObject();  // ""
++}
++
++TEST_F(RequestWeaverTest, CollisionInt64NoTruncation) {
++  // 4294967297 == (1LL << 32) + 1, which truncates to 1 modulo 2^32.
++  Bind("A.int64_field", "4294967297");
++  Bind("A.uint64_field", "4294967297");
++
++  expect_.StartObject("");
++  expect_.StartObject("A");
++  expect_.RenderInt64("int64_field", 4294967297LL);
++  expect_.RenderUint64("uint64_field", 4294967297ULL);
++  expect_.RenderInt64("int64_field", 1LL);
++  expect_.RenderUint64("uint64_field", 1ULL);
++  expect_.EndObject();  // "A"
++  expect_.EndObject();  // ""
++
++  auto w = Create(true);
++
++  w->StartObject("");
++  w->StartObject("A");
++  w->RenderInt64("int64_field", 4294967297LL);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kOk);
++  w->RenderUint64("uint64_field", 4294967297ULL);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kOk);
++  w->RenderInt64("int64_field", 1LL);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kInvalidArgument);
++  EXPECT_THAT(
++      w->Status().ToString(),
++      HasSubstr("The binding value \"4294967297\" of the field int64_field is "
++                "conflicting with the value 1 in the body."));
++  w->RenderUint64("uint64_field", 1ULL);
++  EXPECT_THAT(
++      w->Status().ToString(),
++      HasSubstr("The binding value \"4294967297\" of the field uint64_field is "
++                "conflicting with the value 1 in the body."));
++  w->EndObject();  // "A"
++  w->EndObject();  // ""
++}
++
++TEST_F(RequestWeaverTest, CollisionDoubleNoFloatNarrowing) {
++  // 16777216 (2^24) and 16777217 (2^24 + 1, or 1.6777217E7) round to the same
++  // 32-bit float (16777216.0f), but are distinct 64-bit doubles.
++  Bind("A.double_field", "16777216");
++
++  expect_.StartObject("");
++  expect_.StartObject("A");
++  expect_.RenderDouble("double_field", 16777216.0);
++  expect_.RenderDouble("double_field", 16777217.0);
++  expect_.EndObject();  // "A"
++  expect_.EndObject();  // ""
++
++  auto w = Create(true);
++
++  w->StartObject("");
++  w->StartObject("A");
++  w->RenderDouble("double_field", 16777216.0);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kOk);
++  w->RenderDouble("double_field", 16777217.0);
++  EXPECT_EQ(w->Status().code(), absl::StatusCode::kInvalidArgument);
++  EXPECT_THAT(
++      w->Status().ToString(),
++      HasSubstr("The binding value \"16777216\" of the field double_field is "
++                "conflicting with the value 1.67772e+07 in the body."));
++  w->EndObject();  // "A"
++  w->EndObject();  // ""
++}
++
+ }  // namespace
+ }  // namespace testing
+ }  // namespace transcoding

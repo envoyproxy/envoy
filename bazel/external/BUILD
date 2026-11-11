@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 exports_files([
     "boringssl_fips.genrule_cmd",
+    "grpc_httpjson_transcoding.patch",
 ])
 
 # Use a wrapper cc_library with an empty source source file to force
