@@ -192,7 +192,14 @@ gcc_runtime.toolchain(
     lld = "@llvm_minimal_linux_x64//:bin/lld",
     sysroot = "@sysroot_linux_amd64//sysroot",
 )
-use_repo(gcc_runtime, "gcc_runtime_linux_x86_64")
+gcc_runtime.toolchain(
+    name = "gcc_runtime_linux_aarch64",
+    arch = "aarch64",
+    dwp = "@llvm_minimal_linux_arm64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_arm64//:bin/lld",
+    sysroot = "@sysroot_linux_arm64//sysroot",
+)
+use_repo(gcc_runtime, "gcc_runtime_linux_aarch64", "gcc_runtime_linux_x86_64")
 
 register_toolchains(
     "//bazel/gcc:linux_x86_64_toolchain",
