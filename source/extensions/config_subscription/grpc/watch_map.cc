@@ -1,5 +1,7 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
+#include <vector>
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
@@ -382,6 +384,24 @@ void WatchMap::onConfigUpdate(
   // Execute external config validators.
   config_validators_->executeValidators(type_url_, decoded_resources, removed_resources);
 
+  const auto is_wildcard_watch = [](const Watch& watch) {
+    return watch.resource_names_.empty() || watch.resource_names_.contains(Wildcard);
+  };
+  const bool wire_update_empty = added_resources.empty() && removed_resources.empty();
+  // Snapshot candidate wildcard watches before invoking any callbacks so a callback that calls
+  // addWatch() neither invalidates watches_ iterators nor causes a newly added watch to receive a
+  // stale empty update for this already-in-flight response.
+  std::vector<Watch*> empty_update_watches;
+  for (const auto& watch : watches_) {
+    if (per_watch_added.contains(watch.get()) || per_watch_removed.contains(watch.get())) {
+      continue;
+    }
+    if (is_wildcard_watch(*watch) &&
+        (wire_update_empty || !watch->delivered_initial_delta_update_)) {
+      empty_update_watches.push_back(watch.get());
+    }
+  }
+
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
@@ -415,18 +435,12 @@ void WatchMap::onConfigUpdate(
   // is empty, or on the watch's first delta response when all resources on the wire were
   // filtered out by accept() patterns (establishing that the watch's initial resource set is
   // canonically empty).
-  const bool wire_update_empty = added_resources.empty() && removed_resources.empty();
-  for (auto& watch : watches_) {
-    if (deferred_removed_during_update_->count(watch.get()) > 0) {
+  for (Watch* watch : empty_update_watches) {
+    if (deferred_removed_during_update_->count(watch) > 0) {
       continue;
     }
-    if (per_watch_added.contains(watch.get()) || per_watch_removed.contains(watch.get())) {
-      continue;
-    }
-    const bool is_wildcard_watch = watch->resource_names_.empty() ||
-                                   watch->resource_names_.contains(Wildcard) ||
-                                   accept_wildcard_watches_.contains(watch.get());
-    if (is_wildcard_watch && (wire_update_empty || !watch->delivered_initial_delta_update_)) {
+    if (is_wildcard_watch(*watch) &&
+        (wire_update_empty || !watch->delivered_initial_delta_update_)) {
       THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
       watch->delivered_initial_delta_update_ = true;
     }
