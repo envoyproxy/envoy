@@ -208,7 +208,7 @@ message RateLimit {
   // :ref:`rate_limits_override_option
   // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits_override_option>`.
   // The filter level config is the least specific one, so the value is only used if all the
-  // per-route configs leave the option ``UNSPECIFIED``.
+  // per-route configs leave the option ``RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED``.
   common.ratelimit.v3.RateLimitsOverrideOption rate_limits_override_option = 20
       [(validate.rules).enum = {defined_only: true}];
 }
@@ -279,11 +279,12 @@ message RateLimitPerRoute {
 
   // Determines how the ``rate_limits`` of the per-route configs at different levels and the
   // filter level :ref:`rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>`
-  // are applied. The value of the most specific config that is not ``UNSPECIFIED`` takes effect,
-  // and the filter level :ref:`rate_limits_override_option
+  // are applied. The value of the most specific config that is not
+  // ``RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED`` takes effect, and the filter level
+  // :ref:`rate_limits_override_option
   // <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits_override_option>`
-  // is the least specific one. If all of them are ``UNSPECIFIED``,
-  // :ref:`MOST_SPECIFIC_WINS <envoy_v3_api_enum_value_extensions.common.ratelimit.v3.RateLimitsOverrideOption.MOST_SPECIFIC_WINS>`
+  // is the least specific one. If all of them are ``RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED``,
+  // :ref:`MOST_SPECIFIC_ONLY <envoy_v3_api_enum_value_extensions.common.ratelimit.v3.RateLimitsOverrideOption.MOST_SPECIFIC_ONLY>`
   // is used.
   //
   // If ``ALL_LEVELS`` is used, the descriptors generated from the ``rate_limits`` of all levels,

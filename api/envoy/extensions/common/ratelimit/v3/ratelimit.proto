@@ -53,10 +53,10 @@ enum VhRateLimitsOptions {
 enum RateLimitsOverrideOption {
   // Not specified. The behavior is determined by the filter. See the documentation of the
   // filter's ``rate_limits_override_option``.
-  UNSPECIFIED = 0;
+  RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED = 0;
 
   // Only the ``rate_limits`` of the most specific filter config are applied.
-  MOST_SPECIFIC_WINS = 1;
+  MOST_SPECIFIC_ONLY = 1;
 
   // The ``rate_limits`` of the filter configs at all levels are applied. How they are applied is
   // determined by the filter. See the documentation of the filter's ``rate_limits_override_option``.

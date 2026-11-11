@@ -1645,9 +1645,10 @@ rate_limits:
 
 class RateLimitsOverrideOptionFilterTest : public FilterTest {
 public:
-  static constexpr auto Unspecified = envoy::extensions::common::ratelimit::v3::UNSPECIFIED;
-  static constexpr auto MostSpecificWins =
-      envoy::extensions::common::ratelimit::v3::MOST_SPECIFIC_WINS;
+  static constexpr auto Unspecified =
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED;
+  static constexpr auto MostSpecificOnly =
+      envoy::extensions::common::ratelimit::v3::MOST_SPECIFIC_ONLY;
   static constexpr auto AllLevels = envoy::extensions::common::ratelimit::v3::ALL_LEVELS;
 
   struct Level {
@@ -1744,7 +1745,7 @@ TEST_F(RateLimitsOverrideOptionFilterTest, UnspecifiedFallsBackToLegacyRouteRate
 }
 
 TEST_F(RateLimitsOverrideOptionFilterTest, OptionSetIgnoresLegacyRouteRateLimits) {
-  setUpTest({}, {}, {.option = MostSpecificWins, .max_tokens = 1, .rate_limits = false});
+  setUpTest({}, {}, {.option = MostSpecificOnly, .max_tokens = 1, .rate_limits = false});
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(_))
       .Times(0);
   EXPECT_CALL(decoder_callbacks_2_.route_->route_entry_.rate_limit_policy_,
@@ -1755,13 +1756,13 @@ TEST_F(RateLimitsOverrideOptionFilterTest, OptionSetIgnoresLegacyRouteRateLimits
 
 TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificNonUnspecifiedWins) {
   setUpTest({.option = AllLevels, .max_tokens = 1}, {.option = AllLevels, .max_tokens = 1},
-            {.option = MostSpecificWins});
+            {.option = MostSpecificOnly});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, sendTwoRequests());
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
-TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificWinsRejected) {
-  setUpTest({}, {}, {.option = MostSpecificWins, .max_tokens = 1});
+TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificOnlyRejected) {
+  setUpTest({}, {}, {.option = MostSpecificOnly, .max_tokens = 1});
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
@@ -1779,9 +1780,9 @@ TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsFromFilterLevelIncludesFilte
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
-TEST_F(RateLimitsOverrideOptionFilterTest, OptionSetIgnoresPerConnection) {
-  // Two requests from different connections still share the token bucket.
-  setUpTest({}, {}, {.option = MostSpecificWins, .max_tokens = 1, .per_connection = true});
+TEST_F(RateLimitsOverrideOptionFilterTest, InheritedOptionIgnoresPerConnection) {
+  // The route level inherits the option, so its token bucket is shared across connections.
+  setUpTest({}, {.option = MostSpecificOnly}, {.max_tokens = 1, .per_connection = true});
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
@@ -1813,8 +1814,8 @@ TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsChargesStreamDoneOnLessSpeci
             filter_2_->decodeHeaders(request_headers, false));
 }
 
-TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificWinsSkipsStreamDoneOnLessSpecificLevel) {
-  setUpTest({}, {.max_tokens = 3, .stream_done = true}, {.option = MostSpecificWins});
+TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificOnlySkipsStreamDoneOnLessSpecificLevel) {
+  setUpTest({}, {.max_tokens = 3, .stream_done = true}, {.option = MostSpecificOnly});
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "5"}};
   setStreamHeaders(&request_headers, &response_headers);

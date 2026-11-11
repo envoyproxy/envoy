@@ -406,12 +406,11 @@ void Filter::initializeRouteConfigs() {
     route_configs_.push_back(*it);
   }
 
-  // The most specific non UNSPECIFIED option wins and the filter level config is the least
-  // specific one.
+  // The most specific set option wins and the filter level config is the least specific one.
   override_option_ = config_->rateLimitsOverrideOption();
   for (const FilterConfigPerRoute& route_config : route_configs_) {
     if (route_config.rateLimitsOverrideOption() !=
-        envoy::extensions::common::ratelimit::v3::UNSPECIFIED) {
+        envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
       override_option_ = route_config.rateLimitsOverrideOption();
       break;
     }

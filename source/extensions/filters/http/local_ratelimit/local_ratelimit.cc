@@ -94,6 +94,17 @@ FilterConfig::FilterConfig(
     return;
   }
 
+  // TODO(wbpcode): support the per connection rate limiting with the rate limits override option
+  // after the per connection limiter is fixed to be keyed by the config that creates it.
+  if (rate_limit_per_connection_ &&
+      rate_limits_override_option_ !=
+          envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
+    creation_status =
+        absl::InvalidArgumentError("rate_limits_override_option is set and "
+                                   "local_rate_limit_per_downstream_connection is set to true");
+    return;
+  }
+
   rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
       config.rate_limits(), context, creation_status);
   if (!creation_status.ok()) {
@@ -184,7 +195,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   used_config_->stats().enabled_.inc();
 
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result result;
-  if (override_option_ != envoy::extensions::common::ratelimit::v3::UNSPECIFIED) {
+  if (override_option_ !=
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
     // The legacy rate limits of the route and virtual host are ignored completely.
     result = requestAllowedByConfigs(headers);
   } else {
@@ -279,7 +291,8 @@ void Filter::onDestroy() {
   if (!rate_limit_enabled_) {
     return;
   }
-  if (override_option_ != envoy::extensions::common::ratelimit::v3::UNSPECIFIED) {
+  if (override_option_ !=
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
     consumeStreamDoneByConfigs();
     return;
   }
@@ -343,6 +356,8 @@ Filter::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descripto
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+  // TODO(wbpcode): the limiter is stored under a single key, so the config of the first request
+  // on a connection is used for all the following requests on it, even if they use other configs.
   ASSERT(used_config_->rateLimitPerConnection());
 
   auto typed_state =
@@ -374,11 +389,12 @@ void Filter::initializeUsedConfigs() {
   used_configs_.push_back(*config_);
   used_config_ = used_configs_.front().get();
 
-  // The most specific non UNSPECIFIED option wins.
-  override_option_ = envoy::extensions::common::ratelimit::v3::UNSPECIFIED;
+  // The most specific set option wins.
+  override_option_ =
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED;
   for (const FilterConfig& config : used_configs_) {
     if (config.rateLimitsOverrideOption() !=
-        envoy::extensions::common::ratelimit::v3::UNSPECIFIED) {
+        envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
       override_option_ = config.rateLimitsOverrideOption();
       break;
     }

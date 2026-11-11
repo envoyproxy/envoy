@@ -2815,9 +2815,9 @@ TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDoneResponseHeader
   filter_->onDestroy();
 }
 
-TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsMostSpecificWins) {
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsMostSpecificOnly) {
   const std::string route_config_yaml = R"EOF(
-  rate_limits_override_option: MOST_SPECIFIC_WINS
+  rate_limits_override_option: MOST_SPECIFIC_ONLY
   rate_limits:
   - actions:
     - generic_key:
@@ -2923,7 +2923,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAllLevels) {
                                nullptr, "", nullptr);
 }
 
-TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsUnspecifiedFallsBackToMostSpecificWins) {
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsUnspecifiedFallsBackToMostSpecificOnly) {
   const std::string route_config_yaml = R"EOF(
   rate_limits:
   - actions:
@@ -3032,7 +3032,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteOptionOverridesFilterLevelOption) {
         descriptor_value: "filter-key"
   )EOF";
   const std::string route_config_yaml = R"EOF(
-  rate_limits_override_option: MOST_SPECIFIC_WINS
+  rate_limits_override_option: MOST_SPECIFIC_ONLY
   rate_limits:
   - actions:
     - generic_key:

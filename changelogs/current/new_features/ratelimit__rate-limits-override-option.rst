@@ -6,5 +6,5 @@ local rate limit filter (:ref:`rate_limits_override_option
 set to ``ALL_LEVELS``, the embedded ``rate_limits`` of the configs at all levels are applied instead of only the most
 specific one. The rate limit filter merges the generated descriptors into a single request, and the local rate limit
 filter checks every level against its own descriptors and token buckets. For the local rate limit filter, setting
-the option to any value other than ``UNSPECIFIED`` also ignores ``VirtualHost.rate_limits``, ``RouteAction.rate_limits``
-and ``local_rate_limit_per_downstream_connection``.
+the option also ignores ``VirtualHost.rate_limits`` and ``RouteAction.rate_limits``, and it cannot be combined with
+``local_rate_limit_per_downstream_connection``.

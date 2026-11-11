@@ -480,6 +480,33 @@ local_cluster_rate_limit: {}
   EXPECT_TRUE(share_provider_manager.expired());
 }
 
+TEST(Factory, OverrideOptionAndPerConnection) {
+  for (const std::string option : {"MOST_SPECIFIC_ONLY", "ALL_LEVELS"}) {
+    const std::string config_yaml = fmt::format(R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 1000s
+local_rate_limit_per_downstream_connection: true
+rate_limits_override_option: {}
+)",
+                                                option);
+
+    LocalRateLimitFilterConfig factory;
+    ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+    TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+    auto config_or = factory.createRouteSpecificFilterConfig(
+        *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_THAT(config_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                     "rate_limits_override_option is set and "
+                                     "local_rate_limit_per_downstream_connection is set to true"));
+  }
+}
+
 } // namespace LocalRateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
