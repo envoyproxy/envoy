@@ -3441,6 +3441,117 @@ dynamic_listeners:
 )EOF");
 }
 
+// A listener that updates or is removed after a failed update drops the error state, also without
+// an LDS update.
+TEST_P(ListenerManagerImplTest, UpdateOrRemovalAfterFailureClearsTheErrorState) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Throw(EnvoyException("can't bind")));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)), EnvoyException);
+
+  ListenerHandle* listener_foo_retry = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0));
+  EXPECT_CALL(listener_foo_retry->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  const std::string warming_foo_dump = R"EOF(
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        enable_reuse_port: false
+        filter_chains:
+          - {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
+)EOF";
+  checkConfigDump(warming_foo_dump);
+
+  const std::string listener_foo_new_port_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1235
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+  // An update that finds the listener unchanged drops the error state too.
+  ListenerHandle* listener_foo_new_port = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Throw(EnvoyException("can't bind")));
+  EXPECT_CALL(*listener_foo_new_port, onDestroy());
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_new_port_yaml)),
+               EnvoyException);
+  EXPECT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkConfigDump(warming_foo_dump);
+
+  ListenerHandle* listener_foo_new_port_again = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Throw(EnvoyException("can't bind")));
+  EXPECT_CALL(*listener_foo_new_port_again, onDestroy());
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_new_port_yaml)),
+               EnvoyException);
+  // A listen failure removes the listener and keeps the error state, and a removal of the name
+  // drops it.
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*listener_foo_retry, onDestroy());
+  listener_foo_retry->target_.ready();
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+  - name: foo
+    error_state:
+      failed_configuration:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        enable_reuse_port: false
+        filter_chains:
+          - {}
+      last_update_attempt:
+        seconds: 1001001001
+        nanos: 1000000
+      details: can't bind
+)EOF");
+  EXPECT_FALSE(manager_->removeListener("foo"));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
+}
+
 // Verify that errors tracked on endListenerUpdate show up in the config dump/
 TEST_P(ListenerManagerImplTest, ConfigDumpWithExternalError) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));

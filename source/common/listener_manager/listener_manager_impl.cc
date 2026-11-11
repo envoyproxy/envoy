@@ -665,6 +665,9 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(add_or_update_status.status().message());
     std::ignore = it->second->mutable_failed_configuration()->PackFrom(config);
+  } else {
+    // Callers other than LDS do not clear the error states before an update.
+    lds_error_state_tracker_.erase(name);
   }
   return add_or_update_status;
 }
@@ -1326,6 +1329,8 @@ uint64_t ListenerManagerImpl::numConnections() const {
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
+  // Callers other than LDS do not clear the error states before a removal.
+  lds_error_state_tracker_.erase(name);
   return removeListenerInternal(name, true);
 }
 
