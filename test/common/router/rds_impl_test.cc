@@ -1779,31 +1779,6 @@ TEST_F(RdsVhdsOnDemandTest,
   ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
 }
 
-TEST_F(RdsVhdsOnDemandTest, WarmingBlocksUnmatchedRequestsFailureWakesHeldRequestsAsFalse) {
-  setup();
-  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
-      warmingBlocksUnmatchedRequestsVhdsRdsConfigJson("1"));
-  const auto decoded_rds_resources =
-      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_OK(
-      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
-  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-  ASSERT_NE(nullptr, vhds_callbacks);
-
-  // Request for 'bar.com' arrives while initial wildcard VHDS is in flight.
-  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
-  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
-  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
-  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
-
-  // Initial VHDS update fails.
-  EXPECT_CALL(mock_callback_, Call(false));
-  vhds_callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
-                                       nullptr);
-  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
-}
-
 TEST_F(RdsVhdsOnDemandTest,
        WarmingBlocksUnmatchedRequestsRejectedInitialUpdateWakesHeldRequestsAsFalse) {
   setup();
@@ -1846,7 +1821,11 @@ TEST_F(RdsVhdsOnDemandTest,
     vhds_callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
   }
-  EXPECT_FALSE(rds_->configCast()->awaitingInitialVhdsUpdate());
+  // Subsequent request for 'bar.com' is answered locally with false without sending an on-demand
+  // VHDS request.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(false));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
 }
 
 } // namespace

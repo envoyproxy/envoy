@@ -850,6 +850,8 @@ TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailureResolvesWarming) {
 
   EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
   EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("1", config_update_info->configInfo()->version_);
 }
 
 class WarmingPerRouteFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
