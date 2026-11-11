@@ -10018,7 +10018,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, ListenFailureKeepsActiveList
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   EXPECT_CALL(*socket2->io_handle_, listen(_))
       .WillOnce(Return(Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_CALL(*callbacks, onListenerAddOrUpdateFailure(absl::string_view("foo"), false));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), false));
   EXPECT_TRUE(addOrUpdateListener(listenerProto({"127.0.0.1", "127.0.0.2"})));
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
@@ -11594,7 +11594,7 @@ filter_chains:
   worker_->callRemovalCompletion();
 }
 
-// Listener update callbacks that predate onListenerAddOrUpdateFailure() keep their removal
+// Listener update callbacks that predate onListenerListenFailure() keep their removal
 // callback.
 class RemovalRecordingListenerUpdateCallbacks : public ListenerUpdateCallbacks {
 public:
@@ -11635,7 +11635,7 @@ filter_chains:
   // The removal callbacks get the name after the listener is destroyed.
   EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
       .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
-  EXPECT_CALL(*callbacks, onListenerAddOrUpdateFailure(absl::string_view("foo"), true));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), true));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
   listener_foo->target_.ready();
@@ -11664,7 +11664,7 @@ filter_chains:
 
   EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
       .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
-  EXPECT_CALL(*callbacks, onListenerAddOrUpdateFailure(absl::string_view("foo"), true));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), true));
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
