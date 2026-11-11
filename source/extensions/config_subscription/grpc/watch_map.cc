@@ -566,8 +566,7 @@ void WatchMap::replayCachedResources() {
           Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, cached->second.resource_->New());
       copy->CopyFrom(*cached->second.resource_);
       decoded.push_back(std::make_unique<DecodedResourceImpl>(
-          std::move(copy), name, cached->second.aliases_, cached->second.version_,
-          /*from_cache=*/true));
+          std::move(copy), name, cached->second.aliases_, cached->second.version_));
       refs.emplace_back(*decoded.back());
       version = cached->second.version_;
     }

@@ -1004,11 +1004,7 @@ protected:
       EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, version));
       doSecretDeltaUpdate(resources_, {}, version);
     } else {
-      EXPECT_CALL(callbacks1_, onConfigUpdate(_, version))
-          .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-            EXPECT_FALSE(resources[0].get().fromCache());
-            return absl::OkStatus();
-          });
+      EXPECT_CALL(callbacks1_, onConfigUpdate(_, version));
       watch_map_.onConfigUpdate(resources_, version);
     }
     EXPECT_TRUE(watch_map_.hasCachedResourceForTest("alice"));
@@ -1078,7 +1074,6 @@ TEST_F(WatchMapReplayTest, LateWatchReceivesCachedSotwResource) {
         EXPECT_EQ("v1", resources[0].get().version());
         EXPECT_TRUE(TestUtility::protoEqual(resources[0].get().resource(), alice_));
         EXPECT_EQ(nullptr, resources[0].get().resource().GetArena());
-        EXPECT_TRUE(resources[0].get().fromCache());
         return absl::OkStatus();
       });
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(0);
@@ -1103,7 +1098,6 @@ TEST_F(WatchMapDeltaReplayTest, LateWatchReceivesCachedDeltaResource) {
                        const Protobuf::RepeatedPtrField<std::string>& removed, const std::string&) {
         EXPECT_EQ(1, added.size());
         EXPECT_TRUE(TestUtility::protoEqual(added[0].get().resource(), alice_));
-        EXPECT_TRUE(added[0].get().fromCache());
         EXPECT_TRUE(removed.empty());
         return absl::OkStatus();
       });
@@ -1255,18 +1249,19 @@ TEST_F(WatchMapReplayTest, FreshDeliveryBeforeReplaySkipsReplay) {
   drain(watch2);
 }
 
-TEST_F(WatchMapReplayTest, ReplayRejectionIsLogged) {
+TEST_F(WatchMapReplayTest, ReplayRejectionKeepsWatchWaiting) {
   Watch* watch1 = subscribeAndDeliver("v1");
   EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration());
   Watch* watch2 = joinLate();
   EXPECT_CALL(callbacks2_, onConfigUpdate(_, "v1"))
       .WillOnce(testing::Return(absl::InvalidArgumentError("nope")));
+  EXPECT_CALL(callbacks2_, onConfigUpdateFailed(_, _)).Times(0);
   EXPECT_LOG_CONTAINS("warn", "rejected: nope", replay_cb_->invokeCallback());
   drain(watch1);
   drain(watch2);
 }
 
-TEST_F(WatchMapReplayTest, ReplayExceptionIsLogged) {
+TEST_F(WatchMapReplayTest, ReplayExceptionKeepsWatchWaiting) {
   Watch* watch1 = subscribeAndDeliver("v1");
   EXPECT_CALL(*replay_cb_, scheduleCallbackNextIteration());
   Watch* watch2 = joinLate();
@@ -1274,6 +1269,7 @@ TEST_F(WatchMapReplayTest, ReplayExceptionIsLogged) {
     throw EnvoyException("boom");
     return absl::OkStatus();
   });
+  EXPECT_CALL(callbacks2_, onConfigUpdateFailed(_, _)).Times(0);
   EXPECT_LOG_CONTAINS("warn", "failed: boom", replay_cb_->invokeCallback());
   drain(watch1);
   drain(watch2);

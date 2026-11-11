@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -245,7 +244,7 @@ private:
   absl::flat_hash_map<std::string, CachedResource> cached_resources_;
   // Watches that joined an already-subscribed, cached name and are waiting for the replay,
   // with the names each one joined.
-  std::map<Watch*, absl::flat_hash_set<std::string>> pending_replays_;
+  absl::flat_hash_map<Watch*, absl::flat_hash_set<std::string>> pending_replays_;
 
   const std::string type_url_;
   CustomConfigValidators* config_validators_;

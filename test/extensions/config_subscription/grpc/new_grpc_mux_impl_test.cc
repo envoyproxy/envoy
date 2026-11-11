@@ -1374,7 +1374,6 @@ TEST_P(NewGrpcMuxImplTest, ReplaysCachedSecretToLateWatch) {
       .WillOnce([](const std::vector<DecodedResourceRef>& added,
                    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
         EXPECT_EQ(1, added.size());
-        EXPECT_TRUE(added[0].get().fromCache());
         return absl::OkStatus();
       });
   replay_cb->invokeCallback();

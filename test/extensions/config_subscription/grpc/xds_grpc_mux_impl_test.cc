@@ -1759,7 +1759,6 @@ TEST_P(GrpcMuxImplTest, ReplaysCachedSecretToLateWatch) {
   EXPECT_CALL(callbacks2, onConfigUpdate(_, "1"))
       .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
         EXPECT_EQ(1, resources.size());
-        EXPECT_TRUE(resources[0].get().fromCache());
         return absl::OkStatus();
       });
   replay_cb->invokeCallback();
