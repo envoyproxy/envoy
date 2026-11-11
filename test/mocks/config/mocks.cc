@@ -48,8 +48,7 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
       .WillByDefault([this](const xds::core::v3::ResourceLocator&,
                             const envoy::config::core::v3::ConfigSource&, absl::string_view,
                             Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                            Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder)
-                         -> SubscriptionPtr {
+                            OpaqueResourceDecoderSharedPtr resource_decoder) -> SubscriptionPtr {
         auto ret = std::make_unique<NiceMock<MockSubscription>>();
         subscription_ = ret.get();
         callbacks_ = &callbacks;
