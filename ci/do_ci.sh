@@ -946,20 +946,30 @@ case $CI_TARGET in
             --test_arg="-runs=10"
         ;;
 
-    gcc|gcc.test_only|gcc.server_only)
+    gcc|gcc.build|gcc.test)
         BAZEL_BUILD_OPTIONS+=("--config=gcc")
         echo "gcc toolchain configured: gcc"
-        if [[ "$CI_TARGET" != "gcc.test_only" ]]; then
+        if [[ "$CI_TARGET" == "gcc.build" ]]; then
             echo "bazel fastbuild build with gcc..."
             bazel_envoy_binary_build fastbuild
-        fi
-        if [[ "$CI_TARGET" != "gcc.server_only" ]]; then
-            echo "Testing ${TEST_TARGETS[*]}"
+        else
+            # Nothing built here is published, so the server and tools binaries are built in the
+            # test invocation: one analysis, and no binary downloads.
+            GCC_BUILD_TARGETS=()
+            if [[ "$CI_TARGET" != "gcc.test" ]]; then
+                GCC_BUILD_TARGETS=(
+                    "${ENVOY_BUILD_TARGET}"
+                    //test/tools/schema_validator:schema_validator_tool
+                    //test/tools/router_check:router_check_tool
+                    //test/tools/config_load_check:config_load_check_tool
+                    @su-exec)
+            fi
+            echo "Building ${GCC_BUILD_TARGETS[*]} and testing ${TEST_TARGETS[*]}"
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
                 -c fastbuild  \
                 --remote_download_minimal \
-                -- "${TEST_TARGETS[@]}"
+                -- "${GCC_BUILD_TARGETS[@]}" "${TEST_TARGETS[@]}"
         fi
         ;;
 

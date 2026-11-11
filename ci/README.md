@@ -50,7 +50,7 @@ The source for these images is located in the [envoyproxy/toolshed](https://gith
 repository.
 
 The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC, configured with `--config=gcc`, which builds the binary and runs the tests
-(`ci/do_ci.sh gcc`; `gcc.server_only` and `gcc.test_only` run just one of the two).
+(`ci/do_ci.sh gcc`; `gcc.build` and `gcc.test` run just one of the two).
 
 # Supported compiler configurations
 
