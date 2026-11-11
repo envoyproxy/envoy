@@ -2082,7 +2082,10 @@ envoy_cc_test(
     },
     deps = [
         ":http_integration_lib",
+        "//envoy/network:address_interface",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:utility_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",

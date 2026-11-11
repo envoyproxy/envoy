@@ -71,6 +71,7 @@
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -568,13 +569,20 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
 // a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
 // and using the index as the key to the stat map instead.
 void LoadMetricStatsImpl::add(const absl::string_view key, double value) {
-  absl::MutexLock lock(mu_);
-  if (map_ == nullptr) {
-    map_ = std::make_unique<StatMap>();
+  {
+    absl::MutexLock lock(mu_);
+    if (map_ == nullptr) {
+      map_ = std::make_unique<StatMap>();
+    }
+    Stat& stat = (*map_)[key];
+    ++stat.num_requests_with_metric;
+    stat.total_metric_value += value;
   }
-  Stat& stat = (*map_)[key];
-  ++stat.num_requests_with_metric;
-  stat.total_metric_value += value;
+  // Must happen after the host-level update, see
+  // ClusterLoadReportStats::upstream_host_load_updates_.
+  if (update_counter_ != nullptr) {
+    update_counter_->inc();
+  }
 }
 
 LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
@@ -631,6 +639,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
       endpoint_metadata_hash_(endpoint_metadata ? MessageUtil::hash(*endpoint_metadata) : 0),
       locality_metadata_(locality_metadata), locality_(std::move(locality)),
       locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
+      load_metric_stats_(cluster->loadReportStats().upstream_host_load_updates_),
       priority_(priority),
       // TODO(wbpcode): This should be resolved.
       // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)

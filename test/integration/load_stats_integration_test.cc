@@ -1,3 +1,6 @@
+#include <string>
+#include <tuple>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -5,17 +8,21 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/endpoint/v3/load_report.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
 #include "source/common/common/base64.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -23,8 +30,29 @@ using testing::Ge;
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                 public HttpIntegrationTest {
+// Parameterized over IP version, gRPC client type and whether the load stats reporter skips
+// visiting the hosts of clusters without load to report
+// (envoy.reloadable_features.lrs_skip_idle_clusters). The load reports must be the same either way.
+class LoadStatsIntegrationParamTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
+public:
+  ~LoadStatsIntegrationParamTest() override = default;
+  static std::string
+  protocolTestParamsToString(const ::testing::TestParamInfo<
+                             std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>>& p) {
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                            : "EnvoyGrpc",
+                       std::get<2>(p.param) ? "SkipIdleClusters" : "VisitAllClusters");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  bool skipIdleClusters() const { return std::get<2>(GetParam()); }
+};
+
+class LoadStatsIntegrationTest : public LoadStatsIntegrationParamTest, public HttpIntegrationTest {
 public:
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
     // We rely on some fairly specific load balancing picks in this test, so
@@ -156,6 +184,8 @@ public:
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
     });
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.lrs_skip_idle_clusters",
+                                      skipIdleClusters() ? "true" : "false");
     HttpIntegrationTest::initialize();
     load_report_upstream_ = fake_upstreams_[0].get();
     for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
@@ -521,9 +551,12 @@ public:
   const uint32_t load_report_interval_ms_ = 1000;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientType, LoadStatsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Bool()),
+    LoadStatsIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(LoadStatsIntegrationTest, EmptyLocalityAfterHealthCheckFailure) {
   initialize(true);

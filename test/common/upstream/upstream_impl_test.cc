@@ -32,6 +32,7 @@
 #include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/host_lookup_map.h"
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
@@ -1913,6 +1914,45 @@ TEST_F(HostImplTest, HostCluster) {
   EXPECT_EQ("", host->hostname());
   EXPECT_FALSE(host->canary());
   EXPECT_EQ("", host->locality().zone());
+}
+
+// Recording a custom load metric on a host counts as a host load update of its cluster, which is
+// how the load stats reporter detects clusters with load to report.
+TEST_F(HostImplTest, LoadMetricStatsUpdateClusterHostLoadUpdates) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+  Stats::Counter& host_load_updates = cluster.info_->load_report_stats_.upstream_host_load_updates_;
+  EXPECT_EQ(0U, host_load_updates.value());
+
+  host->loadMetricStats().add("metric_a", 1.0);
+  EXPECT_EQ(1U, host_load_updates.value());
+  host->loadMetricStats().add("metric_a", 2.0);
+  host->loadMetricStats().add("metric_b", 3.0);
+  EXPECT_EQ(3U, host_load_updates.value());
+
+  // Latching the host metrics does not affect the cluster counter, which is latched by the load
+  // stats reporter.
+  LoadMetricStats::StatMapPtr latched = host->loadMetricStats().latch();
+  ASSERT_NE(nullptr, latched);
+  EXPECT_EQ(2U, latched->size());
+  EXPECT_EQ(2U, (*latched)["metric_a"].num_requests_with_metric);
+  EXPECT_EQ(3.0, (*latched)["metric_a"].total_metric_value);
+  EXPECT_EQ(3U, host_load_updates.value());
+  EXPECT_EQ(3U, host_load_updates.latch());
+  EXPECT_EQ(nullptr, host->loadMetricStats().latch());
+}
+
+// A LoadMetricStatsImpl that is not attached to a cluster counter works standalone.
+TEST(LoadMetricStatsImplTest, WithoutUpdateCounter) {
+  LoadMetricStatsImpl stats;
+  EXPECT_EQ(nullptr, stats.latch());
+  stats.add("metric_a", 1.5);
+  stats.add("metric_a", 2.5);
+  LoadMetricStats::StatMapPtr latched = stats.latch();
+  ASSERT_NE(nullptr, latched);
+  EXPECT_EQ(2U, (*latched)["metric_a"].num_requests_with_metric);
+  EXPECT_EQ(4.0, (*latched)["metric_a"].total_metric_value);
+  EXPECT_EQ(nullptr, stats.latch());
 }
 
 TEST_F(HostImplTest, Weight) {

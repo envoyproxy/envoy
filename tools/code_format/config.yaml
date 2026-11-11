@@ -212,6 +212,13 @@ paths:
     include:
     - source/common/grpc/google_grpc_context.cc
 
+  # Files that may update the per-host load report stats (HostStats::rq_total_, rq_success_ and
+  # rq_error_) directly. Everything else must use the HostUtility::chargeRequest*() helpers, which
+  # also count a host load update on the cluster (ClusterLoadReportStats::upstream_host_load_updates_).
+  host_load_update:
+    include:
+    - source/common/upstream/host_utility.cc
+
   # Files in these paths can use Protobuf::util::JsonStringToMessage
   json_string_to_message:
     include:
@@ -393,6 +400,9 @@ re:
   # C++17 feature, lacks sufficient support across various libraries / compilers.
   for_each_n: for_each_n\(
   histogram_si_suffix: (?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)
+  # Direct updates of the per-host load report stats, e.g. host->stats().rq_success_.inc() or
+  # upstreamHost()->stats().rq_error_.inc().
+  host_load_stats_update: '[Hh]ost\w*(\(\))?(->|\.)stats\(\)\.rq_(total|success|error)_\.(inc|add)\('
   line_number: ^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$
   mangled_protobuf_name: envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}
   maintainers: .*github.com.(.*)\)\)

@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
         "//source/common/stats:timespan_lib",
+        "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:upstream_lib",
     ],
 )

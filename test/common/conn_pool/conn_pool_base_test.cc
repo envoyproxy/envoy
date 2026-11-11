@@ -715,6 +715,36 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleNotConnected) {
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
+// Attaching a stream to a client counts a request issued on the host and a host load update on the
+// cluster (see ClusterLoadReportStats::upstream_host_load_updates_); closing the stream does not
+// count as a host load update.
+TEST_F(ConnPoolImplBaseTest, AttachStreamRecordsHostLoadUpdate) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+  Stats::Counter& host_load_updates = cluster_->load_report_stats_.upstream_host_load_updates_;
+
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  ASSERT_EQ(1, clients_.size());
+  EXPECT_EQ(0U, host_->stats().rq_total_.value());
+  EXPECT_EQ(0U, host_load_updates.value());
+
+  // The stream is attached to the client once the connection is established.
+  EXPECT_CALL(pool_, onPoolReady);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(1U, host_->stats().rq_total_.value());
+  EXPECT_EQ(1U, host_->stats().rq_active_.value());
+  EXPECT_EQ(1U, host_load_updates.value());
+
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(0U, host_->stats().rq_active_.value());
+  EXPECT_EQ(1U, host_load_updates.value());
+
+  dispatcher_.clearDeferredDeleteList();
+  clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
 // Remote close simulates the peer closing the connection.
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());

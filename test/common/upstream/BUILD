@@ -518,7 +518,10 @@ envoy_cc_test(
     srcs = ["load_stats_reporter_impl_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/network:address_lib",
+        "//source/common/protobuf",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",
         "//test/common/upstream:utility_lib",
@@ -527,6 +530,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:host_set_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -716,6 +720,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
         "//source/common/upstream:host_lookup_map_lib",
+        "//source/common/upstream:upstream_includes",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
@@ -937,6 +942,40 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "metadata_comparison_benchmark_test",
     benchmark_binary = "metadata_comparison_benchmark",
+)
+
+envoy_cc_benchmark_binary(
+    name = "load_stats_reporter_benchmark",
+    srcs = ["load_stats_reporter_benchmark.cc"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@benchmark",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "load_stats_reporter_benchmark_test",
+    benchmark_binary = "load_stats_reporter_benchmark",
 )
 
 envoy_cc_test(

@@ -70,6 +70,30 @@ public:
    */
   static void forEachOrcaLoadReportRecipient(const HostDescription& host,
                                              absl::FunctionRef<void(HostLbPolicyData&)> callback);
+
+  /**
+   * Charges a request issued to a host for EDS load reporting: increments HostStats::rq_total_
+   * and HostStats::rq_active_ and counts a host load update on the host's cluster. rq_active_ is
+   * decremented directly when the request completes; that does not count as a host load update.
+   *
+   * The per-host load report stats (rq_total_, rq_success_ and rq_error_) must only be updated
+   * through these helpers, which increment the host stat first and
+   * ClusterLoadReportStats::upstream_host_load_updates_ second, see the documentation of that
+   * counter in envoy/upstream/upstream.h. tools/code_format/check_format.py enforces this.
+   */
+  static void chargeRequestIssued(const HostDescription& host);
+
+  /**
+   * Charges a successful request to a host for EDS load reporting: increments
+   * HostStats::rq_success_ and counts a host load update on the host's cluster.
+   */
+  static void chargeRequestSuccess(const HostDescription& host);
+
+  /**
+   * Charges a failed request to a host for EDS load reporting: increments HostStats::rq_error_
+   * and counts a host load update on the host's cluster.
+   */
+  static void chargeRequestError(const HostDescription& host);
 };
 
 } // namespace Upstream

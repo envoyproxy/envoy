@@ -909,11 +909,19 @@ public:
  * total_dropped_requests and dropped_requests, which correspond to the upstream_rq_dropped and
  * upstream_rq_drop_overload counter here. These are latched by LoadStatsReporter interface
  * implementations, independent of the normal stats sink flushing.
-
+ *
+ * upstream_host_load_updates counts updates to the per-host load report stats of the cluster's
+ * hosts: requests issued (HostStats::rq_total_), requests completed (HostStats::rq_success_ and
+ * HostStats::rq_error_) and custom load metrics recorded (LoadMetricStats::add()). Writers MUST
+ * update the host-level stat first and increment this counter second; the request stats are
+ * updated through HostUtility::chargeRequestIssued/Success/Error(), which does both. It is never
+ * reported to the LRS server; LoadStatsReporter implementations latch it to detect clusters whose
+ * hosts have nothing to report, so that they do not need to visit every host of every cluster.
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
   COUNTER(upstream_rq_dropped)                                                                     \
-  COUNTER(upstream_rq_drop_overload)
+  COUNTER(upstream_rq_drop_overload)                                                               \
+  COUNTER(upstream_host_load_updates)
 
 /**
  * Cluster circuit breakers gauges. Note that we do not generate a stats

@@ -1,6 +1,6 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -24,6 +24,19 @@ py_binary(
         "//bazel/deps:buildozer",
         "//tools/clang-format",
     ],
+    deps = [
+        requirement("pyyaml"),
+        ":envoy_build_fixer",
+    ],
+)
+
+py_test(
+    name = "check_format_test",
+    srcs = [
+        "check_format.py",
+        "check_format_test.py",
+    ],
+    data = [":config.yaml"],
     deps = [
         requirement("pyyaml"),
         ":envoy_build_fixer",

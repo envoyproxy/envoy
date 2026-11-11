@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
+#include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
@@ -10,6 +15,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/grpc/typed_async_client.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -34,6 +41,12 @@ namespace Upstream {
  *     - Current `rq_active_` is non-zero.
  *     - Latched `rq_total_` is non-zero.
  *     - Any custom load metrics are non-zero in `LoadMetricStats`.
+ * - envoy.reloadable_features.lrs_skip_idle_clusters: If true, the hosts of a cluster are only
+ *   visited (and their stats latched) when the cluster's
+ *   `ClusterLoadReportStats::upstream_host_load_updates_` counter moved since the last report or
+ *   the last visit found requests in progress. This does not change what is reported: a cluster
+ *   that is skipped would not have contributed any locality stats. It merely avoids walking the
+ *   hosts of idle clusters, which dominates the cost of load reporting with many clusters.
  */
 class LoadStatsReporterImpl
     : public LoadStatsReporter,
@@ -60,11 +73,42 @@ public:
   const uint32_t RETRY_DELAY_MS = 5000;
 
 private:
+  // Per-cluster state tracked between load reports.
+  struct ClusterLoadReportState {
+    explicit ClusterLoadReportState(std::chrono::steady_clock::duration interval_start)
+        : interval_start(interval_start) {}
+
+    // Start of the current measurement interval.
+    std::chrono::steady_clock::duration interval_start;
+    // Whether the last visit of the cluster's hosts found requests in progress. Such clusters are
+    // visited again on the next report so that total_requests_in_progress keeps being reported.
+    // Starts out true so that a newly tracked cluster is always visited at least once.
+    bool requests_in_progress{true};
+    // Generation stamp assigned by startLoadReportPeriod(). Entries that were not (re)selected in
+    // the current generation are no longer tracked.
+    uint64_t generation{0};
+  };
+
   void setRetryTimer();
   void establishNewStream();
   void sendLoadStatsRequest();
   void handleFailure();
   void startLoadReportPeriod();
+  // Appends the ClusterStats of a tracked cluster to request and starts its next measurement
+  // interval.
+  void addClusterStats(envoy::service::load_stats::v3::LoadStatsRequest& request,
+                       const std::string& cluster_name, const Cluster& cluster,
+                       ClusterLoadReportState& state, bool skip_idle_clusters,
+                       bool report_load_for_non_zero_stats);
+  // Latches the load stats of all hosts of cluster and appends the resulting locality (and
+  // optionally endpoint) stats to cluster_stats.
+  // @return whether any host of the cluster has requests in progress.
+  bool addLocalityStats(envoy::config::endpoint::v3::ClusterStats& cluster_stats,
+                        const Cluster& cluster, bool report_load_for_non_zero_stats);
+  // Marks cluster_name as selected for the current generation and, if it was not tracked yet,
+  // starts tracking it with a measurement interval starting now.
+  // @return whether cluster_name was not tracked before.
+  bool trackCluster(absl::string_view cluster_name, std::chrono::steady_clock::duration now);
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
@@ -77,8 +121,11 @@ private:
   Event::TimerPtr response_timer_;
   const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
   Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse> message_{nullptr};
-  // Map from cluster name to start of measurement interval.
-  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
+  // Map from cluster name to the load reporting state of the cluster. Only holds clusters selected
+  // by the latest LoadStatsResponse.
+  absl::flat_hash_map<std::string, ClusterLoadReportState> clusters_;
+  // Generation of the latest startLoadReportPeriod() call, see ClusterLoadReportState::generation.
+  uint64_t generation_{0};
   TimeSource& time_source_;
 };
 
