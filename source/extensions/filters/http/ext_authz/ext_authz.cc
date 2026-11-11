@@ -17,6 +17,7 @@
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/strings/ascii.h"
+#include "utf8_validity.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -1392,7 +1393,13 @@ void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
   for (const auto& [key, value] : response_headers_) {
     auto* hv = msg.add_response_headers();
     hv->set_key(key);
-    hv->set_value(value);
+    // Proto3 string fields reject non-UTF-8 bytes during JSON serialization, so encode
+    // non-UTF-8 header values in raw_value instead.
+    if (utf8_range::IsStructurallyValid(value)) {
+      hv->set_value(value);
+    } else {
+      hv->set_raw_value(value);
+    }
   }
 }
 

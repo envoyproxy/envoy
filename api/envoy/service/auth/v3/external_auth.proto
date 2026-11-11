@@ -54,6 +54,10 @@ message DeniedHttpResponse {
   // false when used in this message.
   // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
   // is not supported.
+  // Each header value is read from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
   // This field allows the authorization service to send a response body data
@@ -76,6 +80,10 @@ message OkHttpResponse {
   // one if there is a match.
   // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
   // is not supported.
+  // Each header value is read from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
   // HTTP entity headers to remove from the original request before dispatching
@@ -107,6 +115,10 @@ message OkHttpResponse {
   // defaults to false when used in this message.
   // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
   // is not supported.
+  // Each header value is read from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6;
 
   // This field allows the authorization service to set (and overwrite) query
