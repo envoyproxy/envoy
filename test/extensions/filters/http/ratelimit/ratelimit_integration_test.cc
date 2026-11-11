@@ -184,6 +184,10 @@ public:
     if (fake_ratelimit_connection_ != nullptr) {
       AssertionResult result = fake_ratelimit_connection_->close();
       RELEASE_ASSERT(result, result.message());
+      // close() only flushes: wait for the disconnect so that the fake upstream thread is not still
+      // draining the write buffer, and releasing outbound frames, when the codec is destroyed.
+      result = fake_ratelimit_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();
   }
