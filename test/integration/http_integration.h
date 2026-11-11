@@ -67,8 +67,9 @@ public:
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   // Wait for the socket event without advancing simulated time. Advance timer deadlines explicitly.
-  ABSL_MUST_USE_RESULT AssertionResult
-  waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::seconds(5));
+  // runDispatcherUntil applies TIMEOUT_FACTOR to the supplied timeout, including the default.
+  ABSL_MUST_USE_RESULT AssertionResult waitForDisconnect(
+      std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout / TIMEOUT_FACTOR);
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent lastConnectionEvent() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }

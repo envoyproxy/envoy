@@ -86,7 +86,7 @@ testing::AssertionResult runDispatcherUntilImpl(Event::Dispatcher& dispatcher,
                                          << "ms of real time waiting for " << description;
     }
     if (advance_time) {
-      time_system.advanceTimeForIo();
+      time_system.advanceTimeForIo(dispatcher);
     }
     dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     std::this_thread::yield();
@@ -297,14 +297,12 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   }
 
 #ifdef ENVOY_ENABLE_QUIC
-  const bool register_dispatcher = time_system.ioDispatcher() == nullptr;
-  if (register_dispatcher) {
-    time_system.setIoDispatcher(dispatcher.get());
-  }
+  Event::Dispatcher* previous_dispatcher = time_system.ioDispatcher();
+  time_system.setIoDispatcher(nullptr);
+  time_system.setIoDispatcher(dispatcher.get());
   Cleanup unregister_dispatcher([&] {
-    if (register_dispatcher) {
-      time_system.setIoDispatcher(nullptr);
-    }
+    time_system.setIoDispatcher(nullptr);
+    time_system.setIoDispatcher(previous_dispatcher);
   });
   testing::NiceMock<ThreadLocal::MockInstance> threadlocal;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;

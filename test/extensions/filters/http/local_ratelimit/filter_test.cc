@@ -1397,7 +1397,7 @@ TEST_P(StreamDoneFilterTest, ChargesStreamInfoUsageForLocallyRateLimitedRequest)
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   filter_->onDestroy();
 
-  // Move past the token boundary to allow for floating-point rounding.
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
   simTime().advanceTimeWait(std::chrono::microseconds(1));
   Filter second_filter(config_);
   second_filter.setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1434,7 +1434,7 @@ TEST_P(StreamDoneFilterTest, InvalidResponseCostDoesNotChargeAgain) {
   filter_->onDestroy();
   expectRemaining(5);
   if (!GetParam()) {
-    // Move past the token boundary to allow for floating-point rounding.
+    // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
     simTime().advanceTimeWait(std::chrono::microseconds(1));
     EXPECT_TRUE(config_->requestAllowed({}).allowed);
     EXPECT_FALSE(config_->requestAllowed({}).allowed);

@@ -30,6 +30,7 @@ public:
   // TestTimeSystem
   void setIoDispatcher(Dispatcher* dispatcher) override;
   Dispatcher* ioDispatcher() override { return io_dispatcher_; }
+  void advanceTimeForIoImpl(Dispatcher& dispatcher, const Duration& elapsed) override;
   void advanceTimeWaitImpl(const Duration& duration) override;
   void advanceTimeAsyncImpl(const Duration& duration) override;
 

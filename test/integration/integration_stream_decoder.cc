@@ -71,13 +71,7 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
       return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
                                 << description << debugState();
     }
-    if (time_system.ioDispatcher() == &dispatcher_) {
-      // Process each clock step before advancing again, giving worker I/O a chance to complete
-      // before response and delayed-close timers expire.
-      time_system.advanceTimeWait(std::chrono::milliseconds(1));
-    } else {
-      time_system.advanceTimeForIo();
-    }
+    time_system.advanceTimeForIo(dispatcher_);
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     if (condition()) {
       break;

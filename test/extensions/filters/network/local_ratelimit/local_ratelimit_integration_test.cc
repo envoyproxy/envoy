@@ -80,7 +80,7 @@ typed_config:
     fill_interval: 0.2s
 )EOF");
 
-  // Move past the initial fill boundary to allow for floating-point rounding.
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
   simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));

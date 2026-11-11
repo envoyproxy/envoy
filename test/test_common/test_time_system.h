@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -52,12 +54,16 @@ public:
   virtual void setIoDispatcher(Dispatcher*) {}
   virtual Dispatcher* ioDispatcher() { return nullptr; }
 
-  // Advance a small step during I/O waits to drive alarms such as QUIC pacing and delayed ACKs.
-  void advanceTimeForIo() {
-    if (ioDispatcher() != nullptr) {
-      advanceTimeAsyncImpl(std::chrono::milliseconds(1));
-    }
+  // Drive the registered I/O dispatcher's alarms, stopping at the next deadline. Limit progress
+  // to real time elapsed between polls so a slow worker cannot cause premature protocol timeouts.
+  // With no armed alarms or a different dispatcher, simulated time stays unchanged.
+  void advanceTimeForIo(Dispatcher& dispatcher) {
+    const auto now = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+    const auto elapsed = last_io_poll_.has_value() ? now - *last_io_poll_ : Duration::zero();
+    last_io_poll_ = now;
+    advanceTimeForIoImpl(dispatcher, elapsed);
   }
+  virtual void advanceTimeForIoImpl(Dispatcher&, const Duration&) {}
 
   /**
    * Advances time forward by the specified duration, running any timers
@@ -139,6 +145,9 @@ public:
 
 protected:
   Thread::OnlyOneThread only_one_thread_;
+
+private:
+  std::optional<MonotonicTime> last_io_poll_;
 };
 
 // There should only be one instance of any time-system resident in a test
@@ -178,6 +187,9 @@ public:
     timeSystem().setIoDispatcher(dispatcher);
   }
   Dispatcher* ioDispatcher() override { return timeSystem().ioDispatcher(); }
+  void advanceTimeForIoImpl(Dispatcher& dispatcher, const Duration& elapsed) override {
+    timeSystem().advanceTimeForIoImpl(dispatcher, elapsed);
+  }
   void advanceTimeAsyncImpl(const Duration& duration) override {
     timeSystem().advanceTimeAsyncImpl(duration);
   }

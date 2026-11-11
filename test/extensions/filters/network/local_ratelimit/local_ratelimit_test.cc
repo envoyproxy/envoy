@@ -61,7 +61,7 @@ token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
 )EOF");
-  // Move past the initial fill boundary to allow for floating-point rounding.
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
   simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   InSequence s;
@@ -80,7 +80,7 @@ token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
 )EOF");
-  // Move past the initial fill boundary to allow for floating-point rounding.
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
   simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   // First connection is OK.
@@ -99,7 +99,7 @@ token_bucket:
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 
-  // Refill just past the boundary to allow for floating-point rounding.
+  // Tokens are (time_now - time_old) * fill_rate_; refill just past the floating-point boundary.
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200) +
                                                  std::chrono::microseconds(1));
 
@@ -119,7 +119,7 @@ runtime_enabled:
   default_value: true
   runtime_key: foo_key
 )EOF");
-  // Move past the initial fill boundary to allow for floating-point rounding.
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
   simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   // First connection is OK.

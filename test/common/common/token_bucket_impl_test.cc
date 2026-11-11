@@ -194,12 +194,16 @@ TEST_F(AtomicTokenBucketImplTest, Refill) {
 }
 
 TEST_F(AtomicTokenBucketImplTest, NextTokenAvailable) {
-  AtomicTokenBucketImpl token_bucket{10, time_system_, 4};
+  AtomicTokenBucketImpl token_bucket{10, time_system_, 5};
   EXPECT_EQ(9, token_bucket.consume(9, false));
   EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
   EXPECT_EQ(1, token_bucket.consume(1, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
-  EXPECT_EQ(std::chrono::milliseconds(250), token_bucket.nextTokenAvailable());
+  // Remove the fractional refill from the extra microsecond to check the delay for an empty bucket.
+  EXPECT_NEAR(5e-6, token_bucket.consume([](double tokens) { return tokens; }), 1e-12);
+  EXPECT_EQ(std::chrono::milliseconds(200), token_bucket.nextTokenAvailable());
 }
 
 // Test partial consumption of tokens.
