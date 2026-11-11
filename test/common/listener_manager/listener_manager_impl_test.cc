@@ -1992,6 +1992,86 @@ static_listeners:
   }
 }
 
+// A listener and an update of it, before the workers start.
+constexpr absl::string_view ListenerFooYaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+constexpr absl::string_view ListenerFooUpdateYaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+per_connection_buffer_limit_bytes: 10
+filter_chains: {}
+  )EOF";
+
+// An update before the workers start keeps the server waiting for the new version of the listener,
+// also when the replaced version holds the last target that the server waits for.
+TEST_P(ListenerManagerImplTest, UpdateBeforeWorkersStartWaitsForTheNewListener) {
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(server_init_mgr));
+  testing::StrictMock<MockListenerUpdateCallbacks> callbacks;
+  auto callbacks_handle = manager_->addListenerUpdateCallbacks(callbacks);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooYaml))));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  server_init_mgr.initialize(server_init_watcher);
+
+  ListenerHandle* listener_foo_update = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_foo_update->target_, initialize());
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooUpdateYaml))));
+  EXPECT_EQ(Init::Manager::State::Initializing, server_init_mgr.state());
+
+  server_init_watcher.expectReady();
+  listener_foo_update->target_.ready();
+  EXPECT_EQ(Init::Manager::State::Initialized, server_init_mgr.state());
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+}
+
+// An update before the workers start reaches the listener update callbacks before the workers
+// start, also when destroying the replaced version finishes the server initialization.
+TEST_P(ListenerManagerImplTest, UpdateBeforeWorkersStartNotifiesBeforeTheWorkersStart) {
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  // Like the server, the watcher starts the workers once the initialization completes.
+  Init::WatcherImpl server_init_watcher("server-init-watcher", [this]() {
+    EXPECT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  });
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(server_init_mgr));
+  testing::StrictMock<MockListenerUpdateCallbacks> callbacks;
+  auto callbacks_handle = manager_->addListenerUpdateCallbacks(callbacks);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooYaml))));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  server_init_mgr.initialize(server_init_watcher);
+
+  // The new version is ready at once, so destroying the replaced version starts the workers.
+  ListenerHandle* listener_foo_update = expectListenerCreate(false, true);
+  Sequence notify_before_start;
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
+      .InSequence(notify_before_start);
+  EXPECT_CALL(*worker_, start(_, _, _)).InSequence(notify_before_start);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooUpdateYaml))));
+  EXPECT_TRUE(manager_->isWorkerStarted());
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, OverrideListener) {
   InSequence s;
 

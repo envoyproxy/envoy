@@ -788,6 +788,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
+  ListenerImplPtr replaced_listener;
 
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
@@ -819,7 +820,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
       new_listener->debugLog("update active listener");
-      *existing_active_listener = std::move(new_listener);
+      replaced_listener = std::exchange(*existing_active_listener, std::move(new_listener));
     }
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
@@ -861,6 +862,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   new_listener_ref.initialize();
+  // Destroying the replaced listener readies its init target, which can finish the server
+  // initialization and start the workers, so it waits until the new listener is set up.
+  replaced_listener.reset();
   return true;
 }
 
