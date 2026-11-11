@@ -24,6 +24,11 @@ static uint64_t g_last_update_id = 0;
 static int g_last_update_status = -1;
 static char g_last_update_cluster_name[256];
 static char g_last_update_error_details[1024];
+static size_t g_listener_update_done_count = 0;
+static uint64_t g_last_listener_update_id = 0;
+static int g_last_listener_update_status = -1;
+static char g_last_listener_update_name[256];
+static char g_last_listener_update_error_details[1024];
 static size_t g_http_callout_done_count = 0;
 static int g_last_http_callout_result = -1;
 
@@ -67,6 +72,11 @@ envoy_dynamic_module_on_bootstrap_extension_config_new(
   g_last_update_status = -1;
   g_last_update_cluster_name[0] = '\0';
   g_last_update_error_details[0] = '\0';
+  g_listener_update_done_count = 0;
+  g_last_listener_update_id = 0;
+  g_last_listener_update_status = -1;
+  g_last_listener_update_name[0] = '\0';
+  g_last_listener_update_error_details[0] = '\0';
   g_http_callout_done_count = 0;
   g_last_http_callout_result = -1;
   if (!g_run_on_all_workers_at_startup) {
@@ -268,6 +278,22 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
   copyBuffer(g_last_update_error_details, sizeof(g_last_update_error_details), error_details);
 }
 
+void envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t update_id, envoy_dynamic_module_type_envoy_buffer listener_name,
+    envoy_dynamic_module_type_bootstrap_listener_writer_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  g_listener_update_done_count++;
+  g_last_listener_update_id = update_id;
+  g_last_listener_update_status = (int)status;
+  copyBuffer(g_last_listener_update_name, sizeof(g_last_listener_update_name), listener_name);
+  copyBuffer(g_last_listener_update_error_details, sizeof(g_last_listener_update_error_details),
+             error_details);
+}
+
 size_t bootstrap_optional_hooks_test_worker_event_count(void) {
   return atomic_load(&g_worker_event_count);
 }
@@ -292,6 +318,26 @@ const char* bootstrap_optional_hooks_test_last_update_cluster_name(void) {
 
 const char* bootstrap_optional_hooks_test_last_update_error_details(void) {
   return g_last_update_error_details;
+}
+
+size_t bootstrap_optional_hooks_test_listener_update_done_count(void) {
+  return g_listener_update_done_count;
+}
+
+uint64_t bootstrap_optional_hooks_test_last_listener_update_id(void) {
+  return g_last_listener_update_id;
+}
+
+int bootstrap_optional_hooks_test_last_listener_update_status(void) {
+  return g_last_listener_update_status;
+}
+
+const char* bootstrap_optional_hooks_test_last_listener_update_name(void) {
+  return g_last_listener_update_name;
+}
+
+const char* bootstrap_optional_hooks_test_last_listener_update_error_details(void) {
+  return g_last_listener_update_error_details;
 }
 
 size_t bootstrap_optional_hooks_test_http_callout_done_count(void) {

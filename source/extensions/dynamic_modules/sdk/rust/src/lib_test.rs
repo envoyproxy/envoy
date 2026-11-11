@@ -3496,6 +3496,45 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writ
   abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  // Differs from the cluster writer stub, so that the test notices crossed wires.
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  listener_name: abi::envoy_dynamic_module_type_module_buffer,
+  listener: abi::envoy_dynamic_module_type_module_buffer,
+  version_info: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out =
+      (listener_name.length * 10000 + listener.length * 100 + version_info.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  listener_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result {
+  // Finds only the listener that the test removes, so that the test checks the name.
+  let listener_name =
+    unsafe { std::slice::from_raw_parts(listener_name.ptr as *const u8, listener_name.length) };
+  if listener_name == b"writer.listener" {
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::Success
+  } else {
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::NotFound
+  }
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -8452,7 +8491,7 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
 }
 
 #[test]
-fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
+fn test_bootstrap_extension_worker_and_writer_default_noop() {
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
     fn new_bootstrap_extension(
@@ -8489,7 +8528,7 @@ fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
     length: cluster_name.len(),
   };
 
-  // Calling the worker and cluster writer hooks with default implementations should not panic.
+  // Calling the worker and writer hooks with default implementations should not panic.
   envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 1);
   envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
     std::ptr::null_mut(),
@@ -8507,6 +8546,17 @@ fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
       length: 0,
     },
   );
+  envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
 
   // Clean up.
   unsafe {
@@ -8515,7 +8565,7 @@ fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
 }
 
 #[test]
-fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
+fn test_bootstrap_extension_worker_event_and_writer_hooks() {
   use std::sync::atomic::{AtomicU64, Ordering};
   static WORKER_EVENT_ID: AtomicU64 = AtomicU64::new(0);
   static DONE_EVENT_ID: AtomicU64 = AtomicU64::new(0);
@@ -8526,6 +8576,14 @@ fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
     String,
   );
   static UPDATE_DONE: std::sync::Mutex<Option<UpdateDone>> = std::sync::Mutex::new(None);
+  type ListenerUpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+    String,
+  );
+  static LISTENER_UPDATE_DONE: std::sync::Mutex<Option<ListenerUpdateDone>> =
+    std::sync::Mutex::new(None);
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -8563,6 +8621,22 @@ fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
       *UPDATE_DONE.lock().unwrap() = Some((
         update_id,
         cluster_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+
+    fn on_listener_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      listener_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+      error_details: &str,
+    ) {
+      *LISTENER_UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        listener_name.to_string(),
         status,
         error_details.to_string(),
       ));
@@ -8625,13 +8699,39 @@ fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
     ))
   );
 
+  let listener_name = "writer.listener";
+  let listener_error_details = "listener writer.listener failed to listen";
+  envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    6,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: listener_name.as_ptr() as *const _,
+      length: listener_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: listener_error_details.as_ptr() as *const _,
+      length: listener_error_details.len(),
+    },
+  );
+  assert_eq!(
+    *LISTENER_UPDATE_DONE.lock().unwrap(),
+    Some((
+      6,
+      "writer.listener".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status::Failed,
+      "listener writer.listener failed to listen".to_string(),
+    ))
+  );
+
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
 }
 
 #[test]
-fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
+fn test_bootstrap_extension_config_run_on_all_workers_and_writers() {
   let envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
   assert!(envoy_config.run_on_all_workers(7));
   assert!(!envoy_config.run_on_all_workers(8));
@@ -8648,6 +8748,20 @@ fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
   assert_eq!(
     envoy_config.cluster_writer_remove("writer.a"),
     abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+  );
+
+  // The stub encodes the lengths of the name, the listener and the version in the update ID.
+  assert!(!envoy_config.enable_listener_writer());
+  assert_eq!(
+    envoy_config.listener_writer_add_or_update("writer.listener", b"xyz", "v1"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result::Success,
+      150302
+    )
+  );
+  assert_eq!(
+    envoy_config.listener_writer_remove("writer.listener"),
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::Success
   );
 }
 

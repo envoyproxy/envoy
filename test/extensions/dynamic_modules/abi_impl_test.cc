@@ -679,6 +679,14 @@ WEAK_STUB(BootstrapExtensionClusterWriterAddOrUpdate,
 WEAK_STUB(BootstrapExtensionClusterWriterRemove,
           envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(nullptr,
                                                                                   {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionEnableListenerWriter,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterAddOrUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterRemove,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(nullptr,
+                                                                                   {nullptr, 0}))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(

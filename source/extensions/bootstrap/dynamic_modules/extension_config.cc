@@ -53,6 +53,10 @@ void DynamicModuleBootstrapExtensionConfig::signalInitComplete() {
   init_target_->ready();
   ENVOY_LOG(debug, "dynamic modules: init target signaled complete, Envoy may start accepting "
                    "traffic");
+  init_complete_signaled_ = true;
+  if (listener_writer_ != nullptr) {
+    listener_writer_->onModuleInitialized();
+  }
 }
 
 void DynamicModuleBootstrapExtensionConfig::postSignalInitComplete() {
@@ -285,10 +289,45 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterWriter() {
   return true;
 }
 
+bool DynamicModuleBootstrapExtensionConfig::enableListenerWriter() {
+  if (listener_writer_ != nullptr || shutdown_started_) {
+    return false;
+  }
+  DynamicModuleListenerWriter::UpdateDoneCallback update_done;
+  if (on_bootstrap_extension_listener_writer_update_done_ != nullptr) {
+    update_done = [this](uint64_t update_id, absl::string_view listener_name,
+                         envoy_dynamic_module_type_bootstrap_listener_writer_update_status status,
+                         absl::string_view error_details) {
+      on_bootstrap_extension_listener_writer_update_done_(
+          thisAsVoidPtr(), in_module_config_, update_id,
+          {listener_name.data(), listener_name.size()}, status,
+          {error_details.data(), error_details.size()});
+    };
+  }
+  listener_writer_ = std::make_unique<DynamicModuleListenerWriter>(extension_name_, context_,
+                                                                   std::move(update_done));
+  if (listener_manager_ != nullptr) {
+    listener_writer_->onServerInitialized(*listener_manager_);
+  }
+  if (init_complete_signaled_) {
+    listener_writer_->onModuleInitialized();
+  }
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onPostInit() {
+  if (listener_writer_ != nullptr) {
+    listener_writer_->onPostInit();
+  }
+}
+
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
+  }
+  if (listener_writer_ != nullptr) {
+    listener_writer_->onShutdown();
   }
 }
 
@@ -556,8 +595,8 @@ newDynamicModuleBootstrapExtensionConfig(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
 
-  // The module constructor can enable the cluster writer, which captures its done hook, so the
-  // optional hooks are resolved first.
+  // The module constructor can enable the writers, which capture their done hooks, so the optional
+  // hooks are resolved first.
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");
@@ -573,6 +612,11 @@ newDynamicModuleBootstrapExtensionConfig(
           "envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done");
   config->on_bootstrap_extension_cluster_writer_update_done_ =
       on_cluster_writer_update_done.ok() ? on_cluster_writer_update_done.value() : nullptr;
+  auto on_listener_writer_update_done =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionListenerWriterUpdateDoneType>(
+          "envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done");
+  config->on_bootstrap_extension_listener_writer_update_done_ =
+      on_listener_writer_update_done.ok() ? on_listener_writer_update_done.value() : nullptr;
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call
