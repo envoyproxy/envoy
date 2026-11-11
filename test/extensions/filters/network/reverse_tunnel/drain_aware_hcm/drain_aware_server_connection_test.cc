@@ -56,13 +56,19 @@ protected:
   }
 
   static DrainDelayConfig defaultConfig() {
-    return DrainDelayConfig{std::chrono::milliseconds(0), std::chrono::milliseconds(0),
-                            std::chrono::milliseconds(5000)};
+    return DrainDelayConfig{
+        .shutdown_notice_delay = std::chrono::milliseconds(0),
+        .metadata_delay = std::chrono::milliseconds(0),
+        .goaway_delay = std::chrono::milliseconds(5000),
+    };
   }
 
   static DrainDelayConfig delayConfig() {
-    return DrainDelayConfig{std::chrono::milliseconds(3000), std::chrono::milliseconds(2000),
-                            std::chrono::milliseconds(5000)};
+    return DrainDelayConfig{
+        .shutdown_notice_delay = std::chrono::milliseconds(3000),
+        .metadata_delay = std::chrono::milliseconds(2000),
+        .goaway_delay = std::chrono::milliseconds(5000),
+    };
   }
 
   // Delivers a connection-level drain notification to the wrapper's registered callbacks.
@@ -277,7 +283,9 @@ TEST_F(DrainAwareServerConnectionTest, DrainSendsMetadataThenShutdownNoticeThenG
   EXPECT_CALL(*inner_ptr_, encodeMetadata(_))
       .WillOnce([](const Http::MetadataMapVector& metadata_map_vector) {
         ASSERT_EQ(1, metadata_map_vector.size());
-        EXPECT_EQ("true", (*metadata_map_vector[0])["envoy.reverse_tunnel.drain"]);
+        EXPECT_EQ(Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_VALUE,
+                  (*metadata_map_vector[0])[std::string(
+                      Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY)]);
       });
   metadata_timer_->invokeCallback();
 
@@ -312,9 +320,11 @@ TEST_F(DrainAwareServerConnectionTest, ShutdownNoticeWithMetadataArmsTimers) {
 
 // Only the metadata delay is set: the metadata frame is sent and the soft GOAWAY is skipped.
 TEST_F(DrainAwareServerConnectionTest, MetadataOnlySkipsShutdownNotice) {
-  auto conn = makeConnection([]() {}, DrainDelayConfig{std::chrono::milliseconds(0),
-                                                       std::chrono::milliseconds(2000),
-                                                       std::chrono::milliseconds(5000)});
+  auto conn = makeConnection([]() {}, DrainDelayConfig{
+                                          .shutdown_notice_delay = std::chrono::milliseconds(0),
+                                          .metadata_delay = std::chrono::milliseconds(2000),
+                                          .goaway_delay = std::chrono::milliseconds(5000),
+                                      });
   EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
   EXPECT_CALL(*metadata_timer_, enableTimer(std::chrono::milliseconds(2000), _));
   conn->shutdownNotice();

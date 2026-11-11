@@ -63,14 +63,29 @@ private:
   bool peer_goaway_handled_{false};
 };
 
+// Per-connection drain schedule. Every delay is an offset from the start of the drain. A
+// metadata_delay or shutdown_notice_delay of 0 skips that step, and both steps only run when the
+// connection has an on_local_drain callback (a reverse tunnel with enable_drain_with_goaway). The
+// METADATA frame is sent before the shutdown notice, and both before the final GOAWAY; config
+// validation enforces that order. Build it with designated initializers so the fields cannot be
+// swapped silently.
 struct DrainDelayConfig {
+  // Soft GOAWAY (shutdown notice) telling the peer to stop opening new streams on this tunnel.
   std::chrono::milliseconds shutdown_notice_delay;
+  // METADATA frame carrying the drain marker to the peer.
   std::chrono::milliseconds metadata_delay;
+  // Final GOAWAY. The jittered hcm_config.drain_timeout, drawn when the connection is created.
+  // Only used when this wrapper detects a listener drain; when the HCM starts the drain itself
+  // (e.g. max_connection_duration), the HCM's own drain timer sends the final GOAWAY.
   std::chrono::milliseconds goaway_delay;
 };
 
 // Wraps an Http::ServerConnection and drains it when the owning listener drains: a shutdown notice
-// first, then a GOAWAY after drain_timeout. Drain is detected on a short timer.
+// first, then a GOAWAY after drain_timeout. Drain is detected on a short timer. When the runtime
+// feature "envoy.reloadable_features.use_connection_event_drain" is enabled, the drain decision is
+// derived from the connection-level drain event delivered via Network::Connection::onDrain();
+// otherwise it falls back to polling DrainDecision::drainClose() (which avoids calling
+// addOnDrainCloseCb(), intentionally unsupported on PerFilterChainFactoryContextImpl).
 class DrainAwareServerConnection : public Http::ServerConnection,
                                    public Network::ConnectionCallbacks,
                                    public Logger::Loggable<Logger::Id::filter> {
@@ -129,6 +144,12 @@ public:
     }
     local_drain_notified_ = true;
 
+    // The HCM calls this at the start of a graceful drain (e.g. max_connection_duration). For
+    // reverse tunnels (on_local_drain_ set) we use it as the "tunnel draining" signal to dial a
+    // replacement now, but SUPPRESS the immediate soft GOAWAY so the peer keeps using this tunnel
+    // during the grace window; it is sent later at shutdown_notice_delay, if configured. The final
+    // GOAWAY then migrates new requests to the established replacement while in-flight requests
+    // finish here.
     if (!on_local_drain_) {
       return inner_->shutdownNotice();
     }
@@ -184,8 +205,9 @@ private:
 
   void sendDrainMetadata() {
     Http::MetadataMap metadata_map;
-    metadata_map.emplace(Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY,
-                         "true");
+    metadata_map.emplace(
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY,
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_VALUE);
     Http::MetadataMapVector metadata_map_vector;
     metadata_map_vector.push_back(std::make_unique<Http::MetadataMap>(std::move(metadata_map)));
 

@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -72,7 +71,9 @@ public:
               metadata_map_ptr->size());
     auto it = metadata_map_ptr->find(
         Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY);
-    if (it != metadata_map_ptr->end() && it->second == metadata_val) {
+    if (it != metadata_map_ptr->end() &&
+        it->second ==
+            Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_VALUE) {
       notifyReporter();
       metadata_map_ptr->erase(it);
     }
@@ -84,7 +85,6 @@ private:
   Envoy::Http::ConnectionCallbacks& inner_;
   int fd_;
   bool notified_{false};
-  constexpr static absl::string_view metadata_val{"true"};
 };
 
 /**

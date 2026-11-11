@@ -33,7 +33,6 @@ envoy_cc_extension(
         "//source/extensions/filters/network/http_connection_manager:config",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
     ],

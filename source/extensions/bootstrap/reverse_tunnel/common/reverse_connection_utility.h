@@ -28,6 +28,7 @@ public:
       "/reverse_connections/request";
   static constexpr absl::string_view TENANT_SCOPE_DELIMITER = ":";
   static constexpr absl::string_view DRAIN_METADATA_KEY = "envoy.reverse_tunnel.drain";
+  static constexpr absl::string_view DRAIN_METADATA_VALUE = "true";
 
   // Upgrade token advertised when the handshake is negotiated as an HTTP/1.1 Upgrade.
   // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
