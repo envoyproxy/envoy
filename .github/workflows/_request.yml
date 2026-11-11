@@ -109,18 +109,24 @@ jobs:
           summary: ${{ steps.summary.outputs.summary }}
         input-format: yaml
         filter: |
-          def check_build_jobs($run; $check; $single):
-            [$run | to_entries[] | select(.key | test("^check-build-\($check)-[a-z0-9-]+$"))] as $flags
-            | if ($flags | length) == 0 then
-                [$single]
+          # `$legacy` is the jobs of a branch that predates the check's targets. Options in
+          # `$ignore` are flags such a branch can already have, so do not show it has the targets.
+          def check_build_jobs($run; $check; $name; $legacy; $ignore):
+            [$run
+             | to_entries[]
+             | select(.key | test("^check-build-\($check)-[a-z0-9-]+$"))
+             | .option = (.key | ltrimstr("check-build-\($check)-"))] as $flags
+            | if ($flags | map(select(.option as $option | any($ignore[]; . == $option) | not)) | length) == 0 then
+                $legacy
               else
                 [$flags[]
                  | select(.value)
-                 | (.key | ltrimstr("check-build-\($check)-")) as $option
-                 | {target: "\($check).\($option | gsub("-"; "_"))",
-                    name: "\($single.name) (\($option | gsub("-"; " ")))"}]
+                 | {target: "\($check).\(.option | gsub("-"; "_"))",
+                    name: "\($name) (\(.option | gsub("-"; " ")))"}]
                 | sort_by(.target)
               end;
+          def check_build_jobs($run; $check; $single):
+            check_build_jobs($run; $check; $single.name; [$single]; []);
           .title as $title
           | .env.config.envoy.icon as $icon
           | .link as $link
@@ -135,6 +141,24 @@ jobs:
                 .run; "cto";
                 {target: "compile_time_options", name: "Compile time options", "docker-ci": true})
               + check_build_jobs(.run; "gcc"; {target: "gcc", name: "GCC"}))
+          # Check/build (OpenSSL) is set the same way with `check-build-openssl-*` flags.
+          #
+          # Branches that predate the `openssl.*` targets have the `check-build-openssl`,
+          # `check-build-openssl-presubmit` and `check-build-openssl-asan` flags, each with a job for
+          # either pull requests or post-submit. Those jobs, and the options ignored for them, can
+          # be removed once release/v1.40 and any branch cut before the `openssl.*` targets landed
+          # are no longer supported; a branch with no flags then needs an empty list.
+          | ((.request.pr // "" | tostring) != "") as $pr
+          | .config.ci["check-build-openssl"] = check_build_jobs(
+              .run; "openssl"; "OpenSSL";
+              [{target: "openssl", name: "OpenSSL",
+                run: (.run["check-build-openssl"] and ($pr | not))},
+               {target: "openssl.presubmit", name: "OpenSSL (presubmit)",
+                run: (.run["check-build-openssl-presubmit"] and $pr)},
+               {target: "openssl.asan", name: "OpenSSL ASAN",
+                run: (.run["check-build-openssl-asan"] and ($pr | not))}]
+              | map(select(.run) | del(.run));
+              ["asan", "presubmit"])
           | .summary = {
               $summary,
               $title,

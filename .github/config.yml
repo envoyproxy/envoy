@@ -43,9 +43,10 @@ checks:
     - check-build-execution-context
     - check-build-gcc-build
     - check-build-gcc-test
-    - check-build-openssl
-    - check-build-openssl-presubmit
     - check-build-openssl-asan
+    - check-build-openssl-build
+    - check-build-openssl-test
+    - check-build-openssl-test-affected
     - check-coverage
     - check-runtime
     - check-san
@@ -455,10 +456,11 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  check-build-openssl:
-    paths:
-    - "**/*"
-  check-build-openssl-presubmit:
+  # A flag with no paths to match is post-submit only: nothing selects it for a pull request, and
+  # a push runs it whatever changed.
+  check-build-openssl-asan:
+    paths: []
+  check-build-openssl-build:
     paths:
     - compat/openssl/**/*
     - source/common/tls/**/*
@@ -473,13 +475,24 @@ run:
     - .bazelrc
     - ci/do_ci.sh
     - ci/bazel_fun.sh
-  check-build-openssl-asan:
+  check-build-openssl-test:
+    paths: []
+  check-build-openssl-test-affected:
     paths:
     - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
     - bazel/**/*
     - .bazelrc
     - ci/do_ci.sh
     - ci/bazel_fun.sh
+    push: never
   check-coverage:
     paths:
     - "**/*"
