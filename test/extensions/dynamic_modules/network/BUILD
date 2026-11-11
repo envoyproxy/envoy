@@ -27,7 +27,7 @@ envoy_extension_cc_dyn_module_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.network.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
@@ -53,7 +53,7 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     extension_names = ["envoy.filters.network.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/network/dynamic_modules:config",
@@ -73,7 +73,7 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
     ],
     extension_names = ["envoy.filters.network.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -101,7 +101,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.network.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
