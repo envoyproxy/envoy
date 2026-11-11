@@ -61,17 +61,15 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = Config::getResourceName<envoy::config::listener::v3::Listener>();
   if (lds_resources_locator == nullptr) {
-    subscription_ =
-        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
-                                  lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-                                  resource_decoder_, {}),
-                              Config::SubscriptionPtr);
+    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                              lds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ =
-        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().collectionSubscriptionFromUrl(
-                                  *lds_resources_locator, lds_config, resource_name, *scope_, *this,
-                                  resource_decoder_),
-                              Config::SubscriptionPtr);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }
