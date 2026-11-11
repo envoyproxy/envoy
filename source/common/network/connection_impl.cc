@@ -833,8 +833,8 @@ void ConnectionImpl::onReadReady() {
   // EOF so transport sockets (RawBufferSocket, SslSocket) flush all payload bytes with
   // end_stream=true above. Once read_end_stream_ is reached, close the connection normally rather
   // than leaving a half-closed survivor leaking until idle timeout.
-  const bool peer_fully_closed = enable_half_close_ && read_end_stream_ && socket_->isOpen() &&
-                                 ioHandle().wasPeerFullyClosed();
+  const bool peer_fully_closed =
+      read_end_stream_ && socket_->isOpen() && ioHandle().wasPeerFullyClosed();
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close || bothSidesHalfClosed() || peer_fully_closed) {
