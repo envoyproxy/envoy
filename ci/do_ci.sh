@@ -949,21 +949,25 @@ case $CI_TARGET in
     gcc|gcc.build|gcc.test)
         BAZEL_BUILD_OPTIONS+=("--config=gcc")
         echo "gcc toolchain configured: gcc"
+        # Nothing built here is published, so the server and tools binaries are built in one
+        # invocation, with the tests if there are any, and are not downloaded.
+        GCC_BUILD_TARGETS=()
+        if [[ "$CI_TARGET" != "gcc.test" ]]; then
+            GCC_BUILD_TARGETS=(
+                "${ENVOY_BUILD_TARGET}"
+                //test/tools/schema_validator:schema_validator_tool
+                //test/tools/router_check:router_check_tool
+                //test/tools/config_load_check:config_load_check_tool
+                @su-exec)
+        fi
         if [[ "$CI_TARGET" == "gcc.build" ]]; then
-            echo "bazel fastbuild build with gcc..."
-            bazel_envoy_binary_build fastbuild
+            echo "Building ${GCC_BUILD_TARGETS[*]}"
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+                -c fastbuild \
+                --remote_download_minimal \
+                -- "${GCC_BUILD_TARGETS[@]}"
+            collect_build_profile build
         else
-            # Nothing built here is published, so the server and tools binaries are built in the
-            # test invocation: one analysis, and no binary downloads.
-            GCC_BUILD_TARGETS=()
-            if [[ "$CI_TARGET" != "gcc.test" ]]; then
-                GCC_BUILD_TARGETS=(
-                    "${ENVOY_BUILD_TARGET}"
-                    //test/tools/schema_validator:schema_validator_tool
-                    //test/tools/router_check:router_check_tool
-                    //test/tools/config_load_check:config_load_check_tool
-                    @su-exec)
-            fi
             echo "Building ${GCC_BUILD_TARGETS[*]} and testing ${TEST_TARGETS[*]}"
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
