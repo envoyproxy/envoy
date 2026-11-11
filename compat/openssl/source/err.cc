@@ -96,18 +96,20 @@ extern "C" uint32_t ERR_peek_error_line_data(const char** file, int* line, const
 extern "C" uint32_t ERR_peek_last_error(void) { return o2b(ossl.ossl_ERR_peek_last_error()); }
 
 extern "C" const char* ERR_reason_error_string(uint32_t packed_error) {
+  // clang-format off
   // Handle system library errors like BoringSSL does
   // For system errors, return strerror(errno) like BoringSSL does
   if (ossl_ERR_SYSTEM_ERROR(packed_error)) {
     uint32_t reason = ossl_ERR_GET_REASON(packed_error);
     // For some reason BoringSSL only calls strerror() for errno < 127, and just
     // returns the string "unknown error" for errno >= 127. This excludes some
-    // valid errno values (on Linux at least). We delibrately differ from
+    // valid errno values (on Linux at least). We deliberately differ from
     // BoringSSL here, and up the limit to 256 to ensure we don't hide any valid
     // error strings.
     if (reason > 0 && reason < 256) {
       return strerror(reason);
     }
+    // clang-format on
     return "unknown error";
   }
 

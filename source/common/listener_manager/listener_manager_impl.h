@@ -439,6 +439,7 @@ private:
   void notifyListenerUpdateCallbacks(absl::string_view listener_name,
                                      Network::ListenerConfig& listener_config);
   void notifyListenerRemovalCallbacks(const std::string& listener_name);
+  void notifyListenerListenFailureCallbacks(absl::string_view listener_name, bool removed);
 
   absl::Status validateNoDuplicatedAddress(const std::string& name,
                                            const ListenerImpl& listener) const;

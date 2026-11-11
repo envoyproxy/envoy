@@ -1209,6 +1209,11 @@ public:
     return value.toStringView();
   }
 
+  std::unique_ptr<LoadShedPoint> getLoadShedPoint(std::string_view name) override {
+    return newLoadShedPoint(envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+        host_config_ptr_, envoy_dynamic_module_type_module_buffer{name.data(), name.size()}));
+  }
+
   bool logEnabled(LogLevel level) override {
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));

@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_base_test",
     srcs = ["conn_pool_base_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/conn_pool:conn_pool_base_lib",
         "//source/common/event:dispatcher_lib",

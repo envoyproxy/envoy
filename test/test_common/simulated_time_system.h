@@ -101,7 +101,10 @@ private:
 
   void maybeLogTimerWarning();
 
+<<<<<<< HEAD
   Dispatcher* io_dispatcher_{nullptr};
+=======
+>>>>>>> main
   RealTimeSource real_time_source_; // Used to initialize system_time_.
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);

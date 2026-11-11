@@ -746,4 +746,12 @@ type HttpFilterConfigHandle interface {
 	// The buffer aliases Envoy memory and must not be retained across events. Copy it if it needs
 	// to outlive the current callback.
 	GetGenericSecret(id GenericSecretID) (UnsafeEnvoyBuffer, bool)
+
+	// GetLoadShedPoint returns a load shed point of the overload manager by name, to shed load at
+	// the plugin's own point of the request processing. It returns nil if the overload manager has
+	// no load shed point with the name, the filter is an upstream filter, or the listener of its
+	// filter chain bypasses the overload manager. Filters that the route configuration creates,
+	// such as those of a per-route filter chain, and filters of a filter chain that FCDS delivers
+	// do not see the bypass and get the load shed point.
+	GetLoadShedPoint(name string) LoadShedPoint
 }

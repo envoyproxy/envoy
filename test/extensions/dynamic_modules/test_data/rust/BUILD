@@ -18,6 +18,7 @@ package(default_visibility = [
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
+    "//test/extensions/resource_monitors/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
@@ -112,3 +113,5 @@ test_program(name = "header_formatter_integration_test")
 test_program(name = "config_validator_test")
 
 test_program(name = "tls_certificate_selector_integration_test")
+
+test_program(name = "resource_monitor_test")
