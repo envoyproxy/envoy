@@ -726,6 +726,7 @@ public:
   bool disableShadowHostSuffixAppend() const override { return false; }
   const Http::HeaderEvaluator& headerEvaluator() const override { return evaluator_; }
   absl::string_view hostRewriteLiteral() const override { return ""; }
+  const Router::ShadowPolicyStatsSharedPtr& stats() const override { return stats_; }
 
 private:
   class NoopEvaluator : public Http::HeaderEvaluator {
@@ -738,6 +739,7 @@ private:
   const Http::LowerCaseString cluster_header_;
   const std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
+  Router::ShadowPolicyStatsSharedPtr stats_;
   NoopEvaluator evaluator_;
 };
 
