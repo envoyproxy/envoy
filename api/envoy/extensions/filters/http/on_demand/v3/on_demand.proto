@@ -26,11 +26,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration of on-demand CDS.
 message OnDemandCds {
-  // Discovery of request mirror (shadow) clusters. Only policies with a static :ref:`cluster
-  // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster>` are discovered,
-  // not ones using a :ref:`cluster_header
-  // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>`, whose
-  // name is client controlled.
+  // Discovery of request mirror (shadow) clusters, named by the :ref:`cluster
+  // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster>` or the
+  // :ref:`cluster_header
+  // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>` of the
+  // mirror policy, like the request's own cluster.
   message ShadowClusterDiscovery {
   }
 

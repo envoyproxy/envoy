@@ -889,11 +889,29 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, PoliciesThatAreSampledOutAreNotDiscove
   EXPECT_THAT(requested_, ElementsAre("sampled-in"));
 }
 
-TEST_F(OnDemandFilterShadowDiscoveryTest, PoliciesSelectingTheClusterWithAHeaderAreIgnored) {
+TEST_F(OnDemandFilterShadowDiscoveryTest, ClusterSelectedWithAHeaderIsDiscovered) {
   addRoutePolicy("", "x-shadow-cluster");
-  headers_.addCopy("x-shadow-cluster", "client-chosen");
+  headers_.addCopy("x-shadow-cluster", "header-shadow");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("header-shadow"));
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, MissingOrEmptyClusterHeaderIsSkipped) {
+  addRoutePolicy("", "x-missing");
+  addRoutePolicy("", "x-empty");
+  // A policy with neither a cluster nor a header selects nothing.
+  addRoutePolicy("", "");
+  headers_.addCopy("x-empty", "");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
   EXPECT_TRUE(requested_.empty());
+}
+
+TEST_F(OnDemandFilterShadowDiscoveryTest, StaticAndHeaderPoliciesNamingTheSameClusterRequestOnce) {
+  addRoutePolicy("shadow");
+  addRoutePolicy("", "x-shadow-cluster");
+  headers_.addCopy("x-shadow-cluster", "shadow");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  EXPECT_THAT(requested_, ElementsAre("shadow"));
 }
 
 TEST_F(OnDemandFilterShadowDiscoveryTest, ConnectRequestsAreNotDiscovered) {

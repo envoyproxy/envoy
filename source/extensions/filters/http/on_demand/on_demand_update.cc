@@ -286,15 +286,22 @@ void OnDemandRouteUpdate::handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds,
 
   absl::InlinedVector<absl::string_view, 2> requested;
   for (const auto& policy : *policies) {
-    // cluster_header policies are skipped: the name is client controlled.
-    const absl::string_view cluster_name = policy->cluster();
-    if (cluster_name.empty()) {
-      continue;
-    }
     // Same sampling as the router.
     if (!options.runtime_.snapshot().featureEnabled(policy->runtimeKey(), policy->defaultValue(),
                                                     callbacks_->streamId())) {
       continue;
+    }
+    absl::string_view cluster_name = policy->cluster();
+    if (cluster_name.empty()) {
+      // Selected by a header, as in the router.
+      if (policy->clusterHeader().get().empty()) {
+        continue;
+      }
+      const auto header = headers->get(policy->clusterHeader());
+      if (header.empty() || header[0]->value().empty()) {
+        continue;
+      }
+      cluster_name = header[0]->value().getStringView();
     }
     if (std::find(requested.begin(), requested.end(), cluster_name) != requested.end() ||
         options.cluster_manager_.getThreadLocalCluster(cluster_name) != nullptr) {

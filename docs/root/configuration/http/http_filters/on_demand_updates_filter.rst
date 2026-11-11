@@ -56,8 +56,9 @@ statistics below, apart from the ones of the cluster of the request, and they ar
 
 Some limits apply:
 
-* Only mirror policies with a static ``cluster`` are discovered. Policies that select the cluster with a ``cluster_header``
-  are not, because that name is controlled by the client.
+* A mirror policy that selects its cluster with a ``cluster_header`` is discovered from the header as the filter saw it. As for
+  a route with a ``cluster_header``, the name comes from the request. A filter that changes the header after this one is not
+  accounted for.
 * The settings are taken from the same configuration as the discovery of the cluster of the request, so a
   :ref:`per route config <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>` replaces the filter's one
   entirely, and has to set ``shadow_cluster_discovery`` itself to keep discovering the mirror clusters of its routes.
