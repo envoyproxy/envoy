@@ -6103,7 +6103,7 @@ TEST_F(HttpConnectionManagerImplTest, InitialVhdsWaitHonorsAlternateVhostHeader)
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
-  // Non-empty alternate vhost header lowercases and holds the stream without dispatching filters.
+  // Non-empty alternate vhost header lower-cases and holds the stream without dispatching filters.
   Http::RouteConfigUpdatedCallbackSharedPtr captured_vhds_cb;
   EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("custom.lyft.com", _, _))
       .WillOnce(

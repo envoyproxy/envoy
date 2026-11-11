@@ -726,6 +726,7 @@ public:
               (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& version_info));
+  MOCK_METHOD(void, onVhdsFailure, ());
 };
 
 class MockScopedConfig : public ScopedConfig {
