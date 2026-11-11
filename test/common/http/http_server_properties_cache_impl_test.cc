@@ -69,6 +69,15 @@ public:
   const MonotonicTime expiration1_;
   const MonotonicTime expiration2_;
 
+  const int64_t expiration1_seconds_ =
+      std::chrono::duration_cast<Seconds>(expiration1_.time_since_epoch()).count();
+  const int64_t expiration2_seconds_ =
+      std::chrono::duration_cast<Seconds>(expiration2_.time_since_epoch()).count();
+  const std::string cached_alpn1_ =
+      absl::StrCat("alpn1=\"hostname1:1\"; ma=", expiration1_seconds_);
+  const std::string cached_alpn2_ =
+      absl::StrCat("alpn2=\"hostname2:2\"; ma=", expiration2_seconds_);
+
   const HttpServerPropertiesCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const HttpServerPropertiesCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
   const HttpServerPropertiesCacheImpl::Origin origin3_ = {https_, hostname3_, port2_};
@@ -95,10 +104,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
   EXPECT_EQ(0, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_, false));
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|5|0"), kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
@@ -112,7 +121,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
   EXPECT_EQ(1, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|5|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_, false));
 }
@@ -128,7 +137,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, SetConcurrency) {
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternatives) {
   initialize();
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -139,10 +148,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternatives) {
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
   initialize();
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn2_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols2_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -154,10 +163,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
   initialize();
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname2:2", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+      addOrUpdate("https://hostname2:2", absl::StrCat(cached_alpn2_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin2_, protocols2_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -171,7 +180,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterExpiration) {
   initialize();
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn1_, "|0|0"), kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
   EXPECT_CALL_WHEN_STORE_VALID(remove("https://hostname1:1"));
@@ -183,14 +192,13 @@ TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterExpiration) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterPartialExpiration) {
   initialize();
-  EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1",
-                  "alpn1=\"hostname1:1\"; ma=5,alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate(
+      "https://hostname1:1", absl::StrCat(cached_alpn1_, ",", cached_alpn2_, "|0|0"), kNoTtl));
   std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> both = {protocol1_, protocol2_};
   protocols_->setAlternatives(origin1_, both);
   dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
   EXPECT_CALL_WHEN_STORE_VALID(
-      addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+      addOrUpdate("https://hostname1:1", absl::StrCat(cached_alpn2_, "|0|0"), kNoTtl));
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
@@ -261,7 +269,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, MaxEntries) {
     HttpServerPropertiesCache::AlternateProtocol protocol = {alpn1_, hostname, i, expiration1_};
     std::vector<HttpServerPropertiesCache::AlternateProtocol> protocols = {protocol};
     EXPECT_CALL(*store_, addOrUpdate(absl::StrCat("https://hostname:", i),
-                                     absl::StrCat("alpn1=\"hostname:", i, "\"; ma=5|0|0"), kNoTtl));
+                                     absl::StrCat("alpn1=\"hostname:", i,
+                                                  "\"; ma=", expiration1_seconds_, "|0|0"),
+                                     kNoTtl));
     if (i == max_entries_) {
       EXPECT_CALL(*store_, remove("https://hostname:0"));
     }
@@ -271,8 +281,15 @@ TEST_P(HttpServerPropertiesCacheImplTest, MaxEntries) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromString) {
   initialize();
-  auto testAltSvc = [&](const std::string& original_alt_svc,
-                        const std::string& expected_alt_svc) -> void {
+  auto testAltSvc = [&](int64_t srtt, bool multiple_protocols) -> void {
+    const auto now_seconds = std::chrono::duration_cast<Seconds>(
+                                 dispatcher_.timeSource().monotonicTime().time_since_epoch())
+                                 .count();
+    std::string original_alt_svc = absl::StrCat("h3-29=\":443\"; ma=", now_seconds + 86400);
+    if (multiple_protocols) {
+      absl::StrAppend(&original_alt_svc, ",h3=\":443\"; ma=", now_seconds + 60);
+    }
+    absl::StrAppend(&original_alt_svc, "|", srtt, "|0");
     std::optional<HttpServerPropertiesCacheImpl::OriginData> origin_data =
         HttpServerPropertiesCacheImpl::originDataFromString(original_alt_svc,
                                                             dispatcher_.timeSource(), true);
@@ -299,18 +316,15 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromString) {
 
     std::string alt_svc =
         HttpServerPropertiesCacheImpl::originDataToStringForCache(origin_data.value());
-    EXPECT_EQ(expected_alt_svc, alt_svc);
+    EXPECT_EQ(original_alt_svc, alt_svc);
   };
 
-  testAltSvc("h3-29=\":443\"; ma=86400|0|0", "h3-29=\":443\"; ma=86400|0|0");
-  testAltSvc("h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2|0",
-             "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60|2|0");
+  testAltSvc(0, false);
+  testAltSvc(2, true);
 
-  // Test once more to make sure we handle time advancing correctly.
-  // the absolute expiration time in testAltSvc is expected to be 86400 so add
-  // 60s to the default max age.
+  // Expiration timestamps should round-trip after time advances too.
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(60));
-  testAltSvc("h3-29=\":443\"; ma=86460|2000|0", "h3-29=\":443\"; ma=86460|2000|0");
+  testAltSvc(2000, false);
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, InvalidString) {
@@ -344,7 +358,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
   }
   EXPECT_CALL(*store_, iterate(_)).WillOnce([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
-    fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|2|3");
+    fn("https://hostname1:1", absl::StrCat(cached_alpn1_, "|2|3"));
   });
 
   // When the cache is created, there should be a warning log for the bad cache
@@ -380,7 +394,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
   if (store_ != nullptr) {
     EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
     EXPECT_CALL(*store_, iterate(_)).WillOnce([&](KeyValueStore::ConstIterateCb fn) {
-      fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0");
+      fn("https://hostname1:1", absl::StrCat(cached_alpn1_, "|0|0"));
     });
   }
   initialize();
