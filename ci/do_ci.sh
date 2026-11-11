@@ -361,14 +361,34 @@ function bazel_envoy_api_go_build() {
     done
 }
 
+# Build the server and tools binaries and run the tests with OpenSSL. `openssl.build` and
+# `openssl.test` do one half each.
 function build_openssl() {
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
-    # Append OpenSSL compat tests
-    TEST_TARGETS=("//compat/openssl/test/..." "${TEST_TARGETS[@]}")
-    echo "Bazel fastbuild build with OpenSSL..."
-    bazel_envoy_binary_build fastbuild
-    echo "Testing ${TEST_TARGETS[*]} with OpenSSL..."
-    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+    local -a build_targets=() test_targets=()
+    if [[ "$CI_TARGET" != "openssl.test" ]]; then
+        build_targets=(
+            "${ENVOY_BUILD_TARGET}"
+            //test/tools/schema_validator:schema_validator_tool
+            //test/tools/router_check:router_check_tool
+            //test/tools/config_load_check:config_load_check_tool
+            @su-exec)
+    fi
+    if [[ "$CI_TARGET" != "openssl.build" ]]; then
+        # Append OpenSSL compat tests
+        test_targets=("//compat/openssl/test/..." "${TEST_TARGETS[@]}")
+    fi
+    # Nothing built here is published, so the binaries are built in one invocation, with the tests
+    # if there are any, and are not downloaded.
+    if [[ ${#test_targets[@]} -eq 0 ]]; then
+        echo "Building ${build_targets[*]} with OpenSSL..."
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --remote_download_minimal \
+            -- "${build_targets[@]}"
+    else
+        echo "Building ${build_targets[*]} and testing ${test_targets[*]} with OpenSSL..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --remote_download_minimal \
+            -- "${build_targets[@]}" "${test_targets[@]}"
+    fi
 }
 
 # Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
@@ -392,15 +412,17 @@ function run_bazel_cquery() {
     return "$rc"
 }
 
-function build_openssl_presubmit() {
-    # Lightweight OpenSSL pre-submit (PRs): build the binary to catch link
-    # errors, then run only the tests affected by the PR (via Bazel rdeps). The
-    # full suite still runs on post-submit via the regular "openssl" target.
+function build_openssl_test_affected() {
+    # Lightweight OpenSSL pre-submit (PRs): run only the tests affected by the PR
+    # (via Bazel rdeps). The binary is built by "openssl.build", and the full
+    # suite still runs on post-submit via "openssl.test".
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     BAZEL_QUERY_OPTIONS+=("--config=openssl")
 
-    echo "Bazel fastbuild build with OpenSSL..."
-    bazel_envoy_binary_build fastbuild
+    if [[ "$CI_TARGET" == "openssl.presubmit" ]]; then
+        echo "Bazel fastbuild build with OpenSSL..."
+        bazel_envoy_binary_build fastbuild
+    fi
 
     # Diff against the merge base to see only the PR's own changes; fall back to
     # the target branch itself when history is too shallow for a merge base.
@@ -1004,12 +1026,14 @@ case $CI_TARGET in
                 -- "${TEST_TARGETS[@]}"
         ;;
 
-    openssl)
+    openssl|openssl.build|openssl.test)
         build_openssl
         ;;
 
-    openssl.presubmit)
-        build_openssl_presubmit
+    # `openssl.presubmit` also builds the binary. It is what a pull request is asked for until the
+    # `check-build-openssl-*` run flags are on its target branch, and can be removed once they are.
+    openssl.presubmit|openssl.test_affected)
+        build_openssl_test_affected
         ;;
 
     openssl.asan)

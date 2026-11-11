@@ -21,7 +21,10 @@ concurrency:
 
 
 jobs:
+  # The jobs are set by the `check-build-openssl-*` run flags in the target branch's
+  # .github/config.yml, which _request.yml turns into this matrix.
   build:
+    if: fromJSON(inputs.request).config.ci.check-build-openssl[0] && true || false
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
@@ -29,12 +32,13 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
-    name: ${{ matrix.name || matrix.target }}
+    name: ${{ matrix.name }}
     with:
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      docker-ci: ${{ matrix.docker-ci || false }}
+      # Only respected by branches that predate the `openssl.*` targets.
+      docker-ci: false
       error-match: |
         ERROR
         error:
@@ -43,21 +47,10 @@ jobs:
         FAIL:
       rbe: true
       request: ${{ inputs.request }}
-      catch-errors: ${{ matrix.catch-errors || false }}
-      skip: ${{ matrix.skip != false && true || false }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - target: openssl
-          name: OpenSSL
-          skip: ${{ fromJSON(inputs.request).request.pr != '' || ! fromJSON(inputs.request).run.check-build-openssl }}
-        - target: openssl.presubmit
-          name: OpenSSL (presubmit)
-          skip: ${{ fromJSON(inputs.request).request.pr == '' || ! fromJSON(inputs.request).run.check-build-openssl-presubmit }}
-        - target: openssl.asan
-          name: OpenSSL ASAN
-          skip: ${{ fromJSON(inputs.request).request.pr != '' || ! fromJSON(inputs.request).run.check-build-openssl-asan }}
+        include: ${{ fromJSON(inputs.request).config.ci.check-build-openssl }}
