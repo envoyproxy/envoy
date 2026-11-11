@@ -125,7 +125,7 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(odcds_config.ref(), timeout, 5000));
   std::optional<ShadowDiscoveryOptions> shadow_discovery;
   if (odcds_config->has_shadow_cluster_discovery()) {
-    shadow_discovery = ShadowDiscoveryOptions{cm, runtime};
+    shadow_discovery.emplace(ShadowDiscoveryOptions{cm, runtime});
   }
   return DecodeHeadersBehavior::cdsRds(std::move(odcds), timeout, shadow_discovery);
 }
