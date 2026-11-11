@@ -1592,6 +1592,139 @@ TEST_F(FilterManagerTest, EncodeDataAddedTrailersDeferredWhenStopAllFilterResume
   filter_manager_->destroyFilters();
 }
 
+// Three async filters each hold one frame (StopIterationNoBuffer), the last of them adds trailers,
+// and a fourth filter is paused on headers with StopAllIteration. Whatever order they resume in,
+// the codec must see all data before the trailers and the trailers exactly once. Here the paused
+// filter resumes first (it must defer the trailers: an earlier filter still owns the stream),
+// followed by the filters from upstream to downstream.
+TEST_F(FilterManagerTest, EncodeDataAddedTrailersOrderedAcrossMultipleStoppedFilters) {
+  initialize();
+
+  // Encode order: upstream (D) -> mid_upstream (C) -> mid_downstream (B) -> downstream (A).
+  auto downstream = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+  auto mid_downstream = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+  auto mid_upstream = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+  auto upstream = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+  auto router_filter = std::make_shared<NiceMock<MockStreamDecoderFilter>>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("downstream");
+        createEncoderFilterFactoryCb(downstream)(callbacks);
+        callbacks.setFilterConfigName("mid_downstream");
+        createEncoderFilterFactoryCb(mid_downstream)(callbacks);
+        callbacks.setFilterConfigName("mid_upstream");
+        createEncoderFilterFactoryCb(mid_upstream)(callbacks);
+        callbacks.setFilterConfigName("upstream");
+        createEncoderFilterFactoryCb(upstream)(callbacks);
+        callbacks.setFilterConfigName("router");
+        createDecoderFilterFactoryCb(router_filter)(callbacks);
+        return true;
+      });
+  RequestHeaderMapPtr request_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*request_headers)));
+  filter_manager_->createDownstreamFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(*router_filter, decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  filter_manager_->decodeHeaders(*request_headers, true);
+
+  EXPECT_CALL(*upstream, encodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*mid_upstream, encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*mid_downstream, encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*downstream, encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+  router_filter->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "via_upstream");
+
+  // Each stopping filter drains the frame it holds and replays it on resume.
+  std::string held_by_b, held_by_c, held_by_d;
+  auto hold = [](std::string& held) {
+    return [&held](Buffer::Instance& data, bool) -> FilterDataStatus {
+      held += data.toString();
+      data.drain(data.length());
+      return FilterDataStatus::StopIterationNoBuffer;
+    };
+  };
+
+  // Frame 1: B stops.
+  EXPECT_CALL(*upstream, encodeData(_, false)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*mid_upstream, encodeData(_, false)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*mid_downstream, encodeData(_, false)).WillOnce(hold(held_by_b));
+  Buffer::OwnedImpl frame1("abc");
+  router_filter->callbacks_->encodeData(frame1, false);
+  EXPECT_EQ("abc", held_by_b);
+
+  // Frame 2: C stops.
+  EXPECT_CALL(*upstream, encodeData(_, false)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*mid_upstream, encodeData(_, false)).WillOnce(hold(held_by_c));
+  Buffer::OwnedImpl frame2("def");
+  router_filter->callbacks_->encodeData(frame2, false);
+  EXPECT_EQ("def", held_by_c);
+
+  // Frame 3 (end of stream): D adds trailers and stops.
+  EXPECT_CALL(*upstream, encodeData(_, true))
+      .WillOnce([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        upstream->callbacks_->addEncodedTrailers().addCopy(LowerCaseString("x-trailer"), "val");
+        held_by_d += data.toString();
+        data.drain(data.length());
+        return FilterDataStatus::StopIterationNoBuffer;
+      });
+  EXPECT_CALL(*downstream, encodeData(_, _)).Times(0);
+  EXPECT_CALL(*downstream, encodeTrailers(_)).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, encodeTrailers(_)).Times(0);
+  Buffer::OwnedImpl frame3("ghi");
+  router_filter->callbacks_->encodeData(frame3, true);
+  EXPECT_EQ("ghi", held_by_d);
+
+  // A resumes first: headers go out, nothing else may (D, C and B still own the stream).
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false));
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
+  downstream->callbacks_->continueEncoding();
+  ::testing::Mock::VerifyAndClearExpectations(downstream.get());
+  ::testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
+
+  // D resumes: replays its frame into C, which holds it, then hands the trailers to C.
+  EXPECT_CALL(*mid_upstream, encodeData(_, false)).WillOnce(hold(held_by_c));
+  EXPECT_CALL(*mid_upstream, encodeTrailers(ContainsHeader("x-trailer", "val")))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  Buffer::OwnedImpl replay_d(held_by_d);
+  upstream->callbacks_->injectEncodedDataToFilterChain(replay_d, false);
+  upstream->callbacks_->continueEncoding();
+  EXPECT_EQ("defghi", held_by_c);
+
+  // C resumes: same hand-off to B.
+  EXPECT_CALL(*mid_downstream, encodeData(_, false)).WillOnce(hold(held_by_b));
+  EXPECT_CALL(*mid_downstream, encodeTrailers(ContainsHeader("x-trailer", "val")))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  Buffer::OwnedImpl replay_c(held_by_c);
+  mid_upstream->callbacks_->injectEncodedDataToFilterChain(replay_c, false);
+  mid_upstream->callbacks_->continueEncoding();
+  EXPECT_EQ("abcdefghi", held_by_b);
+
+  // B resumes last: the whole body reaches A and the codec, then the trailers, exactly once.
+  {
+    InSequence s;
+    EXPECT_CALL(*downstream, encodeData(_, false)).WillOnce(Return(FilterDataStatus::Continue));
+    EXPECT_CALL(filter_manager_callbacks_, encodeData(_, false))
+        .WillOnce([](Buffer::Instance& data, bool) { EXPECT_EQ("abcdefghi", data.toString()); });
+    EXPECT_CALL(*downstream, encodeTrailers(ContainsHeader("x-trailer", "val")))
+        .WillOnce(Return(FilterTrailersStatus::Continue));
+    EXPECT_CALL(*downstream, encodeComplete());
+    EXPECT_CALL(filter_manager_callbacks_, encodeTrailers(ContainsHeader("x-trailer", "val")));
+    EXPECT_CALL(filter_manager_callbacks_, endStream());
+  }
+  Buffer::OwnedImpl replay_b(held_by_b);
+  mid_downstream->callbacks_->injectEncodedDataToFilterChain(replay_b, false);
+  mid_downstream->callbacks_->continueEncoding();
+
+  filter_manager_->destroyFilters();
+}
+
 // When a filter paused in encodeHeaders() sits after the stopping filter and resumes
 // asynchronously before it, doTrailers() defers; the stopping filter's later continueEncoding()
 // delivers data and then trailers exactly once.
