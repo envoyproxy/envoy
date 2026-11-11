@@ -9,6 +9,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "extensible_runtime_interface",
+    hdrs = ["extensible_runtime.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "runtime_interface",
     hdrs = ["runtime.h"],
     deps = [
