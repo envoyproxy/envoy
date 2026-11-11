@@ -109,12 +109,32 @@ jobs:
           summary: ${{ steps.summary.outputs.summary }}
         input-format: yaml
         filter: |
+          def check_build_jobs($run; $check; $single):
+            [$run | to_entries[] | select(.key | test("^check-build-\($check)-[a-z0-9-]+$"))] as $flags
+            | if ($flags | length) == 0 then
+                [$single]
+              else
+                [$flags[]
+                 | select(.value)
+                 | (.key | ltrimstr("check-build-\($check)-")) as $option
+                 | {target: "\($check).\($option | gsub("-"; "_"))",
+                    name: "\($single.name) (\($option | gsub("-"; " ")))"}]
+                | sort_by(.target)
+              end;
           .title as $title
           | .env.config.envoy.icon as $icon
           | .link as $link
           | "\($icon) Request ([\($title)](\($link)))" as $linkedTitle
           | .summary as $summary
           | .env
+          # The Check/build jobs a branch sets with run flags in its config: one per
+          # `check-build-<check>-<option>` flag that is set, as the `<check>.<option>` target. A
+          # branch with no flags for a check predates its targets and has the single job it had.
+          | .config.ci["check-build"] = (
+              check_build_jobs(
+                .run; "cto";
+                {target: "compile_time_options", name: "Compile time options", "docker-ci": true})
+              + check_build_jobs(.run; "gcc"; {target: "gcc", name: "GCC"}))
           | .summary = {
               $summary,
               $title,

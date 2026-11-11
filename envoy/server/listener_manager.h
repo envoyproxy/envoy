@@ -57,6 +57,15 @@ public:
    * @param listener_name is the name of the removed listener.
    */
   virtual void onListenerRemoval(const std::string& listener_name) PURE;
+
+  /**
+   * onListenerListenFailure is called when a listener fails to listen or to set a socket option
+   * after listening. It must not add, update or remove listeners.
+   * @param listener_name is the name of the listener.
+   * @param removed is true when onListenerRemoval() follows, and false when the active listener
+   * keeps serving.
+   */
+  virtual void onListenerListenFailure(absl::string_view /*listener_name*/, bool /*removed*/) {}
 };
 
 /**

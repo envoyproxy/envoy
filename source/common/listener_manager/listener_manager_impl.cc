@@ -1093,9 +1093,12 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // when it stops listening on the old listener.
   if (!doFinalPreWorkerListenerInit(listener)) {
     incListenerCreateFailureStat();
+    // The removal frees the listener, so the removal callbacks get a copy of its name.
+    const std::string name = listener.name();
+    notifyListenerListenFailureCallbacks(name, /*removed=*/true);
     // TODO(mattklein123): Technically we don't need to remove the active listener if one exists.
     // The following call will remove both.
-    removeListenerInternal(listener.name(), true);
+    removeListenerInternal(name, true);
     return;
   }
   for (const auto& worker : workers_) {
@@ -1155,6 +1158,7 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
           std::make_unique<DeferredDeleteListener>(std::move(*existing_warming_listener)));
       warming_listeners_.erase(existing_warming_listener);
       updateWarmingActiveGauges();
+      notifyListenerListenFailureCallbacks(listener.name(), /*removed=*/false);
       return;
     }
     removed_socket_factories = exclusiveSocketFactories(**existing_active_listener, listener);
@@ -1423,6 +1427,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
 
     if (!*init_status) {
       incListenerCreateFailureStat();
+      notifyListenerListenFailureCallbacks(listener->name(), /*removed=*/true);
       removeListenerInternal(listener->name(), false);
       continue;
     }
@@ -1761,6 +1766,12 @@ void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listen
 void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {
   notifyListenerCallbacks(
       [&](ListenerUpdateCallbacks* cb) { cb->onListenerRemoval(listener_name); });
+}
+
+void ListenerManagerImpl::notifyListenerListenFailureCallbacks(absl::string_view listener_name,
+                                                               bool removed) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onListenerListenFailure(listener_name, removed); });
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);
