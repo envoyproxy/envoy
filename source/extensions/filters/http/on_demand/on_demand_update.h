@@ -151,8 +151,7 @@ class OnDemandRouteUpdate;
 class DecodeHeadersBehavior;
 using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 
-// Settings for the best-effort discovery of the clusters that a request is mirrored to. The
-// references are owned by the server and outlive the filter.
+// Settings for mirror cluster discovery. The references outlive the filter.
 struct ShadowDiscoveryOptions {
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
@@ -167,8 +166,8 @@ public:
   // The returned object will perform route discovery if it's missing,
   // then after route is successfully discovered, it will proceed to
   // on-demand cluster discovery if the cluster is missing. The latter
-  // discovery will be done with the passed OdCdsApi and timeout. If shadow_discovery is set, it
-  // will also start the non-blocking discovery of the request's mirror clusters.
+  // discovery will be done with the passed OdCdsApi and timeout. If shadow_discovery is set,
+  // mirror clusters are also discovered, without blocking.
   static DecodeHeadersBehaviorPtr
   cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout,
          std::optional<ShadowDiscoveryOptions> shadow_discovery = std::nullopt);
@@ -177,8 +176,8 @@ public:
 
   virtual void decodeHeaders(OnDemandRouteUpdate& filter) PURE;
 
-  // Called when the cluster of the request was discovered on demand, right before the request
-  // resumes. It must not affect the iteration state of the filter.
+  // Called when the request's cluster was discovered, before it resumes. Must not change the
+  // iteration state.
   virtual void onClusterDiscovered(OnDemandRouteUpdate&) {}
 };
 
@@ -239,10 +238,7 @@ public:
   // is missing.
   void handleOnDemandCds(const Router::Route& route, Upstream::OdCdsApiHandle& odcds,
                          std::chrono::milliseconds timeout);
-  // Starts the discovery of the clusters that the request is mirrored to, if they are missing.
-  // This is best-effort and never pauses the request: it does not change the iteration state of
-  // the filter, and its completion callback only updates stats. A mirror to a cluster that is not
-  // available yet is dropped by the router, as it is without discovery.
+  // Best-effort discovery of the request's missing mirror clusters. Never pauses the request.
   void handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds, std::chrono::milliseconds timeout,
                              const ShadowDiscoveryOptions& options);
   // Get the per-route config if it's available, otherwise the
@@ -278,7 +274,7 @@ private:
   void recordVirtualHost();
   void startClusterDiscovery(MonotonicTime start, absl::string_view cluster_name);
   void finishClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);
-  // Completion of a shadow cluster discovery. Only records stats; never resumes the request.
+  // Records stats only; never resumes the request.
   void finishShadowClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);
 
   OnDemandFilterConfigSharedPtr config_;
@@ -298,8 +294,7 @@ private:
   bool cluster_discovery_in_flight_{false};
   MonotonicTime route_discovery_start_;
   MonotonicTime cluster_discovery_start_;
-  // Discoveries of mirror clusters. Tracked apart from the discovery of the request's own
-  // cluster, so that they cannot affect it, its filter state or its stats.
+  // Mirror cluster discoveries, tracked apart from the request's own.
   bool shadow_discovery_started_{false};
   uint32_t shadow_discovery_in_flight_{0};
   std::vector<Upstream::ClusterDiscoveryCallbackHandlePtr> shadow_discovery_handles_;

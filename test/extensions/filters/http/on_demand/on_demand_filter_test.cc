@@ -712,7 +712,7 @@ TEST_F(OnDemandFilterStatsTest, NoDiscoveryNoStats) {
                          DiscoveryState::key()));
 }
 
-// A mirror policy for the tests: names a static cluster, or selects it with a header.
+// Mirror policy for tests: a static cluster, or a header.
 class TestShadowPolicy : public Router::ShadowPolicy {
 public:
   explicit TestShadowPolicy(std::string cluster, std::string cluster_header = "")
@@ -741,20 +741,19 @@ private:
   NoopEvaluator evaluator_;
 };
 
-// Tests of the discovery of the clusters that a request is mirrored to. It must stay best-effort
-// and never delay the request.
+// Mirror cluster discovery must never delay the request.
 class OnDemandFilterShadowDiscoveryTest : public OnDemandFilterTest {
 public:
   static constexpr absl::string_view Prefix = "http.test.on_demand.";
 
   void SetUp() override {
     OnDemandFilterTest::SetUp();
-    // Every cluster is missing, unless a test says otherwise.
+    // All clusters are missing by default.
     ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
     ON_CALL(decoder_callbacks_, requestHeaders())
         .WillByDefault(Return(makeOptRef<Http::RequestHeaderMap>(headers_)));
     ON_CALL(decoder_callbacks_, streamId()).WillByDefault(Return(7));
-    // The mirror policies are sampled in.
+    // Sampled in.
     ON_CALL(runtime_.snapshot_,
             featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>(), _))
         .WillByDefault(Return(true));
@@ -771,7 +770,7 @@ public:
         *store_.rootScope(), "http.test."));
   }
 
-  // Records the discovery requests, and keeps their callbacks to complete them later.
+  // Records requests and keeps their callbacks.
   void captureRequests(Upstream::MockOdCdsApiHandle& odcds) {
     EXPECT_CALL(odcds, requestOnDemandClusterDiscovery(_, _, _))
         .WillRepeatedly([this](absl::string_view name, Upstream::ClusterDiscoveryCallbackPtr cb,
@@ -816,7 +815,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, DiscoversMissingMirrorClusterWithoutPa
   EXPECT_EQ(std::chrono::milliseconds(5000), timeouts_[0]);
   EXPECT_EQ(1UL, counter("shadow_cluster_discovery_requested"));
   EXPECT_EQ(1UL, pending("shadow_cluster_discovery_pending"));
-  // The discovery of the request's own cluster, and its filter state, are not involved.
+  // Own cluster discovery and filter state are untouched.
   EXPECT_EQ(0UL, counter("cluster_discovery_requested"));
   EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
   EXPECT_EQ(nullptr, decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
@@ -831,7 +830,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, CompletionOnlyRecordsStats) {
   ASSERT_THAT(requested_, ElementsAre("available", "missing", "timeout"));
   EXPECT_EQ(3UL, pending("shadow_cluster_discovery_pending"));
 
-  // Nothing is resumed or recreated: the request is long gone by the time this happens.
+  // Nothing is resumed.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, recreateClusterInfo()).Times(0);
   (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Available);
@@ -851,7 +850,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, CancelledWhenTheStreamEndsFirst) {
   EXPECT_EQ(1UL, counter("shadow_cluster_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("shadow_cluster_discovery_pending"));
 
-  // A completion that still arrives is not counted twice, and the stream stays untouched.
+  // A late completion is not counted again.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Available);
   EXPECT_EQ(0UL, counter("shadow_cluster_discovery_available"));
@@ -879,7 +878,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, ClusterLevelPoliciesTakePrecedenceOver
 TEST_F(OnDemandFilterShadowDiscoveryTest, PoliciesThatAreSampledOutAreNotDiscovered) {
   addRoutePolicy("sampled-in");
   addRoutePolicy("sampled-out");
-  // The router would not mirror to the second one for this request.
+  // The second is sampled out.
   EXPECT_CALL(runtime_.snapshot_,
               featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>(), 7))
       .WillOnce(Return(true))
@@ -896,7 +895,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, PoliciesSelectingTheClusterWithAHeader
 }
 
 TEST_F(OnDemandFilterShadowDiscoveryTest, ConnectRequestsAreNotDiscovered) {
-  // The router does not mirror CONNECT requests.
+  // CONNECT is never mirrored.
   addRoutePolicy("shadow");
   headers_.setMethod("CONNECT");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
@@ -927,8 +926,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, DisabledWithoutShadowClusterDiscoveryC
   EXPECT_TRUE(requested_.empty());
 }
 
-// The cluster of the request is discovered first, and pauses the request as usual. Its mirror
-// clusters are only discovered once it is known, since cluster-level policies depend on it.
+// Own cluster first (pauses as usual), then mirror clusters.
 TEST_F(OnDemandFilterShadowDiscoveryTest, MirrorClustersAreDiscoveredAfterTheRequestsOwnCluster) {
   addRoutePolicy("shadow");
   EXPECT_CALL(decoder_callbacks_, clusterInfo())
@@ -939,7 +937,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, MirrorClustersAreDiscoveredAfterTheReq
   EXPECT_EQ(1UL, counter("cluster_discovery_requested"));
   EXPECT_EQ(0UL, counter("shadow_cluster_discovery_requested"));
 
-  // The mirror cluster is requested before the request resumes.
+  // Requested before the request resumes.
   size_t requested_when_resumed = 0;
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).WillOnce([&]() {
     requested_when_resumed = requested_.size();
@@ -948,7 +946,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, MirrorClustersAreDiscoveredAfterTheReq
   EXPECT_EQ(2UL, requested_when_resumed);
   EXPECT_EQ("shadow", requested_[1]);
   EXPECT_EQ(1UL, counter("shadow_cluster_discovery_requested"));
-  // The request's own discovery is accounted for on its own.
+  // Own stats are separate.
   EXPECT_EQ(1UL, counter("cluster_discovery_available"));
   EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
 }
@@ -961,13 +959,12 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, NoMirrorDiscoveryWhenTheRequestsCluste
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   (*callbacks_[0])(Upstream::ClusterDiscoveryStatus::Missing);
-  // The router has no cluster to mirror from, so there is nothing to discover.
+  // Nothing to mirror from.
   EXPECT_THAT(requested_, ElementsAre(decoder_callbacks_.route_->route_entry_.cluster_name_));
   EXPECT_EQ(0UL, counter("shadow_cluster_discovery_requested"));
 }
 
-// The discovery settings of the route override the ones of the filter, like the rest of the
-// config: the source and timeout of the route's own odcds are used for the mirror clusters.
+// The route's odcds source and timeout are used.
 TEST_F(OnDemandFilterShadowDiscoveryTest, PerRouteConfigProvidesTheDiscoverySettings) {
   addRoutePolicy("shadow");
   auto per_route_odcds = Upstream::MockOdCdsApiHandle::create();
@@ -985,8 +982,7 @@ TEST_F(OnDemandFilterShadowDiscoveryTest, PerRouteConfigProvidesTheDiscoverySett
   EXPECT_EQ(std::chrono::milliseconds(1234), timeouts_[0]);
 }
 
-// A per-route config replaces the filter's one entirely, also for the mirror clusters: it must
-// enable the discovery of its own.
+// A per-route config replaces the filter's, so it must enable it itself.
 TEST_F(OnDemandFilterShadowDiscoveryTest, PerRouteConfigWithoutShadowDiscoveryDisablesIt) {
   addRoutePolicy("shadow");
   auto per_route_odcds = Upstream::MockOdCdsApiHandle::create();
@@ -1027,7 +1023,7 @@ TEST(OnDemandConfigTest, Basic) {
   OnDemandFilterConfig config4(config, cm, runtime, visitor, status4);
   EXPECT_THAT(status4, IsOk());
 
-  // Discovery of mirror clusters is accepted, on the filter and on the per-route config.
+  // Mirror cluster discovery is accepted.
   config.mutable_odcds()->clear_resources_locator();
   config.mutable_odcds()->mutable_shadow_cluster_discovery();
   absl::Status status5 = absl::OkStatus();

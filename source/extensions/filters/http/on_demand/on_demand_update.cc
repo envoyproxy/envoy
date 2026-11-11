@@ -38,8 +38,7 @@ public:
       return;
     }
     filter.handleOnDemandCds(route.value(), *odcds_, timeout_);
-    // Only when the request is not paused: if it is, onClusterDiscovered() or the re-run of this
-    // method will start the shadow discovery once the request's own cluster is known.
+    // Not while paused: onClusterDiscovered() or the re-run covers that.
     if (shadow_discovery_.has_value() &&
         filter.filterIterationState() == Http::FilterHeadersStatus::Continue) {
       filter.handleShadowDiscovery(*odcds_, timeout_, *shadow_discovery_);
@@ -263,8 +262,7 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
 void OnDemandRouteUpdate::handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds,
                                                 std::chrono::milliseconds timeout,
                                                 const ShadowDiscoveryOptions& options) {
-  // This is best-effort and must never interfere with the request: it does not touch
-  // filter_iteration_state_, the discovery state, or the stats of the request's own cluster.
+  // Best-effort: never touches the iteration state, discovery state or the request's own stats.
   if (shadow_discovery_started_) {
     return;
   }
@@ -272,12 +270,12 @@ void OnDemandRouteUpdate::handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds,
   const auto headers = callbacks_->requestHeaders();
   if (!route.has_value() || !headers.has_value() || route->routeEntry() == nullptr ||
       headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
-    // No route, or a CONNECT request, which the router does not mirror.
+    // No route, or CONNECT (never mirrored).
     return;
   }
   shadow_discovery_started_ = true;
 
-  // Pick the policies like the router does: cluster-level policies win over route-level ones.
+  // Cluster-level policies win over route-level ones, as in the router.
   const std::vector<Router::ShadowPolicyPtr>* policies = &route->routeEntry()->shadowPolicies();
   if (const auto cluster_info = callbacks_->clusterInfo(); cluster_info.has_value()) {
     const auto& cluster_policies = cluster_info->httpProtocolOptions().shadowPolicies();
@@ -288,13 +286,12 @@ void OnDemandRouteUpdate::handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds,
 
   absl::InlinedVector<absl::string_view, 2> requested;
   for (const auto& policy : *policies) {
-    // Policies that select their cluster with a header are not discovered: the name is controlled
-    // by the client.
+    // cluster_header policies are skipped: the name is client controlled.
     const absl::string_view cluster_name = policy->cluster();
     if (cluster_name.empty()) {
       continue;
     }
-    // Only for the requests the router will mirror, using the same random as the router.
+    // Same sampling as the router.
     if (!options.runtime_.snapshot().featureEnabled(policy->runtimeKey(), policy->defaultValue(),
                                                     callbacks_->streamId())) {
       continue;
@@ -314,8 +311,7 @@ void OnDemandRouteUpdate::handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds,
         [this](Upstream::ClusterDiscoveryStatus cluster_status) {
           finishShadowClusterDiscovery(cluster_status);
         });
-    // The handle only cancels the callback: if the stream ends first, the discovery still
-    // completes and the cluster is available to later requests.
+    // The handle only cancels the callback; discovery still completes if the stream ends.
     shadow_discovery_handles_.push_back(
         odcds.requestOnDemandClusterDiscovery(cluster_name, std::move(callback), timeout));
   }
@@ -457,7 +453,7 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
   // here.
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
     callbacks_->downstreamCallbacks()->recreateClusterInfo();
-    // Cluster-level mirror policies are only known now. This does not delay the request.
+    // Cluster-level policies are only known now.
     getConfig()->decodeHeadersBehavior().onClusterDiscovered(*this);
   }
   callbacks_->continueDecoding();
@@ -573,7 +569,7 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
 void OnDemandRouteUpdate::finishShadowClusterDiscovery(
     Upstream::ClusterDiscoveryStatus cluster_status) {
   if (shadow_discovery_in_flight_ == 0) {
-    // The stream is complete and already accounted for these as cancelled.
+    // Stream completed; already counted as cancelled.
     return;
   }
   --shadow_discovery_in_flight_;
