@@ -1624,6 +1624,22 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     // trailers itself (doTrailers()); forwarding now would deliver trailers before that data and
     // encode them twice. Skip entirely once a local reply, reset, or completion has ended the
     // encoder chain, since encodeTrailers() does not check those itself.
+    //
+    // Encode-order chain A -> B -> C -> codec, data frame with end_stream=true:
+    //
+    //   A.encodeData(data, true)   addEncodedTrailers(), Continue   trailers_added_entry = A
+    //   B.encodeData(data, false)  StopIterationNoBuffer            entry = B, break
+    //   encodeTrailers(A, AlwaysStartFromNext)
+    //     B.encodeTrailers()       B.end_stream_ = true; B may stop here or continue
+    //     C.encodeTrailers()       only if B continued
+    //   return                     B's later continueEncoding() -> commonContinue() releases its
+    //                              data and, via doTrailers(), the trailers to C and the codec.
+    //
+    // If instead B had returned Continue from encodeData() while paused on headers
+    // (StopIteration from encodeHeaders()), commonHandleAfterDataCallback() runs B's
+    // commonContinue() inline: headers and data flow to C and the codec, and B.doTrailers()
+    // defers (B.end_stream_ is false and B is not re-iterating from itself) so that the
+    // encodeTrailers(A) call above, not B, delivers the trailers through C exactly once.
     const bool trailers_added_by_earlier_filter =
         trailers_added_entry != encoder_filters_.end() && trailers_added_entry != entry;
     if (trailers_added_by_earlier_filter && (*entry)->canContinue() &&
@@ -1645,10 +1661,14 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   // If trailers were added during encodeData we need to trigger encodeTrailers in order
   // to allow filters to process the trailers. Start from the filter after the one that added
-  // them: it has already observed the end of the stream in its encodeData() callback.
+  // them: it has already observed the end of the stream in its encodeData() callback, so it must
+  // not receive its own trailers when it is itself resuming from StopAllIteration.
   if (trailers_added_entry != encoder_filters_.end()) {
     encodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.responseTrailers(),
-                   FilterIterationStartState::AlwaysStartFromNext);
+                   Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration")
+                       ? FilterIterationStartState::AlwaysStartFromNext
+                       : FilterIterationStartState::CanStartFromCurrent);
   }
 }
 
@@ -2077,15 +2097,27 @@ void ActiveStreamEncoderFilter::doTrailers() {
   // still on the stack below commonContinue(), or an earlier filter that stopped trailer
   // iteration) delivers them from the filter that added them; encoding from here would skip
   // intermediate filters or encode the trailers twice. When resuming from StopAllIteration
-  // (iterate_from_current_filter_) no outer pass exists, so encode from here.
-  if (!end_stream_ && !iterate_from_current_filter_ &&
+  // (iterate_from_current_filter_) no outer pass exists, so encode from here unless an earlier
+  // filter is still stopped: that filter has not released the body yet, and its own
+  // continueEncoding() will deliver the trailers through this filter after the body. See the
+  // flow in FilterManager::encodeData() for the filter roles involved.
+  if (!end_stream_ &&
       Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration")) {
-    ENVOY_STREAM_LOG(trace, "deferring trailers to the filter that added them: filter={}", parent_,
+          "envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration") &&
+      (!iterate_from_current_filter_ || earlierFilterStopped())) {
+    ENVOY_STREAM_LOG(trace, "deferring trailers to the filter that owns them: filter={}", parent_,
                      static_cast<const void*>(this));
     return;
   }
   parent_.encodeTrailers(this, *parent_.filter_manager_callbacks_.responseTrailers());
+}
+bool ActiveStreamEncoderFilter::earlierFilterStopped() const {
+  for (auto it = parent_.encoder_filters_.begin(); it != entry(); ++it) {
+    if (!(*it)->canIterate()) {
+      return true;
+    }
+  }
+  return false;
 }
 bool ActiveStreamEncoderFilter::hasTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers().has_value();

@@ -366,6 +366,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
+  // True if an encoder filter before this one has stopped iteration and so still owns the body
+  // and/or trailers; used by doTrailers() to avoid encoding trailers ahead of that filter.
+  bool earlierFilterStopped() const;
 
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
