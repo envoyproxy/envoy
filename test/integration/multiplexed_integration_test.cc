@@ -93,8 +93,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, NetworkWaitsDoNotAdvanceTime
   const auto timeout_result =
       downstream_connections.waitForConnection(2, std::chrono::milliseconds(10));
   EXPECT_FALSE(timeout_result);
-  EXPECT_THAT(timeout_result.message(),
-              HasSubstr(absl::StrCat(10 * TIMEOUT_FACTOR, "ms of real time")));
+  EXPECT_THAT(timeout_result.message(), HasSubstr("10ms of real time"));
   EXPECT_THAT(timeout_result.message(), HasSubstr("downstream connection acceptance"));
   EXPECT_THAT(timeout_result.message(), HasSubstr("expected 2 connections, observed 1"));
 

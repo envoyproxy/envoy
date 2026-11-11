@@ -392,8 +392,7 @@ public:
     EXPECT_EQ(1, test_server_->counter("listener_manager.listener_in_place_updated")->value());
     sendRequest(*dropped_codec_client);
     EXPECT_EQ(connection_event_drain, dropped_codec_client->sawGoAway());
-    // Allow shutdown I/O after the five-second listener drain.
-    ASSERT_TRUE(dropped_codec_client->waitForDisconnect(std::chrono::seconds(10)));
+    ASSERT_TRUE(dropped_codec_client->waitForDisconnect());
     IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
     sendRequest(*codec_client);
     codec_client->close();
@@ -728,8 +727,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
 
   // Wait for the client connection to be disconnected (which happens after GOAWAY is processed and
   // drain timer fires).
-  // Allow shutdown I/O after the five-second listener drain.
-  ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(10)));
+  ASSERT_TRUE(codec_client->waitForDisconnect());
 
   // Wait for the draining filter chain count to drop to 0.
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
@@ -1114,8 +1112,7 @@ TEST_P(ListenerFcdsIntegrationTest, InPlaceUpdateDrainsDroppedFcdsFilterChain) {
   EXPECT_EQ(1, test_server_->counter("listener_manager.listener_in_place_updated")->value());
   sendRequest(*codec_client);
   EXPECT_TRUE(codec_client->sawGoAway());
-  // Allow shutdown I/O after the five-second listener drain.
-  ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(10)));
+  ASSERT_TRUE(codec_client->waitForDisconnect());
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
   sendRequest(*other_codec_client);
   EXPECT_FALSE(other_codec_client->sawGoAway());
@@ -1237,8 +1234,7 @@ TEST_P(ListenerFcdsIntegrationTest, InPlaceUpdateKeepsReaddedFcdsFilterChainConn
   IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
   sendRequest(*codec_client);
 
-  // Allow shutdown I/O after the five-second listener drain.
-  ASSERT_TRUE(dropped_codec_client->waitForDisconnect(std::chrono::seconds(10)));
+  ASSERT_TRUE(dropped_codec_client->waitForDisconnect());
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
   sendRequest(*codec_client);
   EXPECT_FALSE(codec_client->sawGoAway());
@@ -1284,8 +1280,7 @@ TEST_P(ListenerFcdsIntegrationTest, InPlaceAddressUpdateKeepsFcdsFilterChainConn
   IntegrationCodecClientPtr added_codec_client = makeHttpConnection(port);
   sendRequest(*added_codec_client);
   added_codec_client->close();
-  // Allow shutdown I/O after the five-second listener drain.
-  ASSERT_TRUE(removed_codec_client->waitForDisconnect(std::chrono::seconds(10)));
+  ASSERT_TRUE(removed_codec_client->waitForDisconnect());
   test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(0));
   sendRequest(*codec_client);
   EXPECT_FALSE(codec_client->sawGoAway());
