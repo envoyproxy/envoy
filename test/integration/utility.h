@@ -184,6 +184,20 @@ private:
  */
 class IntegrationUtil {
 public:
+  // Run network I/O without advancing simulated time. The real-time timeout is used as supplied;
+  // callers should apply TIMEOUT_FACTOR when needed.
+  static testing::AssertionResult
+  runDispatcherUntil(Event::Dispatcher& dispatcher, const std::function<bool()>& condition,
+                     absl::string_view description,
+                     std::chrono::milliseconds timeout = std::chrono::seconds(5) * TIMEOUT_FACTOR);
+
+  // Also advance simulated time to drive QUIC pacing and delayed ACKs when needed. The real-time
+  // timeout is used as supplied, as above.
+  static testing::AssertionResult runDispatcherUntilWithTimeAdvance(
+      Event::Dispatcher& dispatcher, const std::function<bool()>& condition,
+      absl::string_view description,
+      std::chrono::milliseconds timeout = std::chrono::seconds(5) * TIMEOUT_FACTOR);
+
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
    * @param addr supplies the address to connect to.

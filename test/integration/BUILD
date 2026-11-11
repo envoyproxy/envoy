@@ -791,6 +791,7 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
+        ":downstream_connection_tracker_lib",
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         "//source/common/buffer:buffer_lib",
@@ -1557,6 +1558,7 @@ envoy_cc_test_library(
         "//envoy/http:metadata_interface",
         "//source/common/common:dump_state_utils",
         "//source/common/http:response_decoder_impl_base",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -1730,6 +1732,22 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "downstream_connection_tracker_lib",
+    srcs = ["downstream_connection_tracker.cc"],
+    hdrs = ["downstream_connection_tracker.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/common/network:filter_lib",
+        "//source/common/protobuf",
+        "//test/config:utility_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     srcs = [
         "server.cc",
@@ -1756,6 +1774,7 @@ envoy_cc_test_library(
         "//envoy/stats:stats_interface",
         "//source/common/api:api_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:random_generator_lib",
@@ -2180,7 +2199,6 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "overload_integration_test",
-    size = "large",
     srcs = ["overload_integration_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},
     shard_count = 8,
@@ -2189,10 +2207,12 @@ envoy_cc_test(
     ],
     deps = [
         ":base_overload_integration_test_lib",
+        ":downstream_connection_tracker_lib",
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration/filters:block_filter_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",

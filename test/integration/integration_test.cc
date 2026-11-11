@@ -1970,8 +1970,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
   // With no delayed close processing, Envoy will close the connection immediately after flushing
-  // and this should instead return true.
-  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
+  // and this should instead return true. Keep the wait below the one-second close timeout.
+  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(100)));
 
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
