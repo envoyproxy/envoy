@@ -98,7 +98,7 @@ private:
 
   void maybeLogTimerWarning();
 
-  RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
+  RealTimeSource real_time_source_; // Used to initialize system_time_.
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
