@@ -456,10 +456,13 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  # A flag with no paths to match is post-submit only: nothing selects it for a pull request, and
-  # a push runs it whatever changed.
   check-build-openssl-asan:
-    paths: []
+    paths:
+    - compat/openssl/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
   check-build-openssl-build:
     paths:
     - compat/openssl/**/*
@@ -476,7 +479,8 @@ run:
     - ci/do_ci.sh
     - ci/bazel_fun.sh
   check-build-openssl-test:
-    paths: []
+    paths:
+    - "**/*"
   check-build-openssl-test-affected:
     paths:
     - compat/openssl/**/*
@@ -492,7 +496,6 @@ run:
     - .bazelrc
     - ci/do_ci.sh
     - ci/bazel_fun.sh
-    push: never
   check-coverage:
     paths:
     - "**/*"

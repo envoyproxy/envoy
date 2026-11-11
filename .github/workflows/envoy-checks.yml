@@ -73,7 +73,7 @@ jobs:
       pull-requests: read
     name: Check (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_check_build_openssl.yml
-    if: ${{ fromJSON(needs.load.outputs.request).config.ci.check-build-openssl[0] && true || false }}
+    if: fromJSON(needs.load.outputs.request).config.ci.check-build-openssl[0] && true || false
     needs:
     - load
     with:

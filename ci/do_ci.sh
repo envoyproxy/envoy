@@ -419,6 +419,11 @@ function build_openssl_test_affected() {
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     BAZEL_QUERY_OPTIONS+=("--config=openssl")
 
+    if [[ "$CI_TARGET" == "openssl.presubmit" ]]; then
+        echo "Bazel fastbuild build with OpenSSL..."
+        bazel_envoy_binary_build fastbuild
+    fi
+
     # Diff against the merge base to see only the PR's own changes; fall back to
     # the target branch itself when history is too shallow for a merge base.
     local merge_base
@@ -1025,7 +1030,9 @@ case $CI_TARGET in
         build_openssl
         ;;
 
-    openssl.test_affected)
+    # `openssl.presubmit` also builds the binary. It is what a pull request is asked for until the
+    # `check-build-openssl-*` run flags are on its target branch, and can be removed once they are.
+    openssl.presubmit|openssl.test_affected)
         build_openssl_test_affected
         ;;
 
