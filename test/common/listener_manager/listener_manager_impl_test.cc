@@ -10004,17 +10004,21 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, BindFailureRejectsUpdate) {
 }
 
 // When an added address fails to listen, the update is dropped and the active listener keeps
-// serving its addresses.
+// serving its addresses. The listener update callbacks learn that the update was dropped, and no
+// removal follows.
 TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, ListenFailureKeepsActiveListener) {
   startWorkers();
   auto socket1 = expectListenSocket("127.0.0.1:1234");
   ListenerHandle* listener_foo = addActiveListener(listenerProto({"127.0.0.1"}));
   Network::ListenerConfig& active_listener = manager_->listeners().front().get();
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
 
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   EXPECT_CALL(*socket2->io_handle_, listen(_))
       .WillOnce(Return(Api::SysCallIntResult{-1, EADDRINUSE}));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), false));
   EXPECT_TRUE(addOrUpdateListener(listenerProto({"127.0.0.1", "127.0.0.2"})));
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
@@ -11586,6 +11590,90 @@ filter_chains:
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
 
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+}
+
+// Listener update callbacks that predate onListenerListenFailure() keep their removal
+// callback.
+class RemovalRecordingListenerUpdateCallbacks : public ListenerUpdateCallbacks {
+public:
+  void onListenerAddOrUpdate(absl::string_view, const Network::ListenerConfig&) override {}
+  void onListenerRemoval(const std::string& listener_name) override {
+    removed_listener_names_.push_back(listener_name);
+  }
+
+  std::vector<std::string> removed_listener_names_;
+};
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksListenFailureAfterWarming) {
+  InSequence s;
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+  RemovalRecordingListenerUpdateCallbacks callbacks_without_failure_hook;
+  auto handle_without_failure_hook =
+      manager_->addListenerUpdateCallbacks(callbacks_without_failure_hook);
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+
+  // The removal callbacks get the name after the listener is destroyed.
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), true));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  listener_foo->target_.ready();
+  EXPECT_THAT(callbacks_without_failure_hook.removed_listener_names_, ElementsAre("foo"));
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksListenFailureWhenWorkersStart) {
+  InSequence s;
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), true));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
 }
