@@ -366,6 +366,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
+  // True once FilterManager::encodeTrailers() has processed every filter before this one, i.e. the
+  // trailers can be encoded from here without skipping a filter that still holds body or trailers.
+  bool trailersReachedThisFilter() const;
 
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
@@ -756,7 +759,6 @@ public:
 
   void destroyFilters() {
     state_.destroyed_ = true;
-    state_.encoder_iteration_stopped_at_ = nullptr;
 
     for (auto filter : filters_) {
       filter->onDestroy();
@@ -1022,13 +1024,6 @@ protected:
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
     ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
-
-    // The encoder filter at which the most recent encodeData()/encodeTrailers() pass stopped and
-    // that is still stopped, i.e. the filter that owns the body and/or trailers. Cleared when a
-    // pass started by that filter (or by the codec) reaches the codec. Used by
-    // ActiveStreamEncoderFilter::doTrailers() so that a filter resuming from StopAllIteration does
-    // not encode pending trailers ahead of an earlier filter that has not released the body yet.
-    ActiveStreamEncoderFilter* encoder_iteration_stopped_at_{};
   };
 
   State& state() { return state_; }

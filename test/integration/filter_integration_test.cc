@@ -1,3 +1,5 @@
+#include "envoy/registry/registry.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/logging.h"
 
@@ -559,6 +561,135 @@ typed_config:
   codec_client_->sendReset(encoder);
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
+}
+
+struct StopAllRebufferDecodeCounters {
+  std::atomic<int> decode_trailers_calls{0};
+  std::atomic<int> decode_complete_calls{0};
+};
+
+class StopAllRebufferDecoderFilter : public Http::StreamDecoderFilter {
+public:
+  explicit StopAllRebufferDecoderFilter(std::shared_ptr<StopAllRebufferDecodeCounters> counters)
+      : counters_(std::move(counters)) {}
+
+  void onDestroy() override {
+    if (resume_timer_ != nullptr) {
+      resume_timer_->disableTimer();
+    }
+  }
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override {
+    if (end_stream) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    armResumeTimer();
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
+    return end_stream ? Http::FilterDataStatus::Continue
+                      : Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    counters_->decode_trailers_calls.fetch_add(1);
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  void decodeComplete() override { counters_->decode_complete_calls.fetch_add(1); }
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
+
+private:
+  void armResumeTimer() {
+    resume_timer_ = callbacks_->dispatcher().createTimer([this]() {
+      if (callbacks_->streamInfo().downstreamTiming().lastDownstreamRxByteReceived().has_value()) {
+        callbacks_->continueDecoding();
+        return;
+      }
+      armResumeTimer();
+    });
+    resume_timer_->enableTimer(std::chrono::milliseconds(5));
+  }
+
+  std::shared_ptr<StopAllRebufferDecodeCounters> counters_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Event::TimerPtr resume_timer_;
+};
+
+class StopAllRebufferDecoderFilterFactory
+    : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  static StopAllRebufferDecodeCounters& counters() {
+    static auto* instance = new StopAllRebufferDecodeCounters();
+    return *instance;
+  }
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamDecoderFilter(std::make_shared<StopAllRebufferDecoderFilter>(
+          std::shared_ptr<StopAllRebufferDecodeCounters>(&counters(),
+                                                         [](StopAllRebufferDecodeCounters*) {})));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "stop-all-rebuffer-decoder-filter"; }
+};
+
+static Registry::RegisterFactory<StopAllRebufferDecoderFilterFactory,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_stop_all_rebuffer_decoder_filter_;
+
+// End-to-end request-path counterpart distinguishing clearing iterate_from_current_filter_ in
+// commonHandleAfterTrailersCallback() vs. only in FilterManager::encodeTrailers(): a decoder filter
+// pausing headers with StopAllIterationAndBuffer, resuming once request body + trailers arrive,
+// re-buffering body in decodeData(false) with StopIterationAndBuffer, and returning Continue from
+// decodeTrailers() must forward the body and trailers once rather than dropping the request body
+// and invoking decodeTrailers()/decodeComplete() twice.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  auto& counters = StopAllRebufferDecoderFilterFactory::counters();
+  counters.decode_trailers_calls.store(0);
+  counters.decode_complete_calls.store(0);
+
+  prependFilter(R"EOF(
+name: stop-all-rebuffer-decoder-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, false);
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder, "payload", false);
+  codec_client_->sendTrailers(encoder, Http::TestRequestTrailerMapImpl{{"x-req-trailer", "val"}});
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("payload", upstream_request_->body().toString());
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_EQ("val", upstream_request_->trailers()
+                       ->get(Http::LowerCaseString("x-req-trailer"))[0]
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ(1, counters.decode_trailers_calls.load());
+  EXPECT_EQ(1, counters.decode_complete_calls.load());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Tests missing headers needed for H/1 codec first line.
