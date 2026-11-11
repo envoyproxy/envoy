@@ -1,7 +1,5 @@
 #pragma once
 
-#include <list>
-
 #include "envoy/common/time.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -12,6 +10,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -161,7 +160,7 @@ public:
     return group_members_;
   }
 
-  std::list<ActiveMessagePtr>& activeMessageList() { return active_message_list_; }
+  IntrusiveList<ActiveMessage>& activeMessageList() { return active_message_list_; }
 
   void insertAckDirective(const std::string& key, const AckMessageDirective& directive) {
     ack_directive_table_.insert(std::make_pair(key, directive));
@@ -200,7 +199,7 @@ private:
   TimeSource& time_source_;
   RocketmqFilterStats& stats_;
 
-  std::list<ActiveMessagePtr> active_message_list_;
+  IntrusiveList<ActiveMessage> active_message_list_;
 
   absl::flat_hash_map<std::string, std::vector<ConsumerGroupMember>> group_members_;
 

@@ -238,15 +238,9 @@ protected:
   }
 
   void shutdownAndRestartTestServer() {
-    // Shutdown the Envoy server.
-    absl::Notification shutdown_done;
-    Server::Instance& server = test_server_->server();
-    server.dispatcher().post([&server, &shutdown_done]() {
-      server.shutdown();
-      shutdown_done.Notify();
-    });
-    ASSERT_TRUE(shutdown_done.WaitForNotificationWithTimeout(absl::Seconds(5)));
-    // Reset the test server.
+    // Shut down the Envoy server and wait for it to go away. The test server's destructor posts
+    // the shutdown and waits for the server thread to finish; shutting the server down here
+    // first would race that destructor against the server thread destroying the server.
     test_server_.reset();
     // Reset the server init function, as we don't want xDS responses sent on restart (we want to
     // use the values in the KV store instead).

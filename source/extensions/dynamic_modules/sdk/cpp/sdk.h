@@ -444,6 +444,28 @@ public:
   virtual void schedule(std::function<void()> func) = 0;
 };
 
+/**
+ * A load shed point of the overload manager, which a filter config handle returns from
+ * getLoadShedPoint. The module can check it in the callbacks of the filter config that returned it
+ * and of its filters, but not while the config is destroyed or on threads of its own, since Envoy
+ * can destroy the overload manager before the config when it shuts down. A module typically gets it
+ * once while its config is created and keeps it in its own config.
+ */
+class LoadShedPoint {
+public:
+  virtual ~LoadShedPoint();
+
+  /**
+   * Decides whether to shed one unit of load, such as one request. It returns true with the
+   * probability that the triggers of the load shed point give, and counts shed load in the
+   * shed_load_count statistic of the load shed point. It reads the pressure of the synchronous
+   * feedback resource monitors of the triggers and reports accepted load to them on the calling
+   * thread. Checking a load shed point that Envoy also checks counts the same load twice.
+   * @return True if the module should shed the load, false otherwise.
+   */
+  virtual bool shouldShedLoad() = 0;
+};
+
 class DownstreamWatermarkCallbacks {
 public:
   virtual ~DownstreamWatermarkCallbacks();
@@ -1255,6 +1277,18 @@ public:
    * secret.
    */
   virtual std::optional<std::string_view> getGenericSecret(GenericSecretID id) = 0;
+
+  /**
+   * Returns a load shed point of the overload manager by name, to shed load at the module's own
+   * point of the request processing.
+   * @param name The name of the load shed point.
+   * @return The load shed point, or nullptr if the overload manager has no load shed point with the
+   * name, the filter is an upstream filter, or the listener of its filter chain bypasses the
+   * overload manager. Filters that the route configuration creates, such as those of a per-route
+   * filter chain, and filters of a filter chain that FCDS delivers do not see the bypass and get
+   * the load shed point.
+   */
+  virtual std::unique_ptr<LoadShedPoint> getLoadShedPoint(std::string_view name) = 0;
 
   /**
    * Checks if logging is enabled for the given log level.

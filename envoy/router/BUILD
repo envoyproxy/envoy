@@ -53,6 +53,8 @@ envoy_cc_library(
     deps = [
         ":rds_interface",
         "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:filter_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -92,6 +94,7 @@ envoy_cc_library(
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tracing:tracer_interface",

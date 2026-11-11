@@ -68,6 +68,30 @@ BENCHMARK(benchmarkRoundRobinLoadBalancerBuild)
     ->Args({50000, 100, 50})
     ->Unit(::benchmark::kMillisecond);
 
+// A pick with a context goes through LoadBalancerContext::determinePriorityLoad(), as every pick
+// the router makes does; one without a context reads the balancer's own priority load.
+void benchmarkRoundRobinLoadBalancerChooseHost(::benchmark::State& state) {
+  const uint64_t num_hosts = state.range(0);
+  const bool with_context = state.range(1) != 0;
+
+  RoundRobinTester tester(num_hosts);
+  tester.initialize();
+  TestLoadBalancerContext context;
+  LoadBalancerContext* const context_ptr = with_context ? &context : nullptr;
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    ::benchmark::DoNotOptimize(tester.lb_->chooseHost(context_ptr).host);
+  }
+}
+BENCHMARK(benchmarkRoundRobinLoadBalancerChooseHost)
+    ->ArgNames({"hosts", "context"})
+    ->Args({1, 0})
+    ->Args({1, 1})
+    ->Args({100, 0})
+    ->Args({100, 1})
+    ->Args({10000, 0})
+    ->Args({10000, 1});
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

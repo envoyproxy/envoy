@@ -8,7 +8,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/linked_object.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/filters/network/generic_proxy/interface/codec.h"
@@ -44,7 +43,6 @@ enum class StreamResetReason : uint32_t {
 class RouterFilter;
 
 class UpstreamRequest : public UpstreamRequestCallbacks,
-                        public LinkedObject<UpstreamRequest>,
                         public EncodingContext,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:

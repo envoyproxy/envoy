@@ -36,6 +36,10 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
+// A SotW CDS update removes only the clusters received through that CDS subscription, so it no
+// longer removes the clusters added by ODCDS. Disable to remove every dynamic cluster not in the
+// update.
+RUNTIME_GUARD(envoy_reloadable_features_cds_sotw_track_resources);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
@@ -46,12 +50,6 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown)
 RUNTIME_GUARD(envoy_reloadable_features_connectivity_grid_prevent_double_h2_scheduled);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_default_client_tls_max_version_is_1_3);
-// When enabled, which is the default, the dynamic forward proxy cluster replaces a host with a
-// new host instance when DNS resolution changes its address, publishing the change as a regular
-// priority set update (old host removed, new host added) so that connection pools to the stale
-// address are drained. Disable to restore the previous behavior of mutating the existing host's
-// address in place, which keeps already-established connections to the old address alive.
-RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_replace_host_on_address_change);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
@@ -131,7 +129,6 @@ RUNTIME_GUARD(envoy_reloadable_features_listener_filter_reentrant_continue_guard
 RUNTIME_GUARD(envoy_reloadable_features_listener_in_place_address_update);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_local_cluster_preserve_one_request);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_circuit);
-RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_metadata_formatter_only_truncate_string);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);

@@ -10,6 +10,9 @@
 namespace Envoy {
 namespace Router {
 
+struct ShadowPolicyStats;
+using ShadowPolicyStatsSharedPtr = std::shared_ptr<const ShadowPolicyStats>;
+
 /**
  * Interface used to shadow complete requests to an alternate upstream cluster in a "fire and
  * forget" fashion. Right now this interface takes a fully buffered request and cannot be used for
@@ -24,9 +27,11 @@ public:
    * @param cluster supplies the cluster name to shadow to.
    * @param message supplies the complete request to shadow.
    * @param options supplies the request options for the underlying asynchronous request.
+   * @param stats supplies the stats of the mirror policy, or nullptr if it has none.
    */
   virtual void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-                      const Http::AsyncClient::RequestOptions& options) PURE;
+                      const Http::AsyncClient::RequestOptions& options,
+                      const ShadowPolicyStatsSharedPtr& stats) PURE;
 
   /**
    * Initialize shadowing a request. Differs from the above in that additional
@@ -34,13 +39,15 @@ public:
    * @param cluster supplies the cluster name to shadow to.
    * @param headers supplies the headers for initializing the shadow.
    * @param options supplies the request options for the underlying asynchronous request.
+   * @param stats supplies the stats of the mirror policy, or nullptr if it has none.
    * @return OngoingRequest* pointer owned by the AsyncClient which can have additional data and
    *                         trailers sent to it. Can be null if the stream is immediately
    *                         cancelled.
    */
   virtual Http::AsyncClient::OngoingRequest*
   streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
-                  const Http::AsyncClient::RequestOptions& options) PURE;
+                  const Http::AsyncClient::RequestOptions& options,
+                  const ShadowPolicyStatsSharedPtr& stats) PURE;
 };
 
 using ShadowWriterPtr = std::unique_ptr<ShadowWriter>;

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package test.extensions.transport_sockets.tls.cert_validator.spiffe;
+
+import "envoy/extensions/transport_sockets/tls/v3/common.proto";
+import "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.proto";
+
+message SpiffeValidatorFuzzTestCase {
+  // Only inline trust bundles are exercised; inputs with file or environment sources are skipped.
+  envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig config = 1;
+  repeated envoy.extensions.transport_sockets.tls.v3.SubjectAltNameMatcher san_matchers = 2;
+  bool allow_expired_certificate = 3;
+  bool suppress_client_ca_list = 4;
+
+  // DER-encoded peer certificate chain, leaf first.
+  repeated bytes cert_chain = 5;
+
+  // Selects the downstream (server) or upstream (client) side of the handshake.
+  bool is_server = 6;
+
+  // Published on the connection filter state when is_server is set, or shared with the upstream
+  // transport socket otherwise.
+  string workload_trust_domain = 7;
+
+  // Upstream subject alt name override; only used when is_server is not set.
+  repeated string verify_subject_alt_names = 8;
+}

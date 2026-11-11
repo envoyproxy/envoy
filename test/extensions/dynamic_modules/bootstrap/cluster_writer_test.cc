@@ -7,6 +7,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/writer_shared_state.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -79,6 +80,9 @@ public:
                            absl::string_view error_details) {
         outcomes_.push_back(
             {update_id, std::string(cluster_name), status, std::string(error_details)});
+        if (on_outcome_ != nullptr) {
+          on_outcome_();
+        }
       };
     }
     // The writer creates its apply callback first, and the newest expectation matches first.
@@ -146,6 +150,8 @@ public:
   Event::MockSchedulableCallback* deliver_callback_{};
   std::unique_ptr<DynamicModuleClusterWriter> writer_;
   std::vector<Outcome> outcomes_;
+  // Runs in the done hook after each outcome.
+  std::function<void()> on_outcome_;
 };
 
 MATCHER_P2(IsOutcome, update_id, status, "") {
@@ -743,6 +749,23 @@ TEST_F(ClusterWriterTest, QueuedRemovalOfAnOwnedClusterReplacesItsQueuedWrite) {
   runApplyPass();
 }
 
+TEST_F(ClusterWriterTest, SecondRemovalOfAQueuedRemovalHasNoOutcome) {
+  createInitializedWriter();
+  write("writer.a");
+  EXPECT_CALL(context_.cluster_manager_, addOrUpdateCluster(_, "v1", true)).WillOnce(Return(false));
+  runApplyPass();
+  deliveredOutcomes();
+
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_Success,
+            writer_->removeCluster("writer.a"));
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_Success,
+            writer_->removeCluster("writer.a"));
+  EXPECT_TRUE(deliveredOutcomes().empty());
+  EXPECT_EQ(0, gauge("updates_pending"));
+  EXPECT_CALL(context_.cluster_manager_, removeCluster(absl::string_view("writer.a"), true));
+  runApplyPass();
+}
+
 TEST_F(ClusterWriterTest, WriteReplacesAQueuedRemoval) {
   createInitializedWriter();
   write("writer.a");
@@ -919,6 +942,22 @@ TEST_F(ClusterWriterTest, RemovalDuringTheFirstApplyRemovesTheCluster) {
   EXPECT_EQ(0, gauge("clusters_owned"));
 }
 
+// A write from the done hook that supersedes a queued write reports it in the next delivery.
+TEST_F(ClusterWriterTest, OutcomeOfAWriteFromTheDoneHookArrivesInTheNextDelivery) {
+  createInitializedWriter();
+  const uint64_t first_update_id = write("writer.a");
+  const uint64_t second_update_id = write("writer.a", "v2");
+  bool wrote_again = false;
+  on_outcome_ = [this, &wrote_again]() {
+    if (!wrote_again) {
+      wrote_again = true;
+      write("writer.a", "v3");
+    }
+  };
+  EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(first_update_id, Superseded)));
+  EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(second_update_id, Superseded)));
+}
+
 TEST_F(ClusterWriterTest, WritesAreAppliedWithoutADoneHook) {
   createWriter(/*with_done_hook=*/false);
   writer_->onServerInitialized();
@@ -928,6 +967,31 @@ TEST_F(ClusterWriterTest, WritesAreAppliedWithoutADoneHook) {
   runApplyPass();
   EXPECT_FALSE(deliver_callback_->enabled_);
   EXPECT_EQ(1, counter("update_active"));
+}
+
+// A burst that lasts past the time limit resumes the dependent xDS types anyway, counted from its
+// first pass.
+TEST(WriterSharedStateTest, BurstResumesTheDependentXdsTypesASecondAfterItsFirstPass) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  const std::shared_ptr<WriterSharedState> shared_state = WriterSharedState::get(context);
+  EXPECT_EQ(shared_state, WriterSharedState::get(context));
+  const std::string type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const int writer = 0;
+  int resumes = 0;
+  EXPECT_CALL(context.xds_manager_, pause(Config::dependentTypeUrls(type_url)))
+      .WillOnce([&resumes](const std::vector<std::string>&) {
+        return std::make_unique<Cleanup>([&resumes]() { ++resumes; });
+      });
+
+  const MonotonicTime start{};
+  shared_state->pauseDependentTypes(type_url, context.xds_manager_, start);
+  shared_state->onApplyPassDone(&writer, /*burst_applied=*/false,
+                                start + std::chrono::milliseconds(600));
+  shared_state->pauseDependentTypes(type_url, context.xds_manager_,
+                                    start + std::chrono::milliseconds(600));
+  EXPECT_EQ(0, resumes);
+  shared_state->onApplyPassDone(&writer, /*burst_applied=*/false, start + std::chrono::seconds(1));
+  EXPECT_EQ(1, resumes);
 }
 
 } // namespace

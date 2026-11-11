@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "eds_test",
     srcs = ["eds_test.cc"],
     extension_names = ["envoy.clusters.eds"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",
@@ -52,7 +52,7 @@ envoy_extension_cc_benchmark_binary(
     name = "eds_speed_test",
     srcs = ["eds_speed_test.cc"],
     extension_names = ["envoy.clusters.eds"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:protobuf_link_hacks",
@@ -93,7 +93,7 @@ envoy_extension_cc_test(
     name = "leds_test",
     srcs = ["leds_test.cc"],
     extension_names = ["envoy.clusters.eds"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:leds_lib",

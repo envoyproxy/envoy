@@ -13,7 +13,6 @@ envoy_package()
 envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
@@ -29,7 +28,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "status_code_input_test",
     srcs = ["status_code_input_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:status_code_input_lib",
@@ -43,7 +41,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "inputs_speed_test",
     srcs = ["inputs_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",

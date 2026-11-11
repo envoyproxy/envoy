@@ -43,7 +43,9 @@ pub struct HistogramBucket {
 /// Read-only view over the metrics captured for a single flush.
 ///
 /// The snapshot is owned by Envoy and is valid only until the [`StatSink::on_flush`] call
-/// returns. Stat names and text-readout values are decoded directly into a caller-provided
+/// returns. To read it after that, for example on a Tokio worker, call
+/// [`retain`](Self::retain). Stat names and text-readout values are decoded directly into a
+/// caller-provided
 /// `Vec<u8>`, which the SDK clears and grows as needed, so a single buffer can be reused across
 /// every entry to avoid allocating a string per metric. The bytes are the same UTF-8 form
 /// produced by Envoy's stats subsystem.
@@ -430,6 +432,26 @@ impl<'a> MetricSnapshot<'a> {
     )
   }
 
+  /// Keeps this snapshot readable after [`StatSink::on_flush`] returns.
+  ///
+  /// Envoy takes a reference on every stat and copies their values, so the returned
+  /// [`RetainedMetricSnapshot`] reports the values as of this call. Unlike
+  /// [`to_owned`](Self::to_owned), this decodes no names on the main thread. Names and tags are
+  /// decoded when they are read from the retained snapshot, on whichever thread holds it.
+  ///
+  /// On the snapshot passed to [`StatSink::on_flush`], this must be called on the main thread,
+  /// from that hook. On a [`RetainedMetricSnapshot`], it may be called on whichever thread holds
+  /// it, and the new snapshot reports the values copied by the first retain, not values as of this
+  /// call.
+  #[must_use]
+  pub fn retain(&self) -> RetainedMetricSnapshot {
+    let envoy_ptr =
+      unsafe { abi::envoy_dynamic_module_callback_stat_sink_snapshot_retain(self.envoy_ptr) };
+    RetainedMetricSnapshot {
+      snapshot: MetricSnapshot::new(envoy_ptr),
+    }
+  }
+
   /// Copies the whole snapshot into an [`OwnedMetricSnapshot`].
   ///
   /// The returned value owns its data and is `Send`, so it can be moved to another thread to
@@ -489,6 +511,48 @@ impl<'a> MetricSnapshot<'a> {
       gauges,
       text_readouts,
       histograms,
+    }
+  }
+}
+
+/// A [`MetricSnapshot`] that stays readable after [`StatSink::on_flush`] returns, created by
+/// [`MetricSnapshot::retain`].
+///
+/// It dereferences to [`MetricSnapshot`], so it is read with the same methods, which report the
+/// values copied when it was retained. It is `Send` but not `Sync`: move it to another thread, for
+/// example into a Tokio task, to read and format the metrics off the main thread, where only that
+/// thread reads it. Dropping it releases the Envoy-side snapshot and its stat references.
+///
+/// A stat stays in the store while a retained snapshot references it, even after its scope is
+/// removed or it is evicted, so it keeps appearing in later flush snapshots, and a stat created
+/// again under its name gets it back with its value. A retained snapshot still held when the next
+/// flush starts keeps such stats in that flush, and retaining every flush before dropping the
+/// previous one keeps them indefinitely. To let removed stats go, drop each retained snapshot
+/// before the next [`StatSink::on_flush`].
+///
+/// Every retained snapshot must be dropped before the [`StatSink`] that retained it is dropped, so
+/// a sink that hands them to worker threads should stop and join those workers in its [`Drop`]
+/// implementation.
+pub struct RetainedMetricSnapshot {
+  snapshot: MetricSnapshot<'static>,
+}
+
+// SAFETY: by ABI contract a retained snapshot handle may be read and released on any thread, by one
+// thread at a time. Not implementing Sync is what keeps it to one thread at a time.
+unsafe impl Send for RetainedMetricSnapshot {}
+
+impl std::ops::Deref for RetainedMetricSnapshot {
+  type Target = MetricSnapshot<'static>;
+
+  fn deref(&self) -> &Self::Target {
+    &self.snapshot
+  }
+}
+
+impl Drop for RetainedMetricSnapshot {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_release(self.snapshot.envoy_ptr);
     }
   }
 }
@@ -639,6 +703,9 @@ where
 /// [`on_histogram_complete`]: StatSink::on_histogram_complete
 pub trait StatSink: Send + Sync {
   /// Called with a snapshot of the metrics that passed the configured sink predicates.
+  ///
+  /// This runs on the main thread. To format the snapshot elsewhere, call
+  /// [`MetricSnapshot::retain`] and move the [`RetainedMetricSnapshot`] to a worker.
   fn on_flush(&self, snapshot: &MetricSnapshot<'_>);
 
   /// Called for every completed histogram sample. The name is valid only for this call.

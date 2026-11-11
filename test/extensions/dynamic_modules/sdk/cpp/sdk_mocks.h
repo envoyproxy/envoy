@@ -35,6 +35,11 @@ public:
   MOCK_METHOD(void, schedule, (std::function<void()> func), (override));
 };
 
+class MockLoadShedPoint : public LoadShedPoint {
+public:
+  MOCK_METHOD(bool, shouldShedLoad, (), (override));
+};
+
 class MockHttpCalloutCallback : public HttpCalloutCallback {
 public:
   MOCK_METHOD(void, onHttpCalloutDone,
@@ -84,6 +89,8 @@ public:
   MOCK_METHOD((std::optional<GenericSecretID>), subscribeGenericSecret,
               (std::string_view name, std::string_view sds_config_source), (override));
   MOCK_METHOD((std::optional<std::string_view>), getGenericSecret, (GenericSecretID id),
+              (override));
+  MOCK_METHOD(std::unique_ptr<LoadShedPoint>, getLoadShedPoint, (std::string_view name),
               (override));
   MOCK_METHOD(bool, logEnabled, (LogLevel level), (override));
   MOCK_METHOD(void, log, (LogLevel level, std::string_view message, std::source_location location),

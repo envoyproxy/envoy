@@ -41,12 +41,14 @@ envoy_extension_cc_test(
     name = "socket_interface_test",
     srcs = ["socket_interface_test.cc"],
     extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/common:base_includes",
         "//envoy/common:exception_lib",
         "//source/extensions/network/socket_interface/sockmap:config",
         "//source/extensions/network/socket_interface/sockmap:io_handle_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/network/socket_interface/sockmap/v3:pkg_cc_proto",
     ],
 )
@@ -56,7 +58,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["sockmap_integration_test.cc"],
     extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:socket_interface_lib",
@@ -72,7 +77,6 @@ envoy_extension_cc_benchmark_binary(
     name = "sockmap_benchmark",
     srcs = ["sockmap_benchmark.cc"],
     extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/extensions/network/socket_interface/sockmap:bpf_datapath_lib",

@@ -1021,6 +1021,15 @@ func (h *dymNetworkConfigHandle) RecordHistogramValue(
 	return shared.MetricsResult(result)
 }
 
+func (h *dymNetworkConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	loadShedPoint := C.envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+	)
+	runtime.KeepAlive(name)
+	return newLoadShedPoint(loadShedPoint)
+}
+
 func (h *dymNetworkConfigHandle) GetScheduler() shared.Scheduler {
 	if h.scheduler == nil {
 		schedulerPtr := C.envoy_dynamic_module_callback_network_filter_config_scheduler_new(

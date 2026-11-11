@@ -25,11 +25,21 @@ impl Default for EnvoyBuffer<'_> {
   }
 }
 
-impl EnvoyBuffer<'_> {
+impl<'a> EnvoyBuffer<'a> {
   /// This is a helper function to create an [`EnvoyBuffer`] from a byte slice.
   ///
   /// This is meant for use by the end users in unit tests.
-  pub fn new(s: &[u8]) -> Self {
+  /// The returned buffer cannot outlive the slice.
+  ///
+  /// ```compile_fail,E0515
+  /// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyBuffer;
+  ///
+  /// fn dangling_buffer() -> EnvoyBuffer<'static> {
+  ///   let bytes = vec![1, 2, 3];
+  ///   EnvoyBuffer::new(&bytes)
+  /// }
+  /// ```
+  pub fn new(s: &'a [u8]) -> Self {
     Self {
       raw_ptr: s.as_ptr(),
       length: s.len(),
@@ -113,12 +123,26 @@ impl PartialEq<&[u8]> for EnvoyBuffer<'_> {
 
 /// This is exactly the same as [`EnvoyBuffer`] except that it is mutable and data can be written
 /// in-place. See [`EnvoyBuffer`] for more details.
+///
+/// Mutable buffers cannot be cloned because the underlying memory must be borrowed exclusively.
+///
+/// ```compile_fail,E0599
+/// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer;
+///
+/// fn alias(mut buffer: EnvoyMutBuffer<'_>) {
+///   let mut other = buffer.clone();
+///   let first = buffer.as_mut_slice();
+///   let second = other.as_mut_slice();
+///   first[0] = 1;
+///   second[0] = 2;
+/// }
+/// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct EnvoyMutBuffer<'a> {
   raw_ptr: *mut u8,
   length: usize,
-  _marker: std::marker::PhantomData<&'a ()>,
+  _marker: std::marker::PhantomData<&'a mut [u8]>,
 }
 
 impl EnvoyMutBuffer<'_> {
