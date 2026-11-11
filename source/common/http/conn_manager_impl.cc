@@ -54,6 +54,7 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -1801,58 +1802,25 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // RouteConfigProvider; Scoped RDS (SRDS) does not support on-demand VHDS updates.
   if (!filter_manager_.streamInfo().virtualHost().has_value() &&
       connection_manager_.config_->routeConfigProvider() != nullptr &&
-      snapped_route_config_ != nullptr && snapped_route_config_->awaitingInitialVhdsUpdate() &&
-      route_config_update_requester_.has_value() && !request_headers_->getHostValue().empty()) {
-    state_.waiting_for_vhds_ = true;
-    state_.deferred_end_stream_ = end_stream;
-    response_encoder_->getStream().readDisable(true);
-    vhds_update_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(
-        [this](bool) -> void { onInitialVhdsUpdateComplete(); });
-    requestRouteConfigUpdate(vhds_update_callback_);
-    resetIdleTimer();
-    return;
-  }
-
-  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
-    filter_manager_.streamInfo().setTraceReason(
-        ConnectionManagerUtility::mutateTracingRequestHeader(
-            *request_headers_, connection_manager_.runtime_, *connection_manager_.config_,
-            cached_route_.value().get()));
-  }
-
-  const FilterManager::CreateChainResult create_chain_result =
-      filter_manager_.createDownstreamFilterChain();
-  if (create_chain_result.upgradeAccepted()) {
-    connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-    connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-    state_.successful_upgrade_ = true;
-  }
-
-  if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
-    log(AccessLog::AccessLogType::DownstreamStart);
-  }
-
-  // TODO if there are no filters when starting a filter iteration, the connection manager
-  // should return 404. The current returns no response if there is no router filter.
-  if (hasCachedRoute()) {
-    // Do not allow upgrades if the route does not support it.
-    if (create_chain_result.upgradeRejected()) {
-      // While downstream servers should not send upgrade payload without the upgrade being
-      // accepted, err on the side of caution and refuse to process any further requests on this
-      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
-      // contains a smuggled HTTP request.
-      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
-      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
+      snapped_route_config_ != nullptr && snapped_route_config_->awaitingInitialVhdsUpdate()) {
+    const absl::string_view vhost_domain =
+        snapped_route_config_->vhostHeaderValue(*request_headers_);
+    if (!vhost_domain.empty()) {
+      state_.waiting_for_vhds_ = true;
+      state_.deferred_end_stream_ = end_stream;
+      response_encoder_->getStream().readDisable(true);
+      vhds_update_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(
+          [this](bool) -> void { onInitialVhdsUpdateComplete(); });
+      connection_manager_.config_->routeConfigProvider()->requestVirtualHostsUpdate(
+          absl::AsciiStrToLower(vhost_domain), *connection_manager_.dispatcher_,
+          vhds_update_callback_);
+      resetIdleTimer();
       return;
     }
-    // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  // Check if tracing is enabled.
-  if (connection_manager_tracing_config_.has_value()) {
-    traceRequest();
+  if (!createFilterChainAndTraceRequest()) {
+    return;
   }
 
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
@@ -2905,22 +2873,7 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   return true;
 }
 
-void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
-  if (canDestroyStream() || !state_.waiting_for_vhds_) {
-    return;
-  }
-  state_.waiting_for_vhds_ = false;
-  vhds_update_callback_.reset();
-  response_encoder_->getStream().readDisable(false);
-
-  refreshRouteConfigSnapshot();
-  clearRouteCache();
-  refreshCachedRoute();
-
-  ScopeTrackerScopeState scope(this,
-                               connection_manager_.read_callbacks_->connection().dispatcher());
-  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
-
+bool ConnectionManagerImpl::ActiveStream::createFilterChainAndTraceRequest() {
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     filter_manager_.streamInfo().setTraceReason(
         ConnectionManagerUtility::mutateTracingRequestHeader(
@@ -2940,18 +2893,50 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
     log(AccessLog::AccessLogType::DownstreamStart);
   }
 
+  // TODO if there are no filters when starting a filter iteration, the connection manager
+  // should return 404. The current returns no response if there is no router filter.
   if (hasCachedRoute()) {
+    // Do not allow upgrades if the route does not support it.
     if (create_chain_result.upgradeRejected()) {
+      // While downstream servers should not send upgrade payload without the upgrade being
+      // accepted, err on the side of caution and refuse to process any further requests on this
+      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
+      // contains a smuggled HTTP request.
       filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
-      return;
+      return false;
     }
+    // Allow non websocket requests to go through websocket enabled routes.
   }
 
+  // Check if tracing is enabled.
   if (connection_manager_tracing_config_.has_value()) {
     traceRequest();
+  }
+
+  return true;
+}
+
+void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
+  if (canDestroyStream() || !state_.waiting_for_vhds_) {
+    return;
+  }
+  state_.waiting_for_vhds_ = false;
+  vhds_update_callback_.reset();
+  response_encoder_->getStream().readDisable(false);
+
+  refreshRouteConfigSnapshot();
+  clearRouteCache();
+  refreshCachedRoute();
+
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
+
+  if (!createFilterChainAndTraceRequest()) {
+    return;
   }
 
   state_.deferred_to_next_io_iteration_ = true;

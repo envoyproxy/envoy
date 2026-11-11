@@ -144,6 +144,8 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
   ON_CALL(*this, awaitingInitialVhdsUpdate()).WillByDefault(Return(false));
+  ON_CALL(*this, warmingBlocksUnmatchedRequests()).WillByDefault(Return(false));
+  ON_CALL(*this, vhostHeader()).WillByDefault(ReturnRef(vhost_header_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, ignorePathParametersInPathMatching()).WillByDefault(Return(false));

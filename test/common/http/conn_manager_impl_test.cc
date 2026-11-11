@@ -6186,5 +6186,91 @@ TEST_F(HttpConnectionManagerImplTest, StaticVirtualHostWithUnmatchedRouteIsNotHe
   doRemoteClose();
 }
 
+TEST_F(HttpConnectionManagerImplTest, InitialVhdsWaitUsesAlternateVhostHeader) {
+  const Http::LowerCaseString vhost_header("x-vhost");
+  setup();
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  ON_CALL(*route_config_provider_.route_config_, vhostHeader())
+      .WillByDefault(ReturnRef(vhost_header));
+  EXPECT_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillOnce(Return(true))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(Router::VirtualHostRoute{}))
+      .WillRepeatedly(Return(
+          Router::VirtualHostRoute{route_config_provider_.route_config_->route_->virtual_host_,
+                                   route_config_provider_.route_config_->route_}));
+
+  Http::RouteConfigUpdatedCallbackSharedPtr captured_vhds_cb;
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("custom.lyft.com", _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Event::Dispatcher&,
+                     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+            captured_vhds_cb = route_config_updated_cb.lock();
+          }));
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "ignored.lyft.com"},
+                                                             {"x-vhost", "Custom.Lyft.Com"},
+                                                             {":method", "POST"},
+                                                             {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(captured_vhds_cb, nullptr);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&filter_factory_));
+
+  setupFilterChain(1, 0);
+  EXPECT_CALL(response_encoder_.stream_, readDisable(false));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  (*captured_vhds_cb)(true);
+  captured_vhds_cb.reset();
+
+  doRemoteClose();
+}
+
+TEST_F(HttpConnectionManagerImplTest, InitialVhdsWaitDoesNotHoldWhenAlternateVhostHeaderMissing) {
+  const Http::LowerCaseString vhost_header("x-vhost");
+  setup();
+  setupFilterChain(1, 0);
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  ON_CALL(*route_config_provider_.route_config_, vhostHeader())
+      .WillByDefault(ReturnRef(vhost_header));
+  ON_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillRepeatedly(Return(Router::VirtualHostRoute{}));
+
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+  EXPECT_CALL(response_encoder_.stream_, readDisable(_)).Times(0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "dynamic.lyft.com"}, {":method", "GET"}, {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  doRemoteClose();
+}
+
 } // namespace Http
 } // namespace Envoy

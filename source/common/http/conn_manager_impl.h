@@ -472,6 +472,7 @@ private:
     // Return true if this stream was deferred and dispatched pending headers, body and trailers (if
     // present). Return false if this stream was not deferred.
     bool onDeferredRequestProcessing();
+    bool createFilterChainAndTraceRequest();
     void onInitialVhdsUpdateComplete();
 
     ConnectionManagerImpl& connection_manager_;

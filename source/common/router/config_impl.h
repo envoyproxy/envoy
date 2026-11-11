@@ -1462,6 +1462,10 @@ public:
   }
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return uses_vhds_; }
+  bool warmingBlocksUnmatchedRequests() const override {
+    return warming_blocks_unmatched_requests_;
+  }
+  const Http::LowerCaseString& vhostHeader() const override { return vhost_header_; }
   bool mostSpecificHeaderMutationsWins() const override {
     return most_specific_header_mutations_wins_;
   }
@@ -1493,9 +1497,11 @@ private:
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   RouteMetadataPackPtr metadata_;
   RouteSpecifierList route_specifiers_;
+  const Http::LowerCaseString vhost_header_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;
+  const bool warming_blocks_unmatched_requests_ : 1;
   const bool most_specific_header_mutations_wins_ : 1;
   const bool ignore_path_parameters_in_path_matching_ : 1;
 };
@@ -1537,6 +1543,12 @@ public:
   void setAwaitingInitialVhdsUpdate(bool awaiting) { awaiting_initial_vhds_update_ = awaiting; }
   bool awaitingInitialVhdsUpdate() const override { return awaiting_initial_vhds_update_; }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
+  bool warmingBlocksUnmatchedRequests() const override {
+    return shared_config_->warmingBlocksUnmatchedRequests();
+  }
+  const Http::LowerCaseString& vhostHeader() const override {
+    return shared_config_->vhostHeader();
+  }
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
   }
@@ -1590,6 +1602,7 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
+  const Http::LowerCaseString& vhostHeader() const override { return vhost_header_; }
   bool mostSpecificHeaderMutationsWins() const override { return false; }
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -1599,6 +1612,7 @@ public:
 private:
   std::vector<Http::LowerCaseString> internal_only_headers_;
   const std::string name_;
+  const Http::LowerCaseString vhost_header_{""};
 };
 
 } // namespace Router

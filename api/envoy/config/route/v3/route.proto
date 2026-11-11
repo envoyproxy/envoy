@@ -212,7 +212,8 @@ message Vhds {
   // instead, only HTTP requests that do not match an existing virtual host (including a catch-all
   // ``*`` virtual host, if configured) are held until the initial wildcard VHDS update completes.
   // Per-domain on-demand VHDS requests (via the ``envoy.filters.http.on_demand`` HTTP filter) are
-  // not issued when this option is enabled. When unset, initial VHDS warming blocks listener and
-  // route initialization (blocking all requests).
+  // not issued when this option is enabled. When unset, initial VHDS warming at startup blocks
+  // listener and route initialization (blocking all requests until the initial VHDS update
+  // completes).
   WarmingBlocksUnmatchedRequests warming_blocks_unmatched_requests = 2;
 }

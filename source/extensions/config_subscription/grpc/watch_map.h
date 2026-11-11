@@ -38,9 +38,11 @@ struct Watch {
   bool state_of_the_world_empty_{true};
   // Glob patterns this watch accepts via accept() (the "*" wildcard and/or
   // "<prefix>/*" suffix globs). These affect routing only and never the subscription; a watch that
-  // holds any of them is never treated as a catch-all (empty-interest) wildcard watch. This is the
-  // forward index; the WatchMap keeps the reverse index in accept_wildcard_watches_ and
-  // accept_prefix_watches_ (mirroring resource_names_ <-> watch_interest_).
+  // holds any of them is removed from wildcard_watches_ so it only receives resources matching
+  // these patterns (plus its concrete names), without suppressing empty delta updates when its
+  // wire subscription is wildcard. This is the forward index; the WatchMap keeps the reverse index
+  // in accept_wildcard_watches_ and accept_prefix_watches_ (mirroring resource_names_ <->
+  // watch_interest_).
   absl::flat_hash_set<std::string> accept_patterns_;
 };
 
@@ -115,10 +117,11 @@ public:
   // Declares the routing-acceptance patterns for the given watch (replacing any previously declared
   // patterns). These are evaluated FIRST and take precedence: a watch that has declared any accept
   // pattern is routed only the resources matching 'patterns' (plus the concrete names it watches),
-  // and is never treated as a catch-all wildcard watch -- even if its resource_names_ is empty or
+  // rather than catch-all named-resource routing -- even if its resource_names_ is empty or
   // contains "*". This lets a watch subscribe to the wildcard on the wire while routing only a
-  // subset (e.g. VHDS virtual hosts under a route configuration). To keep wildcard routing, include
-  // "*" in the patterns.
+  // subset (e.g. VHDS virtual hosts under a route configuration), without suppressing empty delta
+  // updates when its wire subscription is wildcard. To keep wildcard resource routing, include "*"
+  // in the patterns.
   //
   // Each pattern must be the wildcard "*" (accept every resource) or a "<prefix>/*" glob (accept
   // every resource named "<prefix>/..."). Unlike updateWatchInterest(), this
