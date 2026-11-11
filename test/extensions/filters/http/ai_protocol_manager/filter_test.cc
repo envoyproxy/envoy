@@ -1711,8 +1711,8 @@ TEST_F(AiProtocolManagerFilterStateTest, FilterStateDoesNotDeclareARequestThatCa
   }
 }
 
-// A catch-all route, such as a dynamic forward proxy's, declares no API: the AI filters still run
-// over a payload parse_unconfigured_routes parsed, and are left to detect the API themselves.
+// A dynamic forward proxy's catch-all route declares no API, but its parsed payload still runs the
+// AI filters.
 TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRoute) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
   createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
@@ -1733,8 +1733,6 @@ TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRoute) {
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// A best-effort payload that fails to parse leaves the AI filters no document, so it is forwarded
-// as received without them.
 TEST_F(AiProtocolManagerFilterTest, UnparsedPayloadOnUnconfiguredRouteRunsNoAiFilters) {
   int built = 0;
   createFilterWithAiFilters({[&](const AiFilterContext&) -> AiFilterSharedPtr {

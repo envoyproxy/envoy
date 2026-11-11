@@ -333,8 +333,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
               llmProtocolName(request_protocol_));
   }
 
-  // Declared AI endpoints are parsed strictly; other requests -- such as a dynamic forward
-  // proxy's catch-all route, where schema validation detects the API -- only if
+  // Declared AI endpoints are parsed strictly; other routes are only parsed if
   // parse_unconfigured_routes is enabled and the request can be buffered without stalling.
   // TODO(penguingao): on best-effort parse failure, flush buffered headers/body immediately
   // and stream the rest through instead of buffering until end-of-stream.

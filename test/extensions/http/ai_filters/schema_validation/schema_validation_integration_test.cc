@@ -17,8 +17,7 @@ class SchemaValidationIntegrationTest : public testing::TestWithParam<Network::A
 public:
   SchemaValidationIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  // The route declares an AI endpoint without naming its API, unless it is a catch-all left to
-  // parse_unconfigured_routes.
+  // The route declares an AI endpoint without naming its API, or with declare_route false, nothing.
   void initializeFilters(bool with_filter_state, bool fail_open = false,
                          bool declare_route = true) {
     if (declare_route) {
@@ -117,8 +116,7 @@ TEST_P(SchemaValidationIntegrationTest, FailOpenForwardsAViolation) {
   test_server_->waitForCounter("ai_protocol_manager.schema_validation.invalid", testing::Eq(1));
 }
 
-// A catch-all route, as a dynamic forward proxy uses, declares no API; the payload still reaches
-// schema validation, which detects the API and holds it to that API's schema.
+// A dynamic forward proxy's catch-all route declares nothing; schema validation detects the API.
 TEST_P(SchemaValidationIntegrationTest, UnconfiguredRouteDetectsTheApi) {
   initializeFilters(/*with_filter_state=*/false, /*fail_open=*/false, /*declare_route=*/false);
   expectForwarded(sendRequest("/v1/messages", AnthropicPayload), AnthropicPayload);
