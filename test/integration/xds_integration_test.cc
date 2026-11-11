@@ -761,9 +761,9 @@ TEST_P(LdsIntegrationTest, SotwUpdateKeepsListenerOfAnotherComponent) {
   EXPECT_EQ(2, test_server_->gauge("listener_manager.total_listeners_active")->value());
 }
 
-// Verify that a SotW LDS update keeps a listener that LDS delivered without a name, so delivering
-// it again adds another listener.
-TEST_P(LdsIntegrationTest, SotwUpdateKeepsListenerWithoutAName) {
+// Verify that a SotW LDS update replaces a listener that LDS delivered without a name, since LDS
+// generates a new name for it on every update.
+TEST_P(LdsIntegrationTest, SotwUpdateReplacesListenerWithoutAName) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_static_resources()->mutable_listeners(0)->clear_name();
@@ -773,8 +773,8 @@ TEST_P(LdsIntegrationTest, SotwUpdateKeepsListenerWithoutAName) {
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.setLds("1");
   test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
-  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(2));
-  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_removed")->value());
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_removed")->value());
 }
 
 // Verify that without tracking a SotW LDS update removes a listener that another component added.

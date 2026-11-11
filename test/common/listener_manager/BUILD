@@ -258,8 +258,10 @@ envoy_cc_test(
     ],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//source/common/config:decoded_resource_lib",
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/init:init_mocks",

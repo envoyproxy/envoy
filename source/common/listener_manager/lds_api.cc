@@ -9,6 +9,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
@@ -19,28 +21,55 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+
+// Generates a UUID name for a listener without one, as the listener manager would, so that a SotW
+// update can remove the listener by that name.
+class ListenerResourceDecoder
+    : public Config::OpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener> {
+public:
+  ListenerResourceDecoder(ProtobufMessage::ValidationVisitor& validation_visitor,
+                          Random::RandomGenerator& random)
+      : OpaqueResourceDecoderImpl(validation_visitor, "name"), random_(random) {}
+
+  // Config::OpaqueResourceDecoder
+  Protobuf::Arena::UniquePtr<Protobuf::Message> decodeResource(const Protobuf::Any& resource,
+                                                               Protobuf::Arena& arena) override {
+    Protobuf::Arena::UniquePtr<Protobuf::Message> message =
+        OpaqueResourceDecoderImpl::decodeResource(resource, arena);
+    auto& listener = Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(*message);
+    if (listener.name().empty()) {
+      listener.set_name(random_.uuid());
+    }
+    return message;
+  }
+
+private:
+  Random::RandomGenerator& random_;
+};
+
+} // namespace
 
 LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        const xds::core::v3::ResourceLocator* lds_resources_locator,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
-                       ProtobufMessage::ValidationVisitor& validation_visitor)
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       Random::RandomGenerator& random)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")),
-      resource_type_helper_(validation_visitor, "name"),
+      resource_decoder_(std::make_shared<ListenerResourceDecoder>(validation_visitor, random)),
       init_target_("LDS", [this]() { subscription_->start({}); }) {
-  const auto resource_name = resource_type_helper_.getResourceName();
+  const auto resource_name = Config::getResourceName<envoy::config::listener::v3::Listener>();
   if (lds_resources_locator == nullptr) {
-    subscription_ =
-        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
-                                  lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-                                  resource_type_helper_.resourceDecoder(), {}),
-                              Config::SubscriptionPtr);
+    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                              lds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ =
-        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().collectionSubscriptionFromUrl(
-                                  *lds_resources_locator, lds_config, resource_name, *scope_, *this,
-                                  resource_type_helper_.resourceDecoder()),
-                              Config::SubscriptionPtr);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }

@@ -88,7 +88,6 @@ directories:
   source/extensions/watchdog: 83.3  # Death tests within extensions
   source/extensions/watchdog/backtrace_action: 91.0
   source/extensions/listener_managers: 77.8
-  source/extensions/listener_managers/validation_listener_manager: 77.8
   source/extensions/watchdog/profile_action: 86.1
   source/server: 93.3  # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
   source/server/config_validation: 93.4
