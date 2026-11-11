@@ -9,7 +9,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/common/cleanup.h"
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -24,6 +23,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -856,6 +856,9 @@ TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailureResolvesWarming) {
 
 class WarmingPerRouteFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
+  explicit WarmingPerRouteFilterFactory(Init::TargetImpl& init_target)
+      : init_target_(init_target) {}
+
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
@@ -874,23 +877,21 @@ public:
   createHttpFilterRouteConfig(const Protobuf::Message&,
                               Server::Configuration::ServerFactoryContext&,
                               Server::Configuration::ExtraFactoryContext& extra_context) override {
-    if (init_target_ != nullptr) {
-      extra_context.init_manager->add(*init_target_);
-    }
+    extra_context.init_manager->add(init_target_);
     return std::make_shared<Router::RouteSpecificFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.http.warming_test"; }
 
-  static inline Init::TargetImpl* init_target_{nullptr};
+private:
+  Init::TargetImpl& init_target_;
 };
-
-REGISTER_FACTORY(WarmingPerRouteFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailurePreservesWarmingRdsVersionInfo) {
   Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
-  WarmingPerRouteFilterFactory::init_target_ = &filter_init_target;
-  Cleanup cleanup([]() { WarmingPerRouteFilterFactory::init_target_ = nullptr; });
+  WarmingPerRouteFilterFactory filter_factory(filter_init_target);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      filter_factory);
 
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(

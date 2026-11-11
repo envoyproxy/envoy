@@ -6003,6 +6003,138 @@ TEST_F(HttpConnectionManagerImplTest,
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
+TEST_F(HttpConnectionManagerImplTest,
+       TimeoutWhileWaitingForInitialVhdsWithPausedEncoderFilterAbortsDecoderChain) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup();
+  setupFilterChain(1, 1);
+  ON_CALL(*codec_, protocol()).WillByDefault(Return(Protocol::Http2));
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  ON_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillRepeatedly(Return(Router::VirtualHostRoute{}));
+
+  Http::RouteConfigUpdatedCallbackSharedPtr captured_vhds_cb;
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("dynamic.lyft.com", _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Event::Dispatcher&,
+                     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+            captured_vhds_cb = route_config_updated_cb.lock();
+          }));
+
+  Event::MockTimer* idle_timer = nullptr;
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    idle_timer = setUpTimer();
+    EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _)).Times(2);
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "dynamic.lyft.com"}, {":method", "POST"}, {":path", "/"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(captured_vhds_cb, nullptr);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  idle_timer->invokeCallback();
+
+  // Trailing body frames arriving while the 408 local reply is still paused must not reach decoder
+  // filters whose decodeHeaders() never ran.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  Buffer::OwnedImpl body("hello");
+  decoder_->decodeData(body, false);
+  RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"x-trailer", "value"}}};
+  decoder_->decodeTrailers(std::move(trailers));
+
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("408", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  encoder_filters_[0]->callbacks_->continueEncoding();
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
+TEST_F(HttpConnectionManagerImplTest,
+       UpgradeRejectedAfterInitialVhdsUpdateSends403WithoutDecoding) {
+  setup();
+
+  ON_CALL(*route_config_provider_.route_config_, usesVhds()).WillByDefault(Return(true));
+  EXPECT_CALL(*route_config_provider_.route_config_, awaitingInitialVhdsUpdate())
+      .WillOnce(Return(true))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(Router::VirtualHostRoute{}))
+      .WillRepeatedly(Return(
+          Router::VirtualHostRoute{route_config_provider_.route_config_->route_->virtual_host_,
+                                   route_config_provider_.route_config_->route_}));
+
+  Http::RouteConfigUpdatedCallbackSharedPtr captured_vhds_cb;
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("dynamic.lyft.com", _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Event::Dispatcher&,
+                     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+            captured_vhds_cb = route_config_updated_cb.lock();
+          }));
+
+  EXPECT_CALL(response_encoder_.stream_, readDisable(true));
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _)).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "dynamic.lyft.com"},
+                                                             {":method", "GET"},
+                                                             {":path", "/"},
+                                                             {"connection", "Upgrade"},
+                                                             {"upgrade", "websocket"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(captured_vhds_cb, nullptr);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&filter_factory_));
+
+  auto* decoder_filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("websocket", _, _)).WillOnce(Return(false));
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter});
+        return true;
+      }));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, onStreamComplete());
+  EXPECT_CALL(*decoder_filter, onDestroy());
+  EXPECT_CALL(response_encoder_.stream_, readDisable(false));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("403", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_.stream_, resetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  (*captured_vhds_cb)(true);
+  captured_vhds_cb.reset();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_ws_on_non_ws_route_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, SrdsDoesNotHoldRequestForInitialVhdsUpdate) {
   setup(SetupOpts().setUseSrds(true));
   setupFilterChain(1, 0);

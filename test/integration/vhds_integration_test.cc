@@ -17,6 +17,7 @@
 #include "test/integration/vhds.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -614,7 +615,8 @@ TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
   cleanupUpstreamAndDownstream();
 }
 
-class VhdsWarmingBlocksUnmatchedRequestsIntegrationTest : public VhdsIntegrationTest {
+class VhdsWarmingBlocksUnmatchedRequestsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                          public VhdsIntegrationTest {
 public:
   using RouteConfigModifier = std::function<void(envoy::config::route::v3::RouteConfiguration&)>;
 
@@ -652,8 +654,20 @@ public:
           {warmingBlocksUnmatchedRequestsRdsConfig()}, "1");
     }
 
-    test_server_->waitUntilListenersReady();
-    registerTestServerPorts({"http"});
+    waitForListenerToServe();
+  }
+
+  // Deterministically synchronizes until Envoy's worker and main dispatchers have processed the
+  // incoming requests and queued their initial VHDS update callbacks without advancing SimTime.
+  void waitForHeldRequests(uint64_t expected_downstream_rq_total) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+        "http.config_test.downstream_rq_total", expected_downstream_rq_total);
+    test_server_->waitForWorkerThreads();
+    absl::Notification done;
+    test_server_->server().dispatcher().post([&done] { done.Notify(); });
+    done.WaitForNotification();
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   envoy::config::route::v3::RouteConfiguration warmingBlocksUnmatchedRequestsRdsConfig() const {
@@ -715,8 +729,9 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers2);
 
-  EXPECT_FALSE(response1->waitForEndStream(std::chrono::milliseconds(100)));
-  EXPECT_FALSE(response2->waitForEndStream(std::chrono::milliseconds(50)));
+  waitForHeldRequests(4);
+  EXPECT_FALSE(response1->complete());
+  EXPECT_FALSE(response2->complete());
 
   // 4. Deliver the initial wildcard VHDS response with sni.lyft.com.
   sendInitialVhdsResponse();
@@ -756,7 +771,8 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_FALSE(response->waitForEndStream(std::chrono::milliseconds(100)));
+  waitForHeldRequests(1);
+  EXPECT_FALSE(response->complete());
 
   // 2. Deliver an empty initial wildcard VHDS response (no resources added or removed).
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
@@ -794,9 +810,12 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_FALSE(response->waitForEndStream(std::chrono::milliseconds(100)));
+  waitForHeldRequests(2);
+  EXPECT_FALSE(response->complete());
 
-  test_server_->waitForCounter(vhdsStatPrefix() + "init_fetch_timeout", testing::Eq(1));
+  timeSystem().advanceTimeWaitImpl(std::chrono::seconds(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+      vhdsStatPrefix() + "init_fetch_timeout", 1);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
 
@@ -821,7 +840,8 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_FALSE(response->waitForEndStream(std::chrono::milliseconds(100)));
+  waitForHeldRequests(1);
+  EXPECT_FALSE(response->complete());
 
   // 2. Send an invalid initial VHDS update (duplicate domain) that Envoy rejects and NACKs.
   auto invalid_vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
@@ -938,7 +958,8 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
   Http::TestRequestHeaderMapImpl dynamic_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
   auto dynamic_response = codec_client_->makeHeaderOnlyRequest(dynamic_headers);
-  EXPECT_FALSE(dynamic_response->waitForEndStream(std::chrono::milliseconds(100)));
+  waitForHeldRequests(2);
+  EXPECT_FALSE(dynamic_response->complete());
 
   sendInitialVhdsResponse();
 
@@ -986,7 +1007,8 @@ TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
                                                       {":authority", "vhost.rds.first"},
                                                       {"x-vhost", "SNI.LYFT.COM"}};
   auto held_response = codec_client_->makeHeaderOnlyRequest(custom_vhost_headers);
-  EXPECT_FALSE(held_response->waitForEndStream(std::chrono::milliseconds(100)));
+  waitForHeldRequests(3);
+  EXPECT_FALSE(held_response->complete());
 
   sendInitialVhdsResponse();
 

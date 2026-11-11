@@ -1,5 +1,7 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
+#include <vector>
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
@@ -407,16 +409,24 @@ void WatchMap::onConfigUpdate(
     THROW_IF_NOT_OK(
         cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
   }
-  // notify empty update
+  // Notify empty update to watches with a wildcard wire subscription. Snapshot matching pointers
+  // first so addWatch() inside a callback cannot rehash watches_ mid-iteration or receive the
+  // in-flight empty update.
   if (added_resources.empty() && removed_resources.empty()) {
+    std::vector<Watch*> empty_update_watches;
     for (auto& watch : watches_) {
       if (deferred_removed_during_update_->count(watch.get()) > 0) {
         continue;
       }
-      if (watch->resource_names_.empty() || watch->resource_names_.contains(Wildcard) ||
-          accept_wildcard_watches_.contains(watch.get())) {
-        THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
+      if (watch->resource_names_.empty() || watch->resource_names_.contains(Wildcard)) {
+        empty_update_watches.push_back(watch.get());
       }
+    }
+    for (Watch* watch : empty_update_watches) {
+      if (deferred_removed_during_update_->count(watch) > 0) {
+        continue;
+      }
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
     }
   }
 

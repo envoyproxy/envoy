@@ -2113,8 +2113,11 @@ std::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream:
 }
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
-  state_.waiting_for_vhds_ = false;
-  vhds_update_callback_.reset();
+  if (state_.waiting_for_vhds_) {
+    filter_manager_.abortDecoderFilterChain();
+    state_.waiting_for_vhds_ = false;
+    vhds_update_callback_.reset();
+  }
   // The BadRequest error code indicates there has been a messaging error.
   if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {
@@ -2923,6 +2926,10 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
   if (canDestroyStream() || !state_.waiting_for_vhds_) {
     return;
   }
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
+
   state_.waiting_for_vhds_ = false;
   vhds_update_callback_.reset();
   response_encoder_->getStream().readDisable(false);
@@ -2930,10 +2937,6 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
   refreshRouteConfigSnapshot();
   clearRouteCache();
   refreshCachedRoute();
-
-  ScopeTrackerScopeState scope(this,
-                               connection_manager_.read_callbacks_->connection().dispatcher());
-  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
 
   if (!createFilterChainAndTraceRequest()) {
     return;

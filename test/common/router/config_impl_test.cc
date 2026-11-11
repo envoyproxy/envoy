@@ -7775,6 +7775,7 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ("", config.name());
   EXPECT_FALSE(config.usesVhds());
   EXPECT_FALSE(config.warmingBlocksUnmatchedRequests());
+  EXPECT_FALSE(config.awaitingInitialVhdsUpdate());
   EXPECT_EQ("", config.vhostHeader().get());
   EXPECT_FALSE(config.mostSpecificHeaderMutationsWins());
   EXPECT_EQ(0Ul, config.maxDirectResponseBodySizeBytes());

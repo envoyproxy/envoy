@@ -55,18 +55,13 @@ public:
   /**
    * @return bool whether warming blocks unmatched requests is configured.
    */
-  virtual bool warmingBlocksUnmatchedRequests() const { return false; }
+  virtual bool warmingBlocksUnmatchedRequests() const PURE;
 
   /**
    * @return bool whether the receiver is awaiting the initial wildcard VHDS update.
    */
-  virtual bool awaitingInitialVhdsUpdate() const { return false; }
+  virtual bool awaitingInitialVhdsUpdate() const PURE;
 
-  /**
-   * Called when a VHDS config update fails (e.g. initial-fetch timeout or rejected update).
-   * Transient gRPC stream failures are retried automatically and do not invoke this callback.
-   */
-  virtual void onVhdsFailure() {}
   /**
    * Requests an on-demand VHDS update for the given alias. Does nothing if the current route
    * configuration doesn't configure VHDS.
