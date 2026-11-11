@@ -184,6 +184,7 @@ public:
 
   MockSubscription* subscription_{};
   SubscriptionCallbacks* callbacks_{};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   MockSingletonSubscription* singleton_subscription_{};
   SingletonSubscriptionCallbacks* singleton_callbacks_{};
 };

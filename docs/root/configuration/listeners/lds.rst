@@ -10,8 +10,8 @@ depending on what is required.
 The semantics of listener updates are as follows:
 
 * Every listener must have a unique :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>`. If a name is not
-  provided, Envoy will create a UUID. Listeners delivered by LDS need a unique name supplied by the
-  management server, since LDS updates and removes listeners by name.
+  provided, Envoy will create a UUID. Listeners that are to be dynamically updated should have a
+  unique name supplied by the management server.
 * When a listener is added, it will be "warmed" before taking traffic. For example, if the listener
   references an :ref:`RDS <config_http_conn_man_rds>` configuration, that configuration will be
   resolved and fetched before the listener is moved to "active."

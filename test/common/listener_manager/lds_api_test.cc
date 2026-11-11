@@ -4,9 +4,11 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/config/decoded_resource_impl.h"
 #include "source/common/listener_manager/lds_api.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/init/mocks.h"
@@ -47,9 +49,9 @@ public:
   void setup() {
     envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
-    lds_ =
-        std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
-                                     *store_.rootScope(), listener_manager_, validation_visitor_);
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
+                                        *store_.rootScope(), listener_manager_, validation_visitor_,
+                                        random_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -97,6 +99,23 @@ public:
     return listener;
   }
 
+  envoy::config::listener::v3::Listener buildListenerWithoutAName(const std::string& address) {
+    envoy::config::listener::v3::Listener listener = buildListener(address);
+    listener.clear_name();
+    return listener;
+  }
+
+  // Decodes the listeners with the decoder that LDS gives its subscription.
+  std::unique_ptr<Config::DecodedResourcesWrapper>
+  decodeListeners(const std::vector<envoy::config::listener::v3::Listener>& listeners) {
+    Protobuf::RepeatedPtrField<Protobuf::Any> resources;
+    for (const auto& listener : listeners) {
+      std::ignore = resources.Add()->PackFrom(listener);
+    }
+    return *Config::DecodedResourcesWrapper::create(
+        *cluster_manager_.subscription_factory_.resource_decoder_, resources, "");
+  }
+
   NiceMock<Config::MockXdsManager> xds_manager_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> grpc_mux_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -108,6 +127,7 @@ public:
   Config::SubscriptionCallbacks* lds_callbacks_{};
   std::unique_ptr<LdsApiImpl> lds_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Random::MockRandomGenerator random_;
   TestScopedRuntime scoped_runtime_;
 
 private:
@@ -492,6 +512,27 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
 }
 
+// LDS names the listeners that it receives without a name, so one update adds all of them, and
+// keeps the names of the other listeners.
+TEST_F(LdsApiTest, NamesListenersWithoutAName) {
+  InSequence s;
+  setup();
+
+  EXPECT_CALL(random_, uuid())
+      .WillOnce(Return("generated_name_1"))
+      .WillOnce(Return("generated_name_2"));
+  const auto update =
+      decodeListeners({buildListenerWithoutAName("address1"), buildListener("listener1"),
+                       buildListenerWithoutAName("address2")});
+  makeListenersAndExpectCall({});
+  expectAdd("generated_name_1", {}, true);
+  expectAdd("listener1", {}, true);
+  expectAdd("generated_name_2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(update->refvec_, "0"));
+}
+
 // The runtime guard keeps the listeners of other components on a SotW update, and removes only the
 // received listeners that the update leaves out.
 TEST_F(LdsApiTest, SotwTrackingRuntimeGuardKeepsListenersOfOtherComponents) {
@@ -618,6 +659,31 @@ TEST_F(LdsApiTest, SotwTrackingDisabledTracksListenersByTheirNames) {
   EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_OK(lds_callbacks_->onConfigUpdate({}, "2"));
+}
+
+// A SotW update removes a listener that LDS received without a name by its generated name, so
+// receiving the listener again replaces it instead of adding a copy.
+TEST_F(LdsApiTest, SotwTrackingReplacesListenersWithoutAName) {
+  InSequence s;
+  setSotwTracking(true);
+  setup();
+  const auto listener = buildListenerWithoutAName("address1");
+
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_name_1"));
+  const auto first_update = decodeListeners({listener});
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("generated_name_1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update->refvec_, "0"));
+
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_name_2"));
+  const auto second_update = decodeListeners({listener});
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("generated_name_1")).WillOnce(Return(true));
+  expectAdd("generated_name_2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(second_update->refvec_, "1"));
 }
 
 // A listener whose update fails stays tracked, so a later SotW update removes the version that
