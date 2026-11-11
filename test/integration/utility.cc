@@ -77,12 +77,11 @@ testing::AssertionResult runDispatcherUntilImpl(Event::Dispatcher& dispatcher,
                                                 absl::string_view description,
                                                 std::chrono::milliseconds timeout,
                                                 bool advance_time) {
-  const auto deadline = timeout * TIMEOUT_FACTOR;
   Event::GlobalTimeSystem time_system;
-  Event::TestTimeSystem::RealTimeBound bound(deadline);
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (!condition()) {
     if (!bound.withinBound()) {
-      return testing::AssertionFailure() << "Timed out after " << deadline.count()
+      return testing::AssertionFailure() << "Timed out after " << timeout.count()
                                          << "ms of real time waiting for " << description;
     }
     if (advance_time) {

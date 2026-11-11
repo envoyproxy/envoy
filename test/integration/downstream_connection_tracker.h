@@ -21,7 +21,7 @@ public:
   // Wait for filter-chain initialization to complete without advancing simulated time.
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForConnection(uint64_t count = 1,
-                    std::chrono::milliseconds timeout = std::chrono::seconds(5));
+                    std::chrono::milliseconds timeout = std::chrono::seconds(5) * TIMEOUT_FACTOR);
 
 private:
   class Impl;
