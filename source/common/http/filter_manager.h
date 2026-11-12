@@ -871,6 +871,11 @@ public:
   }
 
   /**
+   * Aborts the decoder filter chain without marking encoding complete.
+   */
+  void abortDecoderFilterChain() { state_.decoder_filter_chain_aborted_ = true; }
+
+  /**
    * Whether the filters have been destroyed.
    */
   bool destroyed() const { return state_.destroyed_; }
