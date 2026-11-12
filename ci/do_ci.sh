@@ -71,6 +71,120 @@ setup_clang_toolchain() {
     echo "clang toolchain configured: ${config}"
 }
 
+# Settings for the `cto.*` targets (see `compile_time_options` below). Each can be overridden with
+# a space-separated list.
+
+# The options every `cto.*` target builds with.
+read -ra CTO_OPTIONS <<< "${CTO_OPTIONS:---config=compile-time-options -c fastbuild}"
+
+# The options their test runs add. They build only what the tests depend on. Targets under test/
+# that no test uses (benchmark, fuzz and tool binaries) are no longer built with these options,
+# only with the defaults by the rest of CI: leaving them out takes about a third off the analysis.
+read -ra CTO_TEST_OPTIONS <<< "${CTO_TEST_OPTIONS:---build_tests_only}"
+
+# The tests run by the targets whose option only reaches part of the tree, unless tests are given
+# on the command line.
+
+# The wasm engine is exercised by the wasm extensions, and has to link and run with the rest of
+# Envoy: the server and the tests that link every extension, the other Rust code (dynamic modules),
+# and signal handling.
+CTO_WASM_TARGETS_DEFAULT=(
+    @envoy//test/common/signal/...
+    @envoy//test/config_test/...
+    @envoy//test/exe/...
+    @envoy//test/extensions/access_loggers/wasm/...
+    @envoy//test/extensions/bootstrap/wasm/...
+    @envoy//test/extensions/common/wasm/...
+    @envoy//test/extensions/dynamic_modules/...
+    @envoy//test/extensions/filters/http/wasm/...
+    @envoy//test/extensions/filters/network/wasm/...
+    @envoy//test/extensions/stats_sinks/wasm/...
+    @envoy//test/server/...)
+read -ra CTO_WASM_TARGETS <<< "${CTO_WASM_TARGETS:-${CTO_WASM_TARGETS_DEFAULT[*]}}"
+
+# The allocator is only visible through `source/common/memory` and the profiler: the tests run
+# with gperftools are the server's (which link and run the binary) and those that observe
+# allocation.
+CTO_ALLOCATOR_TEST_TARGETS_DEFAULT=(
+    @envoy//test/common/memory/...
+    @envoy//test/common/stats/...
+    @envoy//test/exe/...
+    @envoy//test/server/...
+    @envoy//test/common/quic/platform:quic_platform_test
+    @envoy//test/extensions/access_loggers/stats/...
+    @envoy//test/extensions/filters/http/mcp:mcp_json_parser_test
+    @envoy//test/integration:stats_integration_test)
+read -ra CTO_ALLOCATOR_TEST_TARGETS \
+    <<< "${CTO_ALLOCATOR_TEST_TARGETS:-${CTO_ALLOCATOR_TEST_TARGETS_DEFAULT[*]}}"
+
+# Run one `cto.*` subtask. See `compile-time-options` in `.bazelrc`: the non-default build switches
+# that can all be set together. Every subtask builds with that config and adds one thing of its own
+# that the others do not have, so none of them is a base for the rest: an allocator (jemalloc or
+# gperftools), a wasm engine, the admin code disabled, release-mode asserts, or logging disabled.
+# `cto.jemalloc` is the only run with jemalloc, the allocator the rest of CI does not use, and runs
+# the whole tree, as does `cto.noadmin`. The others run the targets their option can affect.
+function cto_subtask() {
+    local subtask="$1"
+    case "$subtask" in
+        cto.jemalloc)
+            echo "Building and testing with the compile-time-options config and jemalloc: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --@envoy//bazel:jemalloc=True \
+                "${TEST_TARGETS[@]}"
+            ;;
+        cto.wamr|cto.wasmtime)
+            local engine="${subtask#cto.}"
+            echo "Testing with wasm engine=${engine}: ${CTO_WASM_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --define wasm="${engine}" \
+                "${CTO_WASM_TARGETS[@]}"
+            ;;
+        cto.gperftools)
+            echo "Testing with gperftools: ${CTO_ALLOCATOR_TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --define tcmalloc=gperftools \
+                "${CTO_ALLOCATOR_TEST_TARGETS[@]}"
+            ;;
+        cto.noadmin)
+            echo "Building and testing with admin_functionality disabled: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --define admin_functionality=disabled \
+                "${TEST_TARGETS[@]}"
+            ;;
+        cto.asserts)
+            # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
+            # these tests under "-c opt" (which replaces any "-c" in CTO_OPTIONS) to save time in CI.
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                -c opt \
+                @envoy//test/common/common:assert_test \
+                @envoy//test/server:server_test
+            # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                -c opt \
+                @envoy//test/common/common:assert_test \
+                --define log_fast_debug_assert_in_release=enabled \
+                --define log_debug_assert_in_release=disabled
+            ;;
+        cto.nolog)
+            echo "Building binary with logging disabled..."
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define enable_logging=disabled \
+                @envoy//source/exe:envoy-static
+            collect_build_profile build
+            ;;
+        *)
+            echo "Unknown compile-time options subtask: ${subtask}" >&2
+            exit 1
+            ;;
+    esac
+}
+
 function collect_build_profile() {
     local output_base
     declare -g build_profile_count=${build_profile_count:-1}
@@ -454,63 +568,26 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options)
-        # See `compile-time-options` in `.bazelrc`
+    compile_time_options|cto*)
         setup_clang_toolchain
-        # This doesn't go into CI but is available for developer convenience.
-        echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-        if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
-            echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                --config=compile-time-options \
-                --define tcmalloc=gperftools \
-                --define wasm=wamr \
-                -c fastbuild \
-                "${TEST_TARGETS[@]}"
+        if [[ $# -ge 1 ]]; then
+            # Tests given on the command line replace the lists of the subtasks that have one.
+            CTO_WASM_TARGETS=("${TEST_TARGETS[@]}")
+            CTO_ALLOCATOR_TEST_TARGETS=("${TEST_TARGETS[@]}")
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
-            exit 0
-        fi
-        echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wasmtime \
-            --define admin_functionality=disabled \
-            --@envoy//bazel:jemalloc=True \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}"
-        # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
-        # these tests under "-c opt" to save time in CI.
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
-            -c opt \
-            @envoy//test/common/common:assert_test \
-            @envoy//test/server:server_test
-        # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
-            -c opt \
-            @envoy//test/common/common:assert_test \
-            --define log_fast_debug_assert_in_release=enabled \
-            --define log_debug_assert_in_release=disabled
-        echo "Building binary with wasm=wasmtime... and logging disabled"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
-            --define enable_logging=disabled \
-            -c fastbuild \
-            @envoy//source/exe:envoy-static
-        collect_build_profile build
+        case "$CI_TARGET" in
+            compile_time_options|cto|cto.all)
+                # TODO(phlax): add `cto.wasmtime` back once the wasmtime tests are re-enabled on this branch.
+                # for subtask in cto.asserts cto.gperftools cto.jemalloc cto.noadmin cto.nolog cto.wamr cto.wasmtime; do
+                for subtask in cto.asserts cto.gperftools cto.jemalloc cto.noadmin cto.nolog cto.wamr; do
+                    cto_subtask "$subtask"
+                done
+                ;;
+            *)
+                cto_subtask "$CI_TARGET"
+                ;;
+        esac
         ;;
 
     config)
