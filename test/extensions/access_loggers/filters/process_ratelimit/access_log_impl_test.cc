@@ -220,7 +220,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
   expectWritesAndLog(log, /*expect_write_times=*/0, /*log_call_times=*/1);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->advanceTimeWait(std::chrono::seconds(1));
   // Next log is written, following one is rate limited.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
@@ -244,7 +244,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->advanceTimeWait(std::chrono::seconds(1));
   expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 }
@@ -268,7 +268,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->advanceTimeWait(std::chrono::seconds(1));
   expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 }
@@ -319,7 +319,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, RemoveAndAddResource) {
       callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->advanceTimeWait(std::chrono::seconds(1));
 
   // 2. Remove the token bucket.
   callbacks_["token_bucket_name"]->onResourceRemoved();
@@ -338,7 +338,6 @@ fill_interval:
   EXPECT_OK(
       callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   // The rate limiter should be working with the new config.
-  // time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
   expectWritesAndLog(log1, /*expect_write_times=*/3, /*log_call_times=*/4);
 
   // A new log instance should also pick up the re-added config.
@@ -348,7 +347,7 @@ fill_interval:
   // It shares the same token bucket, so it's rate limited.
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
+  time_system_->advanceTimeWait(std::chrono::seconds(3));
   expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
 }
 
@@ -368,7 +367,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter,
       callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->advanceTimeWait(std::chrono::seconds(1));
 
   // 2. Remove the token bucket.
   callbacks_["token_bucket_name"]->onResourceRemoved();
@@ -399,7 +398,7 @@ fill_interval:
   // It shares the same token bucket, so it's rate limited.
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
+  time_system_->advanceTimeWait(std::chrono::seconds(3));
   expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
 }
 

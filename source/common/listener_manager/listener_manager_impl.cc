@@ -665,6 +665,9 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(add_or_update_status.status().message());
     std::ignore = it->second->mutable_failed_configuration()->PackFrom(config);
+  } else {
+    // Callers other than LDS do not clear the error states before an update.
+    lds_error_state_tracker_.erase(name);
   }
   return add_or_update_status;
 }
@@ -788,6 +791,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
+  ListenerImplPtr replaced_listener;
 
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
@@ -819,7 +823,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
       new_listener->debugLog("update active listener");
-      *existing_active_listener = std::move(new_listener);
+      replaced_listener = std::exchange(*existing_active_listener, std::move(new_listener));
     }
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
@@ -861,6 +865,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   new_listener_ref.initialize();
+  // Destroying the replaced listener readies its init target, which can finish the server
+  // initialization and start the workers, so it waits until the new listener is set up.
+  replaced_listener.reset();
   return true;
 }
 
@@ -1089,9 +1096,12 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // when it stops listening on the old listener.
   if (!doFinalPreWorkerListenerInit(listener)) {
     incListenerCreateFailureStat();
+    // The removal frees the listener, so the removal callbacks get a copy of its name.
+    const std::string name = listener.name();
+    notifyListenerListenFailureCallbacks(name, /*removed=*/true);
     // TODO(mattklein123): Technically we don't need to remove the active listener if one exists.
     // The following call will remove both.
-    removeListenerInternal(listener.name(), true);
+    removeListenerInternal(name, true);
     return;
   }
   for (const auto& worker : workers_) {
@@ -1151,6 +1161,7 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
           std::make_unique<DeferredDeleteListener>(std::move(*existing_warming_listener)));
       warming_listeners_.erase(existing_warming_listener);
       updateWarmingActiveGauges();
+      notifyListenerListenFailureCallbacks(listener.name(), /*removed=*/false);
       return;
     }
     removed_socket_factories = exclusiveSocketFactories(**existing_active_listener, listener);
@@ -1322,6 +1333,8 @@ uint64_t ListenerManagerImpl::numConnections() const {
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
+  // Callers other than LDS do not clear the error states before a removal.
+  lds_error_state_tracker_.erase(name);
   return removeListenerInternal(name, true);
 }
 
@@ -1419,6 +1432,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
 
     if (!*init_status) {
       incListenerCreateFailureStat();
+      notifyListenerListenFailureCallbacks(listener->name(), /*removed=*/true);
       removeListenerInternal(listener->name(), false);
       continue;
     }
@@ -1757,6 +1771,12 @@ void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listen
 void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {
   notifyListenerCallbacks(
       [&](ListenerUpdateCallbacks* cb) { cb->onListenerRemoval(listener_name); });
+}
+
+void ListenerManagerImpl::notifyListenerListenFailureCallbacks(absl::string_view listener_name,
+                                                               bool removed) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onListenerListenFailure(listener_name, removed); });
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

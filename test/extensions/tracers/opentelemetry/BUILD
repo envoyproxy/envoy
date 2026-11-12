@@ -25,7 +25,7 @@ envoy_extension_cc_test(
         "envoy.tracers.opentelemetry",
         "envoy.tracers.opentelemetry.samplers.always_on",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -55,7 +55,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:trace_exporter",
@@ -70,7 +70,6 @@ envoy_extension_cc_test(
     name = "span_context_extractor_test",
     srcs = ["span_context_extractor_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:status_utility_lib",
@@ -82,7 +81,6 @@ envoy_extension_cc_test(
     name = "b3_span_context_test",
     srcs = ["b3_span_context_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
@@ -95,7 +93,7 @@ envoy_extension_cc_test(
     name = "grpc_trace_exporter_test",
     srcs = ["grpc_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
@@ -108,7 +106,7 @@ envoy_extension_cc_test(
     name = "http_trace_exporter_test",
     srcs = ["http_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/formatter/file_content:config",
         "//source/extensions/tracers/opentelemetry:trace_exporter",
@@ -125,7 +123,7 @@ envoy_extension_cc_test(
     name = "operation_name_test",
     srcs = ["operation_name_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
@@ -141,7 +139,10 @@ envoy_extension_cc_test(
     name = "grpc_trace_exporter_integration_test",
     srcs = ["grpc_trace_exporter_integration_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
@@ -159,7 +160,10 @@ envoy_extension_cc_test(
     name = "http_trace_exporter_integration_test",
     srcs = ["http_trace_exporter_integration_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",

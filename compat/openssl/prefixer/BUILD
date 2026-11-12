@@ -5,9 +5,18 @@ licenses(["notice"])  # Apache 2
 
 # GCC's libstdc++ for the prefixer, from a hermetic GCC repository that a host GCC override does
 # not replace. It is available when Envoy is a dependency too; set this flag to use another.
+# The default follows the CPU the prefixer is built for: libstdc++.a must match its architecture.
+alias(
+    name = "libstdcxx_default",
+    actual = select({
+        "@platforms//cpu:aarch64": "@gcc_runtime_linux_aarch64//:libstdcxx",
+        "//conditions:default": "@gcc_runtime_linux_x86_64//:libstdcxx",
+    }),
+)
+
 label_flag(
     name = "libstdcxx",
-    build_setting_default = "@gcc_runtime_linux_x86_64//:libstdcxx",
+    build_setting_default = ":libstdcxx_default",
 )
 
 cc_binary(

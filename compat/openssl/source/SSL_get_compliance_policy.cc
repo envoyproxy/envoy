@@ -1,7 +1,7 @@
-#include <cstdint>
-
 #include <openssl/ssl.h>
 #include <ossl.h>
+
+#include <cstdint>
 
 #include "ssl_compliance_policy.h"
 

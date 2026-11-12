@@ -25,7 +25,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:resource_monitor_test",
     ],
     extension_names = ["envoy.resource_monitors.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -49,7 +48,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:resource_monitor_synchronous_feedback",
     ],
     extension_names = ["envoy.resource_monitors.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/resource_monitors/dynamic_modules:abi_impl",
         "//source/extensions/resource_monitors/dynamic_modules:resource_monitor_lib",
@@ -68,7 +66,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:resource_monitor_test",
     ],
     extension_names = ["envoy.resource_monitors.dynamic_modules"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/resource_monitors/dynamic_modules:config",
         "//test/integration:http_integration_lib",
