@@ -653,6 +653,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       executeLocalReplyIfPrepared();
       if (!state_.destroyed_) {
         maybeContinueDecoding(continue_data_entry);
+        if (end_stream) {
+          disarmRequestTimeout();
+        }
       }
       return;
     }
@@ -802,7 +805,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
-    if ((*entry)->end_stream_) {
+    if ((*entry)->end_stream_ && !state_.destroyed_) {
       (*entry)->handle_->decodeComplete();
     }
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
@@ -812,9 +815,12 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
-      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace, "decodeData filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
+      executeLocalReplyIfPrepared();
+      if (end_stream && !state_.destroyed_) {
+        disarmRequestTimeout();
+      }
       return;
     }
 
@@ -915,7 +921,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
-    (*entry)->handle_->decodeComplete();
+    if (!state_.destroyed_) {
+      (*entry)->handle_->decodeComplete();
+    }
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
@@ -927,6 +935,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
                        *this, (*entry)->filter_context_.config_name);
       (*entry)->commonHandleAfterTrailersCallback(status);
       executeLocalReplyIfPrepared();
+      if (!state_.destroyed_) {
+        disarmRequestTimeout();
+      }
       return;
     }
 
