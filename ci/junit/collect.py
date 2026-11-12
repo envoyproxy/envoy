@@ -330,6 +330,11 @@ def run_meta(repo, run, job_names, token):
         "base_sha": "",
         "event": run.get("event", ""),
         "url": run.get("html_url", ""),
+        # The run itself, for the results to link back to.
+        "run_id": run.get("id", ""),
+        "run_number": run.get("run_number", ""),
+        "run_attempt": run.get("run_attempt", ""),
+        "workflow": run.get("name", ""),
         # Lets a watermark prune old entries by age without another GitHub API call.
         "created_at": run.get("created_at", ""),
     }
@@ -453,6 +458,8 @@ def main():
                 metas[run["id"]]["jobs"][os.path.basename(job_dir)] = {
                     "name": job["name"],
                     "leg": job_leg(job["name"]),
+                    "id": job["id"],
+                    "url": job.get("html_url", ""),
                 }
             for invocation, labels in found:
                 totals["invocations"] += 1

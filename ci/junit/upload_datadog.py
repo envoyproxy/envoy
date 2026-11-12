@@ -8,8 +8,13 @@ results to the run's actual commit rather than whatever happens to be checked ou
 runs on a schedule, well after any of the runs it's uploading for).
 
 Each upload is also tagged with what the run was (`envoy.trigger`: `pr` or `postsubmit`), the
-branch it was against (`envoy.target_branch`) and the job the tests ran in (`envoy.job`, e.g.
-`tsan`), as the same tests run in many jobs of many kinds of run.
+branch it was against (`envoy.target_branch`), the job the tests ran in (`envoy.job`, e.g.
+`tsan`) and the EngFlow invocation they ran in (`envoy.engflow_invocation`), as the same tests
+run in many jobs of many kinds of run. The CI run and job that Datadog links the results to are
+set to the ones the tests ran in, rather than the one this is uploading from.
+
+Datadog keeps what it is sent as it was sent, so anything the results should carry has to be
+on them when they are uploaded.
 """
 
 import argparse
@@ -117,9 +122,25 @@ def batches(files, max_bytes=MAX_BATCH_BYTES):
         yield batch
 
 
-def run_env(repo, meta):
+def run_env(repo, meta, job):
     env = dict(os.environ)
+    # datadog-ci takes the CI run and job from the environment, which is this upload's. Point it
+    # at the run and job that the tests ran in.
+    for name in ("GITHUB_HEAD_REF", "GITHUB_BASE_REF", "GITHUB_EVENT_PATH", "GITHUB_WORKSPACE"):
+        env.pop(name, None)
     env.update({
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_REPOSITORY": repo,
+        "GITHUB_RUN_ID": str(meta.get("run_id", "")),
+        "GITHUB_RUN_NUMBER": str(meta.get("run_number", "")),
+        "GITHUB_RUN_ATTEMPT": str(meta.get("run_attempt", "")),
+        "GITHUB_WORKFLOW": meta.get("workflow", ""),
+        "GITHUB_JOB": job.get("leg", ""),
+        "GITHUB_SHA": meta.get("sha", ""),
+        "GITHUB_REF": meta.get("branch", ""),
+        "JOB_CHECK_RUN_ID": str(job.get("id", "")),
+        "DD_GITHUB_JOB_NAME": job.get("name", ""),
         "DD_GIT_REPOSITORY_URL": f"https://github.com/{repo}",
         "DD_GIT_COMMIT_SHA": meta.get("sha", ""),
         "DD_GIT_BRANCH": meta.get("branch", ""),
@@ -131,18 +152,18 @@ def run_env(repo, meta):
     return env
 
 
-def run_tags(meta, job):
+def run_tags(meta, job, invocation):
     tags = {
         "envoy.trigger": meta.get("trigger", ""),
         "envoy.target_branch": meta.get("target_branch", ""),
         "envoy.job": job.get("leg", ""),
+        "envoy.engflow_invocation": invocation,
     }
     return [arg for key, value in tags.items() if value for arg in ("--tags", f"{key}:{value}")]
 
 
 def upload(datadog_ci, repo, meta, run_dir, service, dry_run=False):
     # True if all of the run's XML was uploaded, and how many files that was.
-    env = run_env(repo, meta)
     print(f"  sha {meta.get('sha', '')[:12] or '?'}, branch {meta.get('branch', '?')}, "
           f"{meta.get('trigger', '?')} against {meta.get('target_branch', '?')}")
     uploads = []
@@ -151,14 +172,22 @@ def upload(datadog_ci, repo, meta, run_dir, service, dry_run=False):
         if not files:
             continue
         print(f"    {job.get('leg', '?')}: {len(files)} files")
-        uploads += [(job_dir, job, batch) for batch in batches(files)]
+        # collect.py puts each invocation's XML in a directory of its own.
+        invocations = {}
+        for path in files:
+            invocations.setdefault(path.split(os.sep)[0], []).append(path)
+        uploads += [
+            (job_dir, job, invocation, batch)
+            for invocation, paths in invocations.items()
+            for batch in batches(paths)]
 
-    def run(job_dir, job, batch):
+    def run(job_dir, job, invocation, batch):
         command = [
             datadog_ci, "junit", "upload", "--service", service,
-            *run_tags(meta, job), *(["--dry-run"] if dry_run else []), *batch]
+            *run_tags(meta, job, invocation), *(["--dry-run"] if dry_run else []), *batch]
         # Its output is a line for every file, so only shown if it fails.
-        result = subprocess.run(command, env=env, cwd=job_dir, capture_output=True, text=True)
+        result = subprocess.run(
+            command, env=run_env(repo, meta, job), cwd=job_dir, capture_output=True, text=True)
         if result.returncode != 0:
             print(f"    {job.get('leg', '?')}: datadog-ci exited {result.returncode} "
                   f"uploading {len(batch)} files\n{result.stdout[-2000:]}{result.stderr[-2000:]}")
@@ -166,7 +195,7 @@ def upload(datadog_ci, repo, meta, run_dir, service, dry_run=False):
 
     with concurrent.futures.ThreadPoolExecutor(UPLOADS) as pool:
         results = list(pool.map(lambda u: run(*u), uploads))
-    return all(results), sum(len(batch) for (_, _, batch), ok in zip(uploads, results) if ok)
+    return all(results), sum(len(u[3]) for u, ok in zip(uploads, results) if ok)
 
 
 def main():
