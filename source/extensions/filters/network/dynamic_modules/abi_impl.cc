@@ -1335,6 +1335,22 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
 }
 
 // -----------------------------------------------------------------------------
+// Load Shed Point ABI Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name) {
+  auto* filter_config = static_cast<DynamicModuleNetworkFilterConfig*>(filter_config_envoy_ptr);
+  if (!filter_config->load_shed_point_provider_.has_value()) {
+    return nullptr;
+  }
+  return filter_config->load_shed_point_provider_->getLoadShedPoint(
+      absl::string_view(name.ptr, name.length));
+}
+
+// -----------------------------------------------------------------------------
 // Misc ABI Callbacks
 // -----------------------------------------------------------------------------
 

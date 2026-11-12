@@ -96,7 +96,8 @@ public:
     return std::make_unique<LdsApiImpl>(
         lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
         *server_.stats().rootScope(), server_.listenerManager(),
-        server_.messageValidationContext().dynamicValidationVisitor());
+        server_.messageValidationContext().dynamicValidationVisitor(),
+        server_.api().randomGenerator());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
@@ -439,6 +440,7 @@ private:
   void notifyListenerUpdateCallbacks(absl::string_view listener_name,
                                      Network::ListenerConfig& listener_config);
   void notifyListenerRemovalCallbacks(const std::string& listener_name);
+  void notifyListenerListenFailureCallbacks(absl::string_view listener_name, bool removed);
 
   absl::Status validateNoDuplicatedAddress(const std::string& name,
                                            const ListenerImpl& listener) const;

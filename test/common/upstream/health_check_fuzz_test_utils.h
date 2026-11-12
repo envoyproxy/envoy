@@ -63,18 +63,16 @@ public:
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map);
-
-  void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map);
-
-  void expectStreamCreate(size_t index);
-
   void expectSessionCreate();
-  void expectClientCreate(size_t index);
+
+  // Installs the connection and codec client factories for the session at `index`. The mocks they
+  // hand out are created on demand, when the health checker actually asks for them, so the harness
+  // never has to predict whether a timer callback will create a client. Anything created is owned
+  // by the health checker (or its dispatcher's deferred delete list) and cannot leak.
+  void setupClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map);
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_;
-  std::list<uint32_t> codec_index_;
   const HostWithHealthCheckMap health_checker_map_;
 };
 
@@ -86,7 +84,8 @@ public:
 class TcpHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   void expectSessionCreate();
-  void expectClientCreate();
+  // See HttpHealthCheckerImplTestBase::setupClientCreate().
+  void setupClientCreate();
 
   std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
   Network::MockClientConnection* connection_{};

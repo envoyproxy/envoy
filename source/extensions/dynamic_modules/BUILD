@@ -95,6 +95,7 @@ envoy_cc_library(
         ":dynamic_modules_lib",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/server/overload:load_shed_point_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "@abseil-cpp//absl/container:flat_hash_map",

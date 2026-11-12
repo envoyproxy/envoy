@@ -51,7 +51,10 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
               proto_config.filter_name(), config, metrics_namespace, std::move(dynamic_module),
               server_context.clusterManager(), server_context.scope(),
-              server_context.mainThreadDispatcher());
+              server_context.mainThreadDispatcher(),
+              context.shouldBypassOverloadManager()
+                  ? OptRef<Server::LoadShedPointProvider>()
+                  : makeOptRef<Server::LoadShedPointProvider>(server_context.overloadManager()));
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(

@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
     ],
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -43,11 +44,13 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
     ],
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/udp/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
@@ -62,6 +65,7 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_null_config",
     ],
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/udp/dynamic_modules:config",
@@ -83,13 +87,17 @@ envoy_extension_cc_dyn_module_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/extensions/dynamic_modules:util",
+        "//test/integration:base_overload_integration_test_lib",
         "//test/integration:integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",

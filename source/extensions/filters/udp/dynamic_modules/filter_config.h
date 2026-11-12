@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -22,13 +23,18 @@ public:
   DynamicModuleUdpListenerFilterConfig(
       const envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter&
           config,
-      Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope);
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+      OptRef<Server::LoadShedPointProvider> load_shed_point_provider = {});
 
   ~DynamicModuleUdpListenerFilterConfig();
 
   const std::string filter_name_;
   const std::string filter_config_;
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+
+  // The provider of the load shed points that the module can check. It is empty when the factory
+  // context of the filter bypasses the overload manager.
+  const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
 
   envoy_dynamic_module_type_udp_listener_filter_config_module_ptr in_module_config_{nullptr};
 

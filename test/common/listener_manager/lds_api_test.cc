@@ -4,9 +4,11 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/config/decoded_resource_impl.h"
 #include "source/common/listener_manager/lds_api.h"
 #include "source/common/protobuf/utility.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/init/mocks.h"
@@ -15,6 +17,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -35,14 +38,20 @@ public:
     ON_CALL(init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     });
+    setSotwTracking(false);
+  }
+
+  void setSotwTracking(bool enabled) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.lds_sotw_track_resources", enabled ? "true" : "false"}});
   }
 
   void setup() {
     envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
-    lds_ =
-        std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
-                                     *store_.rootScope(), listener_manager_, validation_visitor_);
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
+                                        *store_.rootScope(), listener_manager_, validation_visitor_,
+                                        random_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -90,6 +99,23 @@ public:
     return listener;
   }
 
+  envoy::config::listener::v3::Listener buildListenerWithoutAName(const std::string& address) {
+    envoy::config::listener::v3::Listener listener = buildListener(address);
+    listener.clear_name();
+    return listener;
+  }
+
+  // Decodes the listeners with the decoder that LDS gives its subscription.
+  std::unique_ptr<Config::DecodedResourcesWrapper>
+  decodeListeners(const std::vector<envoy::config::listener::v3::Listener>& listeners) {
+    Protobuf::RepeatedPtrField<Protobuf::Any> resources;
+    for (const auto& listener : listeners) {
+      std::ignore = resources.Add()->PackFrom(listener);
+    }
+    return *Config::DecodedResourcesWrapper::create(
+        *cluster_manager_.subscription_factory_.resource_decoder_, resources, "");
+  }
+
   NiceMock<Config::MockXdsManager> xds_manager_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> grpc_mux_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -101,6 +127,8 @@ public:
   Config::SubscriptionCallbacks* lds_callbacks_{};
   std::unique_ptr<LdsApiImpl> lds_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Random::MockRandomGenerator random_;
+  TestScopedRuntime scoped_runtime_;
 
 private:
   std::list<NiceMock<Network::MockListenerConfig>> listeners_;
@@ -482,6 +510,232 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
   EXPECT_OK(lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
+}
+
+// LDS names the listeners that it receives without a name, so one update adds all of them, and
+// keeps the names of the other listeners.
+TEST_F(LdsApiTest, NamesListenersWithoutAName) {
+  InSequence s;
+  setup();
+
+  EXPECT_CALL(random_, uuid())
+      .WillOnce(Return("generated_name_1"))
+      .WillOnce(Return("generated_name_2"));
+  const auto update =
+      decodeListeners({buildListenerWithoutAName("address1"), buildListener("listener1"),
+                       buildListenerWithoutAName("address2")});
+  makeListenersAndExpectCall({});
+  expectAdd("generated_name_1", {}, true);
+  expectAdd("listener1", {}, true);
+  expectAdd("generated_name_2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(update->refvec_, "0"));
+}
+
+// The runtime guard keeps the listeners of other components on a SotW update, and removes only the
+// received listeners that the update leaves out.
+TEST_F(LdsApiTest, SotwTrackingRuntimeGuardKeepsListenersOfOtherComponents) {
+  InSequence s;
+  setSotwTracking(true);
+  setup();
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("listener1", {}, true);
+  expectAdd("listener2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  const auto first_update =
+      TestUtility::decodeResources({buildListener("listener1"), buildListener("listener2")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update.refvec_, "0"));
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  expectAdd("listener2", {}, false);
+  expectAdd("listener3", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  const auto second_update =
+      TestUtility::decodeResources({buildListener("listener2"), buildListener("listener3")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(second_update.refvec_, "1"));
+  EXPECT_EQ("1", lds_->versionInfo());
+}
+
+// With the guard disabled, a SotW update removes every listener not in it.
+TEST_F(LdsApiTest, SotwTrackingRuntimeGuardDisabledRemovesAllMissingListeners) {
+  InSequence s;
+  setup();
+
+  makeListenersAndExpectCall({});
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  const auto first_update = TestUtility::decodeResources({buildListener("listener1")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update.refvec_, "0"));
+
+  makeListenersAndExpectCall({"listener1", "other_listener"});
+  // The removal order depends on the hash set iteration order.
+  std::vector<std::string> removed;
+  EXPECT_CALL(listener_manager_, removeListener(_))
+      .Times(2)
+      .WillRepeatedly([&removed](const std::string& name) {
+        removed.push_back(name);
+        return true;
+      });
+  expectAdd("listener2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  const auto second_update = TestUtility::decodeResources({buildListener("listener2")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(second_update.refvec_, "1"));
+  EXPECT_THAT(removed, testing::UnorderedElementsAre("listener1", "other_listener"));
+}
+
+// Listeners received while the guard was disabled are still tracked.
+TEST_F(LdsApiTest, SotwTrackingEnabledAtRuntimeRemovesPreviouslyReceivedListeners) {
+  InSequence s;
+  setup();
+
+  makeListenersAndExpectCall({});
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  const auto first_update = TestUtility::decodeResources({buildListener("listener1")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update.refvec_, "0"));
+
+  setSotwTracking(true);
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  expectAdd("listener2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  const auto second_update = TestUtility::decodeResources({buildListener("listener2")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(second_update.refvec_, "1"));
+}
+
+// A SotW update removes a listener by its own name, which can differ from its resource name, and
+// keeps it while the updates deliver it.
+TEST_F(LdsApiTest, SotwTrackingRemovesListenersByTheirNames) {
+  InSequence s;
+  setSotwTracking(true);
+  setup();
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  const auto first_update = TestUtility::decodeResources<envoy::config::listener::v3::Listener>(
+      {{"collection/entry", buildListener("listener1")}});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update.refvec_, "0"));
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("listener1", {}, false);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update.refvec_, "1"));
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate({}, "2"));
+}
+
+// A listener whose resource name differs from its name stays tracked while the guard is disabled.
+TEST_F(LdsApiTest, SotwTrackingDisabledTracksListenersByTheirNames) {
+  InSequence s;
+  setup();
+  const auto update = TestUtility::decodeResources<envoy::config::listener::v3::Listener>(
+      {{"collection/entry", buildListener("listener1")}});
+  makeListenersAndExpectCall({});
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(update.refvec_, "0"));
+
+  // The removal path compares resource names, so it removes the listener and adds it again.
+  makeListenersAndExpectCall({"listener1"});
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(update.refvec_, "1"));
+
+  setSotwTracking(true);
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate({}, "2"));
+}
+
+// A SotW update removes a listener that LDS received without a name by its generated name, so
+// receiving the listener again replaces it instead of adding a copy.
+TEST_F(LdsApiTest, SotwTrackingReplacesListenersWithoutAName) {
+  InSequence s;
+  setSotwTracking(true);
+  setup();
+  const auto listener = buildListenerWithoutAName("address1");
+
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_name_1"));
+  const auto first_update = decodeListeners({listener});
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("generated_name_1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(first_update->refvec_, "0"));
+
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_name_2"));
+  const auto second_update = decodeListeners({listener});
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("generated_name_1")).WillOnce(Return(true));
+  expectAdd("generated_name_2", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(second_update->refvec_, "1"));
+}
+
+// A listener whose update fails stays tracked, so a later SotW update removes the version that
+// still serves.
+TEST_F(LdsApiTest, SotwTrackingRemovesAListenerWhoseUpdateFailed) {
+  InSequence s;
+  setSotwTracking(true);
+  setup();
+
+  const auto update = TestUtility::decodeResources({buildListener("listener1")});
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(update.refvec_, "0"));
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
+      .WillOnce(Return(absl::InvalidArgumentError("bad listener")));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_FALSE(lds_callbacks_->onConfigUpdate(update.refvec_, "1").ok());
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate({}, "2"));
+}
+
+// A SotW listener whose TTL expires is no longer tracked, so a later SotW update keeps a listener
+// that another component adds with its name.
+TEST_F(LdsApiTest, SotwTrackingForgetsListenersWhoseTtlExpired) {
+  InSequence s;
+  setSotwTracking(true);
+  setup();
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  expectAdd("listener1", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_CALL(init_watcher_, ready());
+  const auto update = TestUtility::decodeResources({buildListener("listener1")});
+  EXPECT_OK(lds_callbacks_->onConfigUpdate(update.refvec_, "0"));
+
+  Protobuf::RepeatedPtrField<std::string> expired;
+  expired.Add("listener1");
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate({}, expired, ""));
+
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
+  EXPECT_OK(lds_callbacks_->onConfigUpdate({}, "1"));
 }
 
 } // namespace

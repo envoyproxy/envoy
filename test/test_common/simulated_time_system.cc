@@ -1,6 +1,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include <chrono>
+#include <optional>
 
 #include "envoy/event/dispatcher.h"
 
@@ -64,6 +65,16 @@ public:
 
   // From Scheduler.
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& /*dispatcher*/) override;
+
+  // Ignore schedulers whose previous update is still pending. Some dispatchers can be inactive
+  // during an I/O wait, so they must not block the active dispatchers.
+  std::optional<MonotonicTime> nextAlarmTime() {
+    absl::MutexLock lock(mutex_);
+    if (pending_dec_ || registered_alarms_.empty()) {
+      return std::nullopt;
+    }
+    return registered_alarms_.next().time_;
+  }
 
   // Implementation of SimulatedTimeSystemHelper::Alarm methods.
   bool isEnabled(Alarm& alarm) ABSL_LOCKS_EXCLUDED(mutex_);
@@ -348,11 +359,10 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
 // to have more than one around at a time, this variable can be deleted.
 static int instance_count = 0;
 
-// When we initialize our simulated time, we'll start the current time based on
-// the real current time. But thereafter, real-time will not be used, and time
-// will march forward only by calling advanceTimeAndRun() or advanceTimeWait().
+// Initialize system time from real time, and monotonic time above zero so valid timestamps
+// are distinct from uninitialized times. Thereafter, time advances only explicitly.
 SimulatedTimeSystemHelper::SimulatedTimeSystemHelper()
-    : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
+    : monotonic_time_(MonotonicTime(std::chrono::seconds(1))),
       system_time_(real_time_source_.systemTime()) {
   ++instance_count;
   ASSERT(instance_count <= 1);
@@ -380,12 +390,50 @@ void SimulatedTimeSystemHelper::advanceTimeAsyncImpl(const Duration& duration) {
   setMonotonicTimeLockHeld(monotonic_time);
 }
 
-void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration) {
+void SimulatedTimeSystemHelper::setIoDispatcher(Dispatcher* dispatcher) {
   only_one_thread_.checkOneThread();
+  ASSERT(io_dispatcher_ == nullptr || dispatcher == nullptr || io_dispatcher_ == dispatcher);
+  io_dispatcher_ = dispatcher;
+}
+
+void SimulatedTimeSystemHelper::advanceTimeForIoImpl(Dispatcher& dispatcher,
+                                                     const Duration& elapsed) {
+  only_one_thread_.checkOneThread();
+  if (io_dispatcher_ != &dispatcher) {
+    return;
+  }
   absl::MutexLock lock(mutex_);
-  MonotonicTime monotonic_time =
-      monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
-  setMonotonicTimeLockHeld(monotonic_time);
+  std::optional<MonotonicTime> next_alarm;
+  // QUIC upstream alarms can live on worker dispatchers even when the test-thread client uses
+  // HTTP/1 or HTTP/2 and has no armed timers of its own.
+  for (SimulatedScheduler* scheduler : schedulers_) {
+    const auto alarm = scheduler->nextAlarmTime();
+    if (alarm.has_value() && (!next_alarm.has_value() || *alarm < *next_alarm)) {
+      next_alarm = alarm;
+    }
+  }
+  if (next_alarm.has_value()) {
+    setMonotonicTimeLockHeld(std::min(*next_alarm, monotonic_time_ + elapsed));
+  }
+}
+
+void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration) {
+  advanceTimeAsyncImpl(duration);
+  if (io_dispatcher_ != nullptr) {
+    // The calling thread owns this dispatcher, so waiting for it without running it would
+    // deadlock whenever it has armed timers (for example QUIC's ACK or pacing alarms).
+    for (;;) {
+      io_dispatcher_->run(Dispatcher::RunType::NonBlock);
+      {
+        absl::MutexLock lock(mutex_);
+        if (pending_updates_ == 0) {
+          return;
+        }
+      }
+      std::this_thread::yield();
+    }
+  }
+  absl::MutexLock lock(mutex_);
   waitForNoPendingLockHeld();
 }
 

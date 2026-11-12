@@ -43,7 +43,6 @@ jobs:
       pull-requests: read
     outputs:
       env: ${{ steps.data.outputs.value }}
-      caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
     - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
@@ -110,60 +109,72 @@ jobs:
           summary: ${{ steps.summary.outputs.summary }}
         input-format: yaml
         filter: |
+          # `$legacy` is the jobs of a branch that predates the check's targets. Options in
+          # `$ignore` are flags such a branch can already have, so do not show it has the targets.
+          def check_build_jobs($run; $check; $name; $legacy; $ignore):
+            [$run
+             | to_entries[]
+             | select(.key | test("^check-build-\($check)-[a-z0-9-]+$"))
+             | .option = (.key | ltrimstr("check-build-\($check)-"))] as $flags
+            | if ($flags | map(select(.option as $option | any($ignore[]; . == $option) | not)) | length) == 0 then
+                $legacy
+              else
+                [$flags[]
+                 | select(.value)
+                 | {target: "\($check).\(.option | gsub("-"; "_"))",
+                    name: "\($name) (\(.option | gsub("-"; " ")))"}]
+                | sort_by(.target)
+              end;
+          def check_build_jobs($run; $check; $single):
+            check_build_jobs($run; $check; $single.name; [$single]; []);
           .title as $title
           | .env.config.envoy.icon as $icon
           | .link as $link
           | "\($icon) Request ([\($title)](\($link)))" as $linkedTitle
           | .summary as $summary
           | .env
+          # The Check/build jobs a branch sets with run flags in its config: one per
+          # `check-build-<check>-<option>` flag that is set, as the `<check>.<option>` target. A
+          # branch with no flags for a check predates its targets and has the single job it had.
+          | .config.ci["check-build"] = (
+              check_build_jobs(
+                .run; "cto";
+                {target: "compile_time_options", name: "Compile time options", "docker-ci": true})
+              + check_build_jobs(.run; "gcc"; {target: "gcc", name: "GCC"}))
+          # Check/build (OpenSSL) is set the same way with `check-build-openssl-*` flags. Some of its
+          # targets are only for pull requests, and some only for anything else (pushes, schedules).
+          #
+          # Branches that predate the `openssl.*` targets have the `check-build-openssl`,
+          # `check-build-openssl-presubmit` and `check-build-openssl-asan` flags. Their jobs, and
+          # the options ignored for them, can be removed once release/v1.40 and any branch cut
+          # before the `openssl.*` targets landed are no longer supported; a branch with no flags
+          # then needs an empty list.
+          | ((.request.pr // "" | tostring) != "") as $pr
+          | .run as $run
+          | .config.ci["check-build-openssl"] = (
+              check_build_jobs(
+                .run; "openssl"; "OpenSSL";
+                [{target: "openssl", name: "OpenSSL", flag: "check-build-openssl"},
+                 {target: "openssl.presubmit", name: "OpenSSL (presubmit)",
+                  flag: "check-build-openssl-presubmit"},
+                 {target: "openssl.asan", name: "OpenSSL ASAN", flag: "check-build-openssl-asan"}]
+                | map(select($run[.flag]) | del(.flag));
+                ["asan", "presubmit"])
+              | map(select(
+                  .target as $target
+                  | if $pr then
+                      ["openssl", "openssl.asan", "openssl.test"]
+                    else
+                      ["openssl.presubmit", "openssl.test_affected"]
+                    end
+                  | any(.[]; . == $target)
+                  | not)))
           | .summary = {
               $summary,
               $title,
               $link,
               "linked-title": $linkedTitle}
           | del(.config.tables)
-
-    # TODO(phlax): shift this to ci/request action above
-    - name: Check Docker cache (x64)
-      id: cache-exists-docker-x64
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}
-    - name: Check Docker cache (arm64)
-      id: cache-exists-docker-arm64
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
-    - name: Caches
-      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
-      id: caches
-      with:
-        input-format: yaml
-        input: |
-          docker:
-            x64: ${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}
-            arm64: ${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}
-        filter: |
-          .
-
-  cache:
-    permissions:
-      actions: write
-      contents: read
-      packages: read
-    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
-    needs: incoming
-    uses: ./.github/workflows/_request_cache.yml
-    secrets:
-      app-id: ${{ secrets.lock-app-id }}
-      app-key: ${{ secrets.lock-app-key }}
-    with:
-      caches: ${{ needs.incoming.outputs.caches }}
-      env: ${{ needs.incoming.outputs.env }}
 
   checks:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}

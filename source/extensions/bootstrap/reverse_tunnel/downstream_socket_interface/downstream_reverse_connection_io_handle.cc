@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
 #include "absl/strings/string_view.h"
 
@@ -26,6 +27,10 @@ DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
   // Register with the parent so it can null this back-pointer if it is torn down first.
   if (parent_ != nullptr) {
     parent_->registerChildIoHandle(*this);
+    auto* extension = parent_->getDownstreamExtension();
+    if (extension != nullptr && extension->getLocalRegistry() != nullptr) {
+      extension->getLocalRegistry()->registerIoHandle(this);
+    }
   }
 }
 
@@ -81,6 +86,10 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
   close();
   if (parent_ != nullptr) {
     parent_->unregisterChildIoHandle(*this);
+    auto* extension = parent_->getDownstreamExtension();
+    if (extension != nullptr && extension->getLocalRegistry() != nullptr) {
+      extension->getLocalRegistry()->unregisterIoHandle(this);
+    }
   }
   SET_SOCKET_INVALID(fd_);
 }
@@ -150,6 +159,10 @@ void DownstreamReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement()
   if (parent_) {
     parent_->markTunnelDrainingAndDialReplacement(connection_key_, connection_id_);
   }
+}
+
+std::string DownstreamReverseConnectionIOHandle::connectionInfo() const {
+  return parent_->connectionInfo();
 }
 
 } // namespace ReverseConnection

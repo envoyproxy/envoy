@@ -61,7 +61,8 @@ TEST_F(RetryPolicyFactoryTest, DefaultFactoryRegistrationAndMetadata) {
 
   ProtobufTypes::MessagePtr empty_proto = factory->createEmptyConfigProto();
   ASSERT_NE(empty_proto, nullptr);
-  EXPECT_NE(dynamic_cast<envoy::config::route::v3::RetryPolicy*>(empty_proto.get()), nullptr);
+  EXPECT_NE(Protobuf::DynamicCastMessage<envoy::config::route::v3::RetryPolicy>(empty_proto.get()),
+            nullptr);
 }
 
 TEST_F(RetryPolicyFactoryTest, DefaultFactoryCreatesValidRetryPolicy) {
