@@ -22,6 +22,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -2041,7 +2042,7 @@ TEST(ABIImpl, filter_state_value_conflicting_life_span) {
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
   filter.setDecoderFilterCallbacks(callbacks);
 
-  const std::string key_str = "envoy.test.bytes";
+  const std::string key_str = "envoy.test.http_typed_object";
   const std::string val1 = "val1";
   const std::string val2 = "val2";
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
@@ -2049,18 +2050,20 @@ TEST(ABIImpl, filter_state_value_conflicting_life_span) {
       envoy_dynamic_module_type_filter_state_life_span_Request,
       envoy_dynamic_module_type_filter_state_stream_sharing_None));
 
+  // The key is held at Request, so storing it at any other life span fails and keeps the value.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()},
+      envoy_dynamic_module_type_filter_state_life_span_Connection,
+      envoy_dynamic_module_type_filter_state_stream_sharing_None));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()}));
+
   envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
-            &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()},
-            envoy_dynamic_module_type_filter_state_life_span_Connection,
-            envoy_dynamic_module_type_filter_state_stream_sharing_None));
-        EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
-            &filter, {key_str.data(), key_str.size()}, &result_buffer));
-        EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val1);
-      },
-      "conflicting life_span");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, {key_str.data(), key_str.size()}, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val1);
 }
 
 TEST(ABIImpl, filter_state_value_unknown_enums) {
@@ -2422,20 +2425,14 @@ TEST(ABIImpl, filter_state_object_conflicting_life_span) {
       &filter, {key_str.data(), key_str.size()}, first, filterStateObjectDestructor,
       envoy_dynamic_module_type_filter_state_life_span_Request));
 
-  // Re-storing the same key at a different life_span does not store (an ENVOY_BUG in FilterState).
-  // The new object is freed, the call reports failure, and the original entry is untouched. All
-  // assertions live inside EXPECT_ENVOY_BUG because in debug the ENVOY_BUG aborts inside setData,
-  // so the graceful-return path only exists in release/coverage where the macro runs in-process.
-  EXPECT_ENVOY_BUG(
-      {
-        EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_object(
-            &filter, {key_str.data(), key_str.size()}, new int(2), filterStateObjectDestructor,
-            envoy_dynamic_module_type_filter_state_life_span_Connection));
-        EXPECT_EQ(1, filter_state_object_destructor_calls);
-        EXPECT_EQ(first, envoy_dynamic_module_callback_http_get_filter_state_object(
-                             &filter, {key_str.data(), key_str.size()}));
-      },
-      "conflicting life_span");
+  // Re-storing the same key at a different life_span does not store. The new object is freed, the
+  // call reports failure, and the original entry is untouched.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_object(
+      &filter, {key_str.data(), key_str.size()}, new int(2), filterStateObjectDestructor,
+      envoy_dynamic_module_type_filter_state_life_span_Connection));
+  EXPECT_EQ(1, filter_state_object_destructor_calls);
+  EXPECT_EQ(first, envoy_dynamic_module_callback_http_get_filter_state_object(
+                       &filter, {key_str.data(), key_str.size()}));
 }
 
 TEST(ABIImpl, filter_state_object_no_filter_state) {
@@ -3857,6 +3854,35 @@ TEST_F(ABIImplGenericSecretTest, ReadUnknownId) {
   // 0 is never a valid ID, and IDs past the end are unknown.
   EXPECT_EQ(getSecret(0), std::nullopt);
   EXPECT_EQ(getSecret(id + 1), std::nullopt);
+}
+
+TEST(ABIImpl, GetLoadShedPoint) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context,
+      std::nullopt, overload_manager);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                                  filter_config.get(), {name.data(), name.size()}));
+}
+
+TEST(ABIImpl, GetLoadShedPointWithoutProvider) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context);
+
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                         filter_config.get(), {name.data(), name.size()}));
 }
 
 TEST(ABIImpl, Stats) {

@@ -36,6 +36,10 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
+// A SotW CDS update removes only the clusters received through that CDS subscription, so it no
+// longer removes the clusters added by ODCDS. Disable to remove every dynamic cluster not in the
+// update.
+RUNTIME_GUARD(envoy_reloadable_features_cds_sotw_track_resources);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
@@ -149,7 +153,6 @@ RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_fi
 RUNTIME_GUARD(envoy_reloadable_features_pqc_default_ecdh_curves);
 RUNTIME_GUARD(envoy_reloadable_features_preserve_downstream_keepalive);
 RUNTIME_GUARD(envoy_reloadable_features_propagate_downstream_rst_to_upstream);
-RUNTIME_GUARD(envoy_reloadable_features_propagate_upstream_rst_through_tunneled_tcp_proxy);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_added_tlvs_format_string);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_remove_too_long_tlvs);
 // TODO(panting): Default to true after ssl fix.

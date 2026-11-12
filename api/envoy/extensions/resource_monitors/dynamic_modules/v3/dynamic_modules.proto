@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Resource Monitor]
+// [#extension: envoy.resource_monitors.dynamic_modules]
+
+// Configuration for an :ref:`overload manager <arch_overview_overload_manager>` resource monitor
+// implemented by a dynamic module, which reports the pressure of the monitored resource. The
+// pressure is the ratio of the usage of the resource to its limit. See
+// :ref:`Dynamic Modules <config_overload_manager_dynamic_modules>`.
+message DynamicModuleResourceMonitor {
+  // Specifies the shared-object level configuration. This field is required.
+  //
+  // Only the ``name`` and ``module.local.filename`` sources are supported. Remote module sources
+  // are not supported because resource monitors are created without a factory context.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name identifying the resource monitor implementation within the module. This is passed to
+  // the module's resource monitor init function so that a module can host multiple
+  // implementations. This field is required.
+  string resource_monitor_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration for the implementation chosen by ``resource_monitor_name``. If not
+  // specified, an empty configuration is passed to the module.
+  //
+  // ``google.protobuf.Struct`` and the ``value`` field of ``xds.type.v3.TypedStruct`` are
+  // serialized as JSON before passing them to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper. Otherwise the serialized bytes of the configured message are passed.
+  google.protobuf.Any resource_monitor_config = 3;
+}

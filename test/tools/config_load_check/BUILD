@@ -20,7 +20,10 @@ envoy_cc_test_library(
 
 envoy_cc_test_binary(
     name = "config_load_check_tool",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         ":config_load_check_lib",
         "//source/common/common:minimal_logger_lib",

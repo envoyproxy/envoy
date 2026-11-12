@@ -13,6 +13,7 @@ func init() {
 		"half_close":       &halfCloseConfigFactory{},
 		"buffer_limits":    &bufferLimitsConfigFactory{},
 		"dynamic_metadata": &dynamicMetadataConfigFactory{},
+		"load_shed_point":  &loadShedPointConfigFactory{},
 	})
 }
 
@@ -219,4 +220,40 @@ func (f *dynamicMetadataFilter) OnNewConnection() shared.NetworkFilterStatus {
 		panic("expected the invalid buffers to be rejected")
 	}
 	return shared.NetworkFilterStatusContinue
+}
+
+// loadShedPointConfigFactory creates filters that close a new connection when the load shed point
+// named in the filter config sheds it.
+type loadShedPointConfigFactory struct {
+	shared.EmptyNetworkFilterConfigFactory
+}
+
+func (f *loadShedPointConfigFactory) Create(handle shared.NetworkFilterConfigHandle, config []byte) (shared.NetworkFilterFactory, error) {
+	return &loadShedPointFactory{loadShedPoint: handle.GetLoadShedPoint(string(config))}, nil
+}
+
+type loadShedPointFactory struct {
+	shared.EmptyNetworkFilterFactory
+	loadShedPoint shared.LoadShedPoint
+}
+
+func (f *loadShedPointFactory) Create(handle shared.NetworkFilterHandle) shared.NetworkFilter {
+	return &loadShedPointFilter{
+		handle:   handle,
+		shedLoad: f.loadShedPoint != nil && f.loadShedPoint.ShouldShedLoad(),
+	}
+}
+
+type loadShedPointFilter struct {
+	handle   shared.NetworkFilterHandle
+	shedLoad bool
+	shared.EmptyNetworkFilter
+}
+
+func (f *loadShedPointFilter) OnNewConnection() shared.NetworkFilterStatus {
+	if !f.shedLoad {
+		return shared.NetworkFilterStatusContinue
+	}
+	f.handle.Close(shared.NetworkConnectionCloseTypeNoFlush)
+	return shared.NetworkFilterStatusStop
 }

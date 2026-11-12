@@ -27,6 +27,8 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`formatter <envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter>`.
 * As a :ref:`stats sink <envoy_v3_api_msg_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink>`
   (:ref:`configuration <config_stat_sinks_dynamic_modules>`).
+* As a :ref:`resource monitor <envoy_v3_api_msg_extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor>`
+  (:ref:`configuration <config_overload_manager_dynamic_modules>`).
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP early header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation>`.
@@ -200,7 +202,7 @@ Statistics
 
 Dynamic-module extension types that receive a factory context emit the following statistics in the shared ``dynamic_modules.`` namespace.
 These stats track failures encountered while loading the extension's configuration. Extension points created without a factory context, such
-as config validators and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
+as config validators, resource monitors and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
 ``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`

@@ -1,17 +1,15 @@
 #include <openssl/ssl.h>
 #include <ossl.h>
 
-
 struct CipherStack {
   ~CipherStack() { sk_SSL_CIPHER_free(p_); }
-  STACK_OF(SSL_CIPHER)* p_ {sk_SSL_CIPHER_new_null()};
+  STACK_OF(SSL_CIPHER)* p_{sk_SSL_CIPHER_new_null()};
 };
-
 
 // BoringSSL excludes TLS 1.3 ciphers so we have to filter them out
 extern "C" STACK_OF(SSL_CIPHER)* SSL_CTX_get_ciphers(const SSL_CTX* ctx) {
-  STACK_OF(SSL_CIPHER) *unfiltered = reinterpret_cast<STACK_OF(SSL_CIPHER)*>(
-                                          ossl.ossl_SSL_CTX_get_ciphers(ctx));
+  STACK_OF(SSL_CIPHER)* unfiltered =
+      reinterpret_cast<STACK_OF(SSL_CIPHER)*>(ossl.ossl_SSL_CTX_get_ciphers(ctx));
   if (unfiltered == nullptr) {
     return nullptr;
   }

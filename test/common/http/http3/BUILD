@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",

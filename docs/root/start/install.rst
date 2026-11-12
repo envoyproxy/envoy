@@ -189,11 +189,12 @@ The following table shows the available Docker tag variants for the latest
 
 .. _install_tools:
 
-`envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu>`__
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+`envoyproxy/envoy-build <https://hub.docker.com/r/envoyproxy/envoy-build>`__
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-Build images are always versioned using their commit SHA, which is in turn committed to the Envoy repository
-to ensure reproducible builds.
+Build images are tagged ``<variant>-<version>`` and pinned by digest in Envoy's
+:repo:`.github/config.yml` to ensure reproducible builds. They are built from
+`envoyproxy/toolshed <https://github.com/envoyproxy/toolshed/tree/main/docker/build>`__.
 
 .. list-table::
    :widths: auto
@@ -202,13 +203,16 @@ to ensure reproducible builds.
 
    * - variant
      - latest (amd64/arm64)
-   * - envoy-build-ubuntu (default)
-     - :dockerhub_envoy:`build-ubuntu`
-   * - envoy-build-ubuntu:mobile
-     - :dockerhub_envoy:`build-ubuntu-mobile`
+   * - envoy-build:ci (default)
+     - :dockerhub_envoy:`build-ci`
+   * - envoy-build:devtools
+     - :dockerhub_envoy:`build-devtools`
+   * - envoy-build:docker
+     - :dockerhub_envoy:`build-docker`
+   * - envoy-build:worker
+     - :dockerhub_envoy:`build-worker`
 
 .. note::
-   The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for
-   building Envoy and related containers.
-
-   This image requires 4-5GB of available disk space to use.
+   The ``envoy-build`` images do not contain a working Envoy server, but can be used for
+   building Envoy and related containers. Compilers and other toolchains are fetched by Bazel
+   rather than installed in the image.

@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/server/overload:load_shed_point_interface",
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",

@@ -49,6 +49,120 @@ else
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
 
+# Settings for the `cto.*` targets (see `compile_time_options` below). Each can be overridden with
+# a space-separated list.
+
+# The options every `cto.*` target builds with.
+read -ra CTO_OPTIONS <<< "${CTO_OPTIONS:---config=compile-time-options -c fastbuild}"
+
+# The options their test runs add. They build only what the tests depend on. Targets under test/
+# that no test uses (benchmark, fuzz and tool binaries) are no longer built with these options,
+# only with the defaults by the rest of CI: leaving them out takes about a third off the analysis.
+read -ra CTO_TEST_OPTIONS <<< "${CTO_TEST_OPTIONS:---build_tests_only}"
+
+# The tests run by the targets whose option only reaches part of the tree, unless tests are given
+# on the command line.
+
+# The wasm engine is exercised by the wasm extensions, and has to link and run with the rest of
+# Envoy: the server and the tests that link every extension, the other Rust code (dynamic modules),
+# and signal handling.
+CTO_WASM_TARGETS_DEFAULT=(
+    @envoy//test/common/signal/...
+    @envoy//test/config_test/...
+    @envoy//test/exe/...
+    @envoy//test/extensions/access_loggers/wasm/...
+    @envoy//test/extensions/bootstrap/wasm/...
+    @envoy//test/extensions/common/wasm/...
+    @envoy//test/extensions/dynamic_modules/...
+    @envoy//test/extensions/filters/http/wasm/...
+    @envoy//test/extensions/filters/network/wasm/...
+    @envoy//test/extensions/stats_sinks/wasm/...
+    @envoy//test/server/...)
+read -ra CTO_WASM_TARGETS <<< "${CTO_WASM_TARGETS:-${CTO_WASM_TARGETS_DEFAULT[*]}}"
+
+# The allocator is only visible through `source/common/memory` and the profiler: the tests run
+# with gperftools are the server's (which link and run the binary) and those that observe
+# allocation.
+CTO_ALLOCATOR_TEST_TARGETS_DEFAULT=(
+    @envoy//test/common/memory/...
+    @envoy//test/common/stats/...
+    @envoy//test/exe/...
+    @envoy//test/server/...
+    @envoy//test/common/quic/platform:quic_platform_test
+    @envoy//test/extensions/access_loggers/stats/...
+    @envoy//test/extensions/filters/http/mcp:mcp_json_parser_test
+    @envoy//test/integration:stats_integration_test)
+read -ra CTO_ALLOCATOR_TEST_TARGETS \
+    <<< "${CTO_ALLOCATOR_TEST_TARGETS:-${CTO_ALLOCATOR_TEST_TARGETS_DEFAULT[*]}}"
+
+# Run one `cto.*` subtask. See `compile-time-options` in `.bazelrc`: the non-default build switches
+# that can all be set together. `cto.base` tests the whole tree with that config and jemalloc, the
+# allocator the rest of CI does not use. Each other subtask is the config plus one thing that cannot
+# be part of the base run because it displaces something that run exercises (the engine, the
+# allocator, the admin code, release-mode asserts, logging), run with the targets that option can
+# affect.
+function cto_subtask() {
+    local subtask="$1"
+    case "$subtask" in
+        cto.base)
+            echo "Building and testing with the compile-time-options config and jemalloc: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --@envoy//bazel:jemalloc=True \
+                "${TEST_TARGETS[@]}"
+            ;;
+        cto.wamr|cto.wasmtime)
+            local engine="${subtask#cto.}"
+            echo "Testing with wasm engine=${engine}: ${CTO_WASM_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --@proxy-wasm-cpp-host//bazel:engine="${engine}" \
+                "${CTO_WASM_TARGETS[@]}"
+            ;;
+        cto.gperftools)
+            echo "Testing with gperftools: ${CTO_ALLOCATOR_TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --define tcmalloc=gperftools \
+                "${CTO_ALLOCATOR_TEST_TARGETS[@]}"
+            ;;
+        cto.noadmin)
+            echo "Building and testing with admin_functionality disabled: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --define admin_functionality=disabled \
+                "${TEST_TARGETS[@]}"
+            ;;
+        cto.asserts)
+            # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
+            # these tests under "-c opt" (which replaces any "-c" in CTO_OPTIONS) to save time in CI.
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                -c opt \
+                @envoy//test/common/common:assert_test \
+                @envoy//test/server:server_test
+            # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                -c opt \
+                @envoy//test/common/common:assert_test \
+                --define log_fast_debug_assert_in_release=enabled \
+                --define log_debug_assert_in_release=disabled
+            ;;
+        cto.nolog)
+            echo "Building binary with logging disabled..."
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define enable_logging=disabled \
+                @envoy//source/exe:envoy-static
+            collect_build_profile build
+            ;;
+        *)
+            echo "Unknown compile-time options subtask: ${subtask}" >&2
+            exit 1
+            ;;
+    esac
+}
+
 function collect_build_profile() {
     local output_base
     declare -g build_profile_count=${build_profile_count:-1}
@@ -260,17 +374,21 @@ function build_openssl() {
 # Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
 # code on failure, so a broken query fails the job instead of silently selecting
 # no tests. Results go to stdout as plain labels.
+# Prints the labels matching a cquery expression, one per line, leaving out targets that are
+# incompatible with the target platform (e.g. Windows-only tests): cquery still returns those,
+# and Bazel only skips them for wildcard patterns, not when they are passed as explicit labels.
 function run_bazel_cquery() {
     local err out rc=0
     err="$(mktemp)"
-    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" \
-                 --output=starlark --starlark:expr=target.label "$1" 2>"$err")" || rc=$?
+    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" --output=starlark \
+                 --starlark:expr='target.label if "IncompatiblePlatformProvider" not in providers(target) else ""' \
+                 "$1" 2>"$err")" || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "ERROR: bazel cquery failed (exit ${rc}): $1" >&2
         cat "$err" >&2
     fi
     rm -f "$err"
-    printf '%s' "$out" | sed 's|^@@||'
+    printf '%s' "$out" | sed '/^$/d; s|^@@||'
     return "$rc"
 }
 
@@ -374,7 +492,7 @@ function build_openssl_presubmit() {
 
     echo "Testing affected targets with OpenSSL (${#test_targets[@]} targets):"
     printf '  %s\n' "${test_targets[@]}"
-    # --keep_going so one broken/incompatible target can't abort the whole run.
+    # --keep_going so one broken target can't abort the whole run.
     bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --keep_going "${test_targets[@]}"
 }
 
@@ -388,7 +506,7 @@ if [[ "$CI_TARGET" =~ bazel.* ]]; then
     echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
 fi
 
-if [[ "${CI_TARGET}" == "deps.update" ]]; then
+if [[ "${CI_TARGET}" == "deps.update" || "${CI_TARGET}" == "registry" ]]; then
     DEPENDENCY_ARGS=("$@")
     set --
 fi
@@ -522,64 +640,23 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options|cto)
-        # See `compile-time-options` in `.bazelrc`
-        # This doesn't go into CI but is available for developer convenience.
-        echo "bazel with different compiletime options build with tests..."
+    compile_time_options|cto*)
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-
-        if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
-            echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                --config=compile-time-options \
-                --define tcmalloc=gperftools \
-                --@proxy-wasm-cpp-host//bazel:engine=wamr \
-                -c fastbuild \
-                "${TEST_TARGETS[@]}"
+        if [[ $# -ge 1 ]]; then
+            # Tests given on the command line replace the lists of the subtasks that have one.
+            CTO_WASM_TARGETS=("${TEST_TARGETS[@]}")
+            CTO_ALLOCATOR_TEST_TARGETS=("${TEST_TARGETS[@]}")
         fi
-        if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
-            exit 0
-        fi
-        echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
-            --define admin_functionality=disabled \
-            --@envoy//bazel:jemalloc=True \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}"
-        # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
-        # these tests under "-c opt" to save time in CI.
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define tcmalloc=gperftools \
-            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
-            -c opt \
-            @envoy//test/common/common:assert_test \
-            @envoy//test/server:server_test
-        # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define tcmalloc=gperftools \
-            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
-            -c opt \
-            @envoy//test/common/common:assert_test \
-            --define log_fast_debug_assert_in_release=enabled \
-            --define log_debug_assert_in_release=disabled
-        echo "Building binary with wasm=wasmtime... and logging disabled"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define tcmalloc=gperftools \
-            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
-            --define enable_logging=disabled \
-            -c fastbuild \
-            @envoy//source/exe:envoy-static
-
-        collect_build_profile build
+        case "$CI_TARGET" in
+            compile_time_options|cto|cto.all)
+                for subtask in cto.asserts cto.base cto.gperftools cto.noadmin cto.nolog cto.wamr cto.wasmtime; do
+                    cto_subtask "$subtask"
+                done
+                ;;
+            *)
+                cto_subtask "$CI_TARGET"
+                ;;
+        esac
         ;;
 
     config)
@@ -677,11 +754,11 @@ case $CI_TARGET in
         ;;
 
     deps.update)
-        if [[ ${#DEPENDENCY_ARGS[@]} -ne 1 ]]; then
-            echo "Usage: ci/do_ci.sh deps.update <name[=version]>" >&2
+        if [[ ${#DEPENDENCY_ARGS[@]} -lt 1 ]]; then
+            echo "Usage: ci/do_ci.sh deps.update <name[=version]>..." >&2
             exit 1
         fi
-        deps_update "${DEPENDENCY_ARGS[0]}"
+        deps_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     dev)
@@ -921,6 +998,18 @@ case $CI_TARGET in
         build_openssl_presubmit
         ;;
 
+    openssl.asan)
+        echo "bazel ASAN/UBSAN build of OpenSSL compat layer tests"
+        bazel_with_collection test \
+            --config=asan \
+            --config=openssl \
+            --dynamic_mode=off \
+            --copt=-fno-sanitize=function \
+            --linkopt=-fno-sanitize=function \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            //compat/openssl/test/...
+        ;;
+
     publish)
         BUILD_SHA="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
@@ -944,7 +1033,7 @@ case $CI_TARGET in
             registry_check
             exit 0
         fi
-        registry_update
+        registry_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     release|release.server_only|release.test_only)
