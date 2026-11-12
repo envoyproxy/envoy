@@ -62,7 +62,6 @@ public:
 using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 using Server::Configuration::MockFactoryContext;
 using ::testing::_;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using testing::Return;
 using Upstream::MockThreadLocalCluster;
@@ -110,15 +109,15 @@ public:
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillRepeatedly(Invoke([&](Envoy::Http::RequestMessagePtr& message,
-                                   Envoy::Http::AsyncClient::Callbacks& callback,
-                                   const Envoy::Http::AsyncClient::RequestOptions& options)
-                                   -> Http::AsyncClient::Request* {
+        .WillRepeatedly([&](Envoy::Http::RequestMessagePtr& message,
+                            Envoy::Http::AsyncClient::Callbacks& callback,
+                            const Envoy::Http::AsyncClient::RequestOptions& options)
+                            -> Http::AsyncClient::Request* {
           message_.swap(message);
           client_callback_ = &callback;
           options_ = options;
           return &client_request_;
-        }));
+        });
   }
 
   void setupFilterAndCallback() {

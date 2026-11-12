@@ -621,6 +621,76 @@ TEST(HttpExtProcConfigTest, PerRouteEmitClientSpanConfig) {
   EXPECT_FALSE(typed_config.emitClientSpan().value());
 }
 
+TEST(HttpExtProcConfigTest, MaxStreamedBodyChunkSizeValidation) {
+  ExternalProcessingFilterConfig factory;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  std::string invalid_yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  max_streamed_body_chunk_size: 1023
+  )EOF";
+
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(invalid_yaml, *proto_config);
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
+      "Proto constraint validation failed.*MaxStreamedBodyChunkSize.*value must be greater than or "
+      "equal to 1024.*");
+
+  std::string valid_yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  max_streamed_body_chunk_size: 1024
+  )EOF";
+
+  proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(valid_yaml, *proto_config);
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_OK(factory.createFilterFactoryFromProto(*proto_config, "stats", context));
+}
+
+TEST(HttpExtProcConfigTest, PerRouteMaxStreamedBodyChunkSizeValidation) {
+  ExternalProcessingFilterConfig factory;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  std::string invalid_yaml = R"EOF(
+  overrides:
+    max_streamed_body_chunk_size: 1023
+  )EOF";
+
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(invalid_yaml, *proto_config);
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           context.messageValidationVisitor())
+          .value(),
+      EnvoyException,
+      "Proto constraint validation failed.*MaxStreamedBodyChunkSize.*value must be greater than or "
+      "equal to 1024.*");
+
+  std::string valid_yaml = R"EOF(
+  overrides:
+    max_streamed_body_chunk_size: 1024
+  )EOF";
+
+  proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(valid_yaml, *proto_config);
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           context.messageValidationVisitor())
+          .value();
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config);
+  ASSERT_TRUE(typed_config.maxStreamedBodyChunkSize().has_value());
+  EXPECT_EQ(typed_config.maxStreamedBodyChunkSize().value(), 1024);
+}
+
 // The gRPC client is shared across listeners and clusters via a central cache, so it must always
 // be created with the server scope. In particular the scope of an upstream filter, which has a
 // 'cluster.<cluster_name>.' prefix, must not leak into the gRPC client stats.
@@ -660,12 +730,11 @@ TEST(HttpExtProcConfigTest, GrpcClientIsCreatedWithServerScope) {
   Stats::Scope* client_scope = nullptr;
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&client_scope](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope& scope,
-                          bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
-            client_scope = &scope;
-            return absl::InternalError("no client for this test");
-          }));
+      .WillOnce([&client_scope](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope& scope,
+                                bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+        client_scope = &scope;
+        return absl::InternalError("no client for this test");
+      });
 
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);

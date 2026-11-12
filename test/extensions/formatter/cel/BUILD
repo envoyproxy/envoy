@@ -18,7 +18,7 @@ envoy_extension_cc_test(
         "-DUSE_CEL_PARSER",
     ],
     extension_names = ["envoy.formatter.cel"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",

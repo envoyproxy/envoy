@@ -108,13 +108,17 @@ public:
       : JwtLocationBase(token, issuer_checker), param_(param) {}
 
   void removeJwt(Http::RequestHeaderMap& headers) const override {
-    absl::string_view path = headers.getPathValue();
+    const Http::HeaderEntry* path_entry = headers.Path();
+    if (path_entry == nullptr) {
+      return;
+    }
     Http::Utility::QueryParamsMulti query_params =
-        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(
+            path_entry->value().getStringView());
 
     query_params.remove(param_);
 
-    const auto updated_path = query_params.replaceQueryString(headers.Path()->value());
+    const auto updated_path = query_params.replaceQueryString(path_entry->value());
     headers.setPath(updated_path);
   }
 

@@ -7,7 +7,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/router/router.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -90,14 +89,13 @@ void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope,
                                                         absl::string_view name) {
-  const Stats::TaggedStatName prefix(
-      scope.symbolTable(), "health_check.",
+  Stats::LiteScopeHelper helper(
+      scope, "health_check.",
       name.empty() ? Stats::TagStringViewSpan{}
                    : Stats::TagStringViewSpan{{Config::TagNames::get().HEALTH_CHECK_NAME, name}},
       name.empty() ? "health_check." : absl::StrCat("health_check.name.", name, "."));
 
-  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_TAGGED(scope, prefix),
-                                   POOL_GAUGE_TAGGED(scope, prefix))};
+  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
 void HealthCheckerImplBase::incHealthy() { stats_.healthy_.add(1); }
@@ -172,9 +170,7 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
     if (host->disableActiveHealthCheck()) {
       continue;
     }
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.health_check_after_cluster_warming") &&
-        active_sessions_.contains(host)) {
+    if (active_sessions_.contains(host)) {
       continue;
     }
     active_sessions_[host] = makeSession(host);
@@ -188,8 +184,7 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
   // Skip processing updates while cluster is still warming (e.g., waiting for SDS secrets).
   // All existing hosts will be added when start() is called.
-  if (!started_ && Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.health_check_after_cluster_warming")) {
+  if (!started_) {
     return;
   }
   addHosts(hosts_added);

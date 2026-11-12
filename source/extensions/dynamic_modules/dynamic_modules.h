@@ -14,6 +14,7 @@
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -53,7 +54,7 @@ public:
                   "T must be a function pointer type");
     auto symbol = getSymbol(symbol_ref);
     if (symbol == nullptr) {
-      return absl::InvalidArgumentError("Failed to resolve symbol " + std::string(symbol_ref));
+      return absl::InvalidArgumentError(absl::StrCat("Failed to resolve symbol ", symbol_ref));
     }
     return reinterpret_cast<T>(symbol);
   }
@@ -86,6 +87,10 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ *
+ * The binding mode is not a parameter: the loader binds now (RTLD_NOW) by default and falls back to
+ * lazy binding (RTLD_LAZY) when the ``envoy.reloadable_features.dynamic_modules_rtld_now`` runtime
+ * guard is disabled.
  */
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,

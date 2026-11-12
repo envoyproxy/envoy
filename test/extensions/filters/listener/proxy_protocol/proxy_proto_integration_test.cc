@@ -6,6 +6,8 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -38,6 +40,17 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
 ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
     : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
   config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
+}
+
+void ProxyProtoIntegrationTest::initialize() {
+  // The stats mode is read during server initialization, before the runtime loader exists, so it
+  // has to be set directly rather than with addRuntimeOverride().
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicitTags());
+  HttpIntegrationTest::initialize();
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
@@ -209,6 +222,16 @@ ProxyProtoTcpIntegrationTest::ProxyProtoTcpIntegrationTest()
     : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
   config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
   config_helper_.renameListener("tcp_proxy");
+}
+
+void ProxyProtoTcpIntegrationTest::initialize() {
+  // See ProxyProtoIntegrationTest::initialize().
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicitTags());
+  BaseIntegrationTest::initialize();
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoTcpIntegrationTest,

@@ -117,6 +117,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "backtrace_lib",
+    srcs = ["backtrace.cc"],
+    hdrs = ["backtrace.h"],
+    deps = [
+        ":task_lib",
+        "//source/common/common:minimal_logger_lib",
+        "@abseil-cpp//absl/debugging:symbolize",
+    ],
+)
+
+envoy_cc_library(
     name = "coroutine_lib",
     deps = [
         ":async_queue_lib",

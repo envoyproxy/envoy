@@ -60,7 +60,8 @@ absl::StatusOr<std::unique_ptr<Filter>> ReusableFuzzerUtil::setup(
 
   absl::Status creation_status = absl::OkStatus();
   config = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                          "ext_authz_prefix", factory_context_, creation_status);
+                                          *stats_store_.rootScope(), "ext_authz_prefix",
+                                          factory_context_, creation_status);
   if (!creation_status.ok()) {
     ENVOY_LOG_MISC(debug, "Invalid filter config: {}", creation_status.message());
     return absl::InvalidArgumentError(

@@ -2656,17 +2656,16 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(
-          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            client_write_buffer = new NiceMock<MockWatermarkBuffer>(
-                std::move(below_low), std::move(above_high), std::move(above_overflow));
-            ON_CALL(*client_write_buffer, move(_))
-                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
-            ON_CALL(*client_write_buffer, drain(_))
-                .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
-            return client_write_buffer;
-          }));
+      .WillOnce([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer = new NiceMock<MockWatermarkBuffer>(
+            std::move(below_low), std::move(above_high), std::move(above_overflow));
+        ON_CALL(*client_write_buffer, move(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer, drain(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer;
+      });
 
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =

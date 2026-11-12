@@ -336,6 +336,13 @@ struct StreamInfoImpl : public StreamInfo {
   }
   Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
 
+  void addRouteResolutionTime(std::chrono::nanoseconds duration) override {
+    route_resolution_time_ += duration;
+    ++route_resolution_count_;
+  }
+  std::chrono::nanoseconds routeResolutionTime() const override { return route_resolution_time_; }
+  uint32_t routeResolutionCount() const override { return route_resolution_count_; }
+
   OptRef<const Router::Route> route() const override {
     return makeOptRefFromPtr<const Router::Route>(route_.get());
   }
@@ -549,6 +556,8 @@ public:
   std::string custom_flags_;
   Router::RouteConstSharedPtr route_;
   Router::VirtualHostConstSharedPtr vhost_;
+  std::chrono::nanoseconds route_resolution_time_{0};
+  uint32_t route_resolution_count_{0};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr filter_state_;
 

@@ -87,6 +87,42 @@ This can be combined with actions to shed load when memory pressure increases:
            threshold:
              value: 0.95  # Trigger at 95% memory utilization
 
+.. _config_overload_manager_dynamic_modules:
+
+Dynamic Modules
+^^^^^^^^^^^^^^^
+
+A :ref:`dynamic module <arch_overview_dynamic_modules>` can implement a resource monitor through the
+:ref:`dynamic module resource monitor
+<envoy_v3_api_msg_extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor>`.
+At each refresh interval the module reports the pressure of the resource, right away or later from
+any thread through a scheduler. Envoy treats a pressure above 1 as 1, and a negative or non-finite
+pressure as a failed update.
+
+A module can also enable synchronous feedback. Load shed points with a trigger on the resource then
+ask the module for the pressure each time they decide whether to shed load, and tell it about the
+load they accept, so that the module can limit new load without waiting for the next refresh. In
+this mode Envoy treats a negative or NaN pressure as 0, and a pressure above 1 as 1.
+
+The following configuration sheds new requests once the pressure that the module reports for the
+``queue_latency`` resource reaches 0.9.
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "queue_latency"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor
+         dynamic_module_config:
+           name: "my_module"
+         resource_monitor_name: "latency"
+   loadshed_points:
+     - name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+       triggers:
+         - name: "queue_latency"
+           threshold:
+             value: 0.9
+
 .. _config_overload_manager_triggers:
 
 Triggers
@@ -151,8 +187,8 @@ The following overload actions are supported:
 
   * - envoy.overload_actions.close_idle_http_connections
     - Envoy will close idle downstream HTTP/3 QUIC connections when the action is active.
-      When the action is *saturated*, connections will be closed aggressively (ignoring the idle timer threshold).
-      When the action is in a *scaled active* state, the idle timer threshold is still respected.
+      When the action is *saturated*, connections will be closed more aggressively with a 10-second minimum idle threshold.
+      When the action is in a *scaled active* state, the 1-minute idle timer threshold is respected.
       Note that this action is currently only supported for HTTP/3 QUIC connections.
 
 .. _config_overload_manager_shrink_heap:
@@ -218,6 +254,13 @@ Compared to overload actions, Load Shed Points are also more flexible to
 integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
 has access to the Overload Manager to request the custom Load Shed Point.
 
+For example, the :ref:`dynamic module <arch_overview_dynamic_modules>` HTTP, network, listener
+and UDP listener filters can get custom Load Shed Points by name and shed load at them. A filter
+on a listener that :ref:`bypasses the overload manager
+<envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>` gets no Load Shed Point,
+unless the route configuration or the Filter Chain Discovery Service (FCDS) created it, and an
+upstream HTTP filter gets none.
+
 The following core load shed points are supported:
 
 .. list-table::
@@ -268,6 +311,10 @@ The following core load shed points are supported:
       returns true for both, this takes precedence. This is a disruptive action
       (causes downstream connections to ungracefully close) that should only be
       used with a very high threshold (if at all).
+
+  * - envoy.load_shed_points.http2_server_reset_stream_on_begin_headers
+    - Envoy will reject new HTTP/2 streams at the codec level on the initial header frame
+      by sending a ``RST_STREAM(REFUSED_STREAM)`` before allocating stream or header objects.
 
   * - envoy.load_shed_points.tcp_proxy_on_data
     - Envoy will close the downstream TCP connection in the TCP proxy filter when receiving data

@@ -319,10 +319,12 @@ Status extractJwk(const Protobuf::Struct& jwk_pb, Jwks::Pubkey* jwk) {
     return Status::JwksBadKty;
   }
 
-  // "kid" and "alg" are optional, if they do not exist, set them to
+  // "kid", "alg", "x5t#S256" and "x5t" are optional, if they do not exist, set them to
   // empty. https://tools.ietf.org/html/rfc7517#page-8
   jwk_getter.GetString("kid", &jwk->kid_);
   jwk_getter.GetString("alg", &jwk->alg_);
+  jwk_getter.GetString("x5t#S256", &jwk->x5t_s256_);
+  jwk_getter.GetString("x5t", &jwk->x5t_);
 
   // Extract public key according to "kty" value.
   // https://tools.ietf.org/html/rfc7518#section-6.1

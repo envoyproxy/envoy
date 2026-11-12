@@ -51,9 +51,9 @@ public:
         .WillByDefault(ReturnRef(internal_http_mock_client_));
 
     ON_CALL(internal_http_mock_client_, send_(_, _, _))
-        .WillByDefault(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
-                                  const Envoy::Http::AsyncClient::RequestOptions)
-                                  -> Http::AsyncClient::Request* {
+        .WillByDefault([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+                           const Envoy::Http::AsyncClient::RequestOptions)
+                           -> Http::AsyncClient::Request* {
           if (status_ == "200") {
             const auto headers = TestCommon::makeHeaderValueOption({{":status", status_, false}});
             http_client_->onSuccess(http_sync_request_, TestCommon::makeMessageResponse(headers));
@@ -61,7 +61,7 @@ public:
             http_client_->onFailure(http_sync_request_, Http::AsyncClient::FailureReason::Reset);
           }
           return &http_sync_request_;
-        }));
+        });
   }
 
   std::unique_ptr<Filters::Common::ExtAuthz::RawHttpClientImpl>

@@ -440,7 +440,7 @@ std::optional<Arn> parseArn(absl::string_view arn) {
   if (parts.size() > min_arn_size) {
     std::string versioned_function_name = std::string(function_name);
     versioned_function_name.push_back(':');
-    versioned_function_name += std::string(parts[7]);
+    versioned_function_name.append(parts[7]);
     return Arn{arn, partition, service, region, account_id, resource_type, versioned_function_name};
   }
 

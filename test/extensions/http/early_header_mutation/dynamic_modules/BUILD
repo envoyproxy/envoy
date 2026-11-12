@@ -1,15 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -20,6 +23,8 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:early_header_mutation_no_op",
         "//test/extensions/dynamic_modules/test_data/c:early_header_mutation_rewrite",
     ],
+    extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/http/early_header_mutation/dynamic_modules:config",
@@ -30,7 +35,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "early_header_mutation_test",
     srcs = ["early_header_mutation_test.cc"],
     data = [
@@ -42,6 +47,8 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:early_header_mutation_rewrite",
         "//test/extensions/dynamic_modules/test_data/c:early_header_mutation_stop_chain",
     ],
+    extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/extensions/http/early_header_mutation/dynamic_modules:early_header_mutation_lib",
         "//test/extensions/dynamic_modules:util",
@@ -53,9 +60,11 @@ envoy_cc_dyn_module_test(
 
 # Calls the extern "C" callbacks directly against a stack-allocated context, so no module is
 # loaded and the dyn-module link options are not needed.
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/http/early_header_mutation/dynamic_modules:early_header_mutation_lib",
@@ -64,7 +73,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
@@ -76,6 +85,11 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:early_header_mutation_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

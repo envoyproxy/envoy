@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
@@ -694,6 +696,122 @@ TEST(TokenUsageTest, SecondaryOnlyCountsStillPublish) {
                                   parse(R"({"usage":{"cache_read_input_tokens":64}})"));
   EXPECT_TRUE(usage.hasAny());
   EXPECT_EQ(usage.cached_input_tokens, 64);
+}
+
+// ---------------------------------------------------------------------------
+// Usage rendering: finalized canonical usage back into each dialect's native shape.
+
+// Canonical usage with every bucket populated. Canonical counts are inclusive: input covers the
+// cache and tool-use buckets, output covers reasoning.
+TokenUsage allBucketsUsage() {
+  TokenUsage usage;
+  usage.input_tokens = 100;
+  usage.cached_input_tokens = 30;
+  usage.cache_creation_input_tokens = 10;
+  usage.tool_use_input_tokens = 5;
+  usage.output_tokens = 40;
+  usage.reasoning_tokens = 15;
+  usage.total_tokens = 140;
+  return usage;
+}
+
+TEST(RenderUsageTest, UsagePathPerDialect) {
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).usagePath(), "usage");
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::OpenAiResponses).usagePath(), "usage");
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::AnthropicMessages).usagePath(), "usage");
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).usagePath(), "usageMetadata");
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::Unspecified).usagePath(), "");
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::Unspecified).renderUsage(allBucketsUsage()),
+            nlohmann::json::object());
+}
+
+TEST(RenderUsageTest, OpenAiRendersCanonicalCountsUnderItsOwnNames) {
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).renderUsage(allBucketsUsage()),
+            parse(R"({"prompt_tokens": 100, "completion_tokens": 40, "total_tokens": 140,
+                      "prompt_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10},
+                      "completion_tokens_details": {"reasoning_tokens": 15}})"));
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::OpenAiResponses).renderUsage(allBucketsUsage()),
+            parse(R"({"input_tokens": 100, "output_tokens": 40, "total_tokens": 140,
+                      "input_tokens_details": {"cached_tokens": 30, "cache_write_tokens": 10},
+                      "output_tokens_details": {"reasoning_tokens": 15}})"));
+}
+
+TEST(RenderUsageTest, AnthropicReportsCacheBucketsBesideInput) {
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::AnthropicMessages).renderUsage(allBucketsUsage()),
+            parse(R"({"input_tokens": 60, "output_tokens": 40, "cache_read_input_tokens": 30,
+                      "cache_creation_input_tokens": 10})"));
+}
+
+TEST(RenderUsageTest, GeminiReportsToolUseAndThoughtsBesideTheirCounts) {
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).renderUsage(allBucketsUsage()),
+            parse(R"({"promptTokenCount": 95, "candidatesTokenCount": 25, "totalTokenCount": 140,
+                      "cachedContentTokenCount": 30, "toolUsePromptTokenCount": 5,
+                      "thoughtsTokenCount": 15})"));
+}
+
+TEST(RenderUsageTest, RendersOnlyTheCountsItHas) {
+  TokenUsage output_only;
+  output_only.output_tokens = 7;
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).renderUsage(output_only),
+            parse(R"({"completion_tokens": 7})"));
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::AnthropicMessages).renderUsage(output_only),
+            parse(R"({"output_tokens": 7})"));
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).renderUsage(output_only),
+            parse(R"({"candidatesTokenCount": 7})"));
+
+  // Without a canonical total the provider's stands in; Anthropic reports no total at all.
+  TokenUsage provider_total;
+  provider_total.provider_total_tokens = 9;
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::OpenAiChatCompletions).renderUsage(provider_total),
+            parse(R"({"total_tokens": 9})"));
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).renderUsage(provider_total),
+            parse(R"({"totalTokenCount": 9})"));
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::AnthropicMessages).renderUsage(provider_total),
+            nlohmann::json::object());
+}
+
+TEST(RenderUsageTest, BucketLargerThanItsCountSaturatesAtZero) {
+  // An inconsistent report must not wrap around.
+  TokenUsage usage;
+  usage.input_tokens = 10;
+  usage.cached_input_tokens = 30;
+  usage.output_tokens = 2;
+  usage.reasoning_tokens = 5;
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::AnthropicMessages).renderUsage(usage),
+            parse(R"({"input_tokens": 0, "output_tokens": 2, "cache_read_input_tokens": 30})"));
+  EXPECT_EQ(AdapterRegistry::get(LLMProtocol::GeminiGenerateContent).renderUsage(usage),
+            parse(R"({"promptTokenCount": 10, "candidatesTokenCount": 0,
+                      "cachedContentTokenCount": 30, "thoughtsTokenCount": 5})"));
+}
+
+// renderUsage() inverts extractUsage() plus canonicalization, so each dialect's native usage
+// survives the trip through the canonical contract unchanged.
+TEST(RenderUsageTest, NativeUsageRoundTripsThroughTheCanonicalContract) {
+  const std::vector<std::pair<LLMProtocol, std::string>> cases = {
+      {LLMProtocol::OpenAiChatCompletions,
+       R"({"prompt_tokens": 19, "completion_tokens": 10, "total_tokens": 29,
+           "prompt_tokens_details": {"cached_tokens": 8, "cache_write_tokens": 4},
+           "completion_tokens_details": {"reasoning_tokens": 3}})"},
+      {LLMProtocol::OpenAiResponses,
+       R"({"input_tokens": 19, "output_tokens": 10, "total_tokens": 29,
+           "input_tokens_details": {"cached_tokens": 8},
+           "output_tokens_details": {"reasoning_tokens": 3}})"},
+      {LLMProtocol::AnthropicMessages,
+       R"({"input_tokens": 70, "output_tokens": 20, "cache_read_input_tokens": 30,
+           "cache_creation_input_tokens": 10})"},
+      {LLMProtocol::GeminiGenerateContent,
+       R"({"promptTokenCount": 10, "candidatesTokenCount": 5, "totalTokenCount": 20,
+           "cachedContentTokenCount": 4, "toolUsePromptTokenCount": 2,
+           "thoughtsTokenCount": 3})"},
+  };
+  for (const auto& [protocol, native] : cases) {
+    const LLMProtocolAdapter& adapter = AdapterRegistry::get(protocol);
+    nlohmann::json body = nlohmann::json::object();
+    body[std::string(adapter.usagePath())] = parse(native);
+    TokenUsage usage = adapter.extractUsage(body).usage;
+    finalizeUsage(usage);
+    EXPECT_EQ(adapter.renderUsage(usage), parse(native)) << llmProtocolName(protocol);
+  }
 }
 
 // ---------------------------------------------------------------------------

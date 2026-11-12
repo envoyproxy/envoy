@@ -8,6 +8,9 @@ repository = "https://github.com/envoyproxy/envoy"
 [dependencies]
 envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust" }
 
+[dev-dependencies]
+envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust", features = ["mock"] }
+
 [[example]]
 name = "no_op"
 path = "no_op.rs"

@@ -4,6 +4,8 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/server/generic_factory_context.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -12,9 +14,12 @@ namespace HeaderMutation {
 absl::StatusOr<Http::FilterFactoryCb>
 HeaderMutationFactoryConfig::createHttpFilterFactoryFromProtoTyped(
     const ProtoConfig& config, Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   absl::Status creation_status = absl::OkStatus();
-  auto filter_config = std::make_shared<HeaderMutationConfig>(config, context, creation_status);
+  auto filter_config =
+      std::make_shared<HeaderMutationConfig>(config, generic_context, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -23,12 +28,14 @@ HeaderMutationFactoryConfig::createHttpFilterFactoryFromProtoTyped(
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-HeaderMutationFactoryConfig::createRouteSpecificFilterConfigTyped(
+HeaderMutationFactoryConfig::createHttpFilterRouteConfigTyped(
     const PerRouteProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
-    ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   absl::Status creation_status = absl::OkStatus();
   auto route_config =
-      std::make_shared<PerRouteHeaderMutation>(proto_config, context, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(proto_config, generic_context, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return route_config;
 }

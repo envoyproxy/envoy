@@ -3,6 +3,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -13,9 +14,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -120,8 +121,8 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersRouteConfigUpdateCompletesSynchronou
   // Invoke the route config update callback synchronously, before requestRouteConfigUpdate()
   // returns, i.e. while decode_headers_active_ is still true.
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
-      .WillOnce(Invoke(
-          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); }));
+      .WillOnce(
+          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); });
   // continueDecoding() must not be called from within decodeHeaders().
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   filter_->decodeHeaders(headers, true);
@@ -134,6 +135,9 @@ TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
 
 // tests onRouteConfigUpdateCompletion() when redirect contains a body with trailers (fully read)
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWithTrailers) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   Http::TestRequestTrailerMapImpl trailers;
   Buffer::OwnedImpl buffer;
@@ -146,28 +150,7 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWith
 }
 
 // tests onClusterDiscoveryCompletion() when redirect contains a body with trailers (fully read)
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundWithTrailers) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  Http::TestRequestTrailerMapImpl trailers;
-  Buffer::OwnedImpl buffer;
-  // Simulate request with body and trailers (end_stream = true)
-  filter_->decodeHeaders(headers, false);
-  filter_->decodeData(buffer, false);
-  filter_->decodeTrailers(trailers);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion() when redirect contains a body with trailers (fully read)
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundWithTrailersNoRecreateStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true"}});
   Http::TestRequestHeaderMapImpl headers;
   Http::TestRequestTrailerMapImpl trailers;
   Buffer::OwnedImpl buffer;
@@ -205,6 +188,9 @@ TEST_F(OnDemandFilterTest,
 // tests onRouteConfigUpdateCompletion() when redirect contains a body but not fully read
 TEST_F(OnDemandFilterTest,
        TestOnRouteConfigUpdateCompletionContinuesDecodingWithRedirectWithIncompleteBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl buffer;
   // Simulate request with body that hasn't ended yet
@@ -216,6 +202,9 @@ TEST_F(OnDemandFilterTest,
 
 // tests onRouteConfigUpdateCompletion() when redirect contains a fully read body
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWithFullyReadBody) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl buffer;
   // Simulate request with body that has been fully read (end_stream = true)
@@ -227,6 +216,9 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWith
 
 // tests onRouteConfigUpdateCompletion() when ActiveStream recreation fails
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionContinuesDecodingIfRedirectFails) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -236,9 +228,169 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionContinuesDecodingIfRedir
 
 // tests onRouteConfigUpdateCompletion() when route was resolved
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// tests onRouteConfigUpdateCompletion() with the no_recreate_stream guard ON (default).
+// Verifies that continueDecoding is called instead of recreateStream.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoRecreateStream) {
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Pin the route-cache refresh policy on the guard-on path. When VHDS resolves
+// the host (``route_exists == true``), the filter must call
+// refreshRouteConfigSnapshot() then clearRouteCache() before continueDecoding()
+// so the next route() lookup uses the post-VHDS ConfigImpl. Without this, the
+// engaged-null cached_route_ short-circuits the router and the request 404s
+// even though the vhost is now known.
+TEST_F(OnDemandFilterTest,
+       OnRouteConfigUpdateCompletionNoRecreateStreamClearsRouteCacheWhenRouteExists) {
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  {
+    testing::InSequence s;
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+    EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  }
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Counterpart of the above for the legitimate-miss case. When VHDS reports
+// the vhost as unresolvable (``route_exists == false``), the filter must NOT
+// refresh or clear the route cache: the engaged-null route is what makes the
+// router emit a 404 immediately without a redundant lookup.
+TEST_F(OnDemandFilterTest,
+       OnRouteConfigUpdateCompletionNoRecreateStreamDoesNotClearRouteCacheWhenRouteDoesNotExist) {
+  Http::TestRequestHeaderMapImpl headers;
+  filter_->decodeHeaders(headers, true);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(false);
+}
+
+// Regression for the combined on-demand VHDS + on-demand CDS scenario. With the
+// no-recreate VHDS guard on (default) and OnDemandCds configured, a VHDS route
+// resolution whose target cluster is absent must start on-demand CDS (returning
+// StopIteration) instead of continuing straight to the router. This mirrors the
+// legacy recreateStream() path, which re-entered decodeHeaders() and thereby
+// reached the cluster-discovery step. Without the fix the guard-on path calls
+// continueDecoding() directly and the cluster is never fetched.
+TEST_F(OnDemandFilterTest, NoRecreateStreamVhdsResolutionTriggersOnDemandCds) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+
+  // The route is unknown until VHDS resolves the virtual host, and resolved
+  // thereafter.
+  bool vhds_resolved = false;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault([&]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(vhds_resolved ? decoder_callbacks_.route_.get()
+                                                                : nullptr);
+  });
+
+  // Initial decodeHeaders: route missing -> VHDS requested, StopIteration. CDS is
+  // not reached yet because the route is still unknown.
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  // VHDS resolves the host to a route whose target cluster is absent. The filter
+  // must refresh the snapshot, clear the route cache, then start on-demand CDS and
+  // hold the stream -- no continueDecoding() and no recreateStream().
+  vhds_resolved = true;
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// VHDS resolves the virtual host, but none of its routes match the request. With the
+// no-recreate VHDS guard on (default), the filter must let the router reply instead of
+// requesting the same virtual host again.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoMatchingRouteContinuesDecoding) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Same as above with the legacy recreateStream() path: the recreated stream would request the
+// same virtual host again, so the stream must be continued instead of recreated.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoMatchingRouteDoesNotRecreateStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// With envoy.reloadable_features.on_demand_vhds_require_route_match disabled, a resolved virtual
+// host without a matching route re-runs decodeHeaders(), which requests the same virtual host
+// again.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoMatchingRouteRouteMatchNotRequired) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_require_route_match", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_)).Times(2);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Same as above with the legacy recreateStream() path: the stream is recreated.
+TEST_F(OnDemandFilterTest,
+       OnRouteConfigUpdateCompletionNoMatchingRouteRouteMatchNotRequiredRecreatesStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"},
+       {"envoy.reloadable_features.on_demand_vhds_require_route_match", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   filter_->onRouteConfigUpdateCompletion(true);
 }
 
@@ -257,53 +409,18 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterTimedOut) {
 }
 
 // tests onClusterDiscoveryCompletion when a cluster is available
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  filter_->decodeHeaders(headers, true);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion when a cluster is available
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundNoRecreateStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true"}});
   Http::TestRequestHeaderMapImpl headers;
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion when a cluster is available with a fully read body
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundWithFullyReadBody) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  Buffer::OwnedImpl buffer;
-  // Simulate request with body that has been fully read (end_stream = true)
-  filter_->decodeHeaders(headers, false);
-  filter_->decodeData(buffer, true);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 // tests onClusterDiscoveryCompletion when a cluster is available with a fully read body
 TEST_F(OnDemandFilterTest,
        OnClusterDiscoveryCompletionClusterFoundWithFullyReadBodyNoRecreateStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true"}});
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl buffer;
   // Simulate request with body that has been fully read (end_stream = true)
@@ -312,20 +429,6 @@ TEST_F(OnDemandFilterTest,
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion when a cluster is available, but recreating a stream failed
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRecreateStreamFailed) {
-  TestScopedRuntime scoped_runtime;
-  // This test is irrelevant for the case when there is no recreateStream call.
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  filter_->decodeHeaders(headers, true);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(false));
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
@@ -340,6 +443,269 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithI
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+}
+
+// Tests for the discovery stats and filter state.
+class OnDemandFilterStatsTest : public OnDemandFilterTest {
+public:
+  static constexpr absl::string_view Prefix = "http.test.on_demand.";
+
+  void setupWithStats(bool with_cds) {
+    OnDemandFilterConfigSharedPtr config;
+    if (with_cds) {
+      auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
+      odcds_ = mock_odcds.get();
+      config = std::make_shared<OnDemandFilterConfig>(
+          DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)),
+          *store_.rootScope(), "http.test.");
+    } else {
+      config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds(),
+                                                      *store_.rootScope(), "http.test.");
+    }
+    setupWithConfig(std::move(config));
+  }
+
+  uint64_t counter(absl::string_view name) {
+    return store_.counter(absl::StrCat(Prefix, name)).value();
+  }
+  uint64_t pending(absl::string_view name) {
+    return store_.gauge(absl::StrCat(Prefix, name), Stats::Gauge::ImportMode::Accumulate).value();
+  }
+  // Recorded histogram values, or empty if none (histogramValues() asserts there is at least one).
+  std::vector<uint64_t> durations(absl::string_view name) {
+    const std::string full_name = absl::StrCat(Prefix, name);
+    if (!store_.histogramRecordedValues(full_name)) {
+      return {};
+    }
+    return store_.histogramValues(full_name, true);
+  }
+
+  // A DiscoveryState field read through the generic interface; monostate if unset.
+  StreamInfo::FilterState::Object::FieldType field(absl::string_view name) {
+    const auto* state = decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
+        DiscoveryState::key());
+    return state == nullptr ? StreamInfo::FilterState::Object::FieldType{absl::monostate{}}
+                            : state->getField(name);
+  }
+  void expectField(absl::string_view name, absl::string_view value) {
+    EXPECT_EQ(StreamInfo::FilterState::Object::FieldType{value}, field(name));
+  }
+  bool hasField(absl::string_view name) {
+    return !absl::holds_alternative<absl::monostate>(field(name));
+  }
+
+  // Starts a route discovery and returns the filter's callback.
+  Http::RouteConfigUpdatedCallbackSharedPtr startRouteDiscovery() {
+    Http::RouteConfigUpdatedCallbackSharedPtr callback;
+    Http::TestRequestHeaderMapImpl headers{{":authority", "foo.example.com"}};
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
+        .WillOnce(SaveArg<0>(&callback));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+    EXPECT_EQ(1UL, counter("route_discovery_requested"));
+    EXPECT_EQ(1UL, pending("route_discovery_pending"));
+    expectField("route_status", "pending");
+    expectField("host", "foo.example.com");
+    EXPECT_FALSE(hasField("route_discovery_duration_us"));
+    return callback;
+  }
+
+  void startClusterDiscovery() {
+    Http::TestRequestHeaderMapImpl headers;
+    EXPECT_CALL(decoder_callbacks_, clusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+    EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+    EXPECT_EQ(1UL, counter("cluster_discovery_requested"));
+    EXPECT_EQ(1UL, pending("cluster_discovery_pending"));
+    expectField("cluster_status", "pending");
+    expectField("cluster", decoder_callbacks_.route_->route_entry_.cluster_name_);
+    EXPECT_FALSE(hasField("cluster_discovery_duration_us"));
+  }
+
+  void expectClusterDiscoveryFinished(absl::string_view status, bool expect_duration) {
+    EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
+    EXPECT_EQ(0UL, counter("cluster_discovery_cancelled"));
+    EXPECT_EQ(expect_duration ? 1UL : 0UL, durations("cluster_discovery_duration").size());
+    // The filter state records every outcome and its duration, unlike the histogram.
+    expectField("cluster_status", status);
+    EXPECT_TRUE(hasField("cluster_discovery_duration_us"));
+  }
+
+  Stats::TestUtil::TestStore store_;
+};
+
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryFound) {
+  setupWithStats(false);
+  auto callback = startRouteDiscovery();
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  (*callback)(true);
+  EXPECT_EQ(1UL, counter("route_discovery_found"));
+  EXPECT_EQ(0UL, counter("route_discovery_not_found"));
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  EXPECT_EQ(1UL, durations("route_discovery_duration").size());
+  expectField("route_status", "found");
+  EXPECT_TRUE(hasField("route_discovery_duration_us"));
+  EXPECT_FALSE(hasField("cluster_status"));
+  // Cluster discovery was never involved.
+  EXPECT_EQ(0UL, counter("cluster_discovery_requested"));
+}
+
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotFound) {
+  setupWithStats(false);
+  auto callback = startRouteDiscovery();
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  (*callback)(false);
+  EXPECT_EQ(0UL, counter("route_discovery_found"));
+  EXPECT_EQ(1UL, counter("route_discovery_not_found"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  // Only found discoveries are timed.
+  EXPECT_TRUE(durations("route_discovery_duration").empty());
+  // The filter state still records the outcome and how long the request waited.
+  expectField("route_status", "not_found");
+  EXPECT_TRUE(hasField("route_discovery_duration_us"));
+}
+
+// A callback that ran inside decodeHeaders() means nothing to discover: it is not counted.
+TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery) {
+  setupWithStats(false);
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
+      .WillOnce(Invoke(
+          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(false); }));
+  filter_->decodeHeaders(headers, true);
+  EXPECT_EQ(0UL, counter("route_discovery_requested"));
+  EXPECT_EQ(0UL, counter("route_discovery_found"));
+  EXPECT_EQ(0UL, counter("route_discovery_not_found"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  EXPECT_TRUE(durations("route_discovery_duration").empty());
+  EXPECT_FALSE(hasField("route_status"));
+  EXPECT_FALSE(hasField("host"));
+  // Ending the stream is not a cancellation either.
+  filter_->onStreamComplete();
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
+  filter_->onDestroy();
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
+}
+
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
+  setupWithStats(false);
+  startRouteDiscovery();
+  // A real stream runs onStreamComplete(), the access logs, then onDestroy(): the logs must
+  // already see the cancellation.
+  filter_->onStreamComplete();
+  EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
+  EXPECT_EQ(0UL, counter("route_discovery_found"));
+  EXPECT_EQ(0UL, counter("route_discovery_not_found"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  EXPECT_TRUE(durations("route_discovery_duration").empty());
+  expectField("route_status", "cancelled");
+  EXPECT_FALSE(hasField("route_discovery_duration_us"));
+
+  // onDestroy() changes nothing and does not count it again.
+  filter_->onDestroy();
+  EXPECT_EQ(1UL, counter("route_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  expectField("route_status", "cancelled");
+}
+
+// Once the discovery completed, destroying the (recreated) stream is not a cancellation.
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotCancelledAfterCompletion) {
+  setupWithStats(false);
+  auto callback = startRouteDiscovery();
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  (*callback)(true);
+  // The logs run in between and see the outcome.
+  filter_->onStreamComplete();
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  expectField("route_status", "found");
+  filter_->onDestroy();
+  EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
+  expectField("route_status", "found");
+}
+
+// The virtual host that handled the request is recorded once a route resolves.
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryRecordsVirtualHost) {
+  setupWithStats(false);
+  auto callback = startRouteDiscovery();
+  EXPECT_FALSE(hasField("vhost"));
+
+  NiceMock<Router::MockVirtualHost> vhost;
+  const std::string vhost_name = "foo_routes/foo.example.com";
+  ON_CALL(vhost, name()).WillByDefault(ReturnRef(vhost_name));
+  EXPECT_CALL(*decoder_callbacks_.route_, virtualHost()).WillRepeatedly(ReturnRef(vhost));
+  const Router::Route& route = *decoder_callbacks_.route_;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(makeOptRef(route)));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  (*callback)(true);
+  expectField("vhost", "foo_routes/foo.example.com");
+  expectField("host", "foo.example.com");
+}
+
+TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryAvailable) {
+  setupWithStats(true);
+  startClusterDiscovery();
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_EQ(1UL, counter("cluster_discovery_available"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
+  expectClusterDiscoveryFinished("available", true);
+}
+
+TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryMissing) {
+  setupWithStats(true);
+  startClusterDiscovery();
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Missing);
+  EXPECT_EQ(0UL, counter("cluster_discovery_available"));
+  EXPECT_EQ(1UL, counter("cluster_discovery_missing"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
+  expectClusterDiscoveryFinished("missing", false);
+}
+
+TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
+  setupWithStats(true);
+  startClusterDiscovery();
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Timeout);
+  EXPECT_EQ(0UL, counter("cluster_discovery_available"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
+  EXPECT_EQ(1UL, counter("cluster_discovery_timeout"));
+  expectClusterDiscoveryFinished("timeout", false);
+}
+
+TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) {
+  setupWithStats(true);
+  startClusterDiscovery();
+  // As above, the logs read the state before onDestroy().
+  filter_->onStreamComplete();
+  EXPECT_EQ(1UL, counter("cluster_discovery_cancelled"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_available"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
+  EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
+  EXPECT_TRUE(durations("cluster_discovery_duration").empty());
+  expectField("cluster_status", "cancelled");
+  EXPECT_FALSE(hasField("cluster_discovery_duration_us"));
+
+  filter_->onDestroy();
+  EXPECT_EQ(1UL, counter("cluster_discovery_cancelled"));
+  EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
+  expectField("cluster_status", "cancelled");
+}
+
+// A route that is already known and a cluster that already exists trigger no discovery at all.
+TEST_F(OnDemandFilterStatsTest, NoDiscoveryNoStats) {
+  setupWithStats(true);
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(0UL, counter("route_discovery_requested"));
+  EXPECT_EQ(0UL, counter("cluster_discovery_requested"));
+  // No discovery, no filter state.
+  EXPECT_EQ(nullptr, decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
+                         DiscoveryState::key()));
 }
 
 TEST(OnDemandConfigTest, Basic) {

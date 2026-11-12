@@ -1,14 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -23,7 +22,7 @@ envoy_extension_cc_test(
         "compressor_filter_testing_peer.h",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
@@ -32,6 +31,7 @@ envoy_extension_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -43,7 +43,10 @@ envoy_extension_cc_test(
         "compressor_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/compression/brotli/compressor:config",
         "//source/extensions/compression/brotli/decompressor:config",
@@ -71,7 +74,7 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":mock_config_cc_proto",
         "//source/extensions/compression/common/compressor:compressor_factory_base_lib",
@@ -85,10 +88,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "compressor_filter_speed_test",
     srcs = ["compressor_filter_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.http.compressor"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/compression/compressor:compressor_factory_interface",
         "//source/common/protobuf:utility_lib",
@@ -110,10 +114,10 @@ envoy_cc_benchmark_binary(
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "compressor_filter_speed_test_benchmark_test",
     benchmark_binary = "compressor_filter_speed_test",
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.http.compressor"],
     # TODO(envoyproxy/windows-dev): diagnose clang-cl build test failure
     tags = ["fails_on_windows"],
 )
@@ -123,13 +127,17 @@ envoy_cc_test_library(
     hdrs = ["compressor_integration_tests.h"],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "compressor_integration_tests",
     size = "large",
     srcs = [
         "compressor_integration_tests.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.http.compressor"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         ":compressor_integration_tests_lib",
         "//source/common/http:header_map_lib",

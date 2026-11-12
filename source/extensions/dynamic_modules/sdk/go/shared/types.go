@@ -281,6 +281,21 @@ type Scheduler interface {
 	Schedule(func())
 }
 
+// LoadShedPoint is a load shed point of the overload manager, which a filter config handle returns
+// from GetLoadShedPoint. The plugin can check it in the callbacks of the filter config that
+// returned it and of its filters, but not while the config is destroyed or on goroutines of its
+// own, since Envoy can destroy the overload manager before the config when it shuts down. A plugin
+// typically gets it once while its config is created and keeps it in its own config.
+type LoadShedPoint interface {
+	// ShouldShedLoad decides whether to shed one unit of load, such as one request. It returns true
+	// with the probability that the triggers of the load shed point give, and counts shed load in
+	// the shed_load_count statistic of the load shed point. It reads the pressure of the
+	// synchronous feedback resource monitors of the triggers and reports accepted load to them on
+	// the calling goroutine. Checking a load shed point that Envoy also checks counts the same load
+	// twice.
+	ShouldShedLoad() bool
+}
+
 // SocketOptionState represents the socket state at which an option should be applied.
 // This corresponds to envoy_dynamic_module_type_socket_option_state in the dynamic module ABI.
 type SocketOptionState uint32
@@ -316,18 +331,49 @@ type ClusterHostCounts struct {
 	Degraded uint64
 }
 
-// TimingInfo is a snapshot of stream timing information. StartTimeUnixNs is a Unix timestamp in
-// nanoseconds. All other fields are durations from the monotonic request start time. Unavailable
-// values are -1.
+// TimingInfo contains stream timing from Envoy. StartTimeUnixNs is a Unix timestamp in nanoseconds;
+// the other numeric fields are nanosecond offsets from the monotonic request start. Use each Has*
+// field to check availability. When the flag is false, the numeric value is -1. Zero and negative
+// offsets are valid.
 type TimingInfo struct {
-	StartTimeUnixNs               int64
-	RequestCompleteDurationNs     int64
-	FirstUpstreamTxByteSentNs     int64
-	LastUpstreamTxByteSentNs      int64
-	FirstUpstreamRxByteReceivedNs int64
-	LastUpstreamRxByteReceivedNs  int64
-	FirstDownstreamTxByteSentNs   int64
-	LastDownstreamTxByteSentNs    int64
+	StartTimeUnixNs                       int64
+	DownstreamConnectionBeginNs           int64
+	DownstreamHandshakeStartNs            int64
+	DownstreamHandshakeCompleteNs         int64
+	LastDownstreamHeaderRxByteReceivedNs  int64
+	LastDownstreamRxByteReceivedNs        int64
+	UpstreamConnectStartNs                int64
+	UpstreamConnectCompleteNs             int64
+	UpstreamHandshakeCompleteNs           int64
+	FirstUpstreamTxByteSentNs             int64
+	LastUpstreamTxByteSentNs              int64
+	FirstUpstreamRxByteReceivedNs         int64
+	FirstUpstreamRxBodyByteReceivedNs     int64
+	LastUpstreamRxByteReceivedNs          int64
+	FirstDownstreamTxByteSentNs           int64
+	LastDownstreamTxByteSentNs            int64
+	LastDownstreamAckReceivedNs           int64
+	RequestCompleteDurationNs             int64
+	DownstreamConnectionEndNs             int64
+	HasStartTime                          bool
+	HasDownstreamConnectionBegin          bool
+	HasDownstreamHandshakeStart           bool
+	HasDownstreamHandshakeComplete        bool
+	HasLastDownstreamHeaderRxByteReceived bool
+	HasLastDownstreamRxByteReceived       bool
+	HasUpstreamConnectStart               bool
+	HasUpstreamConnectComplete            bool
+	HasUpstreamHandshakeComplete          bool
+	HasFirstUpstreamTxByteSent            bool
+	HasLastUpstreamTxByteSent             bool
+	HasFirstUpstreamRxByteReceived        bool
+	HasFirstUpstreamRxBodyByteReceived    bool
+	HasLastUpstreamRxByteReceived         bool
+	HasFirstDownstreamTxByteSent          bool
+	HasLastDownstreamTxByteSent           bool
+	HasLastDownstreamAckReceived          bool
+	HasRequestComplete                    bool
+	HasDownstreamConnectionEnd            bool
 }
 
 // MetricID is an opaque identifier for a metric defined via Define{Counter,Gauge,Histogram}.

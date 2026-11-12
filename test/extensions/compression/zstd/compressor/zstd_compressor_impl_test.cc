@@ -4,6 +4,7 @@
 #include "source/extensions/compression/zstd/decompressor/zstd_decompressor_impl.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -103,6 +104,62 @@ TEST_F(ZstdCompressorImplTest, CompressWitHugeBuffer) {
   default_input_size_ = 60000;
   default_input_round_ = 2;
   verifyWithDecompressor(std::move(compressor));
+}
+
+// Each Flush must write out everything compressed so far, so that a streaming decompressor
+// recovers the data before the frame is finished.
+TEST_F(ZstdCompressorImplTest, FlushWritesOutBufferedData) {
+  ZstdCompressorImpl compressor(default_compression_level_, default_enable_checksum_,
+                                default_strategy_, default_cdict_manager_, 4096);
+  Stats::IsolatedStoreImpl stats_store{};
+  Zstd::Decompressor::ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.",
+                                                        default_ddict_manager_, 4096};
+
+  for (const absl::string_view message : {"first message", "second message"}) {
+    Buffer::OwnedImpl buffer(message);
+    compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
+    Buffer::OwnedImpl decompressed;
+    decompressor.decompress(buffer, decompressed);
+    EXPECT_EQ(message, decompressed.toString());
+  }
+}
+
+// With an output chunk much smaller than the flushed data, the flush takes many passes to drain.
+TEST_F(ZstdCompressorImplTest, FlushWithSmallChunkSize) {
+  ZstdCompressorImpl compressor(default_compression_level_, default_enable_checksum_,
+                                default_strategy_, default_cdict_manager_, 8);
+  Stats::IsolatedStoreImpl stats_store{};
+  Zstd::Decompressor::ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.",
+                                                        default_ddict_manager_, 4096};
+
+  Buffer::OwnedImpl buffer;
+  TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
+  const std::string original_text{buffer.toString()};
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
+  Buffer::OwnedImpl decompressed;
+  decompressor.decompress(buffer, decompressed);
+  EXPECT_EQ(original_text, decompressed.toString());
+}
+
+TEST_F(ZstdCompressorImplTest, FlushRuntimeGuardDisabled) {
+  TestScopedStaticReloadableFeaturesRuntime runtime({{"zstd_compressor_flush", false}});
+  ZstdCompressorImpl compressor(default_compression_level_, default_enable_checksum_,
+                                default_strategy_, default_cdict_manager_, 4096);
+  Stats::IsolatedStoreImpl stats_store{};
+  Zstd::Decompressor::ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.",
+                                                        default_ddict_manager_, 4096};
+
+  const std::string message{"held back until the frame ends"};
+  Buffer::OwnedImpl buffer(message);
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
+  Buffer::OwnedImpl decompressed;
+  decompressor.decompress(buffer, decompressed);
+  EXPECT_EQ(0, decompressed.length());
+
+  buffer.drain(buffer.length());
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  decompressor.decompress(buffer, decompressed);
+  EXPECT_EQ(message, decompressed.toString());
 }
 
 TEST_F(ZstdCompressorImplTest, IllegalConfig) {

@@ -15,12 +15,12 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -88,12 +88,23 @@ FaultFilterConfig::FaultFilterConfig(
       stat_name_set_(scope.symbolTable().makeSet("Fault")),
       aborts_injected_(stat_name_set_->add("aborts_injected")),
       delays_injected_(stat_name_set_->add("delays_injected")),
-      stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
+      stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))),
+      downstream_cluster_tag_(
+          stat_name_set_->add(Envoy::Config::TagNames::get().FAULT_DOWNSTREAM_CLUSTER)),
+      aborts_injected_base_(
+          stat_name_set_->add(absl::StrCat(stats_prefix, "fault.aborts_injected"))),
+      delays_injected_base_(
+          stat_name_set_->add(absl::StrCat(stats_prefix, "fault.delays_injected"))) {}
 
-void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
+void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name,
+                                   Stats::StatName base_name) {
   if (!settings_.disableDownstreamClusterStats()) {
-    Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
-        .inc();
+    // '<stats_prefix>fault.<downstream_cluster>.<stat_name>', with the downstream cluster as its
+    // tag; the tag-extracted name (the pre-joined base_name) drops the cluster segment.
+    const Stats::StatNameJoiner name({stats_prefix_, downstream_cluster, stat_name},
+                                     scope_.constSymbolTable());
+    const Stats::StatNameTag tag{downstream_cluster_tag_, downstream_cluster};
+    scope_.counterFromTaggedName(base_name, Stats::StatNameTagSpan{tag}, name.statName()).inc();
   }
 }
 

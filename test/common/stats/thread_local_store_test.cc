@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -2045,7 +2046,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.99 * million_);
+  // The well-known stat names occupy the lowest symbols, shifting these stats
+  // to slightly longer encodings.
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.02 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -2100,6 +2103,30 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   EXPECT_TRUE(merge_called);
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, HistogramDestructionShutdownRace) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
+  }
+
+  // Execute posted tasks to run clearScopesFromCaches on the main thread.
+  // This will destroy scope1 and in turn destroy the histogram h1 (since there are no other
+  // references). Destroying the histogram will call releaseHistogramCrossThread and post
+  // clearHistogramsFromCaches to the dispatcher.
+  main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+
+  // Now, without executing the newly posted clearHistogramsFromCaches task, we initiate shutdown.
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+
+  // ThreadLocalStore should destruct cleanly without any histograms_to_cleanup_.empty() assert
+  // failure.
   tls_.shutdownThread();
 }
 
@@ -2596,6 +2623,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
 
 class HistogramThreadTest : public ThreadLocalRealThreadsMixin, public testing::Test {
 protected:
+  using Bucket = ParentHistogram::Bucket;
   static constexpr uint32_t NumThreads = 10;
 
   HistogramThreadTest() : ThreadLocalRealThreadsMixin(NumThreads) {}
@@ -2641,6 +2669,40 @@ TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
   ParentHistogramSharedPtr hist = histograms[0];
   EXPECT_THAT(hist->bucketSummary(),
               HasSubstr(absl::StrCat(" B25(0,0) B50(", NumThreads, ",", NumThreads, ") ")));
+}
+
+TEST_F(HistogramThreadTest, MergeWithMostlyEmptyTlsHistograms) {
+  std::atomic<uint32_t> recorded{0};
+  foreachThread([this, &recorded]() {
+    Histogram& histogram = scope_.histogramFromString("my_hist", Histogram::Unit::Unspecified);
+    if (recorded.fetch_add(1) == 0) {
+      histogram.recordValue(42);
+    }
+  });
+
+  mergeHistograms();
+
+  auto histograms = store_->histograms();
+  ASSERT_EQ(1, histograms.size());
+  EXPECT_THAT(histograms[0]->bucketSummary(), HasSubstr(" B50(1,1) "));
+}
+
+TEST_F(HistogramThreadTest, MergeDisjointBucketsAcrossTlsHistograms) {
+  std::atomic<uint32_t> thread_index{0};
+  foreachThread([this, &thread_index]() {
+    Histogram& histogram = scope_.histogramFromString("my_hist", Histogram::Unit::Unspecified);
+    const uint32_t index = thread_index.fetch_add(1);
+    if (index < 2) {
+      histogram.recordValue(index == 0 ? 42 : 100);
+    }
+  });
+
+  mergeHistograms();
+
+  auto histograms = store_->histograms();
+  ASSERT_EQ(1, histograms.size());
+  EXPECT_THAT(histograms[0]->detailedIntervalBuckets(),
+              UnorderedElementsAre(Bucket{42, 1, 1}, Bucket{100, 10, 1}));
 }
 
 TEST_F(HistogramThreadTest, ScopeOverlap) {

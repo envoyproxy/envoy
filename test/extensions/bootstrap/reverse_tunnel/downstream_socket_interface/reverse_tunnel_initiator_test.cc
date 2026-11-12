@@ -15,6 +15,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -116,10 +117,25 @@ TEST_F(ReverseTunnelInitiatorTest, CreateBootstrapExtension) {
       DownstreamReverseConnectionSocketInterface config;
 
   auto extension = socket_interface_->createBootstrapExtension(config, context_);
-  EXPECT_NE(extension, nullptr);
+  ASSERT_OK(extension);
+  EXPECT_NE(*extension, nullptr);
 
   // Verify extension is stored in socket interface.
   EXPECT_NE(socket_interface_->getExtension(), nullptr);
+}
+
+// Socket creation fails cleanly when the bootstrap extension has not been instantiated, rather than
+// dereferencing a null server context and crashing at listener creation.
+TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketWithoutExtensionReturnsNullptr) {
+  ReverseTunnelInitiator uninitialized;
+  EXPECT_FALSE(uninitialized.isInitialized());
+
+  ReverseConnectionSocketConfig config;
+  config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 1));
+  auto handle = uninitialized.createReverseConnectionSocket(
+      Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
+      config);
+  EXPECT_EQ(handle, nullptr);
 }
 
 TEST_F(ReverseTunnelInitiatorTest, CreateEmptyConfigProto) {

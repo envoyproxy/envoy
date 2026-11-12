@@ -40,6 +40,8 @@ on:
           - src: /mnt/runner
             target: RUNNER_TEMP/container/bazel_root
             chown: "runner:runner"
+      # The build image is no longer cached (it is pulled in seconds); these are accepted so
+      # callers need not change, and ignored.
       cache-build-image:
         type: string
       cache-build-image-key-suffix:
@@ -49,6 +51,15 @@ on:
         default: false
       checkout-extra:
         type: string
+      checkout-pr:
+        type: string
+        description: Check out this pull request's merge ref instead of the request's sha.
+      checkout-ref:
+        type: string
+        description: Check out this ref (full sha, branch, tag or refs/pull/N/head) instead of the request's sha.
+      checkout-repository:
+        type: string
+        description: Repository (owner/name) to fetch checkout-ref from. Defaults to this repository, and is not used for checkout-pr.
       concurrency-suffix:
         type: string
         default:
@@ -73,6 +84,11 @@ on:
       docker-ci:
         type: boolean
         default: true
+      # Use the devtools image. Only respected by branches whose `ci/run_envoy_docker.sh` defaults
+      # CI to the minimal `ci` image; older branches select the image with `docker-ci`.
+      devtools:
+        type: boolean
+        default: false
       docker-ipv6:
         default: true
         type: boolean
@@ -137,7 +153,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/actions/envoy/run/summary@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+          - uses: envoyproxy/toolshed/actions/envoy/run/summary@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -204,7 +220,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: started
       name: Create timestamp
       with:
@@ -212,7 +228,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/actions/jq@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Context
       id: context
       with:
@@ -245,14 +261,14 @@ jobs:
         fi
         echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
-    - uses: envoyproxy/toolshed/actions/github/remnt@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/github/remnt@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/actions/bind-mounts@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/bind-mounts@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      uses: envoyproxy/toolshed/actions/diskspace@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -260,7 +276,7 @@ jobs:
         mount
         df -h
 
-    - uses: envoyproxy/toolshed/actions/bson@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/bson@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Configure Docker
       if: runner.os == 'Linux'
       with:
@@ -275,22 +291,7 @@ jobs:
             else . end
           | "${{ inputs.template-docker-configure }}"
 
-    # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
-    - if: ${{ inputs.cache-build-image }}
-      id: cache-lookup
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
-    - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
-      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/actions/docker/cache/restore@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
-      with:
-        image-tag: ${{ inputs.cache-build-image }}
-        key-suffix: ${{ inputs.cache-build-image-key-suffix }}
-
-    - uses: envoyproxy/toolshed/actions/appauth@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -301,7 +302,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/actions/github/checkout@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -315,9 +316,36 @@ jobs:
         pr: ${{ fromJSON(inputs.request).request.pr }}
         ssh-key: ${{ inputs.trusted && secrets.ssh-key || '' }}
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
+    - name: Checkout requested ref
+      if: inputs.checkout-ref || inputs.checkout-pr || inputs.checkout-repository
+      shell: bash
+      run: |
+        # The requested code is not this branch's, so it must not run with the app token, deploy
+        # key (both persisted in .git/config by the checkout) or signing keys of a trusted job.
+        # Enforced here rather than left to each caller.
+        if [[ -z "$REF" ]]; then
+            echo "checkout-repository needs checkout-ref or checkout-pr" >&2
+            exit 1
+        fi
+        if [[ "${{ inputs.trusted }}" == "true" ]]; then
+            echo "checkout-ref/checkout-pr can only be used with trusted: false" >&2
+            exit 1
+        fi
+        git fetch --no-tags "$REPOSITORY" "$REF"
+        git checkout --force FETCH_HEAD
+        git log -1 --format='%H %s'
+      env:
+        # A pull request's merge ref is what PR CI tests. Only the base repository has it, so it
+        # is always fetched from origin, and no API call (or token with pull request access) is
+        # needed.
+        REF: ${{ inputs.checkout-pr && format('refs/pull/{0}/merge', inputs.checkout-pr) || inputs.checkout-ref }}
+        REPOSITORY: >-
+          ${{ (inputs.checkout-repository && !inputs.checkout-pr)
+              && format('https://github.com/{0}', inputs.checkout-repository)
+              || 'origin' }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/actions/github/checkout@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -328,7 +356,7 @@ jobs:
     - name: Stage signing key material
       id: signing
       if: ${{ inputs.signing }}
-      uses: envoyproxy/toolshed/actions/gpg/write@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+      uses: envoyproxy/toolshed/actions/gpg/write@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
@@ -340,7 +368,7 @@ jobs:
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
     - run: |
-        echo "${BAZELRC_CONTENT}" > repo.bazelrc
+        echo "${BAZELRC_CONTENT}" > user.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
       name: Configure repo Bazel settings
       env:
@@ -364,7 +392,7 @@ jobs:
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/actions/github/run@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -417,6 +445,7 @@ jobs:
         ENVOY_SIGNING_PASSPHRASE_PATH: ${{ inputs.signing && '/build/signing/passphrase' || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
+        ENVOY_DOCKER_DEVTOOLS: ${{ inputs.devtools && 'true' || '' }}
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}

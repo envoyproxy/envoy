@@ -38,7 +38,8 @@ public:
                        BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                        StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
                        Http::RequestHeaderMap* request_headers = nullptr,
-                       LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true);
+                       LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true,
+                       LLMProtocol request_protocol = LLMProtocol::Unspecified);
   ~RequestFilterManager();
 
   // Starts the request filter pipeline and sink coroutines.

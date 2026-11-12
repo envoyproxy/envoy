@@ -2,22 +2,33 @@
 
 This directory contains tests that verify Envoy's toolchain detection and selection behavior across different compiler configurations. These tests ensure that Bazel correctly identifies and uses the appropriate compiler toolchains (GCC vs Clang) based on various configuration methods.
 
-> **NOTE**: If running these tests locally, please ensure that you do not have a `user.bazelrc` file as this may interfere with the tests. The tests rely on specific default behavior that can be altered by user-specific Bazel configurations.
+> **NOTE**: If running these tests locally, please ensure that you do not have `ci.bazelrc` or `user.bazelrc` files in the repository root, as these may interfere with the tests. The tests rely on specific default behavior that can be altered by local Bazel configurations.
 
 ## What is Being Tested
 
 The test suite validates toolchain behavior in the following scenarios:
 
 - **Default build**: Testing what toolchain is selected with no explicit configuration
-- **Config-based selection**: Testing `--config=clang` and `--config=gcc` flags
+- **Config-based selection**: Testing the default toolchain (clang + libc++) and `--config=gcc` (gcc + libstdc++)
 - **Environment-based selection**: Testing `CC`/`CXX` environment variable overrides
-- **Compiler availability**: Testing behavior when only specific compilers are available
+- **Compiler availability**: Both LLVM and GCC work hermetically, regardless of installed compilers
+- **Resolution identity**: Checking the resolved compiler, toolchain identifier, and hermetic compiler path
+- **GCC configuration**: Checking that `//bazel:gcc_build` matches only with `--config=gcc`
+- **Host GCC override**: A module fixture opts into `/usr` explicitly, with and without
+  `gcc_version`, and rejects a version that does not match the installed compiler
 
 The tests run against different Docker environments:
-- `gcc`: Only GCC available
-- `llvm`: Only LLVM/Clang available
-- `all`: Both compilers available
-- `none`: No compilers available (tests hermetic toolchain fallback)
+- `gcc`: Host GCC installed
+- `llvm`: LLVM runtime prerequisites installed, without host GCC
+- `all`: Both sets of host prerequisites installed
+- `none`: No host compilers installed
+
+Every environment must use hermetic LLVM by default and hermetic GCC with `--config=gcc`.
+Setting `CC`/`CXX` does not change that selection.
+The `gcc` and `all` environments also test the explicit host override using a temporary module
+copy inside `ci/matrix`. Source directories are symlinked into the fixture, and it is removed when
+the test finishes. Envoy remains the root module because the upstream compiler extensions do not
+support being configured transitively.
 
 ## Running Tests Locally
 
@@ -53,7 +64,6 @@ Successful tests will show output like:
 ```
 ✅ NO_ARGS passed as expected
 ✅ GCC passed as expected
-✅ CLANG passed as expected
 ✅ GCC_ENV passed as expected
 ✅ CLANG_ENV passed as expected
 All test configs passed as expected
@@ -61,11 +71,10 @@ All test configs passed as expected
 
 Failed tests will show which configuration didn't match expectations:
 ```
-❌ CLANG: expected=clang-libc++, got=fail
+❌ GCC: expected=gcc-libstdc++, got=fail
 ```
 
 ### Troubleshooting
 
 - If you get permission errors, ensure `UID` and `GID` environment variables are set correctly
 - If tests fail unexpectedly, check that no local Bazel configuration files are interfering
-- The `none` configuration is expected to fail until hermetic toolchains are fully implemented

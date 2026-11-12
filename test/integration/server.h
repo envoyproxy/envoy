@@ -474,7 +474,7 @@ public:
          Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
          bool use_bootstrap_node_metadata = false,
          std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr,
-         bool use_admin_server = true);
+         bool use_admin_server = true, Server::HotRestart* hot_restart = nullptr);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -653,6 +653,10 @@ protected:
                                        Buffer::WatermarkFactorySharedPtr watermark_factory,
                                        bool use_admin_server) PURE;
 
+  // The hot restart implementation the server runs with: the test's, if it set one, or one that
+  // has no parent.
+  Server::HotRestart* hotRestartForTest() const { return hot_restart_; }
+
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), statStore(),
   // adminAddress()) will be available.
@@ -684,6 +688,7 @@ private:
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
   bool use_admin_interface_to_quit_{};
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_;
+  Server::HotRestart* hot_restart_{};
 };
 
 // Default implementation of IntegrationTestServer

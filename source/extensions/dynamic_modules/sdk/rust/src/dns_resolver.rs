@@ -5,9 +5,18 @@
 //! for upstream cluster endpoint resolution.
 
 use crate::{
-  abi, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer, strs_to_module_buffers,
-  wrap_into_c_void_ptr, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
-  EnvoyHistogramId, EnvoyHistogramVecId,
+  abi,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
 };
 use std::sync::Arc;
 

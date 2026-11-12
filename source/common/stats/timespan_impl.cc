@@ -21,6 +21,7 @@ void HistogramCompletableTimespanImpl::complete() { histogram_.recordValue(tickC
 void HistogramCompletableTimespanImpl::ensureTimeHistogram(const Histogram& histogram) const {
   switch (histogram.unit()) {
   case Histogram::Unit::Null:
+  case Histogram::Unit::Nanoseconds:
   case Histogram::Unit::Microseconds:
   case Histogram::Unit::Milliseconds:
     return;
@@ -40,6 +41,8 @@ uint64_t HistogramCompletableTimespanImpl::tickCount() const {
   switch (histogram_.unit()) {
   case Histogram::Unit::Null:
     return 0;
+  case Histogram::Unit::Nanoseconds:
+    return HistogramCompletableTimespanImpl::elapsedDuration<std::chrono::nanoseconds>().count();
   case Histogram::Unit::Microseconds:
     return HistogramCompletableTimespanImpl::elapsedDuration<std::chrono::microseconds>().count();
   case Histogram::Unit::Milliseconds:

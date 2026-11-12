@@ -6,8 +6,11 @@
 #include <utility>
 
 #include "envoy/data/ai/v3/request_info.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
@@ -23,6 +26,7 @@ namespace RequestInfo {
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::LocalReplier;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 
 namespace {
 
@@ -71,11 +75,11 @@ RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
     : config_(std::move(config)), context_(context) {}
 
 absl::Status RequestInfoFilter::decodeSync(AiRequest& request, LocalReplier) {
-  publish(request.json());
+  publish(request);
   return absl::OkStatus();
 }
 
-void RequestInfoFilter::publish(const nlohmann::json& json) {
+void RequestInfoFilter::publish(const AiRequest& request) {
   StreamInfo::StreamInfo& stream_info = context_.stream_info;
   if (stream_info.dynamicMetadata().typed_filter_metadata().contains(
           config_->metadataNamespace())) {
@@ -85,7 +89,7 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
     return;
   }
 
-  const RequestAttributes attrs = extractRequestAttributes(context_.request_protocol, json,
+  const RequestAttributes attrs = extractRequestAttributes(request.protocol(), request.json(),
                                                            context_.request_headers.getPathValue());
   envoy::data::ai::v3::RequestInfo record = toProto(attrs);
   if (config_->tokensPerByte().has_value()) {
@@ -95,12 +99,24 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
   Protobuf::Any typed_any;
   MessageUtil::packFrom(typed_any, record);
   stream_info.setDynamicTypedMetadata(config_->metadataNamespace(), typed_any);
+  storeModel(attrs.model);
 
   config_->stats().published_.inc();
   if (attrs.malformed) {
     config_->stats().partial_.inc();
   }
   ENVOY_LOG(trace, "request_info: published to namespace {}", config_->metadataNamespace());
+}
+
+void RequestInfoFilter::storeModel(absl::string_view model) {
+  const StreamInfo::FilterStateSharedPtr& filter_state = context_.stream_info.filterState();
+  // A filter ahead may have set the object with another life span, which setData rejects.
+  if (model.empty() || filter_state->hasDataWithName(FilterStateKeys::ModelRequest)) {
+    return;
+  }
+  filter_state->setData(FilterStateKeys::ModelRequest,
+                        std::make_shared<Router::StringAccessorImpl>(model),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 } // namespace RequestInfo

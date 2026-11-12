@@ -29,7 +29,6 @@
 
 using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
@@ -94,12 +93,11 @@ public:
     // Delegate call to mock async client manager to real async client manager.
     ON_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClientWithHashKey(_, _, _))
-        .WillByDefault(
-            Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                       Stats::Scope& scope, bool skip_cluster_check) {
-              return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
-                  config_with_hash_key, scope, skip_cluster_check);
-            }));
+        .WillByDefault([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                           Stats::Scope& scope, bool skip_cluster_check) {
+          return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+              config_with_hash_key, scope, skip_cluster_check);
+        });
     ExtAuthzFilterConfig factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_).value();
   }
@@ -722,15 +720,14 @@ TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
       &context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_);
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
               send_(_, _, _))
-      .WillOnce(Invoke([&async_request](Http::RequestMessagePtr&,
-                                        Http::AsyncClient::Callbacks& callbacks,
-                                        const Http::AsyncClient::RequestOptions&)
-                           -> Http::AsyncClient::Request* {
+      .WillOnce([&async_request](
+                    Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
         Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
             Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
         callbacks.onSuccess(async_request, std::move(response));
         return nullptr;
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
@@ -913,9 +910,9 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, true))
       .WillRepeatedly(
-          Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                     Stats::Scope& scope,
-                     bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+          [&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+              Stats::Scope& scope,
+              bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
             // The per-route gRPC client creation should call getOrCreateRawAsyncClientWithHashKey
             // with a config matching the per-route cluster "per_route_ext_authz_cluster".
             if (config_with_hash_key.config().envoy_grpc().cluster_name() ==
@@ -927,7 +924,7 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
             // A client is made for the default cluster during initialization.
             return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
                 config_with_hash_key, scope, skip_cluster_check);
-          }));
+          });
 
   EXPECT_CALL(*mock_per_route_grpc_client, sendRaw(_, _, _, _, _, _))
       .WillRepeatedly([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,

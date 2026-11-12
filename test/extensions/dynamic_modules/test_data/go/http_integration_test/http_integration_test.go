@@ -45,6 +45,8 @@ func init() {
 		"log_level":                    &LogLevelConfigFactory{},
 		"runtime_values":               &RuntimeValuesConfigFactory{},
 		"generic_secret_callbacks":     &GenericSecretCallbacksConfigFactory{},
+		"filter_state_object_recreate": &FilterStateObjectRecreateConfigFactory{},
+		"load_shed_point":              &LoadShedPointConfigFactory{},
 	})
 }
 
@@ -1021,7 +1023,47 @@ type StreamTimingFilter struct {
 func (f *StreamTimingFilter) OnStreamComplete() {
 	timing := f.handle.GetTimingInfo()
 	assert(timing.StartTimeUnixNs > 0, "start time")
+	assert(timing.HasStartTime, "start time available")
+	assert(timing.DownstreamConnectionBeginNs != -1, "downstream connection accepted")
+	assert(timing.HasDownstreamConnectionBegin, "downstream connection marker available")
+	assert(timing.DownstreamHandshakeStartNs == -1, "no downstream TLS handshake start")
+	assert(!timing.HasDownstreamHandshakeStart, "no downstream TLS start marker")
+	assert(timing.DownstreamHandshakeCompleteNs == -1, "no downstream TLS handshake completion")
+	assert(!timing.HasDownstreamHandshakeComplete, "no downstream TLS completion marker")
+	assert(timing.LastDownstreamHeaderRxByteReceivedNs >= 0, "request headers received")
+	assert(timing.HasLastDownstreamHeaderRxByteReceived, "request headers marker available")
+	assert(timing.LastDownstreamRxByteReceivedNs >= timing.LastDownstreamHeaderRxByteReceivedNs,
+		"request received")
+	assert(timing.HasLastDownstreamRxByteReceived, "request received marker available")
+	assert(timing.UpstreamConnectStartNs >= 0, "upstream connect start")
+	assert(timing.HasUpstreamConnectStart, "upstream connect start marker available")
+	assert(timing.UpstreamConnectCompleteNs >= timing.UpstreamConnectStartNs, "upstream connect complete")
+	assert(timing.HasUpstreamConnectComplete, "upstream connect end marker available")
+	assert(timing.UpstreamHandshakeCompleteNs == -1, "no upstream TLS handshake")
+	assert(!timing.HasUpstreamHandshakeComplete, "no upstream TLS completion marker")
+	assert(timing.FirstUpstreamTxByteSentNs >= 0, "upstream request start")
+	assert(timing.HasFirstUpstreamTxByteSent, "upstream request start marker available")
+	assert(timing.LastUpstreamTxByteSentNs >= timing.FirstUpstreamTxByteSentNs, "upstream request complete")
+	assert(timing.HasLastUpstreamTxByteSent, "upstream request end marker available")
+	assert(timing.FirstUpstreamRxByteReceivedNs >= 0, "upstream response start")
+	assert(timing.HasFirstUpstreamRxByteReceived, "upstream response start marker available")
+	assert(timing.FirstUpstreamRxBodyByteReceivedNs >= timing.FirstUpstreamRxByteReceivedNs,
+		"upstream response body start")
+	assert(timing.HasFirstUpstreamRxBodyByteReceived, "upstream body start marker available")
+	assert(timing.LastUpstreamRxByteReceivedNs >= timing.FirstUpstreamRxBodyByteReceivedNs,
+		"upstream response complete")
+	assert(timing.HasLastUpstreamRxByteReceived, "upstream response end marker available")
+	assert(timing.FirstDownstreamTxByteSentNs >= 0, "downstream response start")
+	assert(timing.HasFirstDownstreamTxByteSent, "downstream response start marker available")
+	assert(timing.LastDownstreamTxByteSentNs >= timing.FirstDownstreamTxByteSentNs,
+		"downstream response complete")
+	assert(timing.HasLastDownstreamTxByteSent, "downstream response end marker available")
+	assert(timing.LastDownstreamAckReceivedNs == -1, "no TCP final ACK marker")
+	assert(!timing.HasLastDownstreamAckReceived, "no TCP final ACK marker available")
 	assert(timing.RequestCompleteDurationNs >= 0, "request complete duration")
+	assert(timing.HasRequestComplete, "request complete marker available")
+	assert(timing.DownstreamConnectionEndNs == -1, "connection remains open")
+	assert(!timing.HasDownstreamConnectionEnd, "connection close marker unavailable")
 	assertEq(f.handle.IncrementCounterValue(f.timingObservedTotal, 1), shared.MetricsSuccess,
 		"timing counter")
 }
@@ -1842,4 +1884,114 @@ func (p *RuntimeValuesFilter) OnResponseHeaders(headers shared.HeaderMap,
 	headers.Set("x-runtime-missing-int", strconv.FormatUint(f.missingInt, 10))
 	headers.Set("x-runtime-missing-number", strconv.FormatFloat(f.missingNumber, 'g', -1, 64))
 	return shared.HeadersStatusContinue
+}
+
+// FilterStateObjectRecreateConfigFactory checks that a Request-lifespan object survives
+// recreate_stream and a FilterChain-lifespan one does not.
+type FilterStateObjectRecreateConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *FilterStateObjectRecreateConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &FilterStateObjectRecreateFilterFactory{}, nil
+}
+
+type FilterStateObjectRecreateFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *FilterStateObjectRecreateFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &FilterStateObjectRecreateFilter{handle: handle}
+}
+
+type FilterStateObjectRecreateFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+type liveExchange struct {
+	tokens chan uint64
+}
+
+const liveObjectKey = "envoy.test.live_object"
+
+func (p *FilterStateObjectRecreateFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	object, ok := p.handle.GetFilterStateObject(liveObjectKey)
+	if !ok {
+		exchange := &liveExchange{tokens: make(chan uint64, 1)}
+		exchange.tokens <- 0xABCD
+		if !p.handle.SetFilterStateObject(liveObjectKey, exchange, shared.FilterStateLifeSpanRequest) {
+			panic("failed to store live object")
+		}
+		if !p.handle.SetFilterStateObject(liveObjectKey+".filter_chain",
+			"filter chain marker", shared.FilterStateLifeSpanFilterChain) {
+			panic("failed to store filter chain marker")
+		}
+		if !p.handle.RecreateStream(nil) {
+			panic("failed to recreate stream")
+		}
+		return shared.HeadersStatusStop
+	}
+
+	exchange := object.(*liveExchange)
+	if _, ok := p.handle.GetFilterStateObject(liveObjectKey + ".filter_chain"); ok {
+		p.handle.SendLocalResponse(500, nil, []byte("filter chain object survived recreate"), "")
+		return shared.HeadersStatusStop
+	}
+	token := <-exchange.tokens
+	p.handle.SendLocalResponse(200,
+		[][2]string{{"x-live-object-value", fmt.Sprintf("%#x", token)}}, nil, "")
+	return shared.HeadersStatusStop
+}
+
+// -----------------------------------------------------------------------------
+// LoadShedPoint
+// -----------------------------------------------------------------------------
+
+// LoadShedPointConfigFactory creates filters that send a local reply when the load shed point
+// named in the filter config sheds the request. Otherwise the filters tell the upstream in a
+// request header whether they got the load shed point.
+type LoadShedPointConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LoadShedPointConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &LoadShedPointFilterFactory{loadShedPoint: handle.GetLoadShedPoint(string(config))}, nil
+}
+
+type LoadShedPointFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	loadShedPoint shared.LoadShedPoint
+}
+
+func (f *LoadShedPointFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &LoadShedPointFilter{
+		handle:           handle,
+		hasLoadShedPoint: f.loadShedPoint != nil,
+		shedLoad:         f.loadShedPoint != nil && f.loadShedPoint.ShouldShedLoad(),
+	}
+}
+
+type LoadShedPointFilter struct {
+	shared.EmptyHttpFilter
+	handle           shared.HttpFilterHandle
+	hasLoadShedPoint bool
+	shedLoad         bool
+}
+
+func (p *LoadShedPointFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if !p.shedLoad {
+		if p.hasLoadShedPoint {
+			headers.Set("x-load-shed-point", "present")
+		} else {
+			headers.Set("x-load-shed-point", "absent")
+		}
+		return shared.HeadersStatusContinue
+	}
+	p.handle.SendLocalResponse(503, nil, []byte("shed"), "")
+	return shared.HeadersStatusStop
 }

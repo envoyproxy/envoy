@@ -10,6 +10,7 @@
 pub use crate::timing::TimingInfo;
 use crate::{abi, ffi_export, EnvoyBuffer};
 use std::ffi::c_void;
+use std::num::NonZero;
 use std::ptr;
 
 // -----------------------------------------------------------------------------
@@ -17,19 +18,19 @@ use std::ptr;
 // -----------------------------------------------------------------------------
 
 /// Handle for a counter metric. Counters can only be incremented.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CounterHandle {
   id: usize,
 }
 
 /// Handle for a gauge metric. Gauges can be set, incremented, or decremented.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GaugeHandle {
   id: usize,
 }
 
 /// Handle for a histogram metric. Histograms record value distributions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HistogramHandle {
   id: usize,
 }
@@ -307,7 +308,7 @@ pub trait AccessLogger: Send {
 }
 
 /// Byte count information from the stream info.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BytesInfo {
   /// Total bytes received from downstream.
   pub bytes_received: u64,
@@ -320,7 +321,7 @@ pub struct BytesInfo {
 }
 
 /// Cumulative wire byte counts from the stream's downstream bytes meter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DownstreamWireBytes {
   /// Wire bytes received from downstream.
   pub bytes_received: u64,
@@ -334,20 +335,20 @@ pub struct DownstreamWireBytes {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum AccessLogType {
-  NotSet = 0,
+  NotSet               = 0,
   TcpUpstreamConnected = 1,
-  TcpPeriodic = 2,
-  TcpConnectionEnd = 3,
-  DownstreamStart = 4,
-  DownstreamPeriodic = 5,
-  DownstreamEnd = 6,
-  UpstreamPoolReady = 7,
-  UpstreamPeriodic = 8,
-  UpstreamEnd = 9,
+  TcpPeriodic          = 2,
+  TcpConnectionEnd     = 3,
+  DownstreamStart      = 4,
+  DownstreamPeriodic   = 5,
+  DownstreamEnd        = 6,
+  UpstreamPoolReady    = 7,
+  UpstreamPeriodic     = 8,
+  UpstreamEnd          = 9,
   DownstreamTunnelSuccessfullyEstablished = 10,
   UdpTunnelUpstreamConnected = 11,
-  UdpPeriodic = 12,
-  UdpSessionEnd = 13,
+  UdpPeriodic          = 12,
+  UdpSessionEnd        = 13,
 }
 
 impl AccessLogType {
@@ -527,29 +528,14 @@ impl LogContext {
 
   /// Get timing information.
   pub fn timing_info(&self) -> TimingInfo {
-    let mut info = abi::envoy_dynamic_module_type_timing_info {
-      start_time_unix_ns: 0,
-      request_complete_duration_ns: -1,
-      first_upstream_tx_byte_sent_ns: -1,
-      last_upstream_tx_byte_sent_ns: -1,
-      first_upstream_rx_byte_received_ns: -1,
-      last_upstream_rx_byte_received_ns: -1,
-      first_downstream_tx_byte_sent_ns: -1,
-      last_downstream_tx_byte_sent_ns: -1,
-    };
+    let mut info = crate::timing::unavailable_timing_info();
     unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_timing_info(self.envoy_ptr, &mut info);
+      abi::envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+        self.envoy_ptr,
+        &mut info,
+      );
     }
-    TimingInfo {
-      start_time_unix_ns: info.start_time_unix_ns,
-      request_complete_duration_ns: info.request_complete_duration_ns,
-      first_upstream_tx_byte_sent_ns: info.first_upstream_tx_byte_sent_ns,
-      last_upstream_tx_byte_sent_ns: info.last_upstream_tx_byte_sent_ns,
-      first_upstream_rx_byte_received_ns: info.first_upstream_rx_byte_received_ns,
-      last_upstream_rx_byte_received_ns: info.last_upstream_rx_byte_received_ns,
-      first_downstream_tx_byte_sent_ns: info.first_downstream_tx_byte_sent_ns,
-      last_downstream_tx_byte_sent_ns: info.last_downstream_tx_byte_sent_ns,
-    }
+    info.into()
   }
 
   /// Get byte count information.
@@ -621,11 +607,11 @@ impl LogContext {
     self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_host)
   }
 
-  /// Get the connection ID, or 0 if not available.
-  pub fn connection_id(&self) -> u64 {
+  /// Get the connection ID, or `None` if not available.
+  pub fn connection_id(&self) -> Option<NonZero<u64>> {
     self
       .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
-      .unwrap_or(0)
+      .and_then(NonZero::new)
   }
 
   /// Check if mTLS was used for the connection.
@@ -1106,11 +1092,11 @@ impl LogContext {
     )
   }
 
-  /// Get the upstream connection ID, or 0 if not available.
-  pub fn upstream_connection_id(&self) -> u64 {
-    unsafe {
+  /// Get the upstream connection ID, or `None` if not available.
+  pub fn upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(self.envoy_ptr)
-    }
+    })
   }
 
   /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
@@ -1291,16 +1277,16 @@ impl LogContext {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_headers_count(header_type);
-    crate::utility::collect_headers(count, |ptr, capacity, size_out| unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_headers(
-        self.envoy_ptr,
-        header_type,
-        ptr,
-        capacity,
-        size_out,
-      )
-    })
+    crate::utility::collect_headers(
+      || self.get_headers_count(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_access_logger_get_headers(
+          self.envoy_ptr,
+          header_type,
+          headers,
+        )
+      },
+    )
   }
 
   /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.
@@ -1350,6 +1336,63 @@ impl LogContext {
     }
     buffers.retain(|buf| !buf.as_slice().is_empty());
     buffers
+  }
+}
+
+impl abi::envoy_dynamic_module_type_response_flag {
+  /// Returns the single bit this flag occupies in a response-flag bitmask.
+  //
+  /// Returns `u64` to match [`LogContext::response_flags`].
+  pub const fn to_bitmask(self) -> u64 {
+    1u64 << (self as u32)
+  }
+
+  /// Returns an iterator over every known flag set in `bitmask`, lowest bit first.
+  pub fn iter_from_bitmask(bitmask: u64) -> ResponseFlagBitmaskIter {
+    ResponseFlagBitmaskIter {
+      remaining: bitmask & Self::VALID_RESPONSE_FLAG_MASK,
+    }
+  }
+
+  const VALID_RESPONSE_FLAG_MASK: u64 = {
+    let variants = <Self as strum::VariantArray>::VARIANTS;
+    let mut mask = 0u64;
+    let mut i = 0;
+    while i < variants.len() {
+      mask |= variants[i].to_bitmask();
+      i += 1;
+    }
+    mask
+  };
+}
+
+/// [Iterator] over the known response flags set in a bitmask.
+#[derive(Copy, Clone, Debug)]
+pub struct ResponseFlagBitmaskIter {
+  remaining: u64,
+}
+
+impl Iterator for ResponseFlagBitmaskIter {
+  type Item = abi::envoy_dynamic_module_type_response_flag;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.remaining == 0 {
+      return None;
+    }
+    let bit = self.remaining.trailing_zeros(); // Always < 64, so fits in a u32 bit index.
+    self.remaining &= self.remaining - 1; // Clear the lowest set bit.
+    abi::envoy_dynamic_module_type_response_flag::from_repr(bit)
+  }
+
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    let len = self.len();
+    (len, Some(len))
+  }
+}
+
+impl ExactSizeIterator for ResponseFlagBitmaskIter {
+  fn len(&self) -> usize {
+    self.remaining.count_ones() as usize
   }
 }
 
@@ -1557,7 +1600,7 @@ ffi_export! {
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       fn __single_access_logger_factory(
         ctx: &$crate::access_log::ConfigContext,
@@ -1586,4 +1629,38 @@ macro_rules! declare_access_logger {
       }
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashSet;
+
+  #[test]
+  fn metric_handles_are_comparable_and_hashable() {
+    let a = CounterHandle { id: 1 };
+    let b = CounterHandle { id: 1 };
+    let c = CounterHandle { id: 2 };
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+
+    let mut set = HashSet::new();
+    set.insert(a);
+    assert!(!set.insert(b));
+    assert!(set.insert(c));
+
+    assert_eq!(GaugeHandle { id: 1 }, GaugeHandle { id: 1 });
+    assert_eq!(HistogramHandle { id: 3 }, HistogramHandle { id: 3 });
+  }
+
+  #[test]
+  fn bytes_info_is_copyable_and_comparable() {
+    let a = BytesInfo::default();
+    let b = a;
+    assert_eq!(a, b);
+
+    let c = DownstreamWireBytes::default();
+    let d = c;
+    assert_eq!(c, d);
+  }
 }

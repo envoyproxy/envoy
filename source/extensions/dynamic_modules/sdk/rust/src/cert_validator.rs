@@ -243,7 +243,10 @@ pub trait CertValidatorConfig: Send + Sync {
 // =============================================================================
 
 use crate::{
-  drop_wrapped_c_void_ptr, ffi_export, wrap_into_c_void_ptr, NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  wrap_into_c_void_ptr,
+  NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
 };
 
 ffi_export! {
@@ -380,7 +383,7 @@ ffi_export! {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cert_validator_update_digest")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
   out_data: *mut abi::envoy_dynamic_module_type_module_buffer,

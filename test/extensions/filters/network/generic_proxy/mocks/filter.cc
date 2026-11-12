@@ -5,7 +5,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -16,38 +15,42 @@ namespace GenericProxy {
 MockRequestFramesHandler::MockRequestFramesHandler() = default;
 
 MockStreamFilterConfig::MockStreamFilterConfig() {
-  ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([]() {
+  ON_CALL(*this, createEmptyConfigProto()).WillByDefault([]() {
     return std::make_unique<Protobuf::Struct>();
-  }));
+  });
   ON_CALL(*this, createFilterFactoryFromProto(_, _, _))
       .WillByDefault(Return([](FilterChainFactoryCallbacks&) {}));
   ON_CALL(*this, name()).WillByDefault(Return("envoy.filters.generic.mock_filter"));
-  ON_CALL(*this, configTypes()).WillByDefault(Invoke([this]() {
+  ON_CALL(*this, configTypes()).WillByDefault([this]() {
     return NamedFilterConfigFactory::configTypes();
-  }));
+  });
 }
 
 MockDecoderFilter::MockDecoderFilter() {
-  ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](DecoderFilterCallback& cb) { decoder_callbacks_ = &cb; }));
+  ON_CALL(*this, setDecoderFilterCallbacks(_)).WillByDefault([this](DecoderFilterCallback& cb) {
+    decoder_callbacks_ = &cb;
+  });
 
   ON_CALL(*this, decodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
   ON_CALL(*this, decodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));
 }
 
 MockEncoderFilter::MockEncoderFilter() {
-  ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](EncoderFilterCallback& cb) { encoder_callbacks_ = &cb; }));
+  ON_CALL(*this, setEncoderFilterCallbacks(_)).WillByDefault([this](EncoderFilterCallback& cb) {
+    encoder_callbacks_ = &cb;
+  });
 
   ON_CALL(*this, encodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
   ON_CALL(*this, encodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));
 }
 
 MockStreamFilter::MockStreamFilter() {
-  ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](DecoderFilterCallback& cb) { decoder_callbacks_ = &cb; }));
-  ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](EncoderFilterCallback& cb) { encoder_callbacks_ = &cb; }));
+  ON_CALL(*this, setDecoderFilterCallbacks(_)).WillByDefault([this](DecoderFilterCallback& cb) {
+    decoder_callbacks_ = &cb;
+  });
+  ON_CALL(*this, setEncoderFilterCallbacks(_)).WillByDefault([this](EncoderFilterCallback& cb) {
+    encoder_callbacks_ = &cb;
+  });
 
   ON_CALL(*this, decodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
   ON_CALL(*this, decodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));

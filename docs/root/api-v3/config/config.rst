@@ -13,6 +13,7 @@ Extensions
   certificate_mappers/certificate_mappers
   certificate_selectors/certificate_selectors
   certificate_validators/certificate_validators
+  tls_handshakers/tls_handshakers
   cluster/cluster
   common/common
   compression/compression
@@ -26,6 +27,7 @@ Extensions
   health_check_event_sinks/health_check_event_sinks
   health_checker/health_checker
   http/ai_filters
+  http/ai_protocol_manager
   http/early_header_mutation
   http/cache_v2
   http/custom_response

@@ -5,6 +5,10 @@
 #![allow(dead_code)]
 #![allow(clippy::unnecessary_cast)]
 
+include!(concat!(env!("OUT_DIR"), "/export_name.rs"));
+#[doc(hidden)]
+pub use __export_name_impl as __export_name;
+
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
@@ -29,14 +33,18 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod resource_monitor;
 pub mod route_specifier;
 pub mod stats_sink;
 pub mod timing;
+pub mod tls_certificate_selector;
 pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;
 pub mod upstream_http_tcp_bridge;
 pub mod utility;
+#[cfg(envoy_dynamic_module_dll)]
+mod windows_delay_load;
 pub use bootstrap::*;
 pub use buffer::*;
 pub use catch_unwind::*;
@@ -97,8 +105,12 @@ pub fn log_ffi_panic(function_name: &str, payload: Box<dyn Any + Send>) {
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
+///
+/// `abi.rs` is generated from `abi/abi.h` by `//tools/dynamic_modules/bindgen` and checked in;
+/// `bazel run //tools/dynamic_modules/bindgen:fix` regenerates it after a header change.
+#[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
-  include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+  include!("abi.rs");
 }
 
 /// Declare the init functions for the dynamic module.
@@ -352,6 +364,50 @@ pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
   }
 }
 
+/// A load shed point of the overload manager, which a filter configuration returns from
+/// `get_load_shed_point`, for example [`EnvoyHttpFilterConfig::get_load_shed_point`].
+///
+/// The module can check it in the event hooks of the filter configuration that returned it and of
+/// its filters, but not while the configuration is dropped or on threads of its own, since Envoy
+/// can destroy the overload manager before the configuration when it shuts down. A module typically
+/// gets it once while its configuration is created and keeps it in its own configuration.
+#[cfg_attr(any(test, feature = "mock"), mockall::automock)]
+pub trait EnvoyLoadShedPoint: Send + Sync {
+  /// Decides whether to shed one unit of load, such as one request.
+  ///
+  /// It returns true with the probability that the triggers of the load shed point give, and counts
+  /// shed load in the `shed_load_count` statistic of the load shed point. It reads the pressure of
+  /// the synchronous feedback resource monitors of the triggers and reports accepted load to them
+  /// on the calling thread. Checking a load shed point that Envoy also checks counts the same load
+  /// twice.
+  fn should_shed_load(&self) -> bool;
+}
+
+struct EnvoyLoadShedPointImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+}
+
+// SAFETY: Envoy allows the filters on all worker threads to check a load shed point concurrently.
+unsafe impl Send for EnvoyLoadShedPointImpl {}
+unsafe impl Sync for EnvoyLoadShedPointImpl {}
+
+impl EnvoyLoadShedPoint for EnvoyLoadShedPointImpl {
+  fn should_shed_load(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_load_shed_point_should_shed_load(self.raw_ptr) }
+  }
+}
+
+/// Wraps a load shed point that a `get_load_shed_point` callback returned, which is null when
+/// there is none.
+pub(crate) fn new_load_shed_point(
+  raw_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+  if raw_ptr.is_null() {
+    return None;
+  }
+  Some(Box::new(EnvoyLoadShedPointImpl { raw_ptr }))
+}
+
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
@@ -572,7 +628,8 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
 ///
 /// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
 /// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
-/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that
+/// pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
 ) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
@@ -691,7 +748,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -705,7 +762,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -718,7 +775,7 @@ macro_rules! ffi_export {
     fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -730,7 +787,7 @@ macro_rules! ffi_export {
     unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -807,9 +864,14 @@ macro_rules! declare_network_filter_init_functions {
 /// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
-/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
-///   mutations
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
+/// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
+///   selectors
+/// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
+/// - `synchronous_feedback_resource_monitor:` —
+///   [`NewSynchronousFeedbackResourceMonitorConfigFunction`] for resource monitors with synchronous
+///   feedback
 ///
 /// # Examples
 ///
@@ -1063,6 +1125,27 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
       $fn,
       "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register tls_certificate_selector : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register resource_monitor : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_RESOURCE_MONITOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register synchronous_feedback_resource_monitor : $fn:expr) => {
+    $crate::set_factory_once!(
+      $crate::NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -1343,8 +1426,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true
@@ -1507,12 +1590,12 @@ pub static NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewRouteSpecifierConfig
 /// struct MyRouteSpecifierConfig {}
 ///
 /// impl RouteSpecifierConfig for MyRouteSpecifierConfig {
-///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
-///     if ctx.select_template("canary") {
-///       RouteDecision::SelectTemplate
-///     } else {
-///       RouteDecision::PassThrough
-///     }
+///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
+///     // With the decision left Unspecified, Envoy generates the final route from the selected
+///     // template, or leaves the route the specifier was given unchanged when the identifier is
+///     // not declared.
+///     let _ = ctx.select_template("canary");
+///     OnRouteStatus::StopIteration
 ///   }
 /// }
 ///
@@ -1751,7 +1834,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///   fn new_load_balancer(
+///     &self,
+///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+///   ) -> Option<Box<dyn ClusterLb>> {
 ///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }
@@ -1973,6 +2059,74 @@ macro_rules! declare_cert_validator_init_functions {
 }
 
 // =============================================================================
+// TLS Certificate Selector
+// =============================================================================
+
+/// The function signature for creating a new TLS certificate selector configuration.
+///
+/// The `name` is the value of `selector_name` from the `dynamic_modules` TLS certificate selector
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `selector_config` field. `is_upstream` is true when the configuration
+/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics, provides
+/// the dynamic certificates and signals the end of the initialization, which the listeners and
+/// clusters that use the TLS context wait for. Dynamic certificates provided during this call, or
+/// before `signal_init_complete`, are available to the first handshake, unless the TLS context
+/// waits for its SDS validation context. Returning `None` causes Envoy to reject the TLS context
+/// configuration.
+pub type NewTlsCertificateSelectorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+    envoy_config: std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig>,
+  ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig>>;
+
+/// Global function for creating TLS certificate selector configurations.
+pub static NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION: OnceLock<
+  NewTlsCertificateSelectorConfigFunction,
+> = OnceLock::new();
+
+// =================================================================================================
+// Resource Monitor Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new resource monitor.
+///
+/// The `name` is the value of `resource_monitor_name` from the `dynamic_modules` resource monitor
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `resource_monitor_config` field. The `envoy_config` handle creates a
+/// [`resource_monitor::EnvoyResourceMonitorConfigScheduler`] while the configuration is being
+/// created. Returning `None` causes Envoy to fail to start.
+pub type NewResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: &mut resource_monitor::EnvoyResourceMonitorConfig,
+  ) -> Option<Box<dyn resource_monitor::ResourceMonitor>>;
+
+/// The global factory function for resource monitors. This is set via the `resource_monitor:` arm
+/// of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<NewResourceMonitorConfigFunction> =
+  OnceLock::new();
+
+/// The function signature for creating a new resource monitor with synchronous feedback.
+///
+/// The `name` and `config` are the same as for [`NewResourceMonitorConfigFunction`]. The SDK calls
+/// this factory first, and calls the `resource_monitor:` factory only when it returns `None`.
+pub type NewSynchronousFeedbackResourceMonitorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>>;
+
+/// The global factory function for resource monitors with synchronous feedback. This is set via
+/// the `synchronous_feedback_resource_monitor:` arm of [`declare_all_init_functions!`] and is not
+/// intended to be set directly.
+pub static NEW_SYNCHRONOUS_FEEDBACK_RESOURCE_MONITOR_CONFIG_FUNCTION: OnceLock<
+  NewSynchronousFeedbackResourceMonitorConfigFunction,
+> = OnceLock::new();
+
+// =============================================================================
 // Config Validator
 // =============================================================================
 
@@ -2033,7 +2187,7 @@ pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConf
 #[macro_export]
 macro_rules! declare_config_validator_init_functions {
   ($f:ident, $new_config_validator_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(

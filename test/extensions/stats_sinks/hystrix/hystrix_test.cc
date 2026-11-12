@@ -23,7 +23,6 @@
 using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -132,11 +131,11 @@ public:
     ON_CALL(server_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
 
-    ON_CALL(callbacks_, encodeData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
+    ON_CALL(callbacks_, encodeData(_, _)).WillByDefault([&](Buffer::Instance& data, bool) {
       // Set callbacks to send data to buffer. This will append to the end of the buffer, so
       // multiple calls will all be dumped one after another into this buffer.
       cluster_stats_buffer_.add(data);
-    }));
+    });
   }
 
   void addClusterToMap(const std::string& cluster_name,

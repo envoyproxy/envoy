@@ -1,7 +1,5 @@
 #include "test/extensions/dynamic_modules/util.h"
 
-#include <cstdlib>
-
 #include "source/common/stats/utility.h"
 
 namespace Envoy {
@@ -26,7 +24,7 @@ std::string testSharedObjectPath(std::string name, std::string language) {
 void DynamicModulesTestEnvironment::setModulesSearchPath() {
   std::string path =
       TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c");
-  setenv("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", path.c_str(), 1);
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", path, 1);
 }
 
 } // namespace DynamicModules

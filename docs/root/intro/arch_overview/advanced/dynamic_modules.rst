@@ -27,13 +27,18 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`formatter <envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter>`.
 * As a :ref:`stats sink <envoy_v3_api_msg_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink>`
   (:ref:`configuration <config_stat_sinks_dynamic_modules>`).
+* As a :ref:`resource monitor <envoy_v3_api_msg_extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor>`
+  (:ref:`configuration <config_overload_manager_dynamic_modules>`).
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP early header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation>`.
 * As an :ref:`HTTP/1 header formatter <envoy_v3_api_msg_extensions.http.header_formatters.dynamic_modules.v3.DynamicModuleHeaderFormatter>`.
 * As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
+* As a :ref:`TLS certificate selector <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3.DynamicModuleTlsCertificateSelector>`
+  (:ref:`configuration <config_tls_certificate_selectors_dynamic_modules>`).
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`TLS handshaker <envoy_v3_api_msg_extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker>`.
 * As a :ref:`transport socket <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleTransportSocket>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
@@ -53,6 +58,52 @@ There are a few design goals for the dynamic modules:
 1. **Performance**: The dynamic modules should have minimal overhead compared to the built-in C++ extensions. For example, the dynamic modules are able to access HTTP headers as well as body without copying them unlike any other extension mechanisms.
 2. **Ease of Use**: The SDK should provide a high-level API that abstracts the details of the Envoy internals.
 3. **Flexibility**: The dynamic modules should be able to implement any functionality that can be implemented by the built-in C++ extensions without performance penalty. This is work in progress and many features are not yet available.
+
+Built-in Rust modules
+---------------------
+
+Rust dynamic modules linked into the Envoy binary must use ``envoy_rust_static_module`` from
+:repo:`dynamic_modules.bzl <source/extensions/dynamic_modules/dynamic_modules.bzl>`, not
+``rust_static_library``. The macro links the module and its SDK as always-linked Rust libraries
+(rlibs), preserving transitive Rust dependencies so the binary shares one toolchain-provided Rust
+runtime. A Rust staticlib bundles its own copy of that runtime and conflicts with other Rust code,
+such as the wasmtime engine or another built-in module.
+
+The SDK's intentionally empty ``rust_runtime`` staticlib provides the allocator shim and std
+runtime exactly once. It is the only Rust staticlib in the binary; all other Rust code linked
+into Envoy, including engines such as wasmtime, must be rlibs. The macro links this shared
+runtime without applying the module's symbol-prefix transition so Bazel deduplicates it.
+
+The macro's ``module_name`` must match the name passed to the static module loader. It configures
+a separate SDK instance whose exported hooks are named ``<module_name>_envoy_dynamic_module_on_*``.
+The SDK's init macros use the same prefix in the module crate. Hand-written ABI hooks must use
+``#[export_name = envoy_proxy_dynamic_modules_rust_sdk::__export_name!("envoy_dynamic_module_on_...")]``
+instead of ``#[no_mangle]``. Rust handles platform-specific symbol decoration, including the
+leading underscore on macOS. Shared modules and ordinary Cargo SDK builds keep unprefixed hook
+names by default.
+
+HTTP stream timing
+------------------
+
+HTTP filters can read stream timing through ``TimingInfo`` in the C++, Go, and Rust SDKs. The
+:repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>` lists the markers in
+``envoy_dynamic_module_type_timing_info_v2``. Access loggers can read these markers with
+``envoy_dynamic_module_callback_access_logger_get_timing_info_v2``. The original
+``envoy_dynamic_module_callback_access_logger_get_timing_info`` remains available without the new
+markers.
+
+``start_time_unix_ns`` is a Unix timestamp in nanoseconds. The other numeric timing fields are
+nanosecond offsets from the request's monotonic start time. Check the ``has_*`` fields in the C ABI
+or ``Has*`` fields in Go to distinguish recorded values from unavailable markers. When a flag is
+false, its numeric field contains ``-1``. C++ and Rust use optional values instead. Zero and
+negative offsets are valid.
+
+``last_downstream_header_rx_byte_received_ns`` marks receipt of all request headers, while
+``last_downstream_rx_byte_received_ns`` marks receipt of the full request. For a header-only
+request, the latter is recorded when the headers end the stream. Envoy records
+``downstream_connection_end_ns`` only if the request is active when the connection closes. It
+records ``last_downstream_ack_received_ns`` when it tracks the final ACK, currently for QUIC. The
+markers do not by themselves measure body buffering or processing.
 
 Compatibility
 --------------------------
@@ -151,7 +202,7 @@ Statistics
 
 Dynamic-module extension types that receive a factory context emit the following statistics in the shared ``dynamic_modules.`` namespace.
 These stats track failures encountered while loading the extension's configuration. Extension points created without a factory context, such
-as config validators and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
+as config validators, resource monitors and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
 ``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`

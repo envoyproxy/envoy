@@ -104,6 +104,14 @@ void ExtProcIntegrationTest::initializeConfig(
       }
     }
 
+    // The filter's default message timeout (200ms) is shorter than a round trip through the
+    // fake ext_proc server can take under the sanitizers. A timeout fails the request with a 504
+    // (or passes it through unprocessed with failure_mode_allow), and the test then fails on
+    // whatever it expected next. Tests of the timeout itself set their own.
+    if (!proto_config_.has_message_timeout()) {
+      proto_config_.mutable_message_timeout()->set_seconds(5);
+    }
+
     const std::string valid_grpc_cluster_name = "ext_proc_server_0";
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
     if (!two_ext_proc_filters_) {
@@ -1144,7 +1152,8 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
 }
 
 void ExtProcIntegrationTest::performStandAloneModeOverrideNormal(
-    envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode) {
+    envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode,
+    bool delay_header_response) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(initial_body_mode);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.set_allow_mode_override(true);
@@ -1167,6 +1176,10 @@ void ExtProcIntegrationTest::performStandAloneModeOverrideNormal(
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   EXPECT_TRUE(request.has_request_body());
   EXPECT_TRUE(request.request_body().end_of_stream());
+
+  if (delay_header_response) {
+    timeSystem().advanceTimeWaitImpl(400ms);
+  }
 
   // The server sends back the header response first:
   ProcessingResponse resp_headers;

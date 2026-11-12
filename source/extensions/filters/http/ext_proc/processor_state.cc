@@ -122,14 +122,8 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                      buffered_chunk.length());
-    auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
-      // Move the current buffer into the queue for remote processing and clear the buffered data.
-      enqueueStreamingChunk(buffered_chunk, end_stream);
-    } else {
-      buffered_chunk.drain(buffered_chunk.length());
-    }
-    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                  ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
   }
   if (queueBelowLowLimit()) {
     clearWatermark();
@@ -264,9 +258,7 @@ absl::Status ProcessorState::handleHeaderContinue() {
   } else if (body_mode_ == ProcessingMode::STREAMED ||
              body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
     sendBufferedDataInStreamedMode(false);
-    if (body_mode_ == ProcessingMode::STREAMED) {
-      continueIfNecessary();
-    }
+    injectHeadersToFilterChain(false);
     return absl::OkStatus();
   } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
     return handleBufferedPartialMode();
@@ -285,8 +277,14 @@ absl::Status ProcessorState::handleCompleteBodyAvailable() {
       // flag of decodeData() can be determined by whether the trailers are received.
       // Also, bufferedData() is not nullptr means decodeData() is called, even though
       // the data can be an empty chunk.
-      auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      if (filter_.maxStreamedBodyChunkSize().has_value() &&
+          (body_mode_ == ProcessingMode::STREAMED ||
+           body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED)) {
+        sendBufferedDataInStreamedMode(trailers_ == nullptr);
+      } else {
+        auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
+        filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      }
       clearWatermark();
     } else {
       return handleTrailersAndCleanup();
@@ -832,6 +830,8 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
   if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
       (old_body_mode == ProcessingMode::STREAMED || old_body_mode == ProcessingMode::NONE) &&
       body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED && send_trailers_) {
+    // Stop the timer, as per-message timeouts are not applicable in FULL_DUPLEX_STREAMED mode.
+    stopMessageTimer();
     bool end_stream = (complete_body_available_ && trailers_ == nullptr);
     if (hasBufferedData() || (bufferedData() && end_stream)) {
       // Body came in while we were waiting for this response.
@@ -839,9 +839,8 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
       modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
       ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                        buffered_chunk.length());
-      auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-      buffered_chunk.drain(buffered_chunk.length());
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+      filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                    ProcessorState::CallbackState::HeadersCallback, end_stream);
     }
 
     if (trailers_ != nullptr) {

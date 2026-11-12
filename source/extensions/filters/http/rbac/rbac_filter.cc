@@ -73,7 +73,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, proto_config.rules_stat_prefix(),
-                                                  proto_config.shadow_rules_stat_prefix(), scope)),
+                                                  proto_config.shadow_rules_stat_prefix(),
+                                                  /*http_filter=*/true, scope)),
       rules_stat_prefix_(proto_config.rules_stat_prefix()),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       per_rule_stats_(proto_config.track_per_rule_stats()),

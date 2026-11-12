@@ -47,29 +47,25 @@ std::vector<std::string> stringsFromGoSlice(void* slice_data, int slice_len) {
   return list;
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace {
 
-CAPIStatus envoyGoFilterProcessStateHandlerWrapper(
-    void* s, std::function<CAPIStatus(std::shared_ptr<Filter>&, ProcessorState&)> f) {
+// The handlers are templates rather than std::function parameters: most callbacks capture more
+// than the std::function small buffer can hold, which would heap allocate on every cgo call.
+template <class F> CAPIStatus envoyGoFilterProcessStateHandlerWrapper(void* s, const F& f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
   if (!state->isProcessingInGo()) {
     return CAPIStatus::CAPINotInGo;
   }
   auto req = static_cast<HttpRequestInternal*>(state->req);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  if (auto filter = req->weakFilter().lock()) {
     return f(filter, *state);
   }
   return CAPIStatus::CAPIFilterIsGone;
 }
 
-CAPIStatus envoyGoFilterHandlerWrapper(void* r,
-                                       std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
+template <class F> CAPIStatus envoyGoFilterHandlerWrapper(void* r, const F& f) {
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  if (auto filter = req->weakFilter().lock()) {
     // Though it's memory safe without this limitation.
     // But it's not a good idea to run Go code after continue back to Envoy C++,
     // so, add this limitation.
@@ -81,15 +77,19 @@ CAPIStatus envoyGoFilterHandlerWrapper(void* r,
   return CAPIStatus::CAPIFilterIsGone;
 }
 
-CAPIStatus
-envoyGoConfigHandlerWrapper(void* c, std::function<CAPIStatus(std::shared_ptr<FilterConfig>&)> fc) {
+template <class F> CAPIStatus envoyGoConfigHandlerWrapper(void* c, const F& fc) {
   auto config = reinterpret_cast<httpConfigInternal*>(c);
-  auto weak_filter_config = config->weakFilterConfig();
-  if (auto filter_config = weak_filter_config.lock()) {
+  if (auto filter_config = config->weakFilterConfig().lock()) {
     return fc(filter_config);
   }
   return CAPIStatus::CAPIFilterIsGone;
 }
+
+} // namespace
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 CAPIStatus envoyGoFilterHttpContinue(void* s, int status) {
   return envoyGoFilterProcessStateHandlerWrapper(
@@ -305,8 +305,7 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
   // phase of the go object.
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  if (auto filter = req->weakFilter().lock()) {
     // Finalize must happens after onDestory, that means Filter is marked as destroyed.
     // When filter is still existing, it could happens in very low rate, since Golang GC
     // finalizer delays execution.

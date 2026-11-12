@@ -70,9 +70,9 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& payload) {
     EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
-  }));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
@@ -100,13 +100,13 @@ TEST_F(ProviderVerifierTest, TestOkJWTWithExtractedHeaderAndPayload) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& payload) {
     // The expected payload is a merged struct of the extracted (from the JWT) payload and
     // header data with "my_payload" and "my_header" as the keys.
     Protobuf::Struct expected_payload;
     MessageUtil::loadFromJson(ExpectedPayloadAndHeaderJSON, expected_payload);
     EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
-  }));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
@@ -127,12 +127,12 @@ TEST_F(ProviderVerifierTest, TestExpiredJWTWithFailedStatusInMetadata) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& payload) {
     Protobuf::Struct expected_payload;
     MessageUtil::loadFromJson(ExpectedJWTExpiredStatusJSON, expected_payload);
 
     EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
-  }));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
 
@@ -149,9 +149,9 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& payload) {
     EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
-  }));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
@@ -251,9 +251,8 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
   EXPECT_CALL(mock_cb_, onComplete(_))
-      .WillOnce(
-          Invoke([](const Status& status) { ASSERT_EQ(status, Status::JwtAudienceNotAllowed); }))
-      .WillOnce(Invoke([](const Status& status) { ASSERT_EQ(status, Status::Ok); }));
+      .WillOnce([](const Status& status) { ASSERT_EQ(status, Status::JwtAudienceNotAllowed); })
+      .WillOnce([](const Status& status) { ASSERT_EQ(status, Status::Ok); });
 
   auto headers =
       Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
@@ -310,9 +309,9 @@ TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
 
   {
     // First call, audience matched, so it is good.
-    EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce([](const Status& status) {
       ASSERT_EQ(status, Status::Ok);
-    }));
+    });
 
     auto headers =
         Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
@@ -322,9 +321,9 @@ TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
   {
     // Second call, audiences don't match, so it is rejected.
     MockVerifierCallbacks mock_cb2;
-    EXPECT_CALL(mock_cb2, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    EXPECT_CALL(mock_cb2, onComplete(_)).WillOnce([](const Status& status) {
       ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
-    }));
+    });
 
     auto headers =
         Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};

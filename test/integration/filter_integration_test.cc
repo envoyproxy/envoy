@@ -1488,50 +1488,6 @@ TEST_P(FilterIntegrationTest, LocalReplyFromEncodeMetadata) {
   cleanupUpstreamAndDownstream();
 }
 
-// Validate that adding trailers during encode/decodeData with end_stream==true works correctly
-// with half close enabled.
-TEST_P(FilterIntegrationTest, FilterAddsTrailersWithIndependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  prependFilter(R"EOF(
-  name: add-trailers-filter
-  typed_config:
-    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
-  )EOF");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":scheme", "http"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":authority", "sni.lyft.com"}});
-  auto request_encoder = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  // The add-body-filter will add trailers to the response
-  upstream_request_->encodeData(100, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(response->body().size(), 100);
-  // Make sure response trailers added by the filter were received by the client
-  EXPECT_EQ(response->trailers()->size(), 1);
-
-  Buffer::OwnedImpl data(std::string(100, 'r'));
-  codec_client_->sendData(*request_encoder, data, true);
-
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  ASSERT_TRUE(upstream_request_->complete());
-  // Make sure request trailers added by the filter were received by the upstream
-  EXPECT_EQ(upstream_request_->trailers()->size(), 1);
-  EXPECT_EQ(upstream_request_->bodyLength(), 100);
-}
-
 void FilterIntegrationTest::testNonTerminalEncodingFilterWithIncompleteRequest() {
   // Encoding by non-terminal upstream filter is not supported
   if (!testing_downstream_filter_) {
@@ -1562,17 +1518,8 @@ void FilterIntegrationTest::testNonTerminalEncodingFilterWithIncompleteRequest()
 }
 
 // Verify that when non terminal filter encodes end_stream with request still incomplete
-// the stream is reset. The behavior is the same with or without independent half-close enabled.
+// the stream is reset.
 TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithIncompleteRequest) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
-  testNonTerminalEncodingFilterWithIncompleteRequest();
-}
-
-TEST_P(FilterIntegrationTest,
-       NonTerminalEncodingFilterWithIncompleteRequestAndIdependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   testNonTerminalEncodingFilterWithIncompleteRequest();
 }
 
@@ -1612,17 +1559,8 @@ void FilterIntegrationTest::testNonTerminalEncodingFilterWithCompleteRequest() {
 }
 
 // Verify that when non terminal filter encodes end_stream with request complete
-// the stream is finished gracefully and not reset. The behavior is the same with or without
-// independent half-close enabled.
+// the stream is finished gracefully and not reset.
 TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequest) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
-  testNonTerminalEncodingFilterWithCompleteRequest();
-}
-
-TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequestAndIdependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   testNonTerminalEncodingFilterWithCompleteRequest();
 }
 
@@ -1691,16 +1629,7 @@ void FilterIntegrationTest::testFilterAddsDataAndTrailersToHeaderOnlyRequest() {
 
 // Validate that extending request lifetime by adding body and trailers to a header only request
 // and then pausing decoder filter chain, results in stream reset when encoding completes.
-// The behavior is the same with or without independent half-close enabled.
 TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequest) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
-  testFilterAddsDataAndTrailersToHeaderOnlyRequest();
-}
-
-TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequestWithIndependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   testFilterAddsDataAndTrailersToHeaderOnlyRequest();
 }
 

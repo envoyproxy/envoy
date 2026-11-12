@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::_;
 
@@ -78,6 +79,17 @@ TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
+}
+
+TEST(HttpJwtAuthnFilterFactoryTest, UnknownAllowedAlgorithm) {
+  JwtAuthentication proto_config;
+  auto& provider = (*proto_config.mutable_providers())["provider"];
+  provider.mutable_local_jwks()->set_inline_string(PublicKey);
+  provider.add_allowed_algorithms(JwtProvider::RS256);
+  TestUtility::validate(proto_config);
+
+  provider.add_allowed_algorithms(static_cast<JwtProvider::Algorithm>(100));
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
 }
 
 TEST(HttpJwtAuthnFilterFactoryTest, EmptyPerRouteConfig) {

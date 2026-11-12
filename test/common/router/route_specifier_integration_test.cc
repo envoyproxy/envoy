@@ -51,7 +51,8 @@ public:
   explicit TagAddingRouteSpecifier(std::string tag) : tag_(std::move(tag)) {}
 
   OnRouteResult onRoute(RouteConstSharedPtr route, const Http::RequestHeaderMap&,
-                        const StreamInfo::StreamInfo&, uint64_t) const override {
+                        const StreamInfo::StreamInfo&, uint64_t,
+                        OnRouteInputStatus) const override {
     // Nothing to decorate: either matching produced no route, or the route is a redirect or direct
     // response, which has no route entry to delegate to.
     if (route == nullptr || route->routeEntry() == nullptr) {

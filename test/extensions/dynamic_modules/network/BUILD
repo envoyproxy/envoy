@@ -1,15 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -18,9 +21,13 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:network_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/cpp:network_integration_test",
+        "//test/extensions/dynamic_modules/test_data/go:network_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
-    rbe_pool = "linux_x64_small",
+    env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.filters.network.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
@@ -37,7 +44,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
@@ -45,7 +52,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/network/dynamic_modules:config",
@@ -58,13 +66,14 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -74,13 +83,14 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:status_utility_lib",
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -90,12 +100,17 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.dynamic_modules"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/network/dynamic_modules:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/integration:base_overload_integration_test_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/extensions/filters/network/dynamic_modules/v3:pkg_cc_proto",
     ],

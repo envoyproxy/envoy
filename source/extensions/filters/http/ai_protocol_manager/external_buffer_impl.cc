@@ -1,9 +1,16 @@
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 
+#include <cstdint>
 #include <memory>
 #include <utility>
 
+#include "envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3/in_memory.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/factory_context.h"
+
 #include "source/common/common/assert.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,6 +59,18 @@ void InMemoryExternalBuffer::read(uint64_t offset, uint64_t length, ReadCallback
   // instead post and complete on a later iteration; both satisfy the contract.
   cb(ExternalBufferStatus::Ok, std::move(out));
 }
+
+ExternalBufferFactorySharedPtr InMemoryExternalBufferConfigFactory::createExternalBufferFactory(
+    const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) {
+  return std::make_shared<InMemoryExternalBufferFactory>();
+}
+
+ProtobufTypes::MessagePtr InMemoryExternalBufferConfigFactory::createEmptyConfigProto() {
+  return std::make_unique<
+      ::envoy::extensions::ai_protocol_manager::external_buffer::in_memory::v3::InMemory>();
+}
+
+REGISTER_FACTORY(InMemoryExternalBufferConfigFactory, ExternalBufferConfigFactory);
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

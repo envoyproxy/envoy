@@ -44,6 +44,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl CBB_add_space \
   --uncomment-func-decl CBB_add_u8 \
   --uncomment-func-decl CBB_add_u16 \
+  --uncomment-regex 'BORINGSSL_MAKE_STACK_TRAITS(CBB,' \
   --uncomment-using ScopedCBB \
   --uncomment-func-decl CBS_get_u64_decimal \
   --uncomment-macro CBS_ASN1_BOOLEAN \

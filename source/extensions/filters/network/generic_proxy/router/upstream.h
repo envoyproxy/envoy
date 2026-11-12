@@ -140,8 +140,8 @@ public:
 private:
   Network::Connection& connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
-  ClientCodecPtr client_codec_;
   RequestManager request_manager_{};
+  ClientCodecPtr client_codec_;
 };
 
 class SharedRequestManager : Logger::Loggable<Logger::Id::upstream> {

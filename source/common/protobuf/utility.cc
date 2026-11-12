@@ -808,7 +808,7 @@ absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_u
 }
 
 std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
-  return "type.googleapis.com/" + std::string(type);
+  return absl::StrCat("type.googleapis.com/", type);
 }
 
 void StructUtil::update(Protobuf::Struct& obj, const Protobuf::Struct& with) {

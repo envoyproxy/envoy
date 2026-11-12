@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 #ifndef NULL_PLUGIN
-#include "proxy_wasm_intrinsics_lite.h"
+#include "proxy_wasm_intrinsics.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #endif

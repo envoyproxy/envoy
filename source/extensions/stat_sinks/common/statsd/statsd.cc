@@ -49,6 +49,8 @@ std::optional<double> scaledTimerMilliseconds(const Stats::Histogram& histogram,
     return std::nullopt;
   }
   switch (histogram.unit()) {
+  case Stats::Histogram::Unit::Nanoseconds:
+    return static_cast<double>(value) / 1000000.0;
   case Stats::Histogram::Unit::Microseconds:
     return static_cast<double>(value) / 1000.0;
   case Stats::Histogram::Unit::Milliseconds:

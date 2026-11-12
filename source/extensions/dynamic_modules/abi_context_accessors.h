@@ -15,6 +15,12 @@ namespace DynamicModules {
 
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 
+// A module buffer is valid when its pointer is non-null or its length is zero. A null pointer with
+// a non-zero length violates the ABI contract, so callbacks reject it instead of dereferencing it.
+inline bool isValidModuleBuffer(envoy_dynamic_module_type_module_buffer buffer) {
+  return buffer.ptr != nullptr || buffer.length == 0;
+}
+
 /**
  * Shared context accessors used by Dynamic Module extensions to expose Envoy request and
  * response state across the C ABI boundary. The access logger and formatter extensions both wrap
@@ -42,15 +48,6 @@ public:
   // pre-allocated with at least map->size() entries.
   static bool getHeaders(HeadersMapOptConstRef map,
                          envoy_dynamic_module_type_envoy_http_header* result_headers);
-
-  // Fill result_headers with all entries of the resolved header map when capacity is large enough.
-  // On success writes up to capacity entries and sets size_out to the header count. When capacity
-  // is smaller than the count, writes nothing, sets size_out to the required count and returns
-  // false. When the map is unavailable, sets size_out to zero and returns false. result_headers may
-  // be null when capacity is zero.
-  static bool getHeadersBounded(HeadersMapOptConstRef map,
-                                envoy_dynamic_module_type_envoy_http_header* result_headers,
-                                size_t capacity, size_t* size_out);
 
   // Look up a single header value by key. index selects the value for multi-value headers and
   // total_count_out, when non-null, receives the total number of values for the key.
@@ -85,6 +82,8 @@ public:
   // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
   static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
                             envoy_dynamic_module_type_timing_info* timing_out);
+  static void getTimingInfoV2(const StreamInfo::StreamInfo* stream_info,
+                              envoy_dynamic_module_type_timing_info_v2* timing_out);
 
   // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
   // when the path is absent or the value is not a string.
@@ -135,13 +134,34 @@ public:
                                 const envoy_dynamic_module_type_module_key_value_pair* entries,
                                 size_t entries_size);
 
-  // Set a string value in filter state. When life_span is set, it is passed to setData.
-  static bool
-  setFilterStateBytes(StreamInfo::StreamInfo& stream_info, absl::string_view key,
-                      absl::string_view value,
-                      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt);
+  // Set dynamic metadata from a serialized google.protobuf.Struct, merging into the named filter
+  // namespace. An empty struct is a no-op and does not create the namespace. Returns false when
+  // the buffer does not parse.
+  static bool setDynamicMetadataStruct(StreamInfo::StreamInfo& stream_info,
+                                       absl::string_view filter_name,
+                                       absl::string_view serialized_struct);
+
+  // Set typed dynamic metadata from a serialized google.protobuf.Any, replacing the entry of the
+  // named filter namespace. Returns false when the buffer does not parse or has no type URL.
+  static bool setDynamicTypedMetadata(StreamInfo::StreamInfo& stream_info,
+                                      absl::string_view filter_name,
+                                      absl::string_view serialized_any);
+
+  // Whether filter state would store key at life_span, logging at debug when it would not.
+  // FilterState refuses, with an ENVOY_BUG, a key already stored at a different life span.
+  static bool canSetFilterState(const StreamInfo::FilterStateSharedPtr& filter_state,
+                                absl::string_view key, StreamInfo::FilterState::LifeSpan life_span);
+
+  // Set a string value in filter state. When life_span or stream_sharing is set, it is passed to
+  // setData. Returns false when there is no filter state or canSetFilterState refuses the key.
+  static bool setFilterStateBytes(
+      StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt,
+      std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing = std::nullopt);
 
   // Set a typed filter state object from serialized bytes using the registered ObjectFactory.
+  // Returns false when no factory is registered for key, it rejects value, or canSetFilterState
+  // refuses the key.
   static bool
   setFilterStateTyped(StreamInfo::StreamInfo& stream_info, absl::string_view key,
                       absl::string_view value,

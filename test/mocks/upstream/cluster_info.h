@@ -159,6 +159,7 @@ public:
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
+  MOCK_METHOD(bool, waitForWarmOnInit, (), (const));
   MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const));
   MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));

@@ -1028,8 +1028,9 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
-      router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
-                     stats_scope, context.serverFactoryContext().clusterManager(),
+      router_config_(context.serverFactoryContext(), stats_scope,
+                     route_stat_name_storage_.statName(), stats_scope,
+                     context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(
@@ -1409,9 +1410,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         // Propagate upstream RST to downstream.
-        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                           "propagate_upstream_rst_through_tunneled_tcp_proxy")) {
+        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset) {
           ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
                          read_callbacks_->connection());
           getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset);

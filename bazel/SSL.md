@@ -19,7 +19,7 @@ bazel build //source/exe:envoy-static
 At this time, only the BoringSSL FIPS build on x86_64 is supported and tested by the Envoy project.
 
 We are happy to accept patches to allow Envoy builds with other libraries or architectures, but
-the responsibility for maintenance, and resolving incompatibility remains with dowstream projects.
+the responsibility for maintenance, and resolving incompatibility remains with downstream projects.
 
 Envoy follows the [Update Stream](https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260211.0/crypto/fipsmodule/FIPS.md#update-stream)
 of FIPS BoringSSL code. When an Envoy stable release branch is made, the BoringSSL FIPS version used

@@ -53,8 +53,11 @@ FakeUpstream::FakeListener::FakeListener(FakeUpstream& parent, bool is_quic)
     // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
     context_ =
         std::make_unique<testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
+    auto creation_status = absl::OkStatus();
     udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_, *context_);
+        parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_, *context_,
+        creation_status);
+    ASSERT(creation_status.ok());
     // Initialize QUICHE flags.
     quiche::FlagRegistry::getInstance();
 #else
@@ -278,6 +281,8 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
                               Event::Dispatcher& client_dispatcher, milliseconds timeout)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
+  // Measure elapsed I/O time within this wait, excluding gaps between waits on the same stream.
+  Event::GlobalTimeSystem io_time_system;
   while (bound.withinBound()) {
     // Wake up periodically to run the client dispatcher.
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
@@ -285,6 +290,9 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
     }
 
     // Run the client dispatcher since we may need to process window updates, etc.
+    lock.Unlock();
+    io_time_system.advanceTimeForIo(client_dispatcher);
+    lock.Lock();
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
   }
   return false;
@@ -815,6 +823,8 @@ void FakeUpstream::initializeServer() {
   }
 
   dispatcher_->post([this]() -> void {
+    EXPECT_OK(listener_.udp_listener_config_.listenerFactory().initializeWorkerRouting(
+        socket_factories_));
     EXPECT_OK(socket_factories_[0]->doFinalPreWorkerInit());
     handler_->addListener(std::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();

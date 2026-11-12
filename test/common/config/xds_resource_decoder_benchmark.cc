@@ -104,7 +104,8 @@ envoy::config::listener::v3::Listener makeComplexListener(int num_filter_chains,
 // Benchmark decoding using OpaqueResourceDecoderImpl.
 template <typename Current>
 void decodeResource(OpaqueResourceDecoderImpl<Current>& decoder, const Protobuf::Any& resource) {
-  auto decoded_resource = decoder.decodeResource(resource);
+  Protobuf::Arena arena(decoder.arenaOptions());
+  auto decoded_resource = decoder.decodeResource(resource, arena);
   benchmark::DoNotOptimize(decoded_resource);
 }
 

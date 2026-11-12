@@ -2,55 +2,68 @@ use crate::buffer::EnvoyBuffer;
 use crate::EnvoyHttpFilter;
 use std::mem::MaybeUninit;
 
-/// Fills a buffer with header entries through the given bounded fill callback and returns them as
-/// key and value pairs. The callback writes up to the buffer capacity and sets the required count
-/// when the buffer is too small, so the buffer grows once and retries. Each pair is built field by
-/// field so the Rust type is never reinterpreted as the C struct. The buffers point into Envoy owned
-/// memory valid for the current event hook. Returns an empty vector when the header map is
-/// unavailable.
-pub(crate) fn collect_headers<'a, F>(
-  size_hint: usize,
+type AbiHeader = crate::abi::envoy_dynamic_module_type_envoy_http_header;
+
+/// Fills `buf` with all the entries of a header map and returns them.
+///
+/// `size` reports the header count of the map and `fill` writes that many entries into the given
+/// array. Both are called here, one right after the other, so the array handed to `fill` always has
+/// room for the count that `size` reported. A caller only names the two callbacks and can never
+/// pair a fill with a count taken from another header map or from an earlier state of the same
+/// one.
+///
+/// `buf` is cleared first and only grows when it is too small, so a caller that reads headers
+/// repeatedly can reuse it. Returns `None` when the header map is unavailable.
+pub(crate) fn fill_headers<S, F>(
+  buf: &mut Vec<MaybeUninit<AbiHeader>>,
+  size: S,
   fill: F,
-) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>
+) -> Option<&[AbiHeader]>
 where
-  F: Fn(*mut crate::abi::envoy_dynamic_module_type_envoy_http_header, usize, *mut usize) -> bool,
+  S: FnOnce() -> usize,
+  F: FnOnce(*mut AbiHeader) -> bool,
 {
-  let mut raw: Vec<MaybeUninit<crate::abi::envoy_dynamic_module_type_envoy_http_header>> =
-    Vec::with_capacity(size_hint);
-  let mut size_out: usize = 0;
-  let mut ok = fill(
-    raw.as_mut_ptr() as *mut crate::abi::envoy_dynamic_module_type_envoy_http_header,
-    raw.capacity(),
-    &mut size_out,
-  );
-  if !ok && size_out > raw.capacity() {
-    raw.reserve(size_out);
-    ok = fill(
-      raw.as_mut_ptr() as *mut crate::abi::envoy_dynamic_module_type_envoy_http_header,
-      raw.capacity(),
-      &mut size_out,
-    );
+  buf.clear();
+  let count = size();
+  buf.reserve(count);
+  if !fill(buf.as_mut_ptr() as *mut AbiHeader) {
+    return None;
   }
-  if !ok {
-    return Vec::new();
-  }
-  // Safety: Envoy initialized size_out entries starting at index zero.
+  // Safety: Envoy initialized count entries starting at index zero, and the buffer has room for
+  // them.
   unsafe {
-    raw.set_len(size_out);
+    buf.set_len(count);
+    Some(std::slice::from_raw_parts(
+      buf.as_ptr() as *const AbiHeader,
+      count,
+    ))
   }
-  raw
-    .iter()
-    .map(|entry| {
-      // Safety: every entry in the filled range was initialized by Envoy.
-      let header = unsafe { entry.assume_init_ref() };
-      unsafe {
-        (
-          EnvoyBuffer::new_from_raw(header.key_ptr as *const u8, header.key_length),
-          EnvoyBuffer::new_from_raw(header.value_ptr as *const u8, header.value_length),
-        )
-      }
-    })
-    .collect()
+}
+
+/// Builds the key and value pair of a filled header entry field by field, so the Rust tuple is
+/// never reinterpreted as the C struct. The buffers point into Envoy owned memory valid for the
+/// current event hook.
+fn header_pair<'a>(header: &AbiHeader) -> (EnvoyBuffer<'a>, EnvoyBuffer<'a>) {
+  unsafe {
+    (
+      EnvoyBuffer::new_from_raw(header.key_ptr as *const u8, header.key_length),
+      EnvoyBuffer::new_from_raw(header.value_ptr as *const u8, header.value_length),
+    )
+  }
+}
+
+/// Reads all the entries of a header map as key and value pairs through the given size and fill
+/// callbacks. See [`fill_headers`]. Returns an empty vector when there are no headers or the header
+/// map is unavailable.
+pub(crate) fn collect_headers<'a, S, F>(size: S, fill: F) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>
+where
+  S: FnOnce() -> usize,
+  F: FnOnce(*mut AbiHeader) -> bool,
+{
+  let mut buf = Vec::new();
+  fill_headers(&mut buf, size, fill).map_or_else(Vec::new, |headers| {
+    headers.iter().map(header_pair).collect()
+  })
 }
 
 fn get_body_content<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF, request: bool) -> Vec<u8> {

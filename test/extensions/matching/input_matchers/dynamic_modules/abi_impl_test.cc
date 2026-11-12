@@ -84,10 +84,8 @@ TEST_F(DynamicModuleMatcherAbiTest, GetHeaders) {
   void* env_ptr = static_cast<void*>(&context);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
-  size_t size_out = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_matcher_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data(),
-      headers.size(), &size_out));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data()));
 
   std::vector<std::pair<std::string, std::string>> result;
   result.reserve(headers.size());
@@ -104,9 +102,8 @@ TEST_F(DynamicModuleMatcherAbiTest, GetHeadersNull) {
   context.request_headers = nullptr;
   void* env_ptr = static_cast<void*>(&context);
 
-  size_t size_out = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_matcher_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr, 0, &size_out));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
 }
 
 TEST_F(DynamicModuleMatcherAbiTest, GetHeadersResponseTrailers) {
@@ -114,10 +111,8 @@ TEST_F(DynamicModuleMatcherAbiTest, GetHeadersResponseTrailers) {
   void* env_ptr = static_cast<void*>(&context);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> headers(1);
-  size_t size_out = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_matcher_get_headers(
-      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseTrailer, headers.data(),
-      headers.size(), &size_out));
+      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseTrailer, headers.data()));
 
   EXPECT_EQ("x-trailer", std::string(headers[0].key_ptr, headers[0].key_length));
   EXPECT_EQ("trailer-value", std::string(headers[0].value_ptr, headers[0].value_length));

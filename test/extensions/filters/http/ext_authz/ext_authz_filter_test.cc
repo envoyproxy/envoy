@@ -44,7 +44,6 @@ using testing::_;
 using testing::A;
 using testing::Contains;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Key;
 using testing::Not;
 using testing::Return;
@@ -75,10 +74,9 @@ TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -111,10 +109,9 @@ TEST_F(HttpFilterTest, MutationAppliedEffect) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -153,10 +150,9 @@ TEST_F(HttpFilterTest, MutationRejectedSizeLimitExceededEffect) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -241,10 +237,9 @@ TEST_F(HttpFilterTest, StatsWithPrefix) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -281,17 +276,16 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -321,18 +315,17 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -363,10 +356,9 @@ TEST_F(HttpFilterTest, ErrorFailOpen) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -404,11 +396,11 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -449,22 +441,21 @@ TEST_F(HttpFilterTest, ErrorResponseWithCustomAttributes) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, false))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::InternalServerError)));
         EXPECT_EQ(headers.get(Http::LowerCaseString("x-error-code"))[0]->value().getStringView(),
                   "AUTH_SERVICE_ERROR");
         EXPECT_EQ(headers.get(Http::LowerCaseString("x-error-message"))[0]->value().getStringView(),
                   "Internal auth service error");
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -494,10 +485,9 @@ TEST_F(HttpFilterTest, ErrorResponseWithFailureModeAllow) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -532,20 +522,19 @@ TEST_F(HttpFilterTest, ErrorResponseWithInvalidHeaders) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
   // Invalid headers should be detected and the response should fall back to generic error.
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
         // Since validation failed, all custom attributes including body should be cleared.
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -574,20 +563,19 @@ TEST_F(HttpFilterTest, ErrorResponseWithInvalidHeadersInAppend) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
   // Invalid header in headers_to_append should be detected and fall back to generic error.
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
         // Since validation failed, all custom attributes should be cleared.
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -618,19 +606,18 @@ TEST_F(HttpFilterTest, ErrorResponseWithInvalidHeaderValue) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
   // Invalid header value should be detected and fall back to generic error.
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -659,10 +646,9 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforced) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -670,12 +656,12 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforced) {
   // Response should include headers up to the limit.
   size_t headers_added = 0;
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, false))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::InternalServerError)));
         // Count how many custom headers were actually added (some may be omitted due to limits).
         headers_added = headers.get(Http::LowerCaseString("x-error-header-0")).size();
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -718,31 +704,30 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedWithMock) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(
-          Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-            // Create a ResponseHeaderMap with a low max_headers_count to trigger the limit.
-            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/3);
-            if (modify_headers) {
-              modify_headers(response_headers);
-            }
-            // With a limit of 3, we should only have 3 headers added (first 3 from headers_to_set).
-            EXPECT_EQ(response_headers.size(), 3);
-            EXPECT_TRUE(response_headers.has("x-error-1"));
-            EXPECT_TRUE(response_headers.has("x-error-2"));
-            EXPECT_TRUE(response_headers.has("x-error-3"));
-            // The rest should be omitted due to the limit.
-            EXPECT_FALSE(response_headers.has("x-append-1"));
-            EXPECT_FALSE(response_headers.has("x-append-2"));
-          }));
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+        // Create a ResponseHeaderMap with a low max_headers_count to trigger the limit.
+        Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/3);
+        if (modify_headers) {
+          modify_headers(response_headers);
+        }
+        // With a limit of 3, we should only have 3 headers added (first 3 from headers_to_set).
+        EXPECT_EQ(response_headers.size(), 3);
+        EXPECT_TRUE(response_headers.has("x-error-1"));
+        EXPECT_TRUE(response_headers.has("x-error-2"));
+        EXPECT_TRUE(response_headers.has("x-error-3"));
+        // The rest should be omitted due to the limit.
+        EXPECT_FALSE(response_headers.has("x-append-1"));
+        EXPECT_FALSE(response_headers.has("x-append-2"));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
@@ -775,28 +760,27 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInSet) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(
-          Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-            // Create a ResponseHeaderMap with a limit of 1 to trigger the break in headers_to_set.
-            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/1);
-            if (modify_headers) {
-              modify_headers(response_headers);
-            }
-            // With a limit of 1, we should only have 1 header added.
-            EXPECT_EQ(response_headers.size(), 1);
-            EXPECT_TRUE(response_headers.has("x-error-1"));
-            EXPECT_FALSE(response_headers.has("x-error-2"));
-            EXPECT_FALSE(response_headers.has("x-error-3"));
-          }));
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+        // Create a ResponseHeaderMap with a limit of 1 to trigger the break in headers_to_set.
+        Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/1);
+        if (modify_headers) {
+          modify_headers(response_headers);
+        }
+        // With a limit of 1, we should only have 1 header added.
+        EXPECT_EQ(response_headers.size(), 1);
+        EXPECT_TRUE(response_headers.has("x-error-1"));
+        EXPECT_FALSE(response_headers.has("x-error-2"));
+        EXPECT_FALSE(response_headers.has("x-error-3"));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -832,30 +816,29 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInAppend) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(
-          Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-            // Create a ResponseHeaderMap with max_headers_count=2 to trigger limit in append loop.
-            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
-            if (modify_headers) {
-              modify_headers(response_headers);
-            }
-            // With a limit of 2, we should have 1 from set + 1 from append.
-            EXPECT_EQ(response_headers.size(), 2);
-            EXPECT_TRUE(response_headers.has("x-error-1"));
-            EXPECT_TRUE(response_headers.has("x-append-1"));
-            // The rest should be omitted due to the limit.
-            EXPECT_FALSE(response_headers.has("x-append-2"));
-            EXPECT_FALSE(response_headers.has("x-append-3"));
-          }));
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+        // Create a ResponseHeaderMap with max_headers_count=2 to trigger limit in append loop.
+        Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
+        if (modify_headers) {
+          modify_headers(response_headers);
+        }
+        // With a limit of 2, we should have 1 from set + 1 from append.
+        EXPECT_EQ(response_headers.size(), 2);
+        EXPECT_TRUE(response_headers.has("x-error-1"));
+        EXPECT_TRUE(response_headers.has("x-append-1"));
+        // The rest should be omitted due to the limit.
+        EXPECT_FALSE(response_headers.has("x-append-2"));
+        EXPECT_FALSE(response_headers.has("x-append-3"));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
@@ -881,10 +864,9 @@ TEST_F(HttpFilterTest, ErrorResponseBodySizeLimit) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -915,18 +897,17 @@ TEST_F(HttpFilterTest, ErrorResponseEmptyAttributes) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -952,15 +933,14 @@ TEST_F(HttpFilterTest, ErrorResponseWithAppendHeaders) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, false))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::InternalServerError)));
         // Verify both headers_to_set and headers_to_append are present.
@@ -968,7 +948,7 @@ TEST_F(HttpFilterTest, ErrorResponseWithAppendHeaders) {
                   "set-value");
         EXPECT_EQ(headers.get(Http::LowerCaseString("x-error-append"))[0]->value().getStringView(),
                   "append-value");
-      }));
+      });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -999,10 +979,9 @@ TEST_F(HttpFilterTest, ErrorOpenWithHeaderAddClose) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -1039,11 +1018,11 @@ TEST_F(HttpFilterTest, ImmediateErrorOpenWithHeaderAddClose) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -1124,7 +1103,7 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -1171,17 +1150,16 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
   // The check call should only be called once.
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
@@ -1233,7 +1211,7 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -1262,17 +1240,17 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_param,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         request_callbacks_ = &callbacks;
         check_request = check_param;
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -1306,17 +1284,17 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
 
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_param,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         request_callbacks_ = &callbacks;
         check_request = check_param;
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -1358,9 +1336,9 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   request_headers_.addCopy(Http::LowerCaseString{header_key}, header_value);
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_request,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest& check_request, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         request_callbacks_ = &callbacks;
         // headers should be empty.
         EXPECT_EQ(0, check_request.attributes().request().http().headers().size());
@@ -1375,7 +1353,7 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
           }
         }
         EXPECT_TRUE(exact_match_utf_8_header);
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
@@ -1396,10 +1374,9 @@ TEST_F(HttpFilterTest, HeaderOnlyRequest) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
   // decodeData() and decodeTrailers() will not be called since request is header only.
@@ -1425,10 +1402,9 @@ TEST_F(HttpFilterTest, UpgradeWebsocketRequest) {
                            Http::Headers::get().UpgradeValues.WebSocket);
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   // decodeData() and decodeTrailers() will not be called until continueDecoding() is called.
@@ -1453,10 +1429,9 @@ TEST_F(HttpFilterTest, H2UpgradeRequest) {
                            Http::Headers::get().ProtocolStrings.Http2String);
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   // decodeData() and decodeTrailers() will not be called until continueDecoding() is called.
@@ -1478,10 +1453,9 @@ TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -1512,10 +1486,9 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1568,10 +1541,9 @@ TEST_F(HttpFilterTest, ClearCache) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1613,10 +1585,9 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1656,10 +1627,9 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1699,10 +1669,9 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1739,10 +1708,9 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyTruncation) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1780,10 +1748,9 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyNotTruncated) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -1818,10 +1785,9 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyNotTruncatedWhenLimitIsZero) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
@@ -1864,10 +1830,9 @@ TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderSizeLimit) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -1881,10 +1846,10 @@ TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderSizeLimit) {
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::InternalServerError)));
-      }));
+      });
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
@@ -1909,10 +1874,9 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1946,10 +1910,9 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1992,11 +1955,11 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::move(response_ptr));
-      }));
+      });
   EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -2009,6 +1972,306 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
                     .counterFromString("ext_authz.denied")
                     .value());
   EXPECT_EQ("ext_authz_denied", decoder_filter_callbacks_.details());
+}
+
+// Verifies that the filter clears the route cache when clear_route_cache_headers is set and the
+// authorization response sets a header that is listed in clear_route_cache_headers.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersMatchHeaderToSet) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"x-route-key", "value"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that clear_route_cache_headers matches header names case insensitively for both the
+// configured names and the mutated names.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersMatchCaseInsensitive) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - X-Route-Key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"X-ROUTE-KEY", "value"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that the filter clears the route cache when a header listed in clear_route_cache_headers
+// is appended by the authorization response.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersMatchHeaderToAppend) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_append = {{"x-route-key", "value"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that the filter clears the route cache when a header listed in clear_route_cache_headers
+// is removed by the authorization response.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersMatchHeaderToRemove) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_remove = std::vector<std::string>{"x-route-key"};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that the filter clears the route cache when the authorization response mutates several
+// headers and only a later mutation matches a header listed in clear_route_cache_headers.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersMatchAmongMultipleMutations) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"x-other", "value"}};
+  response.headers_to_append = {{"x-another", "value"}};
+  response.headers_to_remove = std::vector<std::string>{"x-route-key"};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that the filter clears the route cache on a query parameter mutation even when
+// clear_route_cache_headers is set, because query parameters are not covered by the list.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersQueryParameterAlwaysClears) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.query_parameters_to_set = {{"foo", "bar"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that the filter clears the route cache on a query parameter removal even when
+// clear_route_cache_headers is set.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersQueryParameterRemoveAlwaysClears) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.query_parameters_to_remove = std::vector<std::string>{"foo"};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+// Verifies that the filter does not clear the route cache when clear_route_cache_headers is set and
+// the authorization response only mutates headers that are not listed.
+TEST_F(HttpFilterTest, NoClearCacheRouteHeadersNoMatch) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  clear_route_cache_headers:
+  - x-route-key
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"x-other", "value"}};
+  response.headers_to_append = {{"x-another", "value"}};
+  response.headers_to_remove = std::vector<std::string>{"x-gone"};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Verifies that specified metadata is passed along in the check request
@@ -2059,10 +2322,9 @@ TEST_F(HttpFilterTest, MetadataContext) {
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
-                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { check_request = check_param; });
 
   filter_->decodeHeaders(request_headers_, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -2170,10 +2432,9 @@ TEST_F(HttpFilterTest, ConnectionMetadataContext) {
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
-                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { check_request = check_param; });
 
   filter_->decodeHeaders(request_headers_, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -2322,10 +2583,9 @@ TEST_F(HttpFilterTest, RouteMetadataContext) {
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
-                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { check_request = check_param; });
 
   filter_->decodeHeaders(request_headers_, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -2744,10 +3004,9 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -2767,14 +3026,14 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   initializeMetadata(response);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([&response](const std::string& ns,
-                                   const Protobuf::Struct& returned_dynamic_metadata) {
+      .WillOnce([&response](const std::string& ns,
+                            const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness.
         EXPECT_THAT(returned_dynamic_metadata.fields(),
                     Contains(IsStructNumber("ext_authz_duration", 10)));
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
@@ -2811,23 +3070,23 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         request_callbacks_ = &callbacks;
         callbacks.onComplete(std::move(response_ptr));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([&response](const std::string& ns,
-                                   const Protobuf::Struct& returned_dynamic_metadata) {
+      .WillOnce([&response](const std::string& ns,
+                            const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
         EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_FALSE(response.dynamic_metadata.fields().contains("ext_authz_duration"));
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -2855,10 +3114,9 @@ TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   // When the response check status is error, we skip emitting dynamic metadata.
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _));
@@ -2932,7 +3190,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -3016,7 +3274,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -3070,13 +3328,13 @@ TEST_F(HttpFilterTest, GrpcClientPerRouteError) {
   // Since cluster doesn't exist, per-route client creation should fail
   // and we'll use the default client instead.
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         Filters::Common::ExtAuthz::Response response{};
         response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   // Verify filter processes the request with the default client.
   Http::TestRequestHeaderMapImpl request_headers{
@@ -3115,13 +3373,13 @@ TEST_F(HttpFilterTest, HttpClientPerRouteOverride) {
 
   // Set up a check expectation that will be satisfied by the default client.
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         Filters::Common::ExtAuthz::Response response{};
         response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   // Verify filter processes the request.
   Http::TestRequestHeaderMapImpl request_headers{
@@ -3153,11 +3411,11 @@ TEST_F(HttpFilterTest, EncodeHeadersLimitDisabledByDefault) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
@@ -3197,26 +3455,25 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimit) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(
-          Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
-            if (modify_headers) {
-              modify_headers(response_headers);
-            }
-            EXPECT_EQ(response_headers.size(), 2);
-            EXPECT_TRUE(response_headers.has("key1"));
-            EXPECT_TRUE(response_headers.has("key2"));
-            EXPECT_FALSE(response_headers.has("key3"));
-          }));
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+        Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
+        if (modify_headers) {
+          modify_headers(response_headers);
+        }
+        EXPECT_EQ(response_headers.size(), 2);
+        EXPECT_TRUE(response_headers.has("key1"));
+        EXPECT_TRUE(response_headers.has("key2"));
+        EXPECT_FALSE(response_headers.has("key3"));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
@@ -3243,26 +3500,25 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimitDisabled) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(
-          Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
-            if (modify_headers) {
-              modify_headers(response_headers);
-            }
-            EXPECT_EQ(response_headers.size(), 3);
-            EXPECT_TRUE(response_headers.has("key1"));
-            EXPECT_TRUE(response_headers.has("key2"));
-            EXPECT_TRUE(response_headers.has("key3"));
-          }));
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+        Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
+        if (modify_headers) {
+          modify_headers(response_headers);
+        }
+        EXPECT_EQ(response_headers.size(), 3);
+        EXPECT_TRUE(response_headers.has("key1"));
+        EXPECT_TRUE(response_headers.has("key2"));
+        EXPECT_TRUE(response_headers.has("key3"));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
@@ -3291,10 +3547,9 @@ TEST_F(HttpFilterTest, SetCookieHeaderOnSuccessfulAuthorization) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3330,10 +3585,9 @@ TEST_F(HttpFilterTest, SetCookieHeaderOnDeniedAuthorization) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
@@ -3342,17 +3596,16 @@ TEST_F(HttpFilterTest, SetCookieHeaderOnDeniedAuthorization) {
 
   // Verify headers are present in the local reply (including extra headers added by sendLocalReply)
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, false))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(headers.getStatusValue(), "403");
         EXPECT_EQ(headers.get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView(),
                   "error=invalid");
         EXPECT_EQ(
             headers.get(Http::LowerCaseString("www-authenticate"))[0]->value().getStringView(),
             "Bearer realm=\"example\"");
-      }));
+      });
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
-      .WillOnce(Invoke(
-          [&](Buffer::Instance& data, bool) { EXPECT_EQ(data.toString(), "Unauthorized"); }));
+      .WillOnce([&](Buffer::Instance& data, bool) { EXPECT_EQ(data.toString(), "Unauthorized"); });
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -3384,10 +3637,9 @@ TEST_F(HttpFilterTest, MultipleSetCookieHeadersOnSuccess) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3424,10 +3676,9 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3511,10 +3762,9 @@ TEST_F(HttpFilterTest, ShadowModeErrorSetsFilterStateAndContinues) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3560,10 +3810,9 @@ TEST_F(HttpFilterTest, ShadowModeErrorWithCustomStatusCode) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3596,10 +3845,9 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3702,10 +3950,9 @@ TEST_F(HttpFilterTest, ShadowModeDisabledPreservesExistingBehaviour) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3742,10 +3989,9 @@ TEST_F(HttpFilterTest, ShadowModeDeniedWithAuthServerDynamicMetadata) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3753,12 +3999,11 @@ TEST_F(HttpFilterTest, ShadowModeDeniedWithAuthServerDynamicMetadata) {
   // The auth server's own dynamic_metadata is still emitted to dynamic metadata
   // (this is existing behavior, independent of shadow mode).
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(
-          Invoke([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
-            EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
-            EXPECT_THAT(returned_dynamic_metadata.fields(),
-                        Contains(IsStructString("custom_key", "custom_value")));
-          }));
+      .WillOnce([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+        EXPECT_THAT(returned_dynamic_metadata.fields(),
+                    Contains(IsStructString("custom_key", "custom_value")));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
@@ -3797,10 +4042,9 @@ TEST_F(HttpFilterTest, ShadowModeWithFailureModeAllowOnError) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3849,15 +4093,14 @@ TEST_F(HttpFilterTest, ShadowModeWithRequestBody) {
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+      .WillByDefault([&](Buffer::Instance& data, bool) { data_.add(data); });
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -3969,10 +4212,9 @@ TEST_F(HttpFilterTest, ValidErrorResponseWithMutations) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -3986,15 +4228,14 @@ TEST_F(HttpFilterTest, ValidErrorResponseWithMutations) {
 
   // Should succeed and NOT clear attributes because mutations are valid.
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
-      .WillOnce(
-          Invoke([&](Http::Code, absl::string_view,
-                     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-            Http::TestResponseHeaderMapImpl response_headers;
-            modify_headers(response_headers);
-            EXPECT_EQ("value", response_headers.get_("x-error-header"));
-            EXPECT_EQ("value", response_headers.get_("x-error-append"));
-          }));
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+        EXPECT_EQ("value", response_headers.get_("x-error-header"));
+        EXPECT_EQ("value", response_headers.get_("x-error-append"));
+      });
 
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 }
@@ -4019,11 +4260,11 @@ TEST_F(HttpFilterTest, DestinationLabelsFromBootstrap) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
-                           const envoy::service::auth::v3::CheckRequest& check_param,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         EXPECT_EQ("envoy", check_param.attributes().destination().labels().at("app"));
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -4061,14 +4302,14 @@ TEST_F(HttpFilterTest, SawInvalidAppendActionsNoValidation) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
         response->saw_invalid_append_actions = true;
         callbacks.onComplete(std::move(response));
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
@@ -4084,14 +4325,14 @@ TEST_F(HttpFilterTest, InvalidHeaderRemovalIgnored) {
 
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
         response->headers_to_remove = {"invalid\nheader"};
         callbacks.onComplete(std::move(response));
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
@@ -4109,15 +4350,15 @@ TEST_F(HttpFilterTest, RequestHeaderLimitsReachedWithQueryParameters) {
   limited_request_headers.addCopy(Http::Headers::get().Scheme, "https");
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
         // This will make the path > 1KB.
         response->query_parameters_to_set = {{"foo", std::string(2048, 'a')}};
         callbacks.onComplete(std::move(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_,
               sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
@@ -4163,20 +4404,73 @@ TEST_F(HttpFilterTest, RequestHeaderLimitsReachedDuringRemoval) {
   limited_request_headers.addCopy(Http::LowerCaseString("remove-me"), "value");
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
         response->headers_to_remove = {"remove-me"};
         callbacks.onComplete(std::move(response));
-      }));
+      });
 
   EXPECT_CALL(decoder_filter_callbacks_,
               sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(limited_request_headers, false));
   EXPECT_EQ(1U, config_->stats().request_header_limits_reached_.value());
+}
+
+// Verifies that a check request can be built without crashing when the stream has no downstream
+// connection (for example when the filter runs in an upstream filter chain driven by the async
+// client), and that the check request then carries only request-level metadata and no peer
+// attributes.
+TEST_F(HttpFilterTest, MetadataContextWithoutConnection) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  metadata_context_namespaces:
+  - request.has.data
+  - connection.has.data
+  )EOF");
+
+  const std::string request_yaml = R"EOF(
+  filter_metadata:
+    request.has.data:
+      data: request
+  )EOF";
+
+  envoy::config::core::v3::Metadata request_metadata;
+  TestUtility::loadFromYaml(request_yaml, request_metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(request_metadata));
+
+  // The stream has no downstream connection.
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{}));
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { check_request = check_param; });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ("request", check_request.attributes()
+                           .metadata_context()
+                           .filter_metadata()
+                           .at("request.has.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "connection.has.data"));
+
+  // Without a connection there are no peer attributes.
+  EXPECT_FALSE(check_request.attributes().source().has_address());
+  EXPECT_FALSE(check_request.attributes().destination().has_address());
 }
 
 } // namespace
