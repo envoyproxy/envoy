@@ -17,6 +17,7 @@ envoy_cc_library(
     tags = ["backtrace"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stderr_writer_lib",
         "//source/common/version:version_lib",
         "@abseil-cpp//absl/debugging:stacktrace",
         "@abseil-cpp//absl/debugging:symbolize",

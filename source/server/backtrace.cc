@@ -6,7 +6,7 @@
 
 namespace Envoy {
 
-bool BackwardsTrace::log_to_stderr_ = false;
+std::atomic<bool> BackwardsTrace::log_to_stderr_{false};
 
 absl::string_view BackwardsTrace::addrMapping(bool setup) {
   static absl::string_view value = [setup]() -> absl::string_view {
