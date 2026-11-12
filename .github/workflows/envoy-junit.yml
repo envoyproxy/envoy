@@ -10,6 +10,10 @@ on:
         description: Collect runs completed in the last N hours.
         type: number
         default: 2
+      until-hours:
+        description: End the window N hours ago rather than now, to backfill in slices.
+        type: number
+        default: 0
       workflows:
         description: Comma-separated workflow names to collect from.
         type: string
@@ -43,6 +47,7 @@ jobs:
         python3 ci/junit/collect.py
         --repo "${{ github.repository }}"
         --since-hours "${{ inputs.since-hours || 2 }}"
+        --until-hours "${{ inputs.until-hours || 0 }}"
         --workflows "${{ inputs.workflows || 'Envoy/Checks,Envoy/Prechecks' }}"
         --out junit
       env:

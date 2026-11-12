@@ -2,10 +2,14 @@
 """Upload JUnit XML collected by ci/junit/collect.py to Datadog CI Visibility.
 
 collect.py groups its output by GitHub Actions workflow run, each with that run's own commit,
-branch and PR in a run.json alongside the XML. This uploads each run's XML in one
-`datadog-ci junit upload` call, with DD_GIT_* set from that run's metadata, so Datadog attributes
-the results to the run's actual commit rather than whatever happens to be checked out here (this
+branch, PR and jobs in a run.json alongside the XML. This uploads each run's XML job by job with
+`datadog-ci junit upload`, with DD_GIT_* set from that run's metadata, so Datadog attributes the
+results to the run's actual commit rather than whatever happens to be checked out here (this
 runs on a schedule, well after any of the runs it's uploading for).
+
+Each upload is also tagged with what the run was (`envoy.trigger`: `pr` or `postsubmit`), the
+branch it was against (`envoy.target_branch`) and the job the tests ran in (`envoy.job`, e.g.
+`tsan`), as the same tests run in many jobs of many kinds of run.
 """
 
 import argparse
@@ -16,6 +20,10 @@ import subprocess
 import sys
 
 DATADOG_CI = "@datadog/datadog-ci@5.25.0"
+# npx runs the command through a shell as a single string, which the kernel caps at 128KiB, and a
+# job can have thousands of XML files, so they are uploaded in batches whose paths fit well
+# inside that.
+MAX_BATCH_BYTES = 60 * 1024
 
 
 def run_dirs(junit_dir):
@@ -62,20 +70,41 @@ def save_watermark(path, uploaded, retention_hours):
         json.dump({"uploaded": pruned}, f)
 
 
-def xml_files(run_dir):
+def job_dirs(run_dir, meta):
+    # <run dir>/<job>/, with the job as collect.py recorded it, or just its directory name for
+    # output collected before it did.
+    jobs = meta.get("jobs", {})
+    for name in sorted(os.listdir(run_dir)):
+        job_dir = os.path.join(run_dir, name)
+        if os.path.isdir(job_dir):
+            yield job_dir, jobs.get(name, {"name": name, "leg": name})
+
+
+def xml_files(job_dir):
     # collect.py names files <hash[:12]>.xml, with no "test" in the name - datadog-ci's own
     # directory/--auto-discovery scan silently skips anything whose filename doesn't contain
     # "test" (confirmed against datadog-ci 5.25.0), so pass each file explicitly instead of
-    # letting it discover them.
-    return [
-        os.path.join(root, f)
-        for root, _, files in os.walk(run_dir)
+    # letting it discover them. Relative to the job's directory, to keep the paths short.
+    return sorted(
+        os.path.relpath(os.path.join(root, f), job_dir)
+        for root, _, files in os.walk(job_dir)
         for f in files
-        if f.endswith(".xml")
-    ]
+        if f.endswith(".xml"))
 
 
-def upload(repo, meta, files, service):
+def batches(files, max_bytes=MAX_BATCH_BYTES):
+    batch, size = [], 0
+    for path in files:
+        if batch and size + len(path) + 1 > max_bytes:
+            yield batch
+            batch, size = [], 0
+        batch.append(path)
+        size += len(path) + 1
+    if batch:
+        yield batch
+
+
+def run_env(repo, meta):
     env = dict(os.environ)
     env.update({
         "DD_GIT_REPOSITORY_URL": f"https://github.com/{repo}",
@@ -86,12 +115,40 @@ def upload(repo, meta, files, service):
     })
     if meta.get("pr"):
         env["DD_PR_NUMBER"] = str(meta["pr"])
+    return env
+
+
+def run_tags(meta, job):
+    tags = {
+        "envoy.trigger": meta.get("trigger", ""),
+        "envoy.target_branch": meta.get("target_branch", ""),
+        "envoy.job": job.get("leg", ""),
+    }
+    return [arg for key, value in tags.items() if value for arg in ("--tags", f"{key}:{value}")]
+
+
+def upload(repo, meta, run_dir, service, dry_run=False):
+    # True if all of the run's XML was uploaded, and how many files that was.
+    env = run_env(repo, meta)
     print(f"  sha {meta.get('sha', '')[:12] or '?'}, branch {meta.get('branch', '?')}, "
-          f"{len(files)} files")
-    result = subprocess.run(
-        ["npx", "--yes", DATADOG_CI, "junit", "upload", "--service", service, *files],
-        env=env)
-    return result.returncode == 0
+          f"{meta.get('trigger', '?')} against {meta.get('target_branch', '?')}")
+    total = 0
+    for job_dir, job in job_dirs(run_dir, meta):
+        files = xml_files(job_dir)
+        if not files:
+            continue
+        print(f"    {job.get('leg', '?')}: {len(files)} files")
+        for batch in batches(files):
+            command = [
+                "npx", "--yes", DATADOG_CI, "junit", "upload", "--service", service,
+                *run_tags(meta, job), *(["--dry-run"] if dry_run else []), *batch]
+            result = subprocess.run(command, env=env, cwd=job_dir)
+            if result.returncode != 0:
+                print(f"    {job.get('leg', '?')}: datadog-ci exited {result.returncode} "
+                      f"uploading {len(batch)} files")
+                return False, total
+            total += len(batch)
+    return True, total
 
 
 def main():
@@ -104,6 +161,9 @@ def main():
         help="Path to a run-id watermark file, to skip runs a previous invocation already "
              "uploaded (e.g. from an overlapping --since-hours window). Skipped if unset.")
     parser.add_argument("--watermark-retention-hours", type=float, default=48)
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Run datadog-ci with --dry-run, and leave the watermark as it is.")
     args = parser.parse_args()
 
     if not os.environ.get("DD_API_KEY"):
@@ -117,21 +177,20 @@ def main():
         if run_id in watermark:
             already += 1
             continue
-        files = xml_files(run_dir)
-        if not files:
-            skipped += 1
-            continue
         with open(os.path.join(run_dir, "run.json")) as f:
             meta = json.load(f)
         print(f"  {run_dir}:")
-        if upload(args.repo, meta, files, args.service):
-            uploaded += 1
-            watermark[run_id] = meta.get("created_at", "")
-        else:
+        ok, files = upload(args.repo, meta, run_dir, args.service, args.dry_run)
+        if not ok:
             failed += 1
             print(f"  {run_dir}: upload failed")
+        elif not files:
+            skipped += 1
+        else:
+            uploaded += 1
+            watermark[run_id] = meta.get("created_at", "")
 
-    if args.watermark:
+    if args.watermark and not args.dry_run:
         save_watermark(args.watermark, watermark, args.watermark_retention_hours)
 
     summary = (f"uploaded: {uploaded}, failed: {failed}, skipped (no xml): {skipped}, "

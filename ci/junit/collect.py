@@ -10,8 +10,13 @@ The EngFlow calls are the ones its UI uses (no auth needed on this cluster), so 
 best effort: anything that fails is logged and skipped.
 
 Output is grouped by workflow run (<out>/<workflow>/<run id>/...), alongside a run.json of that
-run's git metadata (commit, branch, PR), since each run is its own commit and whatever uploads
-this on needs that rather than whatever happens to be checked out when it runs.
+run's git metadata (commit, branch, PR) and its jobs, since each run is its own commit and
+whatever uploads this on needs that rather than whatever happens to be checked out when it runs.
+
+The CI workflows are triggered by `workflow_run`, so the head commit and branch GitHub records
+for a run are those of `main` at the time, whatever the run was testing. What it was testing is
+in its job names, e.g. `Check (pr/1234/main@abc1234) / tsan / ...` or
+`Precheck (postsubmit/release/v1.40@abc1234) / ...`, and the metadata is taken from there.
 """
 
 import argparse
@@ -32,6 +37,10 @@ GITHUB_API = "https://api.github.com"
 INVOCATION_RE = re.compile(rb"mordenite\.cluster\.engflow\.com/invocation/([0-9a-f-]{36})")
 # The GetTarget response also lists the test binary and logs; test.xml files are far smaller.
 MAX_XML_BYTES = 20 * 1024 * 1024
+# `<kind> (pr/<number>/<target branch>@<sha>)` or `<kind> (postsubmit/<branch>@<sha>)`.
+JOB_REF_RE = re.compile(r"\((?:pr/(?P<pr>\d+)|postsubmit)/(?P<branch>[^@)]+)@(?P<sha>[0-9a-f]{7,40})\)")
+# GitHub returns at most 1000 runs for a filtered listing, so list the window in slices.
+LIST_SLICE = datetime.timedelta(hours=1)
 
 
 class _NoAuthRedirect(urllib.request.HTTPRedirectHandler):
@@ -140,22 +149,63 @@ def run_dir(out, run):
     return os.path.join(out, _safe(run["name"]), str(run["id"]))
 
 
-def run_meta(run):
+def job_ref(job_names):
+    # What a run was testing, from the first of its job names that says.
+    for name in job_names:
+        m = JOB_REF_RE.search(name)
+        if m:
+            return m.groupdict()
+    return None
+
+
+def job_leg(name):
+    # `Check (postsubmit/main@abc1234) / tsan / ./ci/do_ci.sh tsan` -> `tsan`.
+    parts = [part.strip() for part in name.split(" / ")]
+    return " / ".join(parts[1:-1]) if len(parts) > 2 else parts[-1]
+
+
+def run_meta(repo, run, job_names, token):
     # Each run is its own commit/branch/PR, so whatever uploads this on needs it alongside the
     # XML rather than relying on whatever happens to be checked out when it runs.
-    pr = (run.get("pull_requests") or [{}])[0]
-    base = pr.get("base") or {}
-    return {
+    meta = {
         "sha": run.get("head_sha", ""),
         "branch": run.get("head_branch", ""),
-        "pr": pr.get("number", ""),
-        "base_branch": base.get("ref", ""),
-        "base_sha": base.get("sha", ""),
+        "target_branch": run.get("head_branch", ""),
+        "trigger": run.get("event", ""),
+        "pr": "",
+        "base_branch": "",
+        "base_sha": "",
         "event": run.get("event", ""),
         "url": run.get("html_url", ""),
         # Lets a watermark prune old entries by age without another GitHub API call.
         "created_at": run.get("created_at", ""),
     }
+    ref = job_ref(job_names)
+    if not ref:
+        return meta
+    meta.update({"sha": ref["sha"], "branch": ref["branch"], "target_branch": ref["branch"]})
+    try:
+        # The job names only have the abbreviated commit.
+        commit = json.loads(_get(f"{GITHUB_API}/repos/{repo}/commits/{ref['sha']}", token))
+        meta["sha"] = commit["sha"]
+    except (urllib.error.URLError, ValueError, KeyError) as e:
+        print(f"  {run['id']}: could not resolve commit {ref['sha']} ({e})")
+    if not ref["pr"]:
+        meta["trigger"] = "postsubmit"
+        return meta
+    meta.update({"trigger": "pr", "pr": int(ref["pr"]), "base_branch": ref["branch"]})
+    # Not known from the job names. A fork's branch can have any name, `main` included, so the
+    # fallback is one that cannot be mistaken for a branch of this repo.
+    meta["branch"] = f"pr/{ref['pr']}"
+    try:
+        pull = json.loads(_get(f"{GITHUB_API}/repos/{repo}/pulls/{ref['pr']}", token))
+        head, base = pull["head"], pull["base"]
+        same_repo = (head.get("repo") or {}).get("full_name") == repo
+        meta["branch"] = head["ref"] if same_repo else head["label"]
+        meta["base_sha"] = base["sha"]
+    except (urllib.error.URLError, ValueError, KeyError) as e:
+        print(f"  {run['id']}: could not read pull request {ref['pr']} ({e})")
+    return meta
 
 
 def main():
@@ -163,27 +213,41 @@ def main():
     parser.add_argument("--repo", required=True)
     parser.add_argument("--workflows", default="Envoy/Checks,Envoy/Prechecks")
     parser.add_argument("--since-hours", type=float, default=2)
+    parser.add_argument(
+        "--until-hours", type=float, default=0,
+        help="End the window this many hours ago rather than now, to collect an older window "
+             "in slices.")
     parser.add_argument("--out", default="junit")
     parser.add_argument("--workers", type=int, default=16)
     args = parser.parse_args()
     token = os.environ.get("GITHUB_TOKEN")
     workflows = {w.strip() for w in args.workflows.split(",") if w.strip()}
-    since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=args.since_hours)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    since = now - datetime.timedelta(hours=args.since_hours)
+    until = now - datetime.timedelta(hours=args.until_hours)
 
-    runs = [
-        run for run in _github(
-            f"/repos/{args.repo}/actions/runs?status=completed&created=>={since:%Y-%m-%dT%H:%M:%SZ}",
-            token, "workflow_runs")
-        if run["name"] in workflows and run["conclusion"] not in ("skipped", "cancelled")
-    ]
-    print(f"{len(runs)} completed runs of {sorted(workflows)} since {since:%Y-%m-%d %H:%M}Z")
+    runs = {}
+    start = since
+    while start < until:
+        end = min(start + LIST_SLICE, until)
+        created = f"{start:%Y-%m-%dT%H:%M:%SZ}..{end:%Y-%m-%dT%H:%M:%SZ}"
+        for run in _github(
+                f"/repos/{args.repo}/actions/runs?status=completed&created={created}",
+                token, "workflow_runs"):
+            if run["name"] in workflows and run["conclusion"] not in ("skipped", "cancelled"):
+                runs[run["id"]] = run
+        start = end
+    runs = list(runs.values())
+    print(
+        f"{len(runs)} completed runs of {sorted(workflows)} from {since:%Y-%m-%d %H:%M}Z "
+        f"to {until:%Y-%m-%d %H:%M}Z")
 
-    jobs = [
-        (run, job)
-        for run in runs
-        for job in _github(f"/repos/{args.repo}/actions/runs/{run['id']}/jobs", token, "jobs")
-        if job.get("conclusion") not in (None, "skipped")
-    ]
+    run_job_names = {}
+    jobs = []
+    for run in runs:
+        run_jobs = _github(f"/repos/{args.repo}/actions/runs/{run['id']}/jobs", token, "jobs")
+        run_job_names[run["id"]] = [job["name"] for job in run_jobs]
+        jobs += [(run, job) for job in run_jobs if job.get("conclusion") not in (None, "skipped")]
     totals = {"jobs": 0, "invocations": 0, "tests": 0, "xml": 0, "missing": 0}
 
     def find_tests(run, job):
@@ -220,19 +284,27 @@ def main():
 
     with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
         tests = []
-        meta_written = set()
+        metas = {}
         for (run, job), found in zip(jobs, pool.map(lambda rj: find_tests(*rj), jobs)):
+            job_dir = os.path.join(run_dir(args.out, run), _safe(job["name"]))
             if found:
                 totals["jobs"] += 1
-                if run["id"] not in meta_written:
-                    meta_written.add(run["id"])
+                if run["id"] not in metas:
+                    metas[run["id"]] = run_meta(args.repo, run, run_job_names[run["id"]], token)
+                    metas[run["id"]]["jobs"] = {}
                     os.makedirs(run_dir(args.out, run), exist_ok=True)
-                    with open(os.path.join(run_dir(args.out, run), "run.json"), "w") as f:
-                        json.dump(run_meta(run), f)
-            job_dir = os.path.join(run_dir(args.out, run), _safe(job["name"]))
+                # Keyed by the job's directory, for whatever uploads this to tell the jobs apart.
+                metas[run["id"]]["jobs"][os.path.basename(job_dir)] = {
+                    "name": job["name"],
+                    "leg": job_leg(job["name"]),
+                }
             for invocation, labels in found:
                 totals["invocations"] += 1
                 tests += [(job_dir, invocation, label) for label in labels]
+        for run in runs:
+            if run["id"] in metas:
+                with open(os.path.join(run_dir(args.out, run), "run.json"), "w") as f:
+                    json.dump(metas[run["id"]], f)
         for written in pool.map(lambda t: fetch_xml(*t), tests):
             totals["tests"] += 1
             totals["xml"] += written
