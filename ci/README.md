@@ -189,6 +189,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `cto.<option>` &mdash; run tests with the compile-time options that can be set together (`--config=compile-time-options`, which on this branch includes gperftools and zlib-ng) toggled to their non-default state, and one further option: `cto.wamr` (all tests), `cto.noadmin` (admin disabled, all tests), `cto.wasmtime`, `cto.asserts` (release-mode asserts), `cto.nolog` (builds the server with logging disabled). `cto.zlib_ng` runs the zlib-ng compression tests without the rest of the options.
 * `compile_time_options` (or `cto`) &mdash; run all of the `cto.*` targets.
 * `cto.<option> <test>` &mdash; run a specified test or test dir with that target's options (`cto.asserts`, `cto.nolog` and `cto.zlib_ng` have fixed targets).
+* `gcc` &mdash; build the server and tools and run the tests with GCC (`--config=gcc`); `gcc.build` and `gcc.test` run just one of the two.
 * `clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
