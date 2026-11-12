@@ -34,6 +34,9 @@ jobs:
       run: |
         args=(-sS --max-time 120 -X "$METHOD" -H "DD-API-KEY: $DD_API_KEY" -H "Content-Type: application/json"
               -o response.json -w 'HTTP %{http_code} %{size_download} bytes\n')
+        if [[ -n "$DD_APP_KEY" ]]; then
+            args+=(-H "DD-APPLICATION-KEY: $DD_APP_KEY")
+        fi
         if [[ -n "$BODY" ]]; then
             args+=(--data "$BODY")
         fi
@@ -41,6 +44,7 @@ jobs:
         jq "$JQ" response.json 2>/dev/null | head -c 200000 || head -c 20000 response.json
       env:
         DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
         METHOD: ${{ inputs.method }}
         API_PATH: ${{ inputs.path }}
         BODY: ${{ inputs.body }}
