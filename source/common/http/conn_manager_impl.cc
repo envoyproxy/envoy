@@ -1799,8 +1799,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   refreshCachedRoute();
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
 
-  // Holding unmatched requests until the initial VHDS response arrives requires a top-level
-  // RouteConfigProvider; Scoped RDS (SRDS) does not support on-demand VHDS updates.
+  // Holding unmatched requests until the initial VHDS response arrives currently requires a
+  // top-level RouteConfigProvider.
+  // TODO(antoniovleonti): Support holding unmatched requests during initial VHDS warming with
+  // Scoped RDS (scoped_routes).
   if (!filter_manager_.streamInfo().virtualHost().has_value() &&
       connection_manager_.config_->routeConfigProvider() != nullptr &&
       snapped_route_config_ != nullptr && snapped_route_config_->awaitingInitialVhdsUpdate()) {

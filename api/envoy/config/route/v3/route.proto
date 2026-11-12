@@ -215,5 +215,15 @@ message Vhds {
   // not issued when this option is enabled. When unset, initial VHDS warming at startup blocks
   // listener and route initialization (blocking all requests until the initial VHDS update
   // completes).
+  //
+  // .. note::
+  //   Holding unmatched requests is currently only supported when the route configuration is
+  //   configured via top-level :ref:`rds
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>`
+  //   or :ref:`route_config
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.route_config>`
+  //   (not :ref:`scoped_routes
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scoped_routes>`,
+  //   where initial VHDS warming is skipped without holding unmatched requests).
   WarmingBlocksUnmatchedRequests warming_blocks_unmatched_requests = 2;
 }
