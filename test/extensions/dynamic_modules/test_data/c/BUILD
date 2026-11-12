@@ -15,6 +15,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
+    "//test/extensions/http/ai_filters/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
@@ -431,3 +432,7 @@ test_program(name = "resource_monitor_synchronous_feedback")
 test_program(name = "resource_monitor_synchronous_feedback_missing_get_resource_usage")
 
 test_program(name = "resource_monitor_synchronous_feedback_missing_load_accepted")
+
+test_program(name = "ai_filter")
+
+test_program(name = "ai_filter_missing_request")

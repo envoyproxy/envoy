@@ -15291,3 +15291,169 @@ fn test_load_shed_point_mock() {
     .unwrap()
     .should_shed_load());
 }
+
+// =================================================================================================
+// AI filter
+// =================================================================================================
+
+// Answers each test pointer with the result it names, so the SDK's mapping of every result is
+// observable.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_ai_filter_get_request_json(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_ai_filter_envoy_ptr,
+  json_pointer: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_ai_filter_json_result {
+  const MODEL: &[u8] = b"\"gpt-4o\"";
+  let pointer =
+    unsafe { std::slice::from_raw_parts(json_pointer.ptr as *const u8, json_pointer.length) };
+  match pointer {
+    b"/model" => {
+      unsafe {
+        *result = abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: MODEL.as_ptr() as *const _,
+          length: MODEL.len(),
+        };
+      }
+      abi::envoy_dynamic_module_type_ai_filter_json_result::Ok
+    },
+    b"/offloaded" => abi::envoy_dynamic_module_type_ai_filter_json_result::Offloaded,
+    b"invalid" => abi::envoy_dynamic_module_type_ai_filter_json_result::InvalidArgument,
+    b"/unavailable" => abi::envoy_dynamic_module_type_ai_filter_json_result::Unavailable,
+    _ => abi::envoy_dynamic_module_type_ai_filter_json_result::NotFound,
+  }
+}
+
+#[test]
+fn test_ai_filter_get_request_json_maps_results() {
+  use ai_filter::AiFilterJsonError;
+  let envoy_filter = unsafe { ai_filter::EnvoyAiFilter::new(std::ptr::null_mut()) };
+  assert_eq!(
+    envoy_filter.get_request_json("/model").unwrap(),
+    "\"gpt-4o\""
+  );
+  assert_eq!(
+    envoy_filter.get_request_json("/missing"),
+    Err(AiFilterJsonError::NotFound)
+  );
+  assert_eq!(
+    envoy_filter.get_request_json("/offloaded"),
+    Err(AiFilterJsonError::Offloaded)
+  );
+  assert_eq!(
+    envoy_filter.get_request_json("invalid"),
+    Err(AiFilterJsonError::InvalidArgument)
+  );
+  assert_eq!(
+    envoy_filter.get_request_json("/unavailable"),
+    Err(AiFilterJsonError::Unavailable)
+  );
+}
+
+static AI_FILTERS_DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy)]
+enum TestAiFilterNew {
+  Create,
+  Skip,
+  Panic,
+}
+
+struct TestAiFilterConfig {
+  new: TestAiFilterNew,
+}
+
+impl ai_filter::AiFilterConfig for TestAiFilterConfig {
+  fn new_ai_filter(
+    &self,
+    _envoy_filter: &mut ai_filter::EnvoyAiFilter,
+  ) -> Option<Box<dyn ai_filter::AiFilter>> {
+    match self.new {
+      TestAiFilterNew::Create => Some(Box::new(TestAiFilter)),
+      TestAiFilterNew::Skip => None,
+      TestAiFilterNew::Panic => panic!("intentional panic in new_ai_filter"),
+    }
+  }
+}
+
+struct TestAiFilter;
+
+impl ai_filter::AiFilter for TestAiFilter {
+  fn on_request(
+    &mut self,
+    _envoy_filter: &mut ai_filter::EnvoyAiFilter,
+  ) -> abi::envoy_dynamic_module_type_on_ai_filter_request_status {
+    abi::envoy_dynamic_module_type_on_ai_filter_request_status::Continue
+  }
+}
+
+impl Drop for TestAiFilter {
+  fn drop(&mut self) {
+    AI_FILTERS_DROPPED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  }
+}
+
+fn test_ai_filter_config_new(name: &str) -> *const std::ffi::c_void {
+  let new_config: NewAiFilterConfigFunction = |filter_name, _config| {
+    let new = match filter_name {
+      "filter" => TestAiFilterNew::Create,
+      "skip" => TestAiFilterNew::Skip,
+      "panic" => TestAiFilterNew::Panic,
+      _ => return None,
+    };
+    Some(Box::new(TestAiFilterConfig { new }))
+  };
+  ai_filter::envoy_dynamic_module_on_ai_filter_config_new_impl(name, b"", &new_config)
+}
+
+#[test]
+fn test_ai_filter_new_skips_or_fails_without_a_filter() {
+  assert!(test_ai_filter_config_new("unknown").is_null());
+  for (name, expected) in [
+    (
+      "skip",
+      abi::envoy_dynamic_module_type_on_ai_filter_new_status::Skip,
+    ),
+    (
+      "panic",
+      abi::envoy_dynamic_module_type_on_ai_filter_new_status::Error,
+    ),
+  ] {
+    let config = test_ai_filter_config_new(name);
+    assert!(!config.is_null());
+    let mut filter: abi::envoy_dynamic_module_type_ai_filter_module_ptr = std::ptr::null();
+    unsafe {
+      assert_eq!(
+        ai_filter::envoy_dynamic_module_on_ai_filter_new(config, std::ptr::null_mut(), &mut filter),
+        expected
+      );
+      ai_filter::envoy_dynamic_module_on_ai_filter_config_destroy(config);
+    }
+    assert!(filter.is_null());
+  }
+}
+
+#[test]
+fn test_ai_filter_lifecycle() {
+  let config = test_ai_filter_config_new("filter");
+  assert!(!config.is_null());
+  unsafe {
+    let mut filter: abi::envoy_dynamic_module_type_ai_filter_module_ptr = std::ptr::null();
+    assert_eq!(
+      ai_filter::envoy_dynamic_module_on_ai_filter_new(config, std::ptr::null_mut(), &mut filter),
+      abi::envoy_dynamic_module_type_on_ai_filter_new_status::Created
+    );
+    assert!(!filter.is_null());
+    assert_eq!(
+      ai_filter::envoy_dynamic_module_on_ai_filter_request(std::ptr::null_mut(), filter),
+      abi::envoy_dynamic_module_type_on_ai_filter_request_status::Continue
+    );
+    let dropped = AI_FILTERS_DROPPED.load(std::sync::atomic::Ordering::SeqCst);
+    ai_filter::envoy_dynamic_module_on_ai_filter_destroy(filter);
+    assert_eq!(
+      AI_FILTERS_DROPPED.load(std::sync::atomic::Ordering::SeqCst),
+      dropped + 1
+    );
+    ai_filter::envoy_dynamic_module_on_ai_filter_config_destroy(config);
+  }
+}

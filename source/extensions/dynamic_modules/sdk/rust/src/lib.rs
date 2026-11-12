@@ -10,6 +10,7 @@ include!(concat!(env!("OUT_DIR"), "/export_name.rs"));
 pub use __export_name_impl as __export_name;
 
 pub mod access_log;
+pub mod ai_filter;
 pub mod bootstrap;
 pub mod buffer;
 pub mod catch_unwind;
@@ -866,6 +867,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
 /// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
+/// - `ai_filter:` — [`NewAiFilterConfigFunction`] for AI Protocol Manager AI filters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
 /// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
@@ -1125,6 +1127,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
       $fn,
       "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register ai_filter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_AI_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_AI_FILTER_CONFIG_FUNCTION"
     );
   };
   (@register tls_certificate_selector : $fn:expr) => {
@@ -1758,6 +1767,22 @@ pub type NewHeaderFormatterConfigFunction =
 /// directly.
 pub static NEW_HEADER_FORMATTER_CONFIG_FUNCTION: OnceLock<NewHeaderFormatterConfigFunction> =
   OnceLock::new();
+
+// =================================================================================================
+// AI Filter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new AI filter configuration.
+///
+/// The `name` is the value of `filter_name` from the `dynamic_modules` AI filter configuration,
+/// allowing a single module to dispatch to different implementations. The `config` is the raw
+/// configuration bytes. Returning `None` causes Envoy to reject the AI filter configuration.
+pub type NewAiFilterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn ai_filter::AiFilterConfig>>;
+
+/// The global factory function for AI filter configurations. This is set via the `ai_filter:` arm
+/// of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_AI_FILTER_CONFIG_FUNCTION: OnceLock<NewAiFilterConfigFunction> = OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module

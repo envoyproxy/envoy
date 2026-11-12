@@ -16,6 +16,7 @@ package(default_visibility = [
     "//test/extensions/filters/http/aws_request_signing:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
+    "//test/extensions/http/ai_filters/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/resource_monitors/dynamic_modules:__pkg__",
@@ -109,6 +110,8 @@ test_program(name = "transport_socket_splice")
 test_program(name = "early_header_mutation_integration_test")
 
 test_program(name = "header_formatter_integration_test")
+
+test_program(name = "ai_filter_integration_test")
 
 test_program(name = "config_validator_test")
 
