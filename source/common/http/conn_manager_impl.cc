@@ -421,6 +421,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   stream.state_.waiting_for_vhds_ = false;
+  stream.state_.deferred_to_next_io_iteration_ = false;
   stream.vhds_update_callback_.reset();
   if (!stream.state_.is_internally_destroyed_) {
     ++closed_non_internally_destroyed_requests_;
@@ -2113,9 +2114,10 @@ std::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream:
 }
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
-  if (state_.waiting_for_vhds_) {
+  if (state_.waiting_for_vhds_ || state_.deferred_to_next_io_iteration_) {
     filter_manager_.abortDecoderFilterChain();
     state_.waiting_for_vhds_ = false;
+    state_.deferred_to_next_io_iteration_ = false;
     vhds_update_callback_.reset();
   }
   // The BadRequest error code indicates there has been a messaging error.
@@ -2839,6 +2841,7 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
 
 void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
   state_.waiting_for_vhds_ = false;
+  state_.deferred_to_next_io_iteration_ = false;
   vhds_update_callback_.reset();
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
@@ -2907,6 +2910,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChainAndTraceRequest() {
       // contains a smuggled HTTP request.
       filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+      filter_manager_.abortDecoderFilterChain();
       sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return false;
@@ -2932,7 +2936,6 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
 
   state_.waiting_for_vhds_ = false;
   vhds_update_callback_.reset();
-  response_encoder_->getStream().readDisable(false);
 
   refreshRouteConfigSnapshot();
   clearRouteCache();
@@ -2941,6 +2944,8 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
   if (!createFilterChainAndTraceRequest()) {
     return;
   }
+
+  response_encoder_->getStream().readDisable(false);
 
   state_.deferred_to_next_io_iteration_ = true;
   if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
