@@ -2116,6 +2116,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     bool eager_init = !deferred_vhost_enabled || requiresMainThreadInit(virtual_host_config);
     if (!eager_init && requiresProbeValidation(virtual_host_config, global_route_config,
                                                validate_clusters, factory_context)) {
+      // Configuration may need validation on the main thread, which would exclude this VirtualHost
+      // from deferred initialization.
       IsolatedValidationContext validation_context(factory_context);
       ScopedValidationServerContext scoped_server_context(validation_context);
       auto isolated_vhost_scope = validation_context.scope().scopeFromStatName(Stats::StatName());
@@ -2130,15 +2132,16 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       eager_init = validation_context.requiresMainThreadInit();
     }
 
-    if (!eager_init) {
-      domain_entry.initDeferred(Protobuf::Arena::Create<envoy::config::route::v3::VirtualHost>(
-          &deferred_proto_arena_, std::as_const(virtual_host_config)));
-    } else {
+    if (eager_init) {
       VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
           virtual_host_config, global_route_config, factory_context, vhost_scope_, validator,
           init_manager, validate_clusters, creation_status);
       SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
       domain_entry.initEager(std::move(virtual_host));
+    } else {
+      // The VirtualHostImpl will be instantiated on first use.
+      domain_entry.initDeferred(Protobuf::Arena::Create<envoy::config::route::v3::VirtualHost>(
+          &deferred_proto_arena_, std::as_const(virtual_host_config)));
     }
 
     for (const std::string& domain_name : virtual_host_config.domains()) {
@@ -2172,6 +2175,43 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       }
     }
   }
+}
+
+VirtualHostImplConstSharedPtr
+RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
+  // Fast path the case where we only have a default virtual host.
+  if (hasOnlyDefaultVirtualHost()) {
+    return default_domain_entry_ != nullptr
+               ? default_domain_entry_->getOrCreateVirtualHost(global_route_config_,
+                                                               factory_context_, vhost_scope_)
+               : nullptr;
+  }
+
+  absl::string_view host_header_value;
+  if (!vhost_header_.get().empty()) {
+    auto result = headers.get(vhost_header_);
+    // If using an alternate header, it must not be empty.
+    if (result.empty()) {
+      return nullptr;
+    }
+    host_header_value = result[0]->value().getStringView();
+  } else {
+    // There may be no authority in early reply paths in the HTTP connection manager.
+    if (headers.Host() == nullptr) {
+      return nullptr;
+    }
+    host_header_value = headers.getHostValue();
+  }
+
+  return findVirtualHost(host_header_value);
+}
+
+VirtualHostImplConstSharedPtr RouteMatcher::findVirtualHost(absl::string_view host) const {
+  const DomainEntry* entry = findDomainEntry(host);
+  if (entry == nullptr) {
+    return nullptr;
+  }
+  return entry->getOrCreateVirtualHost(global_route_config_, factory_context_, vhost_scope_);
 }
 
 const DomainEntry* RouteMatcher::findDomainEntry(absl::string_view host) const {
@@ -2221,43 +2261,6 @@ const DomainEntry* RouteMatcher::findDomainEntry(absl::string_view host) const {
     }
   }
   return default_domain_entry_;
-}
-
-VirtualHostImplConstSharedPtr
-RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
-  // Fast path the case where we only have a default virtual host.
-  if (hasOnlyDefaultVirtualHost()) {
-    return default_domain_entry_ != nullptr
-               ? default_domain_entry_->getOrCreateVirtualHost(global_route_config_,
-                                                               factory_context_, vhost_scope_)
-               : nullptr;
-  }
-
-  absl::string_view host_header_value;
-  if (!vhost_header_.get().empty()) {
-    auto result = headers.get(vhost_header_);
-    // If using an alternate header, it must not be empty.
-    if (result.empty()) {
-      return nullptr;
-    }
-    host_header_value = result[0]->value().getStringView();
-  } else {
-    // There may be no authority in early reply paths in the HTTP connection manager.
-    if (headers.Host() == nullptr) {
-      return nullptr;
-    }
-    host_header_value = headers.getHostValue();
-  }
-
-  return findVirtualHost(host_header_value);
-}
-
-VirtualHostImplConstSharedPtr RouteMatcher::findVirtualHost(absl::string_view host) const {
-  const DomainEntry* entry = findDomainEntry(host);
-  if (entry == nullptr) {
-    return nullptr;
-  }
-  return entry->getOrCreateVirtualHost(global_route_config_, factory_context_, vhost_scope_);
 }
 
 VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
