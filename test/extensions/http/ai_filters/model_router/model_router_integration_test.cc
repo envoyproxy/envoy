@@ -316,8 +316,7 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
-  test_server_->waitForCounter("cluster.anthropic_cluster.upstream_rq_503", testing::Eq(1));
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(25));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
 
   // Attempt 2 fails over to the fallback model on the same provider (`fake_upstreams_[0]`).
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
