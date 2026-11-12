@@ -229,7 +229,14 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_host()
     _emsdk()
     _rules_fuzzing()
-    external_http_archive("proxy_wasm_rust_sdk")
+    external_http_archive(
+        name = "proxy_wasm_rust_sdk",
+        patch_args = ["-p1"],
+        # Declares the import module of the host functions, as proxy-wasm-rust-sdk 0.2.5 does
+        # (proxy-wasm/proxy-wasm-rust-sdk#365). Newer Rust no longer lets wasm targets link with
+        # undefined symbols, so without it every Rust wasm module fails to link.
+        patches = ["@envoy//bazel:proxy_wasm_rust_sdk.patch"],
+    )
     _cel_cpp()
     _perfetto()
     _rules_ruby()
