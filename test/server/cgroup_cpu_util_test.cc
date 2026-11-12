@@ -23,8 +23,8 @@ public:
     file_contents_[path] = contents;
   }
 
-  absl::StatusOr<std::string> fileReadToEnd(const std::string& path) override {
-    auto it = file_contents_.find(path);
+  absl::StatusOr<std::string> fileReadToEnd(absl::string_view path) override {
+    auto it = file_contents_.find(std::string(path));
     if (it != file_contents_.end()) {
       return it->second;
     }

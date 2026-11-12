@@ -168,7 +168,7 @@ public:
   /**
    * @return bool whether a file exists on disk and can be opened for read.
    */
-  virtual bool fileExists(const std::string& path) PURE;
+  virtual bool fileExists(absl::string_view path) PURE;
 
   /**
    * @return FileInfo containing information about the file, or an error status.
@@ -186,20 +186,20 @@ public:
   /**
    * @return bool whether a directory exists on disk and can be opened for read.
    */
-  virtual bool directoryExists(const std::string& path) PURE;
+  virtual bool directoryExists(absl::string_view path) PURE;
 
   /**
    * @return ssize_t the size in bytes of the specified file, or -1 if the file size
    *                 cannot be determined for any reason, including without limitation
    *                 the non-existence of the file.
    */
-  virtual ssize_t fileSize(const std::string& path) PURE;
+  virtual ssize_t fileSize(absl::string_view path) PURE;
 
   /**
    * @return full file content as a string or an error if the file can not be read.
    * Be aware, this is not most highly performing file reading method.
    */
-  virtual absl::StatusOr<std::string> fileReadToEnd(const std::string& path) PURE;
+  virtual absl::StatusOr<std::string> fileReadToEnd(absl::string_view path) PURE;
 
   /**
    * @path file path to split
@@ -217,7 +217,7 @@ public:
    * @param path some filesystem path.
    * @return is the path on the deny list?
    */
-  virtual bool illegalPath(const std::string& path) PURE;
+  virtual bool illegalPath(absl::string_view path) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
