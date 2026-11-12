@@ -311,8 +311,8 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
                 {"messages", {{{"role", "user"}, {"content", Question}}}},
             }));
 
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
