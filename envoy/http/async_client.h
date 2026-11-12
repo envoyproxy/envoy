@@ -402,13 +402,17 @@ public:
       upstream_override_host_ = host;
       return *this;
     }
+    StreamOptions& setProtocol(Http::Protocol p) {
+      protocol = p;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
              send_xff == src.send_xff && send_internal == src.send_internal &&
              parent_span_ == src.parent_span_ && child_span_name_ == src.child_span_name_ &&
-             sampled_ == src.sampled_;
+             sampled_ == src.sampled_ && protocol == src.protocol;
     }
 
     // The timeout supplies the stream timeout, measured since when the frame with
@@ -474,6 +478,11 @@ public:
 
     // Optional upstream override host for bypassing load balancer selection
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
+
+    // The protocol context for the stream. If set, this protocol will be reported
+    // in the stream info and used by upstream clusters (such as those using
+    // use_downstream_protocol_config).
+    std::optional<Http::Protocol> protocol;
   };
 
   /**
