@@ -231,6 +231,53 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
+TEST_P(FaultIntegrationTestAllProtocols, FaultAbortWithResponseHeaders) {
+  const std::string filter_config = R"EOF(
+name: fault
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+  abort:
+    http_status: 429
+    percentage:
+      numerator: 100
+    response_body: '{"error":"injected"}'
+    response_headers_to_add:
+    - header:
+        key: content-type
+        value: application/json
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    - header:
+        key: x-fault-abort
+        value: injected
+    - header:
+        key: x-fault-request-id
+        value: "%REQ(X-FAULT-REQUEST-ID)%"
+)EOF";
+
+  initializeFilter(filter_config);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-fault-request-id", "test-request"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
+  EXPECT_THAT(response->headers(),
+              ContainsHeader(Http::Headers::get().ContentType, "application/json"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().ContentLength,
+                                                  std::to_string(response->body().size())));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-fault-abort", "injected"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-fault-request-id", "test-request"));
+  EXPECT_EQ(R"({"error":"injected"})", response->body());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+}
+
 // Request abort controlled via header configuration and enable downstream server stats.
 TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableDownstreamServerStats) {
   initializeFilter(header_fault_config_);
@@ -440,6 +487,55 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestHttp2,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(FaultIntegrationTestHttp2, FaultAbortGrpcWithResponseHeaders) {
+  const std::string filter_config = R"EOF(
+name: fault
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+  abort:
+    grpc_status: 5
+    percentage:
+      numerator: 100
+    response_body: injected
+    response_headers_to_add:
+    - header:
+        key: content-type
+        value: application/json
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    - header:
+        key: content-length
+        value: "999"
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    - header:
+        key: x-fault-abort
+        value: injected
+)EOF";
+
+  initializeFilter(filter_config);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test.Service/Call"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/grpc"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(),
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().GrpcStatus, "5"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().GrpcMessage, "injected"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-fault-abort", "injected"));
+  EXPECT_EQ(nullptr, response->headers().ContentLength());
+  EXPECT_TRUE(response->body().empty());
+  EXPECT_EQ(nullptr, response->trailers());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+}
 
 // Rate limiting with trailers received after the body has been flushed.
 TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
