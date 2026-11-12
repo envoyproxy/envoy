@@ -96,6 +96,16 @@ def _get(url, token=None, timeout=300):
             time.sleep(wait)
 
 
+def rate_limit(token):
+    # What is left of the token's GitHub API budget, which is shared with the repo's other
+    # workflows.
+    try:
+        core = json.loads(_get(f"{GITHUB_API}/rate_limit", token))["resources"]["core"]
+        return f"{core['remaining']} of {core['limit']} requests left"
+    except (urllib.error.URLError, ValueError, KeyError) as e:
+        return f"unknown ({e})"
+
+
 def _github(path, token, key):
     items, page = [], 1
     while True:
@@ -380,6 +390,7 @@ def main():
     if args.until:
         until = datetime.datetime.fromisoformat(args.until.replace("Z", "+00:00"))
 
+    print(f"GitHub API: {rate_limit(token)}")
     runs = {}
     start = since
     while start < until:
@@ -479,6 +490,7 @@ def main():
 
     summary = ", ".join(f"{k}: {v}" for k, v in totals.items())
     print(summary)
+    print(f"GitHub API: {rate_limit(token)}")
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
             f.write(f"### JUnit collected from EngFlow\n\n{len(runs)} runs; {summary}\n")
