@@ -927,6 +927,7 @@ routes:
       Config::TestTypeUrl::get().VirtualHost, {dynamic_vhost}, {}, "1", vhds_stream_.get());
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                            vhds_stream_.get()));
+  test_server_->waitForWorkerThreads();
 
   Http::TestRequestHeaderMapImpl dynamic_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};

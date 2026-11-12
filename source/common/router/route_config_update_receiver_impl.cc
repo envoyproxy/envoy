@@ -166,10 +166,12 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     // The new subscription holds none of the aliases the old one requested, so nothing
     // guarantees pushes for them any more.
     requested_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
     requested_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
