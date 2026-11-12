@@ -68,7 +68,6 @@ envoy_cc_test_library(
         "//source/extensions/formatter/cel:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
-        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -80,6 +79,42 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "deferred_virtual_host_test",
+    srcs = ["deferred_virtual_host_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    rbe_pool = {"build": "linux_x64_small"},
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/server:filter_config_interface",
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/router:config_lib",
+        "//source/extensions/formatter/cel:config",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 

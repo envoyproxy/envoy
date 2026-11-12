@@ -31,7 +31,6 @@
 #include "google/protobuf/util/time_util.h"
 #include "google/protobuf/util/type_resolver.h"
 #include "google/protobuf/util/type_resolver_util.h"
-#include "google/protobuf/wire_format_lite.h"
 #include "google/protobuf/wrappers.pb.h"
 
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
@@ -109,7 +108,6 @@ using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-us
 using ::google::protobuf::Value;                        // NOLINT(misc-unused-using-decls)
 
 using Message = ::google::protobuf::MessageLite;
-using MessageLite = ::google::protobuf::MessageLite;
 
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
 using uint32 = uint32_t;

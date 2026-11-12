@@ -159,16 +159,17 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
           factory_context.initManager());
       if (common_config_or_error.ok()) {
         auto global_config = common_config_or_error.value();
-        auto vhost_scope = factory_context.scope().scopeFromStatName(
-            factory_context.routerContext().virtualClusterStatNames().vhost_);
+        auto vhost_scope = factory_context.scope().scopeFromStatName(Stats::StatName());
+        const bool validate_clusters =
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(cleaned_route_config, validate_clusters, true);
         for (const auto& vhost_proto : cleaned_route_config.virtual_hosts()) {
-          const bool probe_required = requiresProbeValidation(
-              vhost_proto, global_config, /*validate_clusters=*/true, factory_context);
+          const bool probe_required = requiresProbeValidation(vhost_proto, global_config,
+                                                              validate_clusters, factory_context);
           if (!probe_required) {
             absl::Status vhost_status = absl::OkStatus();
-            VirtualHostImpl direct_vhost(vhost_proto, global_config, factory_context, *vhost_scope,
+            VirtualHostImpl direct_vhost(vhost_proto, global_config, factory_context, vhost_scope,
                                          ProtobufMessage::getNullValidationVisitor(),
-                                         factory_context.initManager(), /*validate_clusters=*/true,
+                                         factory_context.initManager(), validate_clusters,
                                          vhost_status);
             FUZZ_ASSERT(vhost_status.ok());
           }
@@ -192,18 +193,27 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     // routing.
     factory_context.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
         true);
+    struct ScopedDeferredCreationReset {
+      Server::Configuration::MockServerFactoryContext& ctx;
+      ~ScopedDeferredCreationReset() {
+        ctx.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(false);
+      }
+    } reset_deferred{factory_context};
+
     std::shared_ptr<ConfigImpl> deferred_config =
         THROW_OR_RETURN_VALUE(ConfigImpl::create(cleaned_route_config, factory_context,
                                                  ProtobufMessage::getNullValidationVisitor(),
                                                  factory_context.initManager(), true),
                               std::shared_ptr<ConfigImpl>);
-    auto deferred_route = deferred_config->route(headers, stream_info, input.random_value()).route;
+    auto deferred_headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
+    const Formatter::Context deferred_formatter_context{&deferred_headers};
+    auto deferred_route =
+        deferred_config->route(deferred_headers, stream_info, input.random_value()).route;
+    FUZZ_ASSERT((route == nullptr) == (deferred_route == nullptr));
     if (deferred_route != nullptr && deferred_route->routeEntry() != nullptr) {
-      deferred_route->routeEntry()->finalizeRequestHeaders(headers, formatter_context, stream_info,
-                                                           true);
+      deferred_route->routeEntry()->finalizeRequestHeaders(
+          deferred_headers, deferred_formatter_context, stream_info, true);
     }
-    factory_context.bootstrap_.mutable_route_manager()->set_enable_deferred_virtual_host_creation(
-        false);
 
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

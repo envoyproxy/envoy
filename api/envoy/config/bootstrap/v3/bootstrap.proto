@@ -145,14 +145,9 @@ message Bootstrap {
   }
 
   message RouteManager {
-    // Enables In-Memory Route and Virtual Host Deferral (VirtualHost Initialization Objects).
+    // Enables deferred in-memory virtual host and route instantiation until a request matches the
+    // virtual host's domain.
     bool enable_deferred_virtual_host_creation = 1;
-
-    // Maximum idle duration before an instantiated virtual host is reclaimed.
-    google.protobuf.Duration virtual_host_idle_ttl = 2;
-
-    // Optional cap on total concurrently inflated virtual hosts.
-    google.protobuf.UInt32Value max_inflated_virtual_hosts = 3;
   }
 
   reserved 10, 11;
