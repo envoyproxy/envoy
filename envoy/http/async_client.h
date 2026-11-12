@@ -94,7 +94,7 @@ public:
     /**
      * @return the context set in the options of the request, if any.
      */
-    virtual OptRef<RequestContext> context() const PURE;
+    virtual OptRef<RequestContext> context() const { return {}; }
   };
 
   /**
