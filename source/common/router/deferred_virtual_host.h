@@ -26,6 +26,59 @@ class VirtualHostImpl;
 using VirtualHostImplConstSharedPtr = std::shared_ptr<const VirtualHostImpl>;
 
 /**
+ * Represents a virtual host slot in RouteMatcher, managing either an eagerly constructed
+ * VirtualHostImpl or a dormant arena-owned VirtualHost proto inflated on first request match.
+ *
+ * Ownership is returned by VirtualHostImplConstSharedPtr and dormant protos remain live in
+ * RouteMatcher's arena for the lifetime of the RouteMatcher so that future idle eviction can reset
+ * active_vhost_ and re-inflate on demand without risking use-after-free on in-flight requests.
+ *
+ * This is a VirtualHost analogue of the ClusterInitializationObject used for deferred Cluster
+ * initialization.
+ */
+class DomainEntry : Logger::Loggable<Logger::Id::router> {
+public:
+  DomainEntry() = default;
+  ~DomainEntry();
+
+  DomainEntry(const DomainEntry&) = delete;
+  DomainEntry& operator=(const DomainEntry&) = delete;
+
+  void initEager(VirtualHostImplConstSharedPtr vhost);
+  void initDeferred(const envoy::config::route::v3::VirtualHost* vhost_proto);
+
+  VirtualHostImplConstSharedPtr
+  getOrCreateVirtualHost(const CommonConfigSharedPtr& global_route_config,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         const Stats::ScopeSharedPtr& vhost_scope) const {
+    if (deferred_vhost_proto_ == nullptr || is_inflated_.load(std::memory_order_acquire)) {
+      return active_vhost_;
+    }
+    return inflateVirtualHost(global_route_config, factory_context, vhost_scope);
+  }
+
+  VirtualHostImplConstSharedPtr activeVirtualHost() const {
+    if (deferred_vhost_proto_ == nullptr || is_inflated_.load(std::memory_order_acquire)) {
+      return active_vhost_;
+    }
+    return nullptr;
+  }
+
+  bool isDeferred() const { return deferred_vhost_proto_ != nullptr; }
+
+private:
+  VirtualHostImplConstSharedPtr
+  inflateVirtualHost(const CommonConfigSharedPtr& global_route_config,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     const Stats::ScopeSharedPtr& vhost_scope) const;
+
+  const envoy::config::route::v3::VirtualHost* deferred_vhost_proto_{nullptr};
+  mutable absl::Mutex init_mutex_;
+  mutable std::atomic<bool> is_inflated_{false};
+  mutable VirtualHostImplConstSharedPtr active_vhost_;
+};
+
+/**
  * Isolated validation context used to probe-validate virtual hosts and their route structures on
  * the main thread at configuration ingestion time without polluting server stats/singletons/TLS
  * slots or registering orphaned targets on the RDS warming Init::Manager.
@@ -264,56 +317,6 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
                              const CommonConfigSharedPtr& global_route_config,
                              bool validate_clusters,
                              Server::Configuration::ServerFactoryContext& factory_context);
-
-/**
- * Represents a virtual host slot in RouteMatcher, managing either an eagerly constructed
- * VirtualHostImpl or a dormant arena-owned VirtualHost proto inflated on first request match.
- *
- * Ownership is returned by VirtualHostImplConstSharedPtr and dormant protos remain live in
- * RouteMatcher's arena for the lifetime of the RouteMatcher so that future idle eviction can reset
- * active_vhost_ and re-inflate on demand without risking use-after-free on in-flight requests.
- */
-class DomainEntry : Logger::Loggable<Logger::Id::router> {
-public:
-  DomainEntry() = default;
-  ~DomainEntry();
-
-  DomainEntry(const DomainEntry&) = delete;
-  DomainEntry& operator=(const DomainEntry&) = delete;
-
-  void initEager(VirtualHostImplConstSharedPtr vhost);
-  void initDeferred(const envoy::config::route::v3::VirtualHost* vhost_proto);
-
-  VirtualHostImplConstSharedPtr
-  getOrCreateVirtualHost(const CommonConfigSharedPtr& global_route_config,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         const Stats::ScopeSharedPtr& vhost_scope) const {
-    if (deferred_vhost_proto_ == nullptr || is_inflated_.load(std::memory_order_acquire)) {
-      return active_vhost_;
-    }
-    return inflateVirtualHost(global_route_config, factory_context, vhost_scope);
-  }
-
-  VirtualHostImplConstSharedPtr activeVirtualHost() const {
-    if (deferred_vhost_proto_ == nullptr || is_inflated_.load(std::memory_order_acquire)) {
-      return active_vhost_;
-    }
-    return nullptr;
-  }
-
-  bool isDeferred() const { return deferred_vhost_proto_ != nullptr; }
-
-private:
-  VirtualHostImplConstSharedPtr
-  inflateVirtualHost(const CommonConfigSharedPtr& global_route_config,
-                     Server::Configuration::ServerFactoryContext& factory_context,
-                     const Stats::ScopeSharedPtr& vhost_scope) const;
-
-  const envoy::config::route::v3::VirtualHost* deferred_vhost_proto_{nullptr};
-  mutable absl::Mutex init_mutex_;
-  mutable std::atomic<bool> is_inflated_{false};
-  mutable VirtualHostImplConstSharedPtr active_vhost_;
-};
 
 } // namespace Router
 } // namespace Envoy

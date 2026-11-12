@@ -332,6 +332,56 @@ bool matcherRequiresMainThreadInit(const xds::type::matcher::v3::Matcher& matche
 
 } // namespace
 
+DomainEntry::~DomainEntry() = default;
+
+void DomainEntry::initEager(VirtualHostImplConstSharedPtr vhost) {
+  active_vhost_ = std::move(vhost);
+  is_inflated_.store(true, std::memory_order_relaxed);
+}
+
+void DomainEntry::initDeferred(const envoy::config::route::v3::VirtualHost* vhost_proto) {
+  deferred_vhost_proto_ = vhost_proto;
+}
+
+VirtualHostImplConstSharedPtr
+DomainEntry::inflateVirtualHost(const CommonConfigSharedPtr& global_route_config,
+                                Server::Configuration::ServerFactoryContext& factory_context,
+                                const Stats::ScopeSharedPtr& vhost_scope) const {
+  if (deferred_vhost_proto_ == nullptr) {
+    return nullptr;
+  }
+
+  absl::MutexLock lock(init_mutex_);
+  if (is_inflated_.load(std::memory_order_relaxed)) {
+    return active_vhost_;
+  }
+
+  struct ScopedWorkerContext {
+    ScopedWorkerContext(Server::Configuration::ServerFactoryContext& parent,
+                        Stats::ScopeSharedPtr vhost_scope)
+        : context(parent), scope(std::move(vhost_scope)) {}
+    WorkerSafeFactoryContext context;
+    Stats::ScopeSharedPtr scope;
+  };
+  auto worker_ctx = std::make_shared<ScopedWorkerContext>(factory_context, vhost_scope);
+  Stats::ScopeSharedPtr aliased_scope(worker_ctx, worker_ctx->scope.get());
+
+  absl::Status creation_status = absl::OkStatus();
+  auto vhost = std::make_shared<VirtualHostImpl>(
+      *deferred_vhost_proto_, global_route_config, worker_ctx->context, std::move(aliased_scope),
+      ProtobufMessage::getNullValidationVisitor(), worker_ctx->context.initManager(),
+      /*validate_clusters=*/false, creation_status);
+  if (!creation_status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}",
+              deferred_vhost_proto_->name(), creation_status.message());
+    return nullptr;
+  }
+
+  active_vhost_ = std::move(vhost);
+  is_inflated_.store(true, std::memory_order_release);
+  return active_vhost_;
+}
+
 IsolatedValidationContext::IsolatedValidationContext(
     Server::Configuration::ServerFactoryContext& parent_context)
     : parent_context_(parent_context), isolated_store_(parent_context.scope().symbolTable()),
@@ -509,56 +559,6 @@ bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_
   }
 
   return false;
-}
-
-DomainEntry::~DomainEntry() = default;
-
-void DomainEntry::initEager(VirtualHostImplConstSharedPtr vhost) {
-  active_vhost_ = std::move(vhost);
-  is_inflated_.store(true, std::memory_order_relaxed);
-}
-
-void DomainEntry::initDeferred(const envoy::config::route::v3::VirtualHost* vhost_proto) {
-  deferred_vhost_proto_ = vhost_proto;
-}
-
-VirtualHostImplConstSharedPtr
-DomainEntry::inflateVirtualHost(const CommonConfigSharedPtr& global_route_config,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                const Stats::ScopeSharedPtr& vhost_scope) const {
-  if (deferred_vhost_proto_ == nullptr) {
-    return nullptr;
-  }
-
-  absl::MutexLock lock(init_mutex_);
-  if (is_inflated_.load(std::memory_order_relaxed)) {
-    return active_vhost_;
-  }
-
-  struct ScopedWorkerContext {
-    ScopedWorkerContext(Server::Configuration::ServerFactoryContext& parent,
-                        Stats::ScopeSharedPtr vhost_scope)
-        : context(parent), scope(std::move(vhost_scope)) {}
-    WorkerSafeFactoryContext context;
-    Stats::ScopeSharedPtr scope;
-  };
-  auto worker_ctx = std::make_shared<ScopedWorkerContext>(factory_context, vhost_scope);
-  Stats::ScopeSharedPtr aliased_scope(worker_ctx, worker_ctx->scope.get());
-
-  absl::Status creation_status = absl::OkStatus();
-  auto vhost = std::make_shared<VirtualHostImpl>(
-      *deferred_vhost_proto_, global_route_config, worker_ctx->context, std::move(aliased_scope),
-      ProtobufMessage::getNullValidationVisitor(), worker_ctx->context.initManager(),
-      /*validate_clusters=*/false, creation_status);
-  if (!creation_status.ok()) {
-    ENVOY_LOG(error, "Failed to initialize deferred virtual host '{}': {}",
-              deferred_vhost_proto_->name(), creation_status.message());
-    return nullptr;
-  }
-
-  active_vhost_ = std::move(vhost);
-  is_inflated_.store(true, std::memory_order_release);
-  return active_vhost_;
 }
 
 } // namespace Router
