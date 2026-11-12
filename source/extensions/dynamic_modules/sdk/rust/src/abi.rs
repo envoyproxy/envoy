@@ -729,6 +729,96 @@ pub enum envoy_dynamic_module_type_socket_direction {
     Upstream = 0,
     Downstream = 1,
 }
+#[repr(u32)]
+/** envoy_dynamic_module_type_access_log_type represents the type of access log event.
+ This corresponds to envoy::data::accesslog::v3::AccessLogType, except that modules see
+ TcpConnectionStart as NotSet.*/
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_access_log_type {
+    NotSet = 0,
+    TcpUpstreamConnected = 1,
+    TcpPeriodic = 2,
+    TcpConnectionEnd = 3,
+    DownstreamStart = 4,
+    DownstreamPeriodic = 5,
+    DownstreamEnd = 6,
+    UpstreamPoolReady = 7,
+    UpstreamPeriodic = 8,
+    UpstreamEnd = 9,
+    DownstreamTunnelSuccessfullyEstablished = 10,
+    UdpTunnelUpstreamConnected = 11,
+    UdpPeriodic = 12,
+    UdpSessionEnd = 13,
+}
+#[repr(u32)]
+/** envoy_dynamic_module_type_response_flag represents a response flag from StreamInfo.
+ Values correspond to CoreResponseFlag enum.*/
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    strum_macros::FromRepr,
+    strum_macros::VariantArray
+)]
+pub enum envoy_dynamic_module_type_response_flag {
+    FailedLocalHealthCheck = 0,
+    NoHealthyUpstream = 1,
+    UpstreamRequestTimeout = 2,
+    LocalReset = 3,
+    UpstreamRemoteReset = 4,
+    UpstreamConnectionFailure = 5,
+    UpstreamConnectionTermination = 6,
+    UpstreamOverflow = 7,
+    NoRouteFound = 8,
+    DelayInjected = 9,
+    FaultInjected = 10,
+    RateLimited = 11,
+    UnauthorizedExternalService = 12,
+    RateLimitServiceError = 13,
+    DownstreamConnectionTermination = 14,
+    UpstreamRetryLimitExceeded = 15,
+    StreamIdleTimeout = 16,
+    InvalidEnvoyRequestHeaders = 17,
+    DownstreamProtocolError = 18,
+    UpstreamMaxStreamDurationReached = 19,
+    ResponseFromCacheFilter = 20,
+    NoFilterConfigFound = 21,
+    DurationTimeout = 22,
+    UpstreamProtocolError = 23,
+    NoClusterFound = 24,
+    OverloadManager = 25,
+    DnsResolutionFailed = 26,
+    DropOverLoad = 27,
+    DownstreamRemoteReset = 28,
+    UnconditionalDropOverload = 29,
+}
+#[repr(u32)]
+/** envoy_dynamic_module_type_detected_close_type represents how a connection was closed.
+ This corresponds to `StreamInfo::DetectedCloseType` in envoy/stream_info/stream_info.h.*/
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_detected_close_type {
+    Normal = 0,
+    LocalReset = 1,
+    RemoteReset = 2,
+}
+#[repr(u32)]
+/** envoy_dynamic_module_type_upstream_timing_event represents an event of a connection to the
+ upstream. In their declared order, the events set the fields of `StreamInfo::UpstreamTiming` in
+ envoy/stream_info/stream_info.h that the access log time points US_CX_BEG, US_CX_END, US_HS_END,
+ US_TX_BEG, US_TX_END, US_RX_BEG and US_RX_END read.*/
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_upstream_timing_event {
+    ConnectStart = 0,
+    ConnectComplete = 1,
+    HandshakeComplete = 2,
+    FirstByteSent = 3,
+    LastByteSent = 4,
+    FirstByteReceived = 5,
+    LastByteReceived = 6,
+}
 /** envoy_dynamic_module_type_load_shed_point_envoy_ptr is a raw pointer to a load shed point of the
  overload manager in Envoy, which corresponds to Server::LoadShedPoint. It is returned by
  envoy_dynamic_module_callback_http_filter_config_get_load_shed_point and its network, listener
@@ -5659,6 +5749,212 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_host is called by the module to set
+ the upstream host of the connection to the given address, as a host of the given cluster.
+
+ Envoy sets the host on the read filter callbacks, which the upstream host getters read, and on
+ the stream info together with the upstream remote address and the upstream cluster. It also adds
+ the host to the upstream hosts attempted, so the module calls this once for each attempt. A host
+ of the cluster with the same address is reused with its hostname and metadata. Otherwise Envoy
+ creates a host without a hostname, which counts toward the transport socket match statistics of
+ the cluster. The hosts of the cluster are not changed.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param cluster_name is the name of the cluster. The buffer is owned by the module.
+ @param address is the IP address of the host, without brackets for IPv6. The buffer is owned by
+ the module.
+ @param port is the port of the host.
+ @return true if the upstream host was set, false if the cluster does not exist, the address is
+ not a valid IP address or the port is above 65535.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_host(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        cluster_name: envoy_dynamic_module_type_module_buffer,
+        address: envoy_dynamic_module_type_module_buffer,
+        port: u32,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_cluster is called by the module to set
+ the upstream cluster of the connection, for example when no host of the cluster was available.
+ envoy_dynamic_module_callback_network_filter_set_upstream_host sets it as well.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param cluster_name is the name of the cluster. The buffer is owned by the module.
+ @return true if the upstream cluster was set, false if the cluster does not exist.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_cluster(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        cluster_name: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_local_address is called by the module
+ to set the local address of its connection to the upstream.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param address is the local IP address, without brackets for IPv6. The buffer is owned by the
+ module.
+ @param port is the local port.
+ @return true if the local address was set, false if the address is not a valid IP address or the
+ port is above 65535.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        address: envoy_dynamic_module_type_module_buffer,
+        port: u32,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason is called by
+ the module to set why its connection to the upstream failed, such as a failed TLS handshake.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param reason is the reason owned by the module. Its pointer may be null only when its length is
+ zero.
+ @return true if the reason was set, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        reason: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason is called by the
+ module to set why it closed its connection to the upstream.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param reason is the reason owned by the module. Its pointer may be null only when its length is
+ zero.
+ @return true if the reason was set, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        reason: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type is called by the
+ module to set how its connection to the upstream was closed.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param close_type is how the connection was closed.
+ @return true if the close type was set, false if it is not a known close type.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        close_type: envoy_dynamic_module_type_detected_close_type,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count is called by the
+ module to set how many times it tried to connect to the upstream.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param attempt_count is the number of attempts.
+ @return true if the attempt count was set, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        attempt_count: u32,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_record_upstream_timing is called by the module to
+ record that an event of its connection to the upstream happened now. A later record of an event
+ replaces the earlier one.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param event is the event that happened.
+ @return true if the event was recorded, false if it is not a known event.*/
+    pub fn envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        event: envoy_dynamic_module_type_upstream_timing_event,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes is called by the module to
+ add to the upstream wire bytes of the connection. The module reports the payload bytes without
+ transport overhead such as TLS, as the TCP proxy counts them, and reports them as they move, so
+ that periodic access logs see them.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param bytes_received is the number of bytes received from the upstream.
+ @param bytes_sent is the number of bytes sent to the upstream.
+ @return true if the bytes were added, false if the connection has no upstream bytes meter.*/
+    pub fn envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        bytes_received: u64,
+        bytes_sent: u64,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes is called by the module
+ to add to the downstream wire bytes of the connection, and creates its downstream bytes meter if
+ there is none. The module reports the bytes it reads from and writes to the downstream, as the
+ TCP proxy counts them, and reports them as they move, so that periodic access logs see them.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param bytes_received is the number of bytes received from the downstream.
+ @param bytes_sent is the number of bytes sent to the downstream.
+ @return true if the bytes were added, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        bytes_received: u64,
+        bytes_sent: u64,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_set_response_flag is called by the module to set a
+ response flag of the connection, such as UpstreamConnectionFailure when it could not connect to
+ the upstream.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param flag is the response flag to set.
+ @return true if the flag was set, false if it is not a known flag.*/
+    pub fn envoy_dynamic_module_callback_network_filter_set_response_flag(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        flag: envoy_dynamic_module_type_response_flag,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_add_custom_flag is called by the module to add a
+ custom flag that marks a noteworthy event of the connection. Multiple flags are joined with
+ commas.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param flag is the flag owned by the module. It must not be empty, contain whitespace or be the
+ short name of a response flag.
+ @return true if the flag was added, false if it is not a valid flag.*/
+    pub fn envoy_dynamic_module_callback_network_filter_add_custom_flag(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        flag: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_network_filter_flush_access_log is called by the module to flush
+ the access logs configured on the filter, using the given access log type, for example
+ TcpUpstreamConnected once it has connected to the upstream. The access loggers run before this
+ returns, including a dynamic module access logger configured on the filter. A TcpPeriodic flush
+ also snapshots the bytes meters, like the flushes at access_log_flush_interval.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ @param access_log_type is the access log type, TcpUpstreamConnected or TcpPeriodic.
+ @return true if the type is TcpUpstreamConnected or TcpPeriodic, even when the filter has no
+ access logs, false if the type is another one or the call is made before
+ envoy_dynamic_module_on_network_filter_new_connection.*/
+    pub fn envoy_dynamic_module_callback_network_filter_flush_access_log(
+        filter_envoy_ptr: envoy_dynamic_module_type_network_filter_envoy_ptr,
+        access_log_type: envoy_dynamic_module_type_access_log_type,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport is called by the
  module to convert the downstream connection from non-secure to secure mode (StartTLS).
 
@@ -7870,71 +8166,6 @@ pub type envoy_dynamic_module_type_access_logger_envoy_ptr = *mut ::std::os::raw
 
  OWNERSHIP: The module is responsible for managing the lifetime of the pointer.*/
 pub type envoy_dynamic_module_type_access_logger_module_ptr = *const ::std::os::raw::c_void;
-#[repr(u32)]
-/** envoy_dynamic_module_type_access_log_type represents the type of access log event.
- This corresponds to envoy::data::accesslog::v3::AccessLogType.*/
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub enum envoy_dynamic_module_type_access_log_type {
-    NotSet = 0,
-    TcpUpstreamConnected = 1,
-    TcpPeriodic = 2,
-    TcpConnectionEnd = 3,
-    DownstreamStart = 4,
-    DownstreamPeriodic = 5,
-    DownstreamEnd = 6,
-    UpstreamPoolReady = 7,
-    UpstreamPeriodic = 8,
-    UpstreamEnd = 9,
-    DownstreamTunnelSuccessfullyEstablished = 10,
-    UdpTunnelUpstreamConnected = 11,
-    UdpPeriodic = 12,
-    UdpSessionEnd = 13,
-}
-#[repr(u32)]
-/** envoy_dynamic_module_type_response_flag represents a response flag from StreamInfo.
- Values correspond to CoreResponseFlag enum.*/
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Hash,
-    PartialEq,
-    Eq,
-    strum_macros::FromRepr,
-    strum_macros::VariantArray
-)]
-pub enum envoy_dynamic_module_type_response_flag {
-    FailedLocalHealthCheck = 0,
-    NoHealthyUpstream = 1,
-    UpstreamRequestTimeout = 2,
-    LocalReset = 3,
-    UpstreamRemoteReset = 4,
-    UpstreamConnectionFailure = 5,
-    UpstreamConnectionTermination = 6,
-    UpstreamOverflow = 7,
-    NoRouteFound = 8,
-    DelayInjected = 9,
-    FaultInjected = 10,
-    RateLimited = 11,
-    UnauthorizedExternalService = 12,
-    RateLimitServiceError = 13,
-    DownstreamConnectionTermination = 14,
-    UpstreamRetryLimitExceeded = 15,
-    StreamIdleTimeout = 16,
-    InvalidEnvoyRequestHeaders = 17,
-    DownstreamProtocolError = 18,
-    UpstreamMaxStreamDurationReached = 19,
-    ResponseFromCacheFilter = 20,
-    NoFilterConfigFound = 21,
-    DurationTimeout = 22,
-    UpstreamProtocolError = 23,
-    NoClusterFound = 24,
-    OverloadManager = 25,
-    DnsResolutionFailed = 26,
-    DropOverLoad = 27,
-    DownstreamRemoteReset = 28,
-    UnconditionalDropOverload = 29,
-}
 /// envoy_dynamic_module_type_bytes_info contains byte count information.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]

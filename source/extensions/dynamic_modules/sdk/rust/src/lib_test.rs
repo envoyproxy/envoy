@@ -2613,6 +2613,287 @@ fn test_http_get_header_values_fast_path() {
 }
 
 // =============================================================================
+// Stream Info Reporting Tests
+// =============================================================================
+
+// The filter that test_stream_info_reporting reports for. The stubs fail the calls for any other
+// filter, so the test sees that each method passes its filter pointer.
+const REPORTING_FILTER: abi::envoy_dynamic_module_type_network_filter_envoy_ptr = 0x5e7 as *mut _;
+
+// Holds the reporting calls in order. Only test_stream_info_reporting makes them.
+static STUB_NETWORK_REPORTS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+// Records the call and returns whether it was made for REPORTING_FILTER.
+fn record_network_report(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  report: String,
+) -> bool {
+  let reporting_filter = filter_envoy_ptr == REPORTING_FILTER;
+  STUB_NETWORK_REPORTS.lock().unwrap().push(
+    if reporting_filter {
+      report
+    } else {
+      format!("{report} for another filter")
+    },
+  );
+  reporting_filter
+}
+
+// Only the cluster "compute" exists, so a test sees both the arguments and the result.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_host(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  address: abi::envoy_dynamic_module_type_module_buffer,
+  port: u32,
+) -> bool {
+  let cluster_name = module_buffer_to_string(cluster_name);
+  let cluster_exists = cluster_name == "compute";
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_host {cluster_name} {} {port}",
+      module_buffer_to_string(address)
+    ),
+  ) && cluster_exists
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_cluster(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let cluster_name = module_buffer_to_string(cluster_name);
+  let cluster_exists = cluster_name == "compute";
+  record_network_report(
+    filter_envoy_ptr,
+    format!("set_upstream_cluster {cluster_name}"),
+  ) && cluster_exists
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  address: abi::envoy_dynamic_module_type_module_buffer,
+  port: u32,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_local_address {} {port}",
+      module_buffer_to_string(address)
+    ),
+  ) && port <= 65535
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  reason: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_transport_failure_reason {}",
+      module_buffer_to_string(reason)
+    ),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  reason: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_local_close_reason {}",
+      module_buffer_to_string(reason)
+    ),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  close_type: abi::envoy_dynamic_module_type_detected_close_type,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("set_upstream_detected_close_type {close_type:?}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  attempt_count: u32,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("set_upstream_request_attempt_count {attempt_count}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  event: abi::envoy_dynamic_module_type_upstream_timing_event,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("record_upstream_timing {event:?}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  bytes_received: u64,
+  bytes_sent: u64,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("add_upstream_wire_bytes {bytes_received} {bytes_sent}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  bytes_received: u64,
+  bytes_sent: u64,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("add_downstream_wire_bytes {bytes_received} {bytes_sent}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_response_flag(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  flag: abi::envoy_dynamic_module_type_response_flag,
+) -> bool {
+  record_network_report(filter_envoy_ptr, format!("set_response_flag {flag:?}"))
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_add_custom_flag(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  flag: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let flag = module_buffer_to_string(flag);
+  let valid = !flag.is_empty();
+  record_network_report(filter_envoy_ptr, format!("add_custom_flag {flag}")) && valid
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_flush_access_log(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  access_log_type: abi::envoy_dynamic_module_type_access_log_type,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("flush_access_log {access_log_type:?}"),
+  ) && access_log_type == abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected
+}
+
+#[test]
+fn test_stream_info_reporting() {
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: REPORTING_FILTER,
+  };
+  assert!(filter.set_upstream_host("compute", "10.1.2.3", 5432));
+  assert!(!filter.set_upstream_host("missing", "10.1.2.3", 5432));
+  assert!(filter.set_upstream_cluster("compute"));
+  assert!(!filter.set_upstream_cluster("missing"));
+  assert!(filter.set_upstream_local_address("10.1.2.4", 65535));
+  assert!(!filter.set_upstream_local_address("10.1.2.4", 65536));
+  assert!(filter.set_upstream_transport_failure_reason("connection refused"));
+  assert!(filter.set_upstream_local_close_reason("idle timeout"));
+  assert!(filter.set_upstream_detected_close_type(
+    abi::envoy_dynamic_module_type_detected_close_type::RemoteReset
+  ));
+  assert!(filter.set_upstream_request_attempt_count(2));
+  assert!(filter
+    .record_upstream_timing(abi::envoy_dynamic_module_type_upstream_timing_event::FirstByteSent));
+  assert!(filter.add_upstream_wire_bytes(1, 2));
+  assert!(filter.add_downstream_wire_bytes(3, 4));
+  assert!(filter
+    .set_response_flag(abi::envoy_dynamic_module_type_response_flag::UpstreamConnectionFailure));
+  assert!(filter.add_custom_flag("retried"));
+  assert!(!filter.add_custom_flag(""));
+  assert!(
+    filter.flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected)
+  );
+  assert!(
+    !filter.flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpConnectionEnd)
+  );
+
+  // The stubs fail the calls for another filter, and the methods return what the stubs return.
+  let mut other_filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(!other_filter.set_upstream_host("compute", "10.1.2.3", 5432));
+  assert!(!other_filter.set_upstream_cluster("compute"));
+  assert!(!other_filter.set_upstream_local_address("10.1.2.4", 65535));
+  assert!(!other_filter.set_upstream_transport_failure_reason("connection refused"));
+  assert!(!other_filter.set_upstream_local_close_reason("idle timeout"));
+  assert!(!other_filter.set_upstream_detected_close_type(
+    abi::envoy_dynamic_module_type_detected_close_type::RemoteReset
+  ));
+  assert!(!other_filter.set_upstream_request_attempt_count(2));
+  assert!(!other_filter
+    .record_upstream_timing(abi::envoy_dynamic_module_type_upstream_timing_event::FirstByteSent));
+  assert!(!other_filter.add_upstream_wire_bytes(1, 2));
+  assert!(!other_filter.add_downstream_wire_bytes(3, 4));
+  assert!(!other_filter
+    .set_response_flag(abi::envoy_dynamic_module_type_response_flag::UpstreamConnectionFailure));
+  assert!(!other_filter.add_custom_flag("retried"));
+  assert!(!other_filter
+    .flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected));
+
+  assert_eq!(
+    *STUB_NETWORK_REPORTS.lock().unwrap(),
+    [
+      "set_upstream_host compute 10.1.2.3 5432",
+      "set_upstream_host missing 10.1.2.3 5432",
+      "set_upstream_cluster compute",
+      "set_upstream_cluster missing",
+      "set_upstream_local_address 10.1.2.4 65535",
+      "set_upstream_local_address 10.1.2.4 65536",
+      "set_upstream_transport_failure_reason connection refused",
+      "set_upstream_local_close_reason idle timeout",
+      "set_upstream_detected_close_type RemoteReset",
+      "set_upstream_request_attempt_count 2",
+      "record_upstream_timing FirstByteSent",
+      "add_upstream_wire_bytes 1 2",
+      "add_downstream_wire_bytes 3 4",
+      "set_response_flag UpstreamConnectionFailure",
+      "add_custom_flag retried",
+      "add_custom_flag ",
+      "flush_access_log TcpUpstreamConnected",
+      "flush_access_log TcpConnectionEnd",
+      "set_upstream_host compute 10.1.2.3 5432 for another filter",
+      "set_upstream_cluster compute for another filter",
+      "set_upstream_local_address 10.1.2.4 65535 for another filter",
+      "set_upstream_transport_failure_reason connection refused for another filter",
+      "set_upstream_local_close_reason idle timeout for another filter",
+      "set_upstream_detected_close_type RemoteReset for another filter",
+      "set_upstream_request_attempt_count 2 for another filter",
+      "record_upstream_timing FirstByteSent for another filter",
+      "add_upstream_wire_bytes 1 2 for another filter",
+      "add_downstream_wire_bytes 3 4 for another filter",
+      "set_response_flag UpstreamConnectionFailure for another filter",
+      "add_custom_flag retried for another filter",
+      "flush_access_log TcpUpstreamConnected for another filter",
+    ]
+  );
+}
+
+// =============================================================================
 // StartTLS Tests
 // =============================================================================
 
