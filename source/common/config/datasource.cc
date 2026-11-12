@@ -20,15 +20,15 @@ namespace DataSource {
  * @return std::string with file contents. or an error status if the file does not exist or
  * cannot be read.
  */
-absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
+absl::StatusOr<std::string> readFile(absl::string_view path, Api::Api& api, bool allow_empty,
                                      uint64_t max_size) {
   auto& file_system = api.fileSystem();
 
   if (max_size > 0) {
-    if (!file_system.fileExists(path)) {
+    if (!file_system.fileExists(std::string(path))) {
       return absl::InvalidArgumentError(fmt::format("file {} does not exist", path));
     }
-    const ssize_t size = file_system.fileSize(path);
+    const ssize_t size = file_system.fileSize(std::string(path));
     if (size < 0) {
       return absl::InvalidArgumentError(absl::StrCat("cannot determine size of file ", path));
     }
@@ -38,7 +38,7 @@ absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, boo
     }
   }
 
-  auto file_content_or_error = file_system.fileReadToEnd(path);
+  auto file_content_or_error = file_system.fileReadToEnd(std::string(path));
   RETURN_IF_NOT_OK_REF(file_content_or_error.status());
 
   if (!allow_empty && file_content_or_error.value().empty()) {
