@@ -14,10 +14,6 @@ envoy_package()
 envoy_extension_cc_test(
     name = "reverse_connection_cluster_test",
     srcs = ["reverse_connection_cluster_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [],
-    }),
     extension_names = ["envoy.clusters.reverse_connection"],
     rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],

@@ -109,25 +109,16 @@ envoy_cc_library(
     name = "matching_utils_lib",
     srcs = ["matching_utils.cc"],
     hdrs = ["matching_utils.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/protobuf",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@cel-cpp//eval/public:cel_expr_builder_factory",
-    ] + select(
-        {
-            "//bazel:windows_x86_64": [],
-            "//conditions:default": [
-                "@cel-cpp//parser",
-            ],
-        },
-    ),
+        "@cel-cpp//parser",
+    ],
 )
 
 envoy_cc_library(

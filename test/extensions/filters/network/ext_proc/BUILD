@@ -26,12 +26,9 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "matching_utils_test",
     srcs = ["matching_utils_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.network.ext_proc"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [

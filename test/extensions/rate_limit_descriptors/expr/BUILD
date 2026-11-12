@@ -14,12 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.rate_limit_descriptors.expr"],
     rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],

@@ -28,12 +28,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     # legacy test use
     extra_visibility = [
         "//test/common/access_log:__subpackages__",
@@ -49,13 +46,7 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/access_loggers/filters/cel/v3:pkg_cc_proto",
-    ] + select(
-        {
-            "//bazel:windows_x86_64": [],
-            "//conditions:default": [
-                "@cel-cpp//parser",
-            ],
-        },
-    ),
+    ],
 )
