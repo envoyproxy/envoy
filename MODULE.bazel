@@ -152,6 +152,13 @@ single_version_override(
     version = "3.5.9.bcr.1",
 )
 
+single_version_override(
+    module_name = "grpc-httpjson-transcoding",
+    patch_strip = 1,
+    patches = ["//bazel/external:grpc_httpjson_transcoding.patch"],
+    version = "0.0.0-20250507-a6e226f.envoy.1",
+)
+
 # testing/debugging
 # local_path_override(
 #     module_name = "envoy_toolshed",

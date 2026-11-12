@@ -1749,6 +1749,80 @@ TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, CreateShelfBodyWildcard) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
 }
 
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, ClientStreamingCollisionRejected) {
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":method", "POST"},
+                                                 {":path", "/bulk/shelves?shelf.id=123"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/bookstore.Bookstore/BulkCreateShelf", request_headers.get_(":path"));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{R"([{"id": 456, "theme": "Children"}])"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, CamelCaseJsonNameCollisionRejected) {
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":method", "PATCH"},
+                                                 {":path", "/authors/123?author.first_name=Leo"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/bookstore.Bookstore/UpdateAuthor", request_headers.get_(":path"));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{R"({"firstName": "Fyodor"})"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, DuplicateJsonKeysCollisionRejected) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfBodyWildcard", request_headers.get_(":path"));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{R"({"shelf": {"id": 123, "id": 456, "theme": "Children"}})"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, Int64TruncationCollisionRejected) {
+  // 4294967297 == (1LL << 32) + 1, which truncates to 1 modulo 2^32.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/4294967297"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfBodyWildcard", request_headers.get_(":path"));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{R"({"shelf": {"id": 1, "theme": "Children"}})"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, DoubleFloatNarrowingCollisionRejected) {
+  // 16777216 (2^24) and 1.6777217E7 (2^24 + 1) round to the same 32-bit float (16777216.0f).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/16777216"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfBodyWildcard", request_headers.get_(":path"));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{R"({"shelf": {"id": 1.6777217E7, "theme": "Children"}})"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
+}
+
 bookstore::EchoStructReqResp createDeepStruct(int level) {
   bookstore::EchoStructReqResp msg;
   auto* field_map = msg.mutable_content()->mutable_fields();
