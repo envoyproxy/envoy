@@ -34,6 +34,14 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-cto-asserts
+    - check-build-cto-gperftools
+    - check-build-cto-jemalloc
+    - check-build-cto-noadmin
+    - check-build-cto-nolog
+    - check-build-cto-wamr
+    # TODO(phlax): enable once the wasmtime tests are re-enabled on this branch.
+    # - check-build-cto-wasmtime
     - check-build-openssl
     - check-coverage
     - check-runtime
@@ -119,6 +127,194 @@ run:
   check-build:
     paths:
     - "**/*"
+  check-build-cto-asserts:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+  check-build-cto-gperftools:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-jemalloc:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-noadmin:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-nolog:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - envoy/**/*
+    - source/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+  check-build-cto-wamr:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  # TODO(phlax): enable once the wasmtime tests are re-enabled on this branch.
+  # check-build-cto-wasmtime:
+  #   paths:
+  #   - .bazelrc
+  #   - .bazelversion
+  #   - .github/config.yml
+  #   - API_VERSION.txt
+  #   - BUILD
+  #   - Cargo.Bazel.lock
+  #   - Cargo.lock
+  #   - MODULE.bazel
+  #   - MODULE.bazel.lock
+  #   - VERSION.txt
+  #   - WORKSPACE
+  #   - api/**/*
+  #   - bazel/**/*
+  #   - ci/build_setup.sh
+  #   - ci/do_ci.sh
+  #   - configs/**/*
+  #   - envoy/**/*
+  #   - source/**/*
+  #   - test/**/*
+  #   - third_party/**/*
+  #   - tools/api_versioning/**/*
+  #   - tools/base/requirements.txt
+  #   - tools/dev/requirements.txt
+  #   - tools/h3_request/**/*
+  #   - tools/socket_passing/**/*
+  #   - tools/type_whisperer/**/*
   check-build-openssl:
     paths:
     - "**/*"
