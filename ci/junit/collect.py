@@ -35,6 +35,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ENGFLOW = "https://mordenite.cluster.engflow.com"
@@ -342,14 +343,22 @@ def run_meta(repo, run, job_names, token):
     if not ref:
         return meta
     meta.update({"sha": ref["sha"], "branch": ref["branch"], "target_branch": ref["branch"]})
-    try:
-        # The job names only have the abbreviated commit.
-        commit = json.loads(_get(f"{GITHUB_API}/repos/{repo}/commits/{ref['sha']}", token))
-        meta["sha"] = commit["sha"]
-    except (urllib.error.URLError, ValueError, KeyError) as e:
-        print(f"  {run['id']}: could not resolve commit {ref['sha']} ({e})")
     if not ref["pr"]:
         meta["trigger"] = "postsubmit"
+        # The job names only have the abbreviated commit, which GitHub will not look up if any
+        # fork has another that starts the same, so find it on the branch, where it was the
+        # newest commit or near it when the run was created.
+        try:
+            commits = json.loads(_get(
+                f"{GITHUB_API}/repos/{repo}/commits?sha={urllib.parse.quote(ref['branch'])}"
+                f"&until={run.get('created_at', '')}&per_page=100", token))
+            full = [c["sha"] for c in commits if c["sha"].startswith(ref["sha"])]
+            if full:
+                meta["sha"] = full[0]
+            else:
+                print(f"  {run['id']}: could not resolve commit {ref['sha']} on {ref['branch']}")
+        except (urllib.error.URLError, ValueError, KeyError) as e:
+            print(f"  {run['id']}: could not resolve commit {ref['sha']} ({e})")
         return meta
     meta.update({"trigger": "pr", "pr": int(ref["pr"]), "base_branch": ref["branch"]})
     # Not known from the job names. A fork's branch can have any name, `main` included, so the
@@ -361,6 +370,19 @@ def run_meta(repo, run, job_names, token):
         same_repo = (head.get("repo") or {}).get("full_name") == repo
         meta["branch"] = head["ref"] if same_repo else head["label"]
         meta["base_sha"] = base["sha"]
+        # An abbreviated commit from a fork cannot be looked up in this repo, so find it among
+        # the pull request's own, starting with the one it is most likely to be.
+        shas = [head["sha"]]
+        if not head["sha"].startswith(ref["sha"]):
+            shas += [
+                commit["sha"] for commit in json.loads(_get(
+                    f"{GITHUB_API}/repos/{repo}/pulls/{ref['pr']}/commits?per_page=100", token))]
+        full = [sha for sha in shas if sha.startswith(ref["sha"])]
+        if full:
+            meta["sha"] = full[0]
+        else:
+            # No longer one of its commits, after a force push for instance.
+            print(f"  {run['id']}: could not resolve commit {ref['sha']} of #{ref['pr']}")
     except (urllib.error.URLError, ValueError, KeyError) as e:
         print(f"  {run['id']}: could not read pull request {ref['pr']} ({e})")
     return meta
