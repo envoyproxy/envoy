@@ -117,6 +117,7 @@ public:
   void onVhdsFailure() override;
 
 private:
+  void clearAwaitingInitialVhdsUpdate();
   static void notifyCallback(const ConfigImpl& config, const std::string& alias,
                              Event::Dispatcher& thread_local_dispatcher,
                              std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
