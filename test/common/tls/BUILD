@@ -105,6 +105,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:connection_impl",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
@@ -230,6 +231,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_test_utils",
+        "//source/common/buffer:buffer_lib",
         "//source/common/tls:ssl_socket_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/network:io_handle_mocks",

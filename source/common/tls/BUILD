@@ -58,6 +58,7 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/network:io_handle_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/runtime:runtime_features_lib",
     ],
 )

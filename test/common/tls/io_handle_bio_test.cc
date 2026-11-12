@@ -1,5 +1,8 @@
+#include <algorithm>
 #include <limits>
+#include <string>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/tls/io_handle_bio.h"
 
@@ -499,46 +502,58 @@ TEST_F(IoHandleBioTest, ReadAheadRejectsOtherBioTypes) {
   EXPECT_FALSE(setIoHandleBioReadAheadSize(socket_bio.get(), 16384));
 }
 
+static void copyToSlices(const std::string& data, Buffer::RawSlice* slices, uint64_t num_slices) {
+  uint64_t copied = 0;
+  for (uint64_t i = 0; i < num_slices && copied < data.size(); ++i) {
+    const uint64_t size = std::min<uint64_t>(data.size() - copied, slices[i].len_);
+    memcpy(slices[i].mem_, data.data() + copied, size);
+    copied += size;
+  }
+  EXPECT_EQ(data.size(), copied);
+}
+
 class IoHandleBioReadAheadSizeTest : public IoHandleBioTest,
                                      public testing::WithParamInterface<uint32_t> {};
 
 INSTANTIATE_TEST_SUITE_P(Sizes, IoHandleBioReadAheadSizeTest,
-                         testing::Values(1, 7, 16384, 65536, 128 * 1024, 1024 * 1024));
+                         testing::Values(1, 7, 16384, 65536, 128 * 1024, 133672, 1024 * 1024,
+                                         std::numeric_limits<uint32_t>::max()));
 
-TEST_P(IoHandleBioReadAheadSizeTest, LargerAndExactRequestsAreBoundedAndReuseBuffer) {
-  const uint32_t size = GetParam();
-  EXPECT_TRUE(setIoHandleBioReadAheadSize(bio_, size));
+TEST_P(IoHandleBioReadAheadSizeTest, RequestsAreBoundedByTargetAndReservation) {
+  const uint32_t size = std::min<uint32_t>(GetParam(), 128 * 1024);
+  EXPECT_TRUE(setIoHandleBioReadAheadSize(bio_, GetParam()));
+  std::string input(size, '\0');
+  for (uint32_t i = 0; i < size; ++i) {
+    input[i] = 'a' + i % 26;
+  }
   std::string out(size + 17, '\0');
-  void* buffer = nullptr;
-  EXPECT_CALL(io_handle_, readv(size, _, 1))
+  EXPECT_CALL(io_handle_, readv(size, _, Buffer::Reservation::MAX_SLICES_))
       .Times(2)
-      .WillRepeatedly(Invoke([&out, &buffer, size](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-        EXPECT_EQ(size, slices[0].len_);
-        EXPECT_NE(out.data(), slices[0].mem_);
-        if (buffer == nullptr) {
-          buffer = slices[0].mem_;
-        } else {
-          EXPECT_EQ(buffer, slices[0].mem_);
-        }
-        memset(slices[0].mem_, 'x', size);
-        return makeSuccessResult(size);
-      }));
+      .WillRepeatedly(
+          Invoke([&input, &out, size](uint64_t, Buffer::RawSlice* slices, uint64_t num_slices) {
+            for (uint64_t i = 0; i < num_slices; ++i) {
+              EXPECT_NE(out.data(), slices[i].mem_);
+            }
+            copyToSlices(input, slices, num_slices);
+            return makeSuccessResult(size);
+          }));
   EXPECT_EQ(size, BIO_read(bio_, out.data(), out.size()));
-  EXPECT_EQ(std::string(size, 'x'), out.substr(0, size));
+  EXPECT_EQ(input, out.substr(0, size));
   EXPECT_EQ(std::string(17, '\0'), out.substr(size));
   EXPECT_EQ(0, BIO_pending(bio_));
   EXPECT_EQ(size, BIO_read(bio_, out.data(), size));
-  EXPECT_EQ(std::string(size, 'x'), out.substr(0, size));
+  EXPECT_EQ(input, out.substr(0, size));
   EXPECT_EQ(0, BIO_pending(bio_));
 }
 
 TEST_P(IoHandleBioReadAheadSizeTest, PendingBytesAreReturnedBeforeRefilling) {
-  const uint32_t size = GetParam();
-  setIoHandleBioReadAheadSize(bio_, size);
+  const uint32_t size = std::min<uint32_t>(GetParam(), 128 * 1024);
+  setIoHandleBioReadAheadSize(bio_, GetParam());
+  const std::string input(size, 'x');
   std::string out(size + 1, '\0');
-  EXPECT_CALL(io_handle_, readv(size, _, 1))
-      .WillOnce(Invoke([size](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-        memset(slices[0].mem_, 'x', size);
+  EXPECT_CALL(io_handle_, readv(size, _, Buffer::Reservation::MAX_SLICES_))
+      .WillOnce(Invoke([&input, size](uint64_t, Buffer::RawSlice* slices, uint64_t num_slices) {
+        copyToSlices(input, slices, num_slices);
         return makeSuccessResult(size);
       }))
       .WillOnce(Return(testing::ByMove(makeAgainResult())));
@@ -552,6 +567,64 @@ TEST_P(IoHandleBioReadAheadSizeTest, PendingBytesAreReturnedBeforeRefilling) {
   EXPECT_EQ(0, BIO_pending(bio_));
   EXPECT_EQ(-1, BIO_read(bio_, out.data(), out.size()));
   EXPECT_TRUE(BIO_should_read(bio_));
+}
+
+TEST_F(IoHandleBioTest, ReadAheadPartialInputAcrossSlices) {
+  ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, 128 * 1024));
+  const std::string input = std::string(16384, 'a') + "remaining ciphertext";
+  std::string out(input.size(), '\0');
+  EXPECT_CALL(io_handle_, readv(128 * 1024, _, Buffer::Reservation::MAX_SLICES_))
+      .WillOnce(Invoke([&input](uint64_t, Buffer::RawSlice* slices, uint64_t num_slices) {
+        copyToSlices(input, slices, num_slices);
+        return makeSuccessResult(input.size());
+      }))
+      .WillOnce(Return(testing::ByMove(makeAgainResult())));
+
+  ASSERT_EQ(16382, BIO_read(bio_, out.data(), 16382));
+  EXPECT_EQ(input.substr(0, 16382), out.substr(0, 16382));
+  EXPECT_EQ(input.size() - 16382, BIO_pending(bio_));
+  ASSERT_EQ(input.size() - 16382, BIO_read(bio_, out.data(), out.size()));
+  EXPECT_EQ(input.substr(16382), out.substr(0, input.size() - 16382));
+  EXPECT_EQ(0, BIO_pending(bio_));
+  EXPECT_EQ(-1, BIO_read(bio_, out.data(), out.size()));
+  EXPECT_TRUE(BIO_should_read(bio_));
+}
+
+TEST_F(IoHandleBioTest, ReadAheadReleasesConsumedSlices) {
+  constexpr uint64_t size = 128 * 1024;
+  ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, size));
+  const std::string input(size, 'x');
+  std::string out(size, '\0');
+  EXPECT_CALL(io_handle_, readv(size, _, Buffer::Reservation::MAX_SLICES_))
+      .Times(1)
+      .WillRepeatedly(Invoke([&input](uint64_t, Buffer::RawSlice* slices, uint64_t num_slices) {
+        copyToSlices(input, slices, num_slices);
+        return makeSuccessResult(input.size());
+      }));
+
+  // Keep the thread-local free slices reserved so the measurements cover this BIO's allocations.
+  Buffer::OwnedImpl other_buffer;
+  auto other_reservation = other_buffer.reserveForRead();
+  ASSERT_EQ(size, other_reservation.length());
+  Memory::TestUtil::MemoryTest memory_test;
+  const int first_read = BIO_read(bio_, out.data(), 1);
+  const size_t allocated_bytes = memory_test.consumedBytes();
+  const int cached_read = BIO_read(bio_, out.data(), size - 2);
+  const size_t partially_drained_bytes = memory_test.consumedBytes();
+  const int pending = BIO_pending(bio_);
+  const int last_read = BIO_read(bio_, out.data(), 1);
+  const size_t drained_bytes = memory_test.consumedBytes();
+
+  EXPECT_EQ(1, first_read);
+  EXPECT_EQ(size - 2, cached_read);
+  EXPECT_EQ(1, pending);
+  EXPECT_EQ(1, last_read);
+  EXPECT_EQ(0, BIO_pending(bio_));
+  if (Memory::TestUtil::MemoryTest::mode() != Memory::TestUtil::MemoryTest::Mode::Disabled) {
+    EXPECT_GE(allocated_bytes, size);
+    EXPECT_LE(partially_drained_bytes, 16384);
+    EXPECT_EQ(0, drained_bytes);
+  }
 }
 
 class IoHandleBioReadAheadAllocationTest : public IoHandleBioTest,
@@ -596,7 +669,7 @@ TEST_F(IoHandleBioTest, ReadAheadDrainsBeforeReadingAgain) {
   setIoHandleBioReadAheadSize(bio_, 16384);
   char out[20];
   EXPECT_EQ(0, BIO_pending(bio_));
-  EXPECT_CALL(io_handle_, readv(16384, _, 1))
+  EXPECT_CALL(io_handle_, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         EXPECT_EQ(16384, slices[0].len_);
         memcpy(slices[0].mem_, "helloworld!", 11);
@@ -618,7 +691,7 @@ TEST_F(IoHandleBioTest, ReadAheadDrainsBeforeReadingAgain) {
 TEST_F(IoHandleBioTest, ReadAheadPartialInput) {
   setIoHandleBioReadAheadSize(bio_, 7);
   char out[10];
-  EXPECT_CALL(io_handle_, readv(7, _, 1))
+  EXPECT_CALL(io_handle_, readv(7, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "abc", 3);
         return makeSuccessResult(3);
@@ -644,10 +717,8 @@ TEST_P(IoHandleBioReadAheadResizeTest, SizeChangesPreservePendingInput) {
   const uint64_t first_size = GetParam() ? 7 : 16384;
   const uint64_t second_size = GetParam() ? 16384 : 7;
   ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, first_size));
-  void* first_buffer = nullptr;
-  EXPECT_CALL(io_handle_, readv(first_size, _, 1))
-      .WillOnce(Invoke([&first_buffer](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-        first_buffer = slices[0].mem_;
+  EXPECT_CALL(io_handle_, readv(first_size, _, Buffer::Reservation::MAX_SLICES_))
+      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "abcdef", 6);
         return makeSuccessResult(6);
       }));
@@ -665,38 +736,25 @@ TEST_P(IoHandleBioReadAheadResizeTest, SizeChangesPreservePendingInput) {
   EXPECT_EQ("cdef", std::string(out, 4));
   EXPECT_EQ(0, BIO_pending(bio_));
 
-  EXPECT_CALL(io_handle_, readv(second_size, _, 1))
-      .WillOnce(Invoke(
-          [&first_buffer, first_size, second_size](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-            EXPECT_EQ(second_size, slices[0].len_);
-            if (second_size < first_size) {
-              EXPECT_EQ(first_buffer, slices[0].mem_);
-            }
-            memcpy(slices[0].mem_, "ghijkl", 6);
-            return makeSuccessResult(6);
-          }));
+  EXPECT_CALL(io_handle_, readv(second_size, _, Buffer::Reservation::MAX_SLICES_))
+      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+        memcpy(slices[0].mem_, "ghijkl", 6);
+        return makeSuccessResult(6);
+      }));
   ASSERT_EQ(6, BIO_read(bio_, out, sizeof(out)));
   EXPECT_EQ("ghijkl", std::string(out, 6));
 }
 
-TEST_F(IoHandleBioTest, ReadAheadReusesCapacityAfterTargetShrinksAndGrows) {
+TEST_F(IoHandleBioTest, ReadAheadTargetShrinksAndGrows) {
   ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, 16384));
-  void* buffer = nullptr;
-  EXPECT_CALL(io_handle_, readv(16384, _, 1))
+  EXPECT_CALL(io_handle_, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .Times(2)
-      .WillRepeatedly(Invoke([&buffer](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-        if (buffer == nullptr) {
-          buffer = slices[0].mem_;
-        } else {
-          EXPECT_EQ(buffer, slices[0].mem_);
-        }
+      .WillRepeatedly(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "a", 1);
         return makeSuccessResult(1);
       }));
-  EXPECT_CALL(io_handle_, readv(7, _, 1))
-      .WillOnce(Invoke([&buffer](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-        EXPECT_EQ(buffer, slices[0].mem_);
-        EXPECT_EQ(7, slices[0].len_);
+  EXPECT_CALL(io_handle_, readv(7, _, Buffer::Reservation::MAX_SLICES_))
+      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "b", 1);
         return makeSuccessResult(1);
       }));
@@ -712,7 +770,7 @@ TEST_F(IoHandleBioTest, ReadAheadReusesCapacityAfterTargetShrinksAndGrows) {
 
 TEST_P(IoHandleBioReadAheadResizeTest, DisablingDrainsPendingInputBeforeDirectReads) {
   ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, 16384));
-  EXPECT_CALL(io_handle_, readv(16384, _, 1))
+  EXPECT_CALL(io_handle_, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "abcd", 4);
         return makeSuccessResult(4);
@@ -743,67 +801,34 @@ class IoHandleBioReadAheadReleaseTest : public IoHandleBioTest,
 INSTANTIATE_TEST_SUITE_P(SocketResults, IoHandleBioReadAheadReleaseTest,
                          testing::Values(0, SOCKET_ERROR_AGAIN, ECONNRESET, SOCKET_ERROR_INTR));
 
-TEST_P(IoHandleBioReadAheadReleaseTest, ReleasesExhaustedBufferAndAllocatesOnNextRead) {
+TEST_P(IoHandleBioReadAheadReleaseTest, FailedReadDoesNotCommitInput) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "false"}});
-  ERR_put_error(ERR_LIB_SYS, 0, ECONNRESET, __FILE__, __LINE__);
-  ERR_clear_error();
-
-  constexpr uint64_t size = 1024 * 1024;
-  ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, size));
-  bool return_socket_result = false;
+  ASSERT_TRUE(setIoHandleBioReadAheadSize(bio_, 128 * 1024));
   const int socket_result = GetParam();
-  EXPECT_CALL(io_handle_, readv(size, _, 1))
-      .WillRepeatedly(Invoke(
-          [&return_socket_result, socket_result](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-            if (return_socket_result) {
-              if (socket_result == 0) {
-                return makeSuccessResult(0);
-              }
-              return socket_result == SOCKET_ERROR_AGAIN ? makeAgainResult()
-                                                         : makeErrorResult(socket_result);
-            }
-            memcpy(slices[0].mem_, "abcd", 4);
-            return makeSuccessResult(4);
-          }));
+  EXPECT_CALL(io_handle_, readv(128 * 1024, _, Buffer::Reservation::MAX_SLICES_))
+      .WillOnce(Invoke([socket_result](uint64_t, Buffer::RawSlice*, uint64_t) {
+        if (socket_result == 0) {
+          return makeSuccessResult(0);
+        }
+        return socket_result == SOCKET_ERROR_AGAIN ? makeAgainResult()
+                                                   : makeErrorResult(socket_result);
+      }))
+      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+        memcpy(slices[0].mem_, "abcd", 4);
+        return makeSuccessResult(4);
+      }));
   char out[4];
-  Memory::TestUtil::MemoryTest memory_test;
-  const int first_read = BIO_read(bio_, out, 1);
-  const size_t allocated_bytes = memory_test.consumedBytes();
-  const int cached_read = BIO_read(bio_, out, sizeof(out));
-  const size_t drained_bytes = memory_test.consumedBytes();
-  return_socket_result = true;
-  const int exhausted_read = BIO_read(bio_, out, sizeof(out));
-  const bool retry = BIO_should_retry(bio_);
-  const auto error = ERR_get_error();
-  const size_t exhausted_bytes = memory_test.consumedBytes();
-  return_socket_result = false;
-  const int next_read = BIO_read(bio_, out, sizeof(out));
-  const size_t next_read_bytes = memory_test.consumedBytes();
-
-  EXPECT_EQ(1, first_read);
-  EXPECT_EQ(3, cached_read);
-  EXPECT_EQ(socket_result == 0 ? 0 : -1, exhausted_read);
-  EXPECT_EQ(socket_result == SOCKET_ERROR_AGAIN || socket_result == SOCKET_ERROR_INTR, retry);
-  EXPECT_EQ(socket_result == ECONNRESET ? ECONNRESET : 0, ERR_GET_REASON(error));
-  EXPECT_EQ(4, next_read);
-  EXPECT_EQ("abcd", std::string(out, sizeof(out)));
+  EXPECT_EQ(socket_result == 0 ? 0 : -1, BIO_read(bio_, out, sizeof(out)));
+  EXPECT_EQ(socket_result == SOCKET_ERROR_AGAIN || socket_result == SOCKET_ERROR_INTR,
+            BIO_should_retry(bio_) != 0);
+  EXPECT_EQ(socket_result == ECONNRESET ? ECONNRESET : 0, ERR_GET_REASON(ERR_get_error()));
   EXPECT_EQ(0, BIO_pending(bio_));
-  if (Memory::TestUtil::MemoryTest::mode() != Memory::TestUtil::MemoryTest::Mode::Disabled) {
-    // OpenSSL may retain error bookkeeping independently of the read-ahead allocation.
-    constexpr uint64_t error_overhead = 4096;
-    for (const size_t bytes : {allocated_bytes, drained_bytes, next_read_bytes}) {
-      EXPECT_GE(bytes, size);
-      EXPECT_LE(bytes, size + error_overhead);
-    }
-    if (socket_result == SOCKET_ERROR_INTR) {
-      EXPECT_GE(exhausted_bytes, size);
-      EXPECT_LE(exhausted_bytes, size + error_overhead);
-    } else {
-      EXPECT_LE(exhausted_bytes, socket_result == ECONNRESET ? error_overhead : 0);
-    }
-  }
+  EXPECT_EQ(4, BIO_read(bio_, out, sizeof(out)));
+  EXPECT_EQ("abcd", std::string(out, sizeof(out)));
+  EXPECT_FALSE(BIO_should_retry(bio_));
+  EXPECT_EQ(0, BIO_pending(bio_));
 }
 
 class IoHandleBioEofTest : public IoHandleBioTest, public testing::WithParamInterface<uint32_t> {};
@@ -816,7 +841,8 @@ TEST_P(IoHandleBioEofTest, EofReportsPendingSocketError) {
       {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "true"}});
   setIoHandleBioReadAheadSize(bio_, GetParam());
   char out[10];
-  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _, 1))
+  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _,
+                                GetParam() == 0 ? 1 : Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Return(testing::ByMove(makeSuccessResult(0))));
   EXPECT_CALL(io_handle_, getOption(SOL_SOCKET, SO_ERROR, _, _))
       .WillOnce(Invoke([](int, int, void* value, socklen_t* len) {
@@ -839,7 +865,8 @@ TEST_P(IoHandleBioEofTest, EofWithoutPendingSocketError) {
       {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "true"}});
   setIoHandleBioReadAheadSize(bio_, GetParam());
   char out[10];
-  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _, 1))
+  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _,
+                                GetParam() == 0 ? 1 : Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Return(testing::ByMove(makeSuccessResult(0))));
   EXPECT_CALL(io_handle_, getOption(SOL_SOCKET, SO_ERROR, _, _))
       .WillOnce(Invoke([](int, int, void* value, socklen_t*) {
@@ -857,7 +884,8 @@ TEST_P(IoHandleBioEofTest, EofIgnoresFailedSocketErrorLookup) {
       {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "true"}});
   setIoHandleBioReadAheadSize(bio_, GetParam());
   char out[10];
-  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _, 1))
+  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _,
+                                GetParam() == 0 ? 1 : Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Return(testing::ByMove(makeSuccessResult(0))));
   EXPECT_CALL(io_handle_, getOption(SOL_SOCKET, SO_ERROR, _, _))
       .WillOnce(Invoke([](int, int, void* value, socklen_t*) {
@@ -875,7 +903,8 @@ TEST_P(IoHandleBioEofTest, EofSocketErrorLookupDisabledByRuntime) {
       {{"envoy.reloadable_features.ssl_socket_report_connection_reset", "false"}});
   setIoHandleBioReadAheadSize(bio_, GetParam());
   char out[10];
-  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _, 1))
+  EXPECT_CALL(io_handle_, readv(GetParam() == 0 ? sizeof(out) : GetParam(), _,
+                                GetParam() == 0 ? 1 : Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Return(testing::ByMove(makeSuccessResult(0))));
   EXPECT_CALL(io_handle_, getOption(_, _, _, _)).Times(0);
   EXPECT_EQ(0, BIO_read(bio_, out, sizeof(out)));
@@ -886,7 +915,7 @@ TEST_P(IoHandleBioEofTest, EofSocketErrorLookupDisabledByRuntime) {
 TEST_F(IoHandleBioTest, ReadAheadRetryFlagsClearOnCachedRead) {
   setIoHandleBioReadAheadSize(bio_, 16384);
   char out[4];
-  EXPECT_CALL(io_handle_, readv(16384, _, 1))
+  EXPECT_CALL(io_handle_, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Return(testing::ByMove(makeAgainResult())))
       .WillOnce(Return(testing::ByMove(makeErrorResult(SOCKET_ERROR_INTR))))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
@@ -911,7 +940,7 @@ TEST_F(IoHandleBioTest, ReadAheadRetryFlagsClearOnCachedRead) {
 TEST_F(IoHandleBioTest, ReadAheadDrainsBeforeEof) {
   setIoHandleBioReadAheadSize(bio_, 16384);
   char out[4];
-  EXPECT_CALL(io_handle_, readv(16384, _, 1))
+  EXPECT_CALL(io_handle_, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "abcd", 4);
         return makeSuccessResult(4);
@@ -928,7 +957,7 @@ TEST_F(IoHandleBioTest, ReadAheadDrainsBeforeEof) {
 TEST_F(IoHandleBioTest, ReadAheadDrainsBeforeError) {
   setIoHandleBioReadAheadSize(bio_, 16384);
   char out[4];
-  EXPECT_CALL(io_handle_, readv(16384, _, 1))
+  EXPECT_CALL(io_handle_, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "abcd", 4);
         return makeSuccessResult(4);
@@ -961,12 +990,12 @@ TEST(IoHandleBioIndependentTest, ReadAheadStateAndLifetimeAreIndependent) {
   bssl::UniquePtr<BIO> second_bio(BIO_new_io_handle(&second));
   setIoHandleBioReadAheadSize(first_bio.get(), 16384);
   setIoHandleBioReadAheadSize(second_bio.get(), 7);
-  EXPECT_CALL(first, readv(16384, _, 1))
+  EXPECT_CALL(first, readv(16384, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "abc", 3);
         return makeSuccessResult(3);
       }));
-  EXPECT_CALL(second, readv(7, _, 1))
+  EXPECT_CALL(second, readv(7, _, Buffer::Reservation::MAX_SLICES_))
       .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "xyz", 3);
         return makeSuccessResult(3);

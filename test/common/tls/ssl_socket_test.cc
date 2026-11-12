@@ -1,12 +1,10 @@
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
-#include <thread>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -20,6 +18,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
@@ -8530,13 +8529,19 @@ TEST_P(SslReadBufferLimitTest, ReadAheadFollowsBufferReservation) {
   size_t ciphertext_length = 0;
   ASSERT_EQ(1, BIO_mem_contents(output, &ciphertext, &ciphertext_length));
 
+  Buffer::OwnedImpl queued_ciphertext;
+  queued_ciphertext.add(ciphertext, ciphertext_length);
   StrictMock<Network::MockIoHandle> receiver_io;
   SSL_set0_rbio(server_transport->rawSslForTest(), BIO_new_io_handle(&receiver_io));
   Buffer::WatermarkBuffer read_buffer([] {}, [] {}, [] {});
   auto expect_read_size = [&](uint64_t expected_size) {
-    EXPECT_CALL(receiver_io, readv(expected_size, _, 1))
-        .WillOnce(Invoke([expected_size](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-          EXPECT_EQ(expected_size, slices[0].len_);
+    EXPECT_CALL(receiver_io, readv(expected_size, _, _))
+        .WillOnce(Invoke([expected_size](uint64_t, Buffer::RawSlice* slices, uint64_t num_slices) {
+          uint64_t capacity = 0;
+          for (uint64_t i = 0; i < num_slices; ++i) {
+            capacity += slices[i].len_;
+          }
+          EXPECT_GE(capacity, expected_size);
           return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
         }));
     const uint64_t original_length = read_buffer.length();
@@ -8561,27 +8566,27 @@ TEST_P(SslReadBufferLimitTest, ReadAheadFollowsBufferReservation) {
   expect_read_size(16 * 1024 + record_overhead);
   read_buffer.drain(read_buffer.length());
   read_buffer.setWatermarks(256 * 1024);
-  expect_read_size(128 * 1024 + 8 * record_overhead);
+  expect_read_size(128 * 1024);
 
   // The first record leaves one byte in the reservation, but the next record still needs a full
   // ciphertext read before TLS can authenticate it and return that byte.
   const uint64_t full_record_read_size = SSL3_RT_MAX_PLAIN_LENGTH + record_overhead;
-  EXPECT_CALL(receiver_io, readv(_, _, 1))
-      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t) {
+  EXPECT_CALL(receiver_io, readv(_, _, _))
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slices) {
         EXPECT_EQ(full_record_read_size, max_length);
-        EXPECT_EQ(max_length, slices[0].len_);
-        const uint64_t length = std::min<uint64_t>(max_length, first_ciphertext_length);
+        const uint64_t length = queued_ciphertext.copyOutToSlices(
+            std::min<uint64_t>(max_length, first_ciphertext_length), slices, num_slices);
         EXPECT_EQ(first_ciphertext_length, length);
-        memcpy(slices[0].mem_, ciphertext, length);
+        queued_ciphertext.drain(length);
         return Api::IoCallUint64Result{length, Api::IoError::none()};
       }))
-      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slices) {
         EXPECT_EQ(full_record_read_size, max_length);
-        EXPECT_EQ(max_length, slices[0].len_);
-        const uint64_t remaining = ciphertext_length - first_ciphertext_length;
-        const uint64_t length = std::min<uint64_t>(max_length, remaining);
+        const uint64_t remaining = queued_ciphertext.length();
+        const uint64_t length =
+            queued_ciphertext.copyOutToSlices(std::min(max_length, remaining), slices, num_slices);
         EXPECT_EQ(remaining, length);
-        memcpy(slices[0].mem_, ciphertext + first_ciphertext_length, length);
+        queued_ciphertext.drain(length);
         return Api::IoCallUint64Result{length, Api::IoError::none()};
       }))
       .WillRepeatedly(Invoke([](uint64_t, Buffer::RawSlice*, uint64_t) {
@@ -8675,11 +8680,16 @@ TEST_P(SslReadBufferLimitTest, ReadAheadAcrossTls13KeyUpdate) {
   ASSERT_GT(ciphertext_length, payload.size());
   ASSERT_LE(ciphertext_length, 16384);
 
+  Buffer::OwnedImpl queued_ciphertext;
+  queued_ciphertext.add(ciphertext, ciphertext_length);
   NiceMock<Network::MockIoHandle> receiver_io;
-  EXPECT_CALL(receiver_io, readv(_, _, 1))
-      .WillOnce(Invoke([&](uint64_t, Buffer::RawSlice* slices, uint64_t) {
-        memcpy(slices[0].mem_, ciphertext, ciphertext_length);
-        return Api::IoCallUint64Result{ciphertext_length, Api::IoError::none()};
+  EXPECT_CALL(receiver_io, readv(_, _, _))
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slices) {
+        const uint64_t length = queued_ciphertext.copyOutToSlices(
+            std::min<uint64_t>(max_length, ciphertext_length), slices, num_slices);
+        EXPECT_EQ(ciphertext_length, length);
+        queued_ciphertext.drain(length);
+        return Api::IoCallUint64Result{length, Api::IoError::none()};
       }))
       .WillRepeatedly(Invoke([](uint64_t, Buffer::RawSlice*, uint64_t) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
@@ -8730,106 +8740,126 @@ void SslReadBufferLimitTest::readAheadResumeTest(bool runtime_enabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.tls_io_handle_read_ahead", runtime_enabled ? "true" : "false"}});
-  initialize();
-  auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
-  ASSERT_NE(nullptr, client_transport);
-  // Pin TLS 1.2 so the receiver-side barrier below can identify the final close_notify record.
-  ASSERT_EQ(1, SSL_set_max_proto_version(client_transport->rawSslForTest(), TLS1_2_VERSION));
-  client_connection_->noDelay(true);
-  client_connection_->enableHalfClose(true);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_), downstream_tls_context_);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, {}, false);
+  manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
+  server_ssl_socket_factory_ = *ServerSslSocketFactory::create(std::move(server_cfg), *manager_,
+                                                               *server_stats_store_.rootScope());
 
-  SslSocket* server_transport = nullptr;
-  Network::IoHandle* server_io_handle = nullptr;
-  uint32_t connected = 0;
-  auto on_connected = [&](Network::ConnectionEvent) {
-    if (++connected == 2) {
-      dispatcher_->exit();
-    }
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
+  ASSERT_EQ(1, SSL_set_max_proto_version(client_ssl.get(), TLS1_2_VERSION));
+  SSL_set_connect_state(client_ssl.get());
+  BIO* client_input = BIO_new(BIO_s_mem());
+  BIO* client_output = BIO_new(BIO_s_mem());
+  ASSERT_NE(nullptr, client_input);
+  ASSERT_NE(nullptr, client_output);
+  SSL_set_bio(client_ssl.get(), client_input, client_output);
+
+  Buffer::OwnedImpl queued_ciphertext;
+  auto queue_client_output = [&] {
+    const uint8_t* ciphertext = nullptr;
+    size_t length = 0;
+    ASSERT_EQ(1, BIO_mem_contents(client_output, &ciphertext, &length));
+    queued_ciphertext.add(ciphertext, length);
+    ASSERT_EQ(1, BIO_reset(client_output));
   };
-  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke(on_connected));
-  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke(on_connected));
-  EXPECT_CALL(listener_callbacks_, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) {
-        server_io_handle = &socket->ioHandle();
-        auto transport = server_ssl_socket_factory_->createDownstreamTransportSocket();
-        server_transport = dynamic_cast<SslSocket*>(transport.get());
-        server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), std::move(transport), stream_info_);
-        server_connection_->setBufferLimits(1024);
-        server_connection_->enableHalfClose(true);
-        server_connection_->addConnectionCallbacks(server_callbacks_);
-        server_connection_->addReadFilter(read_filter_);
+  auto receiver_io = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  bool socket_open = true;
+  ON_CALL(*receiver_io, isOpen()).WillByDefault(Invoke([&] { return socket_open; }));
+  EXPECT_CALL(*receiver_io, close()).WillOnce(Invoke([&] {
+    socket_open = false;
+    return Api::IoCallUint64Result{0, Api::IoError::none()};
+  }));
+  Event::FileReadyCb on_file_event;
+  uint32_t pending_events = 0;
+  EXPECT_CALL(*receiver_io, createFileEvent_(_, _, _, _))
+      .WillOnce(Invoke([&](Event::Dispatcher&, Event::FileReadyCb cb, Event::FileTriggerType,
+                           uint32_t) { on_file_event = std::move(cb); }));
+  ON_CALL(*receiver_io, activateFileEvents(_)).WillByDefault(Invoke([&](uint32_t events) {
+    pending_events |= events;
+  }));
+  uint64_t socket_reads = 0;
+  EXPECT_CALL(*receiver_io, readv(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slices) {
+            ++socket_reads;
+            if (queued_ciphertext.length() == 0) {
+              return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+            }
+            const uint64_t length = queued_ciphertext.copyOutToSlices(
+                std::min(max_length, queued_ciphertext.length()), slices, num_slices);
+            queued_ciphertext.drain(length);
+            return Api::IoCallUint64Result{length, Api::IoError::none()};
+          }));
+  EXPECT_CALL(*receiver_io, writev(_, _))
+      .WillRepeatedly(Invoke([&](const Buffer::RawSlice* slices, uint64_t num_slices) {
+        uint64_t length = 0;
+        for (uint64_t i = 0; i < num_slices; ++i) {
+          const int written = BIO_write(client_input, slices[i].mem_, slices[i].len_);
+          EXPECT_EQ(slices[i].len_, written);
+          length += written;
+        }
+        return Api::IoCallUint64Result{length, Api::IoError::none()};
       }));
-  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
-  EXPECT_CALL(*read_filter_, onNewConnection());
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  auto transport = server_ssl_socket_factory_->createDownstreamTransportSocket();
+  auto* server_transport = dynamic_cast<SslSocket*>(transport.get());
   ASSERT_NE(nullptr, server_transport);
-  ASSERT_EQ(2, connected);
-  ASSERT_EQ(TLS1_2_VERSION, SSL_version(server_transport->rawSslForTest()));
+  auto address = Network::Test::getCanonicalLoopbackAddress(version_);
+  auto socket =
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(receiver_io), address, address);
+  Network::ConnectionImpl connection(*dispatcher_, std::move(socket), std::move(transport),
+                                     stream_info_, true);
+  connection.setBufferLimits(1024);
+  connection.enableHalfClose(true);
+  connection.addConnectionCallbacks(server_callbacks_);
+  read_filter_ = std::make_shared<Network::MockReadFilter>();
+  connection.addReadFilter(read_filter_);
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+
+  bool handshake_complete = false;
+  for (uint32_t i = 0; i < 50; ++i) {
+    const int result = SSL_do_handshake(client_ssl.get());
+    if (result != 1) {
+      EXPECT_EQ(SSL_ERROR_WANT_READ, SSL_get_error(client_ssl.get(), result));
+    }
+    queue_client_output();
+    const auto read_result = server_transport->doRead(connection.getReadBuffer().buffer);
+    EXPECT_EQ(Network::PostIoAction::KeepOpen, read_result.action_);
+    EXPECT_EQ(0, read_result.bytes_processed_);
+    if (result == 1 && server_transport->canFlushClose()) {
+      handshake_complete = true;
+      break;
+    }
+  }
+  if (!handshake_complete) {
+    connection.close(Network::ConnectionCloseType::NoFlush);
+    FAIL() << "In-memory TLS handshake did not complete";
+  }
+  EXPECT_EQ(TLS1_2_VERSION, SSL_version(server_transport->rawSslForTest()));
+  EXPECT_EQ(0, queued_ciphertext.length());
 
   // Changing the runtime value must not change this established connection's latched behavior.
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.tls_io_handle_read_ahead", runtime_enabled ? "false" : "true"}});
-  server_connection_->readDisable(true);
+  connection.readDisable(true);
   const std::string payload(32 * 1024 + 37, 'a');
-  uint64_t sent = 0;
-  client_connection_->addBytesSentCallback([&](uint64_t bytes) {
-    sent += bytes;
-    if (sent == payload.size()) {
-      dispatcher_->exit();
-    }
-    return true;
-  });
-  Buffer::OwnedImpl write_buffer(payload);
-  client_connection_->write(write_buffer, true);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  ASSERT_EQ(payload.size(), sent);
-
-  // Bytes-sent means the sender accepted all plaintext, not that the receiver has all ciphertext.
-  // Wait without consuming data until all three application records and close_notify are queued.
-  // The record count follows doWrite()'s 16 KiB SSL_write chunks for this fixed-size payload.
-  // Kernel TCP delivery uses real time independently of the fixture's simulated clock.
-  std::array<char, 64 * 1024> queued_ciphertext;
-  bool all_records_queued = false;
-  auto now = [] { return std::chrono::steady_clock::now(); }; // NO_CHECK_FORMAT(real_time)
-  const auto deadline = now() + std::chrono::seconds(5);
-  while (!all_records_queued && now() < deadline) {
-    auto peek =
-        server_io_handle->recv(queued_ciphertext.data(), queued_ciphertext.size(), MSG_PEEK);
-    if (peek.ok()) {
-      uint64_t offset = 0;
-      uint32_t records = 0;
-      while (records < 4 && peek.return_value_ - offset >= 5) {
-        const auto* header = reinterpret_cast<const uint8_t*>(queued_ciphertext.data() + offset);
-        const uint64_t record_length = 5 + (uint64_t{header[3]} << 8) + header[4];
-        const uint8_t expected_type = records < 3 ? SSL3_RT_APPLICATION_DATA : SSL3_RT_ALERT;
-        if (header[0] != expected_type || record_length > peek.return_value_ - offset) {
-          break;
-        }
-        offset += record_length;
-        ++records;
-      }
-      all_records_queued = records == 4 && offset == peek.return_value_;
-    }
-    if (!all_records_queued) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1)); // NO_CHECK_FORMAT(real_time)
-    }
+  for (size_t offset = 0; offset < payload.size(); offset += SSL3_RT_MAX_PLAIN_LENGTH) {
+    const size_t length = std::min<size_t>(SSL3_RT_MAX_PLAIN_LENGTH, payload.size() - offset);
+    EXPECT_EQ(length, SSL_write(client_ssl.get(), payload.data() + offset, length));
   }
-  if (!all_records_queued) {
-    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-    client_connection_->close(Network::ConnectionCloseType::NoFlush);
-    server_connection_->close(Network::ConnectionCloseType::NoFlush);
-    FAIL() << "Timed out waiting for all TLS records in the receiver queue";
-  }
+  EXPECT_EQ(0, SSL_shutdown(client_ssl.get()));
+  queue_client_output();
 
   std::string received;
   bool paused = false;
   bool received_end_stream = false;
+  EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool end_stream) {
+        EXPECT_LE(data.length(), SSL3_RT_MAX_PLAIN_LENGTH);
         received += data.toString();
         data.drain(data.length());
         if (!paused) {
@@ -8837,33 +8867,40 @@ void SslReadBufferLimitTest::readAheadResumeTest(bool runtime_enabled) {
           EXPECT_FALSE(end_stream);
           EXPECT_EQ(runtime_enabled,
                     BIO_pending(SSL_get_rbio(server_transport->rawSslForTest())) > 0);
-          // Read-ahead follows the small reservation instead of consuming the whole payload.
-          char byte;
-          auto peek = server_io_handle->recv(&byte, 1, MSG_PEEK);
-          EXPECT_TRUE(peek.ok());
-          server_connection_->readDisable(true);
-          dispatcher_->post([&] { server_connection_->readDisable(false); });
+          EXPECT_GT(queued_ciphertext.length(), 0);
+          connection.readDisable(true);
         }
         if (end_stream) {
           EXPECT_FALSE(received_end_stream);
           received_end_stream = true;
           EXPECT_EQ(payload, received);
           EXPECT_EQ(0, BIO_pending(SSL_get_rbio(server_transport->rawSslForTest())));
-          dispatcher_->exit();
         }
         return Network::FilterStatus::StopIteration;
       }));
-  server_connection_->readDisable(false);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  connection.readDisable(false);
+  EXPECT_TRUE(on_file_event(Event::FileReadyType::Read).ok());
   EXPECT_TRUE(paused);
+  EXPECT_FALSE(received_end_stream);
+
+  // Consume a scheduled event while reads are disabled, then verify that re-enabling reads
+  // schedules another event even without a new socket notification.
+  pending_events = 0;
+  const uint64_t reads_before_resume = socket_reads;
+  EXPECT_TRUE(on_file_event(Event::FileReadyType::Read).ok());
+  EXPECT_EQ(reads_before_resume, socket_reads);
+  connection.readDisable(false);
+  EXPECT_NE(0, pending_events & Event::FileReadyType::Read);
+  for (uint32_t i = 0; i < 10 && pending_events != 0; ++i) {
+    const uint32_t events = pending_events;
+    pending_events = 0;
+    EXPECT_TRUE(on_file_event(events).ok());
+  }
   EXPECT_TRUE(received_end_stream);
   EXPECT_EQ(payload, received);
+  EXPECT_EQ(0, queued_ciphertext.length());
   EXPECT_EQ(0, server_stats_store_.counter("ssl.connection_error").value());
-  EXPECT_EQ(0, client_stats_store_.counter("ssl.connection_error").value());
-  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  client_connection_->close(Network::ConnectionCloseType::NoFlush);
-  server_connection_->close(Network::ConnectionCloseType::NoFlush);
+  connection.close(Network::ConnectionCloseType::NoFlush);
 }
 
 TEST_P(SslReadBufferLimitTest, WritesSmallerThanBufferLimit) { singleWriteTest(5 * 1024, 1024); }
