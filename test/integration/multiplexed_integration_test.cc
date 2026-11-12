@@ -18,6 +18,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/socket_option_impl.h"
 
+#include "test/integration/downstream_connection_tracker.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/utility.h"
@@ -73,6 +74,45 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTime
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, SingleRequest) { testRouterNotFound(); }
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, NetworkWaitsDoNotAdvanceTime) {
+  DownstreamConnectionTracker downstream_connections(config_helper_, *dispatcher_);
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt,
+                                        std::nullopt, /*wait_till_connected=*/false);
+  const auto start_time = timeSystem().monotonicTime();
+  bool timer_fired = false;
+  auto timer = dispatcher_->createTimer([&timer_fired] { timer_fired = true; });
+  timer->enableTimer(std::chrono::milliseconds(1));
+
+  ASSERT_TRUE(downstream_connections.waitForConnection());
+  EXPECT_EQ(start_time, timeSystem().monotonicTime());
+  EXPECT_FALSE(timer_fired);
+  const auto timeout_result =
+      downstream_connections.waitForConnection(2, std::chrono::milliseconds(10));
+  EXPECT_FALSE(timeout_result);
+  EXPECT_THAT(timeout_result.message(), HasSubstr("10ms of real time"));
+  EXPECT_THAT(timeout_result.message(), HasSubstr("downstream connection acceptance"));
+  EXPECT_THAT(timeout_result.message(), HasSubstr("expected 2 connections, observed 1"));
+
+  dispatcher_->post([this] { codec_client_->close(); });
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_EQ(start_time, timeSystem().monotonicTime());
+  EXPECT_FALSE(timer_fired);
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false, false);
+}
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST_P(MultiplexedIntegrationTestWithSimulatedTime, Http3UpstreamRequestAndResponseWithBody) {
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  testRouterRequestAndResponseWithBody(128 * 1024, 128 * 1024, false, false);
+}
+#endif
 
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);

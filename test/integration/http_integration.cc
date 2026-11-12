@@ -100,7 +100,14 @@ IntegrationCodecClient::IntegrationCodecClient(
   setCodecConnectionCallbacks(codec_callbacks_);
   setCodecClientCallbacks(codec_client_callbacks_);
   if (wait_till_connected) {
-    dispatcher.run(Event::Dispatcher::RunType::Block);
+    Event::GlobalTimeSystem time_system;
+    if (time_system.ioDispatcher() != nullptr) {
+      const auto result = IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+          dispatcher, [this] { return connected_ || disconnected_; }, "connection establishment");
+      RELEASE_ASSERT(result, result.message());
+    } else {
+      dispatcher.run(Event::Dispatcher::RunType::Block);
+    }
   }
 }
 
@@ -189,35 +196,8 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
 }
 
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
-  if (disconnected_) {
-    return AssertionSuccess();
-  }
-  Event::TimerPtr wait_timer;
-  bool wait_timer_triggered = false;
-  if (time_to_wait.count()) {
-    wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
-      connection_->dispatcher().exit();
-      wait_timer_triggered = true;
-    });
-    wait_timer->enableTimer(time_to_wait);
-  }
-
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  // Disable the timer if it was created. This call is harmless if the timer already triggered.
-  if (wait_timer) {
-    wait_timer->disableTimer();
-  }
-
-  if (wait_timer_triggered && !disconnected_) {
-    if (time_to_wait == TestUtility::DefaultTimeout) {
-      ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
-    }
-    return AssertionFailure() << "Timed out waiting for disconnect";
-  }
-  EXPECT_TRUE(disconnected_);
-
-  return AssertionSuccess();
+  return IntegrationUtil::runDispatcherUntil(
+      dispatcher_, [this] { return disconnected_; }, "downstream disconnect", time_to_wait);
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -389,6 +369,7 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  timeSystem().setIoDispatcher(nullptr);
   // Reset last, once the connections are torn down. The server's workers outlive this destructor
   // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
   // that reason.
@@ -397,6 +378,10 @@ HttpIntegrationTest::~HttpIntegrationTest() {
 }
 
 void HttpIntegrationTest::initialize() {
+  if (downstream_protocol_ == Http::CodecType::HTTP3 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    timeSystem().setIoDispatcher(dispatcher_.get());
+  }
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
     return BaseIntegrationTest::initialize();
   }

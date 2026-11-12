@@ -735,6 +735,62 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
   test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
 
+// Adds a listener on the main thread as a component other than LDS would.
+void addListenerOfAnotherComponent(IntegrationTestServer& test_server,
+                                   envoy::config::listener::v3::Listener listener) {
+  listener.set_name("other_listener");
+  listener.mutable_address()->mutable_socket_address()->set_port_value(0);
+  test_server.server().dispatcher().post([&test_server, listener]() {
+    EXPECT_TRUE(
+        test_server.server().listenerManager().addOrUpdateListener(listener, "", true).ok());
+  });
+  test_server.waitForGauge("listener_manager.total_listeners_active", Eq(2));
+}
+
+// Verify that a SotW LDS update keeps a listener that another component added.
+TEST_P(LdsIntegrationTest, SotwUpdateKeepsListenerOfAnotherComponent) {
+  autonomous_upstream_ = true;
+  initialize();
+  addListenerOfAnotherComponent(*test_server_,
+                                config_helper_.bootstrap().static_resources().listeners(0));
+
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_removed")->value());
+  EXPECT_EQ(2, test_server_->gauge("listener_manager.total_listeners_active")->value());
+}
+
+// Verify that a SotW LDS update replaces a listener that LDS delivered without a name, since LDS
+// generates a new name for it on every update.
+TEST_P(LdsIntegrationTest, SotwUpdateReplacesListenerWithoutAName) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->mutable_listeners(0)->clear_name();
+  });
+  initialize();
+
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_removed")->value());
+}
+
+// Verify that without tracking a SotW LDS update removes a listener that another component added.
+TEST_P(LdsIntegrationTest, SotwUpdateWithoutTrackingRemovesListenerOfAnotherComponent) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.lds_sotw_track_resources", "false");
+  autonomous_upstream_ = true;
+  initialize();
+  addListenerOfAnotherComponent(*test_server_,
+                                config_helper_.bootstrap().static_resources().listeners(0));
+
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.listener_removed", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
+}
+
 // Sample test making sure our config framework informs on listener failure.
 TEST_P(LdsIntegrationTest, FailConfigLoad) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

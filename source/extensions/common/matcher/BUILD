@@ -55,6 +55,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//source/common/matcher:matcher_lib",
+        "@abseil-cpp//absl/strings",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

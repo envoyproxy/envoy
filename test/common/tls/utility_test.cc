@@ -18,8 +18,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
@@ -31,6 +34,7 @@ namespace TransportSockets {
 namespace Tls {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
 using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
@@ -485,6 +489,387 @@ TEST(UtilityTest, EffectiveTlsParamsSkipsHandshakerOwnedFields) {
   EXPECT_TRUE(none.cipher_suites.empty());
   EXPECT_TRUE(none.ecdh_curves.empty());
   EXPECT_TRUE(none.signature_algorithms.empty());
+}
+
+// Looks up `pem` in `cache`, parsing it as a CRL blob on a miss.
+absl::StatusOr<CrlListSharedPtr> getCrlList(CrlCache& cache, const std::string& pem,
+                                            absl::string_view path) {
+  return cache.getOrCreate(pem, [&] { return parseCrlList(pem, path); });
+}
+
+// Looks up `pem` in `cache`, parsing it as a trusted CA blob on a miss.
+absl::StatusOr<CaCertListSharedPtr> getCaCertList(CaCertCache& cache, const std::string& pem,
+                                                  absl::string_view path) {
+  return cache.getOrCreate(pem, [&] { return parseCaCertList(pem, path); });
+}
+
+// The CRL cache returns one shared parsed representation for identical content,
+// so a CRL referenced from many contexts is materialized in memory only once.
+TEST(CrlCacheTest, SharesIdenticalCrlContent) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> first = getCrlList(*cache, crl, "ca_cert.crl");
+  ASSERT_OK(first);
+  absl::StatusOr<CrlListSharedPtr> second = getCrlList(*cache, crl, "ca_cert.crl");
+  ASSERT_OK(second);
+
+  // Both lookups return the same CrlList and the same parsed X509_CRL.
+  EXPECT_EQ(first->get(), second->get());
+  ASSERT_FALSE((*first)->empty());
+  EXPECT_EQ((**first)[0].get(), (**second)[0].get());
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Distinct CRL content is cached separately.
+TEST(CrlCacheTest, SeparatesDistinctCrlContent) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl1 = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+  const std::string crl2 = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> first = getCrlList(*cache, crl1, "ca_cert.crl");
+  ASSERT_OK(first);
+  absl::StatusOr<CrlListSharedPtr> second = getCrlList(*cache, crl2, "intermediate_ca_cert.crl");
+  ASSERT_OK(second);
+
+  EXPECT_NE(first->get(), second->get());
+  EXPECT_EQ(cache->size(), 2);
+}
+
+// An entry is released once the last reference to it is dropped, so the cache
+// does not grow without bound as CRLs are rotated via xDS.
+TEST(CrlCacheTest, ReleasesUnreferencedEntries) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  {
+    absl::StatusOr<CrlListSharedPtr> entry = getCrlList(*cache, crl, "ca_cert.crl");
+    ASSERT_OK(entry);
+    EXPECT_EQ(cache->size(), 1);
+  }
+  // The only reference is gone, so the entry is released.
+  EXPECT_EQ(cache->size(), 0);
+
+  // Re-adding the same content succeeds and repopulates the cache.
+  absl::StatusOr<CrlListSharedPtr> reloaded = getCrlList(*cache, crl, "ca_cert.crl");
+  ASSERT_OK(reloaded);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Invalid CRL content returns an error and is not cached.
+TEST(CrlCacheTest, ReturnsErrorForInvalidCrl) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string invalid = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/not_a_crl.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> result = getCrlList(*cache, invalid, "not_a_crl.crl");
+  EXPECT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Failed to load CRL from not_a_crl.crl")));
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CrlList keeps the cache alive, so a caller only needs to hold the
+// CrlList (this is what lets the validator store a single shared_ptr).
+TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
+  std::weak_ptr<CrlCache> weak_cache;
+  CrlListSharedPtr crl_list;
+  {
+    auto cache = std::make_shared<CrlCache>();
+    weak_cache = cache;
+    const std::string crl = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+    absl::StatusOr<CrlListSharedPtr> result = getCrlList(*cache, crl, "ca_cert.crl");
+    ASSERT_OK(result);
+    crl_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CrlList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(weak_cache.lock()->size(), 1);
+
+  // Dropping the CrlList releases the cache.
+  crl_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// A minimal value type used to test the shared release and lifetime behavior independently of any
+// PEM format.
+struct TestPemValue {
+  std::string pem;
+};
+
+// Wraps a SharedPemCache and counts parses.
+class TestPemCache {
+public:
+  absl::StatusOr<std::shared_ptr<TestPemValue>> get(const std::string& pem) {
+    return cache_->getOrCreate(pem, [&]() -> absl::StatusOr<std::unique_ptr<TestPemValue>> {
+      ++parses_;
+      if (pem == "invalid") {
+        return absl::InvalidArgumentError("invalid pem");
+      }
+      return std::make_unique<TestPemValue>(TestPemValue{pem});
+    });
+  }
+  size_t size() const { return cache_->size(); }
+
+  std::shared_ptr<SharedPemCache<TestPemValue>> cache_ =
+      std::make_shared<SharedPemCache<TestPemValue>>();
+  int parses_{0};
+};
+
+// An entry is erased as soon as its last reference is released, without waiting for a later
+// insert, and is parsed only once while any reference is held.
+TEST(SharedPemCacheTest, ErasesEntryWhenLastReferenceIsReleased) {
+  auto cache = std::make_shared<TestPemCache>();
+  auto first = cache->get("a");
+  ASSERT_OK(first);
+  auto second = cache->get("a");
+  ASSERT_OK(second);
+  EXPECT_EQ(first->get(), second->get());
+  EXPECT_EQ(cache->parses_, 1);
+  EXPECT_EQ(cache->size(), 1);
+
+  first->reset();
+  EXPECT_EQ(cache->size(), 1);
+  second->reset();
+  EXPECT_EQ(cache->size(), 0);
+
+  // The released key is parsed again on the next lookup.
+  auto again = cache->get("a");
+  ASSERT_OK(again);
+  EXPECT_EQ(cache->parses_, 2);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Releasing one of many distinct entries erases only that entry.
+TEST(SharedPemCacheTest, ErasesOnlyTheReleasedEntry) {
+  auto cache = std::make_shared<TestPemCache>();
+  std::vector<std::shared_ptr<TestPemValue>> entries;
+  for (int i = 0; i < 100; ++i) {
+    auto entry = cache->get(absl::StrCat("pem-", i));
+    ASSERT_OK(entry);
+    entries.push_back(std::move(*entry));
+  }
+  EXPECT_EQ(cache->size(), 100);
+
+  for (int i = 0; i < 100; i += 2) {
+    entries[i].reset();
+  }
+  EXPECT_EQ(cache->size(), 50);
+
+  // The surviving entries are still shared rather than re-parsed.
+  const int parses = cache->parses_;
+  auto survivor = cache->get("pem-1");
+  ASSERT_OK(survivor);
+  EXPECT_EQ(survivor->get(), entries[1].get());
+  EXPECT_EQ(cache->parses_, parses);
+}
+
+// A parse error is returned to the caller and nothing is cached.
+TEST(SharedPemCacheTest, ParseErrorIsNotCached) {
+  auto cache = std::make_shared<TestPemCache>();
+  EXPECT_THAT(cache->get("invalid"), HasStatusMessage(testing::HasSubstr("invalid pem")));
+  EXPECT_EQ(cache->size(), 0);
+  EXPECT_THAT(cache->get("invalid"), HasStatusMessage(testing::HasSubstr("invalid pem")));
+  EXPECT_EQ(cache->parses_, 2);
+}
+
+// An entry keeps its cache alive, and releasing the last entry after every other cache reference
+// is gone erases the entry and then destroys the cache.
+TEST(SharedPemCacheTest, EntryKeepsCacheAlive) {
+  std::weak_ptr<SharedPemCache<TestPemValue>> weak_cache;
+  std::shared_ptr<TestPemValue> entry;
+  {
+    auto cache = std::make_shared<TestPemCache>();
+    weak_cache = cache->cache_;
+    auto result = cache->get("a");
+    ASSERT_OK(result);
+    entry = std::move(*result);
+  }
+  ASSERT_FALSE(weak_cache.expired());
+  EXPECT_EQ(weak_cache.lock()->size(), 1);
+
+  entry.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// The last reference can be released on a thread other than the one that created the entry.
+TEST(SharedPemCacheTest, ReleasesOnAnotherThread) {
+  auto cache = std::make_shared<TestPemCache>();
+  std::vector<std::shared_ptr<TestPemValue>> entries;
+  for (int i = 0; i < 10; ++i) {
+    auto entry = cache->get(absl::StrCat("pem-", i));
+    ASSERT_OK(entry);
+    entries.push_back(std::move(*entry));
+  }
+  EXPECT_EQ(cache->size(), 10);
+
+  Thread::ThreadPtr worker =
+      Thread::threadFactoryForTest().createThread([&entries]() { entries.clear(); });
+  worker->join();
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// The last reference to a key is released on another thread while the main thread looks the same
+// key up again. Whichever order the two take, the entry the main thread ends up holding must stay
+// cached: a release that loses the race to a re-add must not erase the replacement.
+TEST(SharedPemCacheTest, ConcurrentReleaseDoesNotEraseReplacement) {
+  auto cache = std::make_shared<TestPemCache>();
+  // Counts the iterations in which the re-add lost the race and was served the entry being
+  // released, as opposed to re-parsing after the release.
+  int shared_with_release = 0;
+  for (int i = 0; i < 1000; ++i) {
+    auto held = cache->get("a");
+    ASSERT_OK(held);
+    std::shared_ptr<TestPemValue> to_release = std::move(*held);
+    const int parses_before = cache->parses_;
+
+    Thread::ThreadPtr worker =
+        Thread::threadFactoryForTest().createThread([&to_release]() { to_release.reset(); });
+    auto latest = cache->get("a");
+    ASSERT_OK(latest);
+    worker->join();
+    if (cache->parses_ == parses_before) {
+      ++shared_with_release;
+    }
+
+    // The held entry is still the cached one.
+    EXPECT_EQ(cache->size(), 1);
+    auto lookup = cache->get("a");
+    ASSERT_OK(lookup);
+    EXPECT_EQ(lookup->get(), latest->get());
+    latest->reset();
+    lookup->reset();
+    ASSERT_EQ(cache->size(), 0);
+  }
+  testing::Test::RecordProperty("re_adds_sharing_the_released_entry", shared_with_release);
+}
+
+// The trusted CA cache returns one shared parsed representation for identical
+// content, so a trust bundle referenced from many contexts is materialized in
+// memory only once.
+TEST(CaCertCacheTest, SharesIdenticalCaContent) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> first = getCaCertList(*cache, ca_cert, "ca_cert.pem");
+  ASSERT_OK(first);
+  absl::StatusOr<CaCertListSharedPtr> second = getCaCertList(*cache, ca_cert, "ca_cert.pem");
+  ASSERT_OK(second);
+
+  // Both lookups return the same CaCertList and the same parsed X509.
+  EXPECT_EQ(first->get(), second->get());
+  ASSERT_FALSE((*first)->certs.empty());
+  EXPECT_EQ((*first)->certs[0].get(), (*second)->certs[0].get());
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Distinct CA content is cached separately.
+TEST(CaCertCacheTest, SeparatesDistinctCaContent) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  const std::string fake_ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> first = getCaCertList(*cache, ca_cert, "ca_cert.pem");
+  ASSERT_OK(first);
+  absl::StatusOr<CaCertListSharedPtr> second =
+      getCaCertList(*cache, fake_ca_cert, "fake_ca_cert.pem");
+  ASSERT_OK(second);
+
+  EXPECT_NE(first->get(), second->get());
+  EXPECT_EQ(cache->size(), 2);
+}
+
+// A trust bundle carrying several certificates is parsed into one entry holding
+// all of them.
+TEST(CaCertCacheTest, KeepsEveryCertificateInABundle) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string bundle = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> entry = getCaCertList(*cache, bundle, "ca_certificates.pem");
+  ASSERT_OK(entry);
+  EXPECT_GT((*entry)->certs.size(), 1);
+}
+
+// A CA blob is allowed to carry CRLs alongside the certificates; both are kept
+// on the shared entry.
+TEST(CaCertCacheTest, KeepsCrlsCarriedInTheCaBlob) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert_with_crl =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> entry =
+      getCaCertList(*cache, ca_cert_with_crl, "ca_cert_with_crl.pem");
+  ASSERT_OK(entry);
+  EXPECT_FALSE((*entry)->certs.empty());
+  EXPECT_FALSE((*entry)->crls.empty());
+}
+
+// An entry is released once the last reference to it is dropped, so the cache
+// does not grow without bound as certificates are rotated via xDS.
+TEST(CaCertCacheTest, ReleasesUnreferencedEntries) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  {
+    absl::StatusOr<CaCertListSharedPtr> entry = getCaCertList(*cache, ca_cert, "ca_cert.pem");
+    ASSERT_OK(entry);
+    EXPECT_EQ(cache->size(), 1);
+  }
+  // The only reference is gone, so the entry is released.
+  EXPECT_EQ(cache->size(), 0);
+
+  // Re-adding the same content succeeds and repopulates the cache.
+  absl::StatusOr<CaCertListSharedPtr> reloaded = getCaCertList(*cache, ca_cert, "ca_cert.pem");
+  ASSERT_OK(reloaded);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Content that carries no usable certificate returns an error and is not cached.
+TEST(CaCertCacheTest, ReturnsErrorForInvalidCaCert) {
+  auto cache = std::make_shared<CaCertCache>();
+  // Valid PEM envelope but garbage base64 inside, so nothing parses out of it.
+  const std::string invalid = "-----BEGIN CERTIFICATE-----\n"
+                              "not valid base64 content!!!\n"
+                              "-----END CERTIFICATE-----\n";
+
+  absl::StatusOr<CaCertListSharedPtr> result =
+      getCaCertList(*cache, invalid, "invalid_ca_cert.pem");
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Failed to load trusted CA certificates from invalid_ca_cert.pem")));
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CaCertList keeps the cache alive, so a caller only needs to hold
+// the CaCertList (this is what lets the validator store a single shared_ptr).
+TEST(CaCertCacheTest, CaCertListKeepsCacheAlive) {
+  std::weak_ptr<CaCertCache> weak_cache;
+  CaCertListSharedPtr ca_cert_list;
+  {
+    auto cache = std::make_shared<CaCertCache>();
+    weak_cache = cache;
+    const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+    absl::StatusOr<CaCertListSharedPtr> result = getCaCertList(*cache, ca_cert, "ca_cert.pem");
+    ASSERT_OK(result);
+    ca_cert_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CaCertList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(weak_cache.lock()->size(), 1);
+
+  // Dropping the CaCertList releases the cache.
+  ca_cert_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
 }
 
 } // namespace

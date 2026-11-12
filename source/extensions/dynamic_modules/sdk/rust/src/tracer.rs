@@ -13,37 +13,37 @@ use std::ffi::c_void;
 // -----------------------------------------------------------------------------
 
 /// Handle for a counter metric without labels defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerCounterHandle {
   id: usize,
 }
 
 /// Handle for a labeled counter metric defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerCounterVecHandle {
   id: usize,
 }
 
 /// Handle for a gauge metric without labels defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerGaugeHandle {
   id: usize,
 }
 
 /// Handle for a labeled gauge metric defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerGaugeVecHandle {
   id: usize,
 }
 
 /// Handle for a histogram metric without labels defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerHistogramHandle {
   id: usize,
 }
 
 /// Handle for a labeled histogram metric defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerHistogramVecHandle {
   id: usize,
 }
@@ -967,4 +967,27 @@ macro_rules! declare_tracer_init_functions {
       on_panic = ::std::ptr::null()
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashSet;
+
+  #[test]
+  fn metric_handles_are_comparable_and_hashable() {
+    let a = TracerCounterHandle { id: 1 };
+    assert_eq!(a, TracerCounterHandle { id: 1 });
+    assert_ne!(a, TracerCounterHandle { id: 2 });
+
+    let mut set = HashSet::new();
+    set.insert(a);
+    assert!(!set.insert(TracerCounterHandle { id: 1 }));
+
+    assert_eq!(TracerGaugeHandle { id: 5 }, TracerGaugeHandle { id: 5 });
+    assert_eq!(
+      TracerHistogramHandle { id: 7 },
+      TracerHistogramHandle { id: 7 }
+    );
+  }
 }

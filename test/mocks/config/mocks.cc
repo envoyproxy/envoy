@@ -14,11 +14,12 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillByDefault([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                             Stats::Scope&, SubscriptionCallbacks& callbacks,
-                            OpaqueResourceDecoderSharedPtr,
+                            OpaqueResourceDecoderSharedPtr resource_decoder,
                             const SubscriptionOptions&) -> SubscriptionPtr {
         auto ret = std::make_unique<NiceMock<MockSubscription>>();
         subscription_ = ret.get();
         callbacks_ = &callbacks;
+        resource_decoder_ = std::move(resource_decoder);
         return ret;
       });
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _, _))
@@ -35,21 +36,23 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
   ON_CALL(*this, subscriptionOverAdsGrpcMux(_, _, _, _, _, _, _))
       .WillByDefault([this](GrpcMuxSharedPtr&, const envoy::config::core::v3::ConfigSource&,
                             absl::string_view, Stats::Scope&, SubscriptionCallbacks& callbacks,
-                            OpaqueResourceDecoderSharedPtr,
+                            OpaqueResourceDecoderSharedPtr resource_decoder,
                             const SubscriptionOptions&) -> SubscriptionPtr {
         auto ret = std::make_unique<NiceMock<MockSubscription>>();
         subscription_ = ret.get();
         callbacks_ = &callbacks;
+        resource_decoder_ = std::move(resource_decoder);
         return ret;
       });
   ON_CALL(*this, collectionSubscriptionFromUrl(_, _, _, _, _, _))
       .WillByDefault([this](const xds::core::v3::ResourceLocator&,
                             const envoy::config::core::v3::ConfigSource&, absl::string_view,
                             Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                            Envoy::Config::OpaqueResourceDecoderSharedPtr) -> SubscriptionPtr {
+                            OpaqueResourceDecoderSharedPtr resource_decoder) -> SubscriptionPtr {
         auto ret = std::make_unique<NiceMock<MockSubscription>>();
         subscription_ = ret.get();
         callbacks_ = &callbacks;
+        resource_decoder_ = std::move(resource_decoder);
         return ret;
       });
   ON_CALL(*this, messageValidationVisitor())

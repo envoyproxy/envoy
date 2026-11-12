@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 // A SotW CDS update removes only the clusters received through that CDS subscription, so it no
 // longer removes the clusters added by ODCDS. Disable to remove every dynamic cluster not in the
@@ -124,6 +125,10 @@ RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_select_key_by_x5t);
+// A SotW LDS update removes only the listeners received through LDS, so it no longer removes the
+// listeners that other components add. Disable to remove every dynamic listener not in the
+// update.
+RUNTIME_GUARD(envoy_reloadable_features_lds_sotw_track_resources);
 RUNTIME_GUARD(envoy_reloadable_features_limit_json_parser_nesting_depth);
 RUNTIME_GUARD(envoy_reloadable_features_listener_filter_reentrant_continue_guard);
 RUNTIME_GUARD(envoy_reloadable_features_listener_in_place_address_update);
@@ -187,6 +192,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_web
 RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunnel_allow_upstream_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_tls_ecdsa_selection_check_supported_versions);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
 RUNTIME_GUARD(envoy_reloadable_features_udp_hot_restart_session_handoff);
 RUNTIME_GUARD(envoy_reloadable_features_udp_send_zero_length_datagrams);

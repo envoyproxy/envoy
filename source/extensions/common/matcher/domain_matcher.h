@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
@@ -7,6 +9,7 @@
 #include "source/common/matcher/matcher.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/ascii.h"
 #include "xds/type/matcher/v3/domain.pb.h"
 #include "xds/type/matcher/v3/domain.pb.validate.h"
 
@@ -73,6 +76,16 @@ public:
     }
     if (domain->empty()) {
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
+    }
+
+    // Domain names are case-insensitive (RFC 1035 section 2.3.3 / RFC 4343). Scan first and only
+    // allocate a lower-cased copy when an upper-case ASCII byte is present so that the common
+    // lower-case path remains allocation-free.
+    std::string lowercase_domain;
+    if (std::any_of(domain->begin(), domain->end(),
+                    [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
+      lowercase_domain = absl::AsciiStrToLower(*domain);
+      domain = lowercase_domain;
     }
 
     // 1. Try exact match first (highest priority).
@@ -194,7 +207,8 @@ private:
 
     for (const auto& domain_matcher : config.domain_matchers()) {
       for (const auto& domain : domain_matcher.domains()) {
-        if (!seen_domains.insert(domain).second) {
+        const std::string lowercase_domain = absl::AsciiStrToLower(domain);
+        if (!seen_domains.insert(lowercase_domain).second) {
           return absl::InvalidArgumentError(
               absl::StrCat("Duplicate domain in ServerNameMatcher: ", domain));
         }
@@ -256,18 +270,19 @@ private:
       auto on_match = std::make_shared<OnMatch<DataType>>(on_match_factory_cb());
 
       for (const auto& domain : domain_matcher.domains()) {
-        if (domain == "*") {
+        const std::string lowercase_domain = absl::AsciiStrToLower(domain);
+        if (lowercase_domain == "*") {
           // Global wildcard. We use first declaration if multiple exist.
           if (!domain_config->global_wildcard_match_) {
             domain_config->global_wildcard_match_ = on_match;
           }
-        } else if (domain[0] == '*') {
+        } else if (lowercase_domain[0] == '*') {
           // Wildcard pattern. We strip "*." prefix for efficient lookup.
-          const auto suffix = domain.substr(2); // Remove "*."
+          const auto suffix = lowercase_domain.substr(2); // Remove "*."
           domain_config->wildcard_matches_.emplace(std::string(suffix), on_match);
         } else {
           // Exact match.
-          domain_config->exact_matches_.emplace(domain, on_match);
+          domain_config->exact_matches_.emplace(lowercase_domain, on_match);
         }
       }
     }

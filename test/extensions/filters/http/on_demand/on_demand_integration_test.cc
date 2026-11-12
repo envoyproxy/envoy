@@ -1130,10 +1130,11 @@ routes:
       std::ignore = config_blob->PackFrom(hcm_config);
     });
 
+    // The listener warms on the route configuration's xDS init targets (RDS, then VHDS), which
+    // are served below by this thread. Waiting for the listener before serving them only returns
+    // once the initial_fetch_timeout (15s) gives up on each of them.
+    defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
-
-    test_server_->waitUntilListenersReady();
-    registerTestServerPorts({"http"});
 
     // Set up xDS connection (xds_cluster is the second cluster, so it maps to fake_upstreams_[1])
     auto result = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
@@ -1166,6 +1167,17 @@ routes:
 
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
+
+    // Deliver the initial VHDS response the route configuration is warming on, then wait for the
+    // listener to finish warming and the workers to start serving it.
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost,
+        {buildVirtualHost("my_route/vhost_0", "vhost.first")}, {}, "1", vhds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+    test_server_->waitUntilListenersReady();
+    test_server_->waitForGauge("listener_manager.workers_started", testing::Eq(1));
+    registerTestServerPorts({"http"});
   }
 
   FakeStreamPtr vhds_stream_;
