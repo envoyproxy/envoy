@@ -23,6 +23,14 @@ on:
         description: jq filter for the response.
         type: string
         default: .
+      dashboard-id:
+        description: A dashboard to change with the jq program in dashboard-edit, in place of an API call.
+        type: string
+        default: ""
+      dashboard-edit:
+        description: jq program applied to the dashboard's definition before it is put back.
+        type: string
+        default: .
       xml:
         description: A JUnit XML document to upload under the envoy-ci-probe service, in place of an API call.
         type: string
@@ -53,8 +61,22 @@ jobs:
         XML_NAME: ${{ inputs.xml-name }}
         UPLOAD_ARGS: ${{ inputs.upload-args }}
         GIT_CEILING_DIRECTORIES: ${{ github.workspace }}
+    - name: Edit a dashboard
+      if: inputs.dashboard-id != ''
+      run: |
+        auth=(-H "DD-API-KEY: $DD_API_KEY" -H "DD-APPLICATION-KEY: $DD_APP_KEY" -H "Content-Type: application/json")
+        url="https://api.datadoghq.com/api/v1/dashboard/${DASHBOARD_ID}"
+        curl -sS --max-time 120 "${auth[@]}" -o before.json -w 'GET HTTP %{http_code}\n' "$url"
+        jq "$EDIT" before.json > after.json
+        curl -sS --max-time 120 -X PUT "${auth[@]}" --data @after.json -o result.json -w 'PUT HTTP %{http_code}\n' "$url"
+        jq '{id, title, modified_at, errors}' result.json
+      env:
+        DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+        DASHBOARD_ID: ${{ inputs.dashboard-id }}
+        EDIT: ${{ inputs.dashboard-edit }}
     - name: Call the Datadog API
-      if: inputs.xml == ''
+      if: inputs.xml == '' && inputs.dashboard-id == ''
       run: |
         args=(-sS --max-time 120 -X "$METHOD" -H "DD-API-KEY: $DD_API_KEY" -H "Content-Type: application/json"
               -o response.json -w 'HTTP %{http_code} %{size_download} bytes\n')
