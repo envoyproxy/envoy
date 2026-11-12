@@ -23,6 +23,16 @@ on:
         description: jq filter for the response.
         type: string
         default: .
+      xml:
+        description: A JUnit XML document to upload under the envoy-ci-probe service, in place of an API call.
+        type: string
+        default: ""
+      xml-name:
+        type: string
+        default: probe_test.xml
+      upload-args:
+        type: string
+        default: ""
 
 jobs:
   api:
@@ -30,7 +40,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+    - name: Upload a probe document
+      if: inputs.xml != ''
+      run: |
+        mkdir probe && cd probe
+        printf '%s' "$XML" > "$XML_NAME"
+        read -ra args <<< "$UPLOAD_ARGS"
+        npx --yes @datadog/datadog-ci@5.25.0 junit upload --service envoy-ci-probe --skip-git-metadata-upload "${args[@]}" "$XML_NAME"
+      env:
+        DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        XML: ${{ inputs.xml }}
+        XML_NAME: ${{ inputs.xml-name }}
+        UPLOAD_ARGS: ${{ inputs.upload-args }}
+        GIT_CEILING_DIRECTORIES: ${{ github.workspace }}
     - name: Call the Datadog API
+      if: inputs.xml == ''
       run: |
         args=(-sS --max-time 120 -X "$METHOD" -H "DD-API-KEY: $DD_API_KEY" -H "Content-Type: application/json"
               -o response.json -w 'HTTP %{http_code} %{size_download} bytes\n')
