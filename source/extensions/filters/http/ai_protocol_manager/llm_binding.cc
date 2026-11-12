@@ -231,13 +231,12 @@ bool removes(const std::vector<const LlmBinding::Mutation*>& edits, absl::string
 // Reads the path and `body` under `binding`. The edits go to `edited` -- `body` itself, or null
 // to leave it as it is; the read says the same either way, so a filter ahead of the transcoder
 // sees what it will do.
-std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& binding,
-                                          const LlmBinding* api_binding, absl::string_view path,
-                                          const nlohmann::json& body, nlohmann::json* edited,
-                                          const HeaderLookup& header) {
-  LlmBindingRead read{binding};
-  const std::vector<const LlmBinding::Mutation*> edits = editsOf(*binding, api_binding);
-  if (const UriPattern* pattern = patternOf(*binding, api_binding); pattern != nullptr) {
+std::optional<LlmBindingRead> readRequest(const LlmBinding& binding, const LlmBinding* api_binding,
+                                          absl::string_view path, const nlohmann::json& body,
+                                          nlohmann::json* edited, const HeaderLookup& header) {
+  LlmBindingRead read;
+  const std::vector<const LlmBinding::Mutation*> edits = editsOf(binding, api_binding);
+  if (const UriPattern* pattern = patternOf(binding, api_binding); pattern != nullptr) {
     std::optional<UriPattern::Match> match = pattern->match(path);
     if (!match.has_value()) {
       return std::nullopt;
@@ -301,19 +300,24 @@ std::optional<LlmBindingRead>
 readFirstMatch(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
                absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
                const nlohmann::json& body, nlohmann::json* edited, const HeaderLookup& header) {
+  const auto read_under = [&](const LlmBindingConstSharedPtr& candidate,
+                              const LlmBinding* api) -> std::optional<LlmBindingRead> {
+    std::optional<LlmBindingRead> read = readRequest(*candidate, api, path, body, edited, header);
+    if (read.has_value()) {
+      read->binding = candidate;
+    }
+    return read;
+  };
   if (binding != nullptr) {
-    return readRequest(binding, api_binding.get(), path, body, edited, header);
+    return read_under(binding, api_binding.get());
   }
   if (api_binding != nullptr) {
-    if (std::optional<LlmBindingRead> read =
-            readRequest(api_binding, nullptr, path, body, edited, header);
-        read.has_value()) {
+    if (std::optional<LlmBindingRead> read = read_under(api_binding, nullptr); read.has_value()) {
       return read;
     }
   }
   for (const LlmBindingConstSharedPtr& client_binding : client_bindings) {
-    if (std::optional<LlmBindingRead> read =
-            readRequest(client_binding, nullptr, path, body, edited, header);
+    if (std::optional<LlmBindingRead> read = read_under(client_binding, nullptr);
         read.has_value()) {
       return read;
     }
