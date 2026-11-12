@@ -1,185 +1,47 @@
 name: Envoy/JUnit
 
+# NOT FOR MERGE: a probe of the Datadog API with the CI key, on a branch of its own.
+
 permissions:
   contents: read
 
 on:
   workflow_dispatch:
     inputs:
-      since-hours:
-        description: Collect runs completed in the last N hours.
-        type: number
-        default: 2
-      until-hours:
-        description: End the window N hours ago rather than now.
-        type: number
-        default: 0
-      slice-hours:
-        description: >-
-          Split the window into jobs of N hours each, to backfill (0 for one job). A day of
-          runs takes a job about 70 minutes.
-        type: number
-        default: 0
-      max-parallel:
-        description: How many of the window's jobs to run at once.
+      method:
         type: string
-        default: "2"
-      artifact:
-        description: Keep the collected XML as an artifact.
-        type: boolean
-        default: true
-      workflows:
-        description: Comma-separated workflow names to collect from.
+        default: GET
+      path:
+        description: API path, e.g. /api/v1/validate
         type: string
-        default: Envoy/Checks,Envoy/Prechecks
-      datadog-service:
-        description: Datadog service name to upload test results under.
+        default: /api/v1/validate
+      body:
+        description: JSON request body, if any.
         type: string
-        default: envoy-ci
-
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
-
+        default: ""
+      jq:
+        description: jq filter for the response.
+        type: string
+        default: .
 
 jobs:
-  slices:
-    # The window as fixed times, in slices, as the jobs for them do not all start at once.
+  api:
     permissions: {}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    outputs:
-      slices: ${{ steps.slices.outputs.slices }}
-    steps:
-    - id: slices
-      run: |
-        python3 - >> "$GITHUB_OUTPUT" <<'EOF'
-        import datetime
-        import json
-        import os
-
-        now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
-        since = now - datetime.timedelta(hours=float(os.environ["SINCE_HOURS"]))
-        until = now - datetime.timedelta(hours=float(os.environ["UNTIL_HOURS"]))
-        size = datetime.timedelta(hours=float(os.environ["SLICE_HOURS"])) or until - since
-        slices = []
-        # Newest first.
-        while until > since and len(slices) < 256:
-            start = max(since, until - size)
-            slices.append({"since": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                           "until": until.strftime("%Y-%m-%dT%H:%M:%SZ")})
-            until = start
-        print(f"slices={json.dumps(slices)}")
-        EOF
-      env:
-        SINCE_HOURS: ${{ inputs.since-hours || 2 }}
-        UNTIL_HOURS: ${{ inputs.until-hours || 0 }}
-        SLICE_HOURS: ${{ inputs.slice-hours || 0 }}
-
-  collect:
-    # Manually triggered, not run on each CI run, so collecting never slows CI down. Each job
-    # takes a slice of the window and pulls the test.xml of every test the matched runs' Bazel
-    # invocations actually executed, from EngFlow.
-    needs: slices
-    if: needs.slices.outputs.slices != '[]'
-    name: collect (${{ matrix.slice.since }} to ${{ matrix.slice.until }})
-    permissions:
-      actions: read
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      max-parallel: ${{ fromJSON(inputs.max-parallel || '2') }}
-      matrix:
-        slice: ${{ fromJSON(needs.slices.outputs.slices) }}
-    env:
-      # So that the step logs are timestamped as things happen.
-      PYTHONUNBUFFERED: "1"
-    steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      with:
-        sparse-checkout: ci/junit
-    - name: Collect JUnit XML from EngFlow
-      run: >-
-        python3 ci/junit/collect.py
-        --repo "${{ github.repository }}"
-        --since "${{ matrix.slice.since }}"
-        --until "${{ matrix.slice.until }}"
-        --workflows "${{ inputs.workflows || 'Envoy/Checks,Envoy/Prechecks' }}"
-        --out junit
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-      if: inputs.artifact
-      with:
-        name: junit-${{ strategy.job-index }}
-        path: junit
-        if-no-files-found: warn
-    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
-      with:
-        node-version: '22'
-    - name: Restore Datadog upload watermark
-      # Which run ids a previous dispatch already uploaded, so that going over a window again
-      # (re-running a backfill that was cut short, or overlapping windows) doesn't upload the
-      # same run's results twice. Each job adds to its own copy, and the watermark job below
-      # puts them together.
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        path: .datadog-watermark.json
-        key: datadog-watermark-${{ github.run_id }}
-        restore-keys: datadog-watermark-
-    - name: Upload JUnit XML to Datadog
-      # Best effort, same as collection above: a Datadog hiccup shouldn't fail the run.
-      continue-on-error: true
-      run: >-
-        python3 ci/junit/upload_datadog.py
-        --repo "${{ github.repository }}"
-        --service "${{ inputs.datadog-service || 'envoy-ci' }}"
-        --junit-dir junit
-        --watermark .datadog-watermark.json
-      env:
-        DD_API_KEY: ${{ secrets.DD_API_KEY }}
-    - name: Keep this job's watermark
-      if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-      with:
-        name: watermark-${{ strategy.job-index }}
-        path: .datadog-watermark.json
-        # The cache it was restored from is keyed on this path, so it keeps its name.
-        include-hidden-files: true
-        if-no-files-found: ignore
-        retention-days: 1
-
-  watermark:
-    # One watermark from those of the jobs above, whatever became of them, so that the next
-    # dispatch knows everything that was uploaded.
-    needs: collect
-    if: always() && needs.collect.result != 'skipped'
-    permissions:
-      actions: read
-      contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      with:
-        sparse-checkout: ci/junit
-    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        path: .datadog-watermark.json
-        key: datadog-watermark-${{ github.run_id }}
-        restore-keys: datadog-watermark-
-    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
-      with:
-        pattern: watermark-*
-        path: watermarks
-    - run: >-
-        python3 ci/junit/upload_datadog.py
-        --repo "${{ github.repository }}"
-        --watermark .datadog-watermark.json
-        --merge-watermarks watermarks/*/.datadog-watermark.json
-    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        path: .datadog-watermark.json
-        key: datadog-watermark-${{ github.run_id }}
+    - name: Call the Datadog API
+      run: |
+        args=(-sS --max-time 120 -X "$METHOD" -H "DD-API-KEY: $DD_API_KEY" -H "Content-Type: application/json"
+              -o response.json -w 'HTTP %{http_code} %{size_download} bytes\n')
+        if [[ -n "$BODY" ]]; then
+            args+=(--data "$BODY")
+        fi
+        curl "${args[@]}" "https://api.datadoghq.com${API_PATH}"
+        jq "$JQ" response.json 2>/dev/null | head -c 200000 || head -c 20000 response.json
+      env:
+        DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        METHOD: ${{ inputs.method }}
+        API_PATH: ${{ inputs.path }}
+        BODY: ${{ inputs.body }}
+        JQ: ${{ inputs.jq }}
