@@ -95,10 +95,14 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
-    ENVOY_BUG(hasHandshakeCompleted(), "Received MAX_STREAM frame before handshake completed.");
-    parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
-    // If there's waiting streams, make sure the pool will now serve them.
-    parent_.onUpstreamReady();
+    if (!hasHandshakeCompleted()) {
+      parent_.transitionActiveClientState(*this, ActiveClient::State::ReadyForEarlyData);
+      parent_.onUpstreamReadyForEarlyData(*this);
+    } else {
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
+      // If there's waiting streams, make sure the pool will now serve them.
+      parent_.onUpstreamReady();
+    }
   } else if (state() == ActiveClient::State::ReadyForEarlyData) {
     if (currentUnusedCapacity() == 0) {
       // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
