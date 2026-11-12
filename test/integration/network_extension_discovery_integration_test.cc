@@ -433,6 +433,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   // The config failure completes warming, but the listener only starts listening once the
   // workers add it, so wait for that before connecting.
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
 
   // New connections will close since there's no valid configuration.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
@@ -800,6 +801,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToExist
   // The config update completes warming, but the listener only starts listening once the
   // workers add it, so wait for that before connecting.
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
   FakeRawConnectionPtr fake_upstream_connection;
