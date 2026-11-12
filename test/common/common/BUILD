@@ -620,6 +620,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stderr_writer_test",
+    srcs = ["stderr_writer_test.cc"],
+    deps = [
+        "//source/common/common:stderr_writer_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "interval_value_test",
     srcs = ["interval_value_test.cc"],
     deps = ["//source/common/common:interval_value"],

@@ -652,6 +652,14 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "stderr_writer_lib",
+    hdrs = ["stderr_writer.h"],
+    deps = [
+        "@abseil-cpp//absl/strings:str_format",
+    ],
+)
+
 envoy_pch_library(
     name = "common_pch",
     includes = [
