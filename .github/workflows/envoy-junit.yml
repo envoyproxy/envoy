@@ -23,6 +23,10 @@ on:
         description: jq filter for the response.
         type: string
         default: .
+      batch-url:
+        description: URL of a JSON array of {name, method, path, body} calls to make, in place of one API call.
+        type: string
+        default: ""
       dashboard-id:
         description: A dashboard to change with the jq program in dashboard-edit, in place of an API call.
         type: string
@@ -61,6 +65,25 @@ jobs:
         XML_NAME: ${{ inputs.xml-name }}
         UPLOAD_ARGS: ${{ inputs.upload-args }}
         GIT_CEILING_DIRECTORIES: ${{ github.workspace }}
+    - name: Make a batch of API calls
+      if: inputs.batch-url != ''
+      run: |
+        curl -sSL --max-time 60 -o batch.json "$BATCH_URL"
+        n=$(jq length batch.json)
+        for i in $(seq 0 $((n - 1))); do
+            name=$(jq -r ".[$i].name" batch.json)
+            method=$(jq -r ".[$i].method // \"POST\"" batch.json)
+            path=$(jq -r ".[$i].path" batch.json)
+            jq -c ".[$i].body" batch.json > body.json
+            code=$(curl -sS --max-time 120 -X "$method" -H "DD-API-KEY: $DD_API_KEY" -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" --data @body.json -o response.json -w '%{http_code}' "https://api.datadoghq.com${path}")
+            echo "RESULT $i $code $name :: $(jq -c "$JQ" response.json 2>/dev/null | head -c 600)"
+        done
+      env:
+        DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+        BATCH_URL: ${{ inputs.batch-url }}
+        JQ: ${{ inputs.jq }}
     - name: Edit a dashboard
       if: inputs.dashboard-id != ''
       run: |
@@ -76,7 +99,7 @@ jobs:
         DASHBOARD_ID: ${{ inputs.dashboard-id }}
         EDIT: ${{ inputs.dashboard-edit }}
     - name: Call the Datadog API
-      if: inputs.xml == '' && inputs.dashboard-id == ''
+      if: inputs.xml == '' && inputs.dashboard-id == '' && inputs.batch-url == ''
       run: |
         args=(-sS --max-time 120 -X "$METHOD" -H "DD-API-KEY: $DD_API_KEY" -H "Content-Type: application/json"
               -o response.json -w 'HTTP %{http_code} %{size_download} bytes\n')
