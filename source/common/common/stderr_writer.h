@@ -25,4 +25,15 @@ void writeStderr(const absl::FormatSpec<Args...>& format, const Args&... args) {
   }
 }
 
+/**
+ * Write a backtrace frame to stderr with `writeStderr()`.
+ */
+inline void writeStderrFrame(int index, const char* symbol, const void* address) {
+  if (symbol != nullptr) {
+    writeStderr("[backtrace] [stderr] #%d: %s [%p]\n", index, symbol, address);
+  } else {
+    writeStderr("[backtrace] [stderr] #%d: [%p]\n", index, address);
+  }
+}
+
 } // namespace Envoy

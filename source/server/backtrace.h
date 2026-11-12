@@ -142,13 +142,7 @@ public:
       if (!addrMapping().empty()) {
         writeStderr("[backtrace] [stderr] Address mapping: %s\n", addrMapping());
       }
-      visitTrace([](int index, const char* symbol, void* address) {
-        if (symbol != nullptr) {
-          writeStderr("[backtrace] [stderr] #%d: %s [%p]\n", index, symbol, address);
-        } else {
-          writeStderr("[backtrace] [stderr] #%d: [%p]\n", index, address);
-        }
-      });
+      visitTrace(writeStderrFrame);
       return;
     }
 

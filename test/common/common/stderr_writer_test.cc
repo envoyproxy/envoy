@@ -22,5 +22,15 @@ TEST(WriteStderrTest, TruncatesLongOutput) {
   EXPECT_EQ(std::string(4607, 'x'), testing::internal::GetCapturedStderr());
 }
 
+TEST(WriteStderrTest, WritesFrames) {
+  const void* address = reinterpret_cast<const void*>(uintptr_t{0x1f2e3d});
+  testing::internal::CaptureStderr();
+  writeStderrFrame(3, "Envoy::main()", address);
+  writeStderrFrame(4, nullptr, address);
+  EXPECT_EQ("[backtrace] [stderr] #3: Envoy::main() [0x1f2e3d]\n"
+            "[backtrace] [stderr] #4: [0x1f2e3d]\n",
+            testing::internal::GetCapturedStderr());
+}
+
 } // namespace
 } // namespace Envoy
