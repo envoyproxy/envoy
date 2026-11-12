@@ -178,11 +178,24 @@ def main():
         "--watermark", default="",
         help="Path to a run-id watermark file, to skip runs a previous invocation already "
              "uploaded (e.g. from an overlapping --since-hours window). Skipped if unset.")
-    parser.add_argument("--watermark-retention-hours", type=float, default=48)
+    parser.add_argument(
+        "--merge-watermarks", nargs="*", default=None,
+        help="Add the run ids in these watermark files to --watermark, and do nothing else. "
+             "For the jobs of a window that was split, which each write their own.")
+    # Long enough to cover a backfill, so that going over one again does not upload it twice.
+    parser.add_argument("--watermark-retention-hours", type=float, default=24 * 45)
     parser.add_argument(
         "--dry-run", action="store_true",
         help="Run datadog-ci with --dry-run, and leave the watermark as it is.")
     args = parser.parse_args()
+
+    if args.merge_watermarks is not None:
+        merged = load_watermark(args.watermark)
+        for path in args.merge_watermarks:
+            merged.update(load_watermark(path))
+        save_watermark(args.watermark, merged, args.watermark_retention_hours)
+        print(f"{len(merged)} uploaded runs recorded from {len(args.merge_watermarks)} files")
+        return 0
 
     if not os.environ.get("DD_API_KEY"):
         print("DD_API_KEY not set, skipping Datadog upload.")
@@ -209,6 +222,9 @@ def main():
         else:
             uploaded += 1
             watermark[run_id] = meta.get("created_at", "")
+            # As each run is done, so that a job that is cut short keeps what it has uploaded.
+            if args.watermark and not args.dry_run:
+                save_watermark(args.watermark, watermark, args.watermark_retention_hours)
 
     if args.watermark and not args.dry_run:
         save_watermark(args.watermark, watermark, args.watermark_retention_hours)

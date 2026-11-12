@@ -120,14 +120,14 @@ jobs:
       with:
         node-version: '22'
     - name: Restore Datadog upload watermark
-      # Which run ids a previous dispatch already uploaded, so two overlapping windows (e.g.
-      # re-running this manually before narrowing the window) don't re-upload the same run's
-      # results. The slices of one dispatch do not overlap, so it does not matter that the jobs
-      # for them each save their own.
+      # Which run ids a previous dispatch already uploaded, so that going over a window again
+      # (re-running a backfill that was cut short, or overlapping windows) doesn't upload the
+      # same run's results twice. Each job adds to its own copy, and the watermark job below
+      # puts them together.
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: .datadog-watermark.json
-        key: datadog-watermark-${{ github.run_id }}-${{ strategy.job-index }}
+        key: datadog-watermark-${{ github.run_id }}
         restore-keys: datadog-watermark-
     - name: Upload JUnit XML to Datadog
       # Best effort, same as collection above: a Datadog hiccup shouldn't fail the run.
@@ -140,9 +140,46 @@ jobs:
         --watermark .datadog-watermark.json
       env:
         DD_API_KEY: ${{ secrets.DD_API_KEY }}
-    - name: Save Datadog upload watermark
+    - name: Keep this job's watermark
       if: always()
-      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: watermark-${{ strategy.job-index }}
+        path: .datadog-watermark.json
+        # The cache it was restored from is keyed on this path, so it keeps its name.
+        include-hidden-files: true
+        if-no-files-found: ignore
+        retention-days: 1
+
+  watermark:
+    # One watermark from those of the jobs above, whatever became of them, so that the next
+    # dispatch knows everything that was uploaded.
+    needs: collect
+    if: always() && needs.collect.result != 'skipped'
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        sparse-checkout: ci/junit
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: .datadog-watermark.json
-        key: datadog-watermark-${{ github.run_id }}-${{ strategy.job-index }}
+        key: datadog-watermark-${{ github.run_id }}
+        restore-keys: datadog-watermark-
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+      with:
+        pattern: watermark-*
+        path: watermarks
+    - run: >-
+        python3 ci/junit/upload_datadog.py
+        --repo "${{ github.repository }}"
+        --watermark .datadog-watermark.json
+        --merge-watermarks watermarks/*/.datadog-watermark.json
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      with:
+        path: .datadog-watermark.json
+        key: datadog-watermark-${{ github.run_id }}
