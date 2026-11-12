@@ -214,8 +214,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
     SET_AND_RETURN_IF_NOT_OK(cert.status(), creation_status);
 
-    absl::StatusOr<CaCertListSharedPtr> ca_cert_list =
-        ca_cert_cache->getOrCreate(*cert, domain.trust_bundle().filename());
+    absl::StatusOr<CaCertListSharedPtr> ca_cert_list = ca_cert_cache->getOrCreate(
+        *cert, [&]() { return parseCaCertList(*cert, domain.trust_bundle().filename()); });
     if (!ca_cert_list.ok()) {
       // The cache rejects a bundle that cannot be parsed as well as one that
       // parses but carries no certificate, and reports both with a path-based

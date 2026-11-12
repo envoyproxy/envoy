@@ -9,37 +9,67 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Server {
+namespace {
+
+// Generates a UUID name for a listener without one, as the listener manager would, so that a SotW
+// update can remove the listener by that name.
+class ListenerResourceDecoder
+    : public Config::OpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener> {
+public:
+  ListenerResourceDecoder(ProtobufMessage::ValidationVisitor& validation_visitor,
+                          Random::RandomGenerator& random)
+      : OpaqueResourceDecoderImpl(validation_visitor, "name"), random_(random) {}
+
+  // Config::OpaqueResourceDecoder
+  Protobuf::Arena::UniquePtr<Protobuf::Message> decodeResource(const Protobuf::Any& resource,
+                                                               Protobuf::Arena& arena) override {
+    Protobuf::Arena::UniquePtr<Protobuf::Message> message =
+        OpaqueResourceDecoderImpl::decodeResource(resource, arena);
+    auto& listener = Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(*message);
+    if (listener.name().empty()) {
+      listener.set_name(random_.uuid());
+    }
+    return message;
+  }
+
+private:
+  Random::RandomGenerator& random_;
+};
+
+} // namespace
 
 LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        const xds::core::v3::ResourceLocator* lds_resources_locator,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
-                       ProtobufMessage::ValidationVisitor& validation_visitor)
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       Random::RandomGenerator& random)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")),
-      resource_type_helper_(validation_visitor, "name"),
+      resource_decoder_(std::make_shared<ListenerResourceDecoder>(validation_visitor, random)),
       init_target_("LDS", [this]() { subscription_->start({}); }) {
-  const auto resource_name = resource_type_helper_.getResourceName();
+  const auto resource_name = Config::getResourceName<envoy::config::listener::v3::Listener>();
   if (lds_resources_locator == nullptr) {
-    subscription_ =
-        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
-                                  lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-                                  resource_type_helper_.resourceDecoder(), {}),
-                              Config::SubscriptionPtr);
+    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                              lds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ =
-        THROW_OR_RETURN_VALUE(cm.subscriptionFactory().collectionSubscriptionFromUrl(
-                                  *lds_resources_locator, lds_config, resource_name, *scope_, *this,
-                                  resource_type_helper_.resourceDecoder()),
-                              Config::SubscriptionPtr);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }
@@ -54,6 +84,8 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
   // We do all listener removals before adding the new listeners. This allows adding a new
   // listener with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {
+    // SotW listeners whose TTL expires are removed here, so they are no longer tracked.
+    sotw_listener_names_.erase(removed_listener);
     if (listener_manager_.removeListener(removed_listener)) {
       ENVOY_LOG(info, "lds: remove listener '{}'", removed_listener);
       any_applied = true;
@@ -121,6 +153,28 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
 
 absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                         const std::string& version_info) {
+  absl::flat_hash_set<std::string> next_sotw_listener_names;
+  next_sotw_listener_names.reserve(resources.size());
+  for (const auto& resource : resources) {
+    next_sotw_listener_names.insert(
+        Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(
+            resource.get().resource())
+            .name());
+  }
+
+  // Other components may add listeners, so only remove the listeners received via SotW.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lds_sotw_track_resources")) {
+    Protobuf::RepeatedPtrField<std::string> to_remove;
+    for (const std::string& listener_name : sotw_listener_names_) {
+      if (!next_sotw_listener_names.contains(listener_name)) {
+        to_remove.Add(std::string(listener_name));
+      }
+    }
+    absl::Status status = onConfigUpdate(resources, to_remove, version_info);
+    sotw_listener_names_ = std::move(next_sotw_listener_names);
+    return status;
+  }
+
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   absl::node_hash_set<std::string> listeners_to_remove;
@@ -137,7 +191,11 @@ absl::Status LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourc
   for (const auto& listener : listeners_to_remove) {
     *to_remove_repeated.Add() = listener;
   }
-  return onConfigUpdate(resources, to_remove_repeated, version_info);
+  absl::Status status = onConfigUpdate(resources, to_remove_repeated, version_info);
+  // Track the names even if unused, so enabling the guard at runtime doesn't leak listeners. Store
+  // them after the call, since it untracks the listeners that it removes.
+  sotw_listener_names_ = std::move(next_sotw_listener_names);
+  return status;
 }
 
 void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
