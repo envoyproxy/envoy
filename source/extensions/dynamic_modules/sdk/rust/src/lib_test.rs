@@ -2285,25 +2285,30 @@ fn test_http_get_timing_info() {
   };
 
   let timing: access_log::TimingInfo = filter.get_timing_info();
-  assert_eq!(timing.start_time_unix_ns, Some(1_000));
-  assert_eq!(timing.downstream_connection_begin_ns, Some(-4));
-  assert_eq!(timing.downstream_handshake_start_ns, Some(-3));
-  assert_eq!(timing.downstream_handshake_complete_ns, Some(-2));
-  assert_eq!(timing.last_downstream_header_rx_byte_received_ns, Some(0));
-  assert_eq!(timing.last_downstream_rx_byte_received_ns, Some(1));
-  assert_eq!(timing.upstream_connect_start_ns, Some(2));
-  assert_eq!(timing.upstream_connect_complete_ns, Some(3));
-  assert_eq!(timing.upstream_handshake_complete_ns, Some(4));
-  assert_eq!(timing.first_upstream_tx_byte_sent_ns, Some(5));
-  assert_eq!(timing.last_upstream_tx_byte_sent_ns, Some(6));
-  assert_eq!(timing.first_upstream_rx_byte_received_ns, Some(7));
-  assert_eq!(timing.first_upstream_rx_body_byte_received_ns, Some(8));
-  assert_eq!(timing.last_upstream_rx_byte_received_ns, Some(9));
-  assert_eq!(timing.first_downstream_tx_byte_sent_ns, Some(10));
-  assert_eq!(timing.last_downstream_tx_byte_sent_ns, Some(11));
-  assert_eq!(timing.last_downstream_ack_received_ns, Some(12));
-  assert_eq!(timing.request_complete_duration_ns, Some(13));
-  assert_eq!(timing.downstream_connection_end_ns, Some(14));
+  assert_eq!(
+    timing,
+    access_log::TimingInfo {
+      start_time_unix_ns: Some(1_000),
+      downstream_connection_begin_ns: Some(-4),
+      downstream_handshake_start_ns: Some(-3),
+      downstream_handshake_complete_ns: Some(-2),
+      last_downstream_header_rx_byte_received_ns: Some(0),
+      last_downstream_rx_byte_received_ns: Some(1),
+      upstream_connect_start_ns: Some(2),
+      upstream_connect_complete_ns: Some(3),
+      upstream_handshake_complete_ns: Some(4),
+      first_upstream_tx_byte_sent_ns: Some(5),
+      last_upstream_tx_byte_sent_ns: Some(6),
+      first_upstream_rx_byte_received_ns: Some(7),
+      first_upstream_rx_body_byte_received_ns: Some(8),
+      last_upstream_rx_byte_received_ns: Some(9),
+      first_downstream_tx_byte_sent_ns: Some(10),
+      last_downstream_tx_byte_sent_ns: Some(11),
+      last_downstream_ack_received_ns: Some(12),
+      request_complete_duration_ns: Some(13),
+      downstream_connection_end_ns: Some(14),
+    }
+  );
 }
 
 const HTTP_UPSTREAM_ATTEMPTS_AVAILABLE: usize = 1;
