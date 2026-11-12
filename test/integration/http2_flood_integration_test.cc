@@ -85,6 +85,7 @@ protected:
   // Avoid hiding the other form of beginSession.
   using Http2RawFrameIntegrationTest::beginSession;
   void beginSession() override;
+  void sendPrefillRequest(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
   void triggerListenerDrain();
@@ -215,8 +216,10 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
-void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count,
-                                                              uint32_t data_frame_size) {
+// Starts a session and sends the request that pre-fills the downstream outbound frame queue,
+// without waiting for the queue to fill.
+void Http2FloodMitigationTest::sendPrefillRequest(uint32_t data_frame_count,
+                                                  uint32_t data_frame_size) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
@@ -236,6 +239,11 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
        Http2Frame::Header("response_size_bytes", absl::StrCat(data_frame_size)),
        Http2Frame::Header("no_trailers", "0")});
   sendFrame(request);
+}
+
+void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count,
+                                                              uint32_t data_frame_size) {
+  sendPrefillRequest(data_frame_count, data_frame_size);
 
   // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
   // that the first request has completed.
@@ -751,7 +759,11 @@ TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloo
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
         max_connection_duration->set_seconds(seconds.count());
       });
-  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  // The duration timer runs from when the connection is made, so it also covers the pre-fill.
+  // Do not wait to see the queue full: if the timer fires before the test thread has seen it, the
+  // connection is already closed and the queue is empty again. The response and the GOAWAY are
+  // one frame over the limit together, whichever is queued first.
+  sendPrefillRequest(AllFrameFloodLimit - 1);
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
