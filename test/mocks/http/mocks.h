@@ -512,12 +512,12 @@ public:
   MOCK_METHOD(void, onRequestDestroy, ());
 
   // Http::AsyncClient
-  Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
-                const RequestOptions& args) override {
+  Request* send(RequestMessagePtr&& request, Callbacks& callbacks, const RequestOptions& args,
+                Tracing::SpanPtr = nullptr) override {
     return send_(request, callbacks, args);
   }
   OngoingRequest* startRequest(RequestHeaderMapPtr&& headers, Callbacks& callbacks,
-                               const RequestOptions& args) override {
+                               const RequestOptions& args, Tracing::SpanPtr = nullptr) override {
     return startRequest_(headers, callbacks, args);
   }
   MOCK_METHOD(Request*, send_,

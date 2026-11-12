@@ -40,6 +40,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/upstream/host_utility.h"
+#include "source/common/upstream/od_cds_context.h"
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/inlined_vector.h"
@@ -937,6 +938,16 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     }
   }
 
+  Upstream::OdCdsContextSharedPtr mirror_discovery_context;
+  if (!active_shadow_policies.empty()) {
+    const auto* discovery_state =
+        callbacks_->streamInfo().filterState()->getDataReadOnly<Upstream::OdCdsFilterState>(
+            Upstream::OdCdsFilterState::key());
+    if (discovery_state != nullptr) {
+      mirror_discovery_context = discovery_state->mirrorDiscoveryContextSharedPtr();
+    }
+  }
+
   // Start the shadow streams.
   const size_t num_shadow_policies = active_shadow_policies.size();
   for (size_t i = 0; i < num_shadow_policies; ++i) {
@@ -995,11 +1006,11 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       // without waiting.
       Http::RequestMessagePtr request(new Http::RequestMessageImpl(std::move(shadow_headers)));
       config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                     options, shadow_policy.stats());
+                                     options, shadow_policy.stats(), mirror_discovery_context);
     } else {
       Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
           std::string(shadow_cluster_name.value()), std::move(shadow_headers), options,
-          shadow_policy.stats());
+          shadow_policy.stats(), mirror_discovery_context);
       if (shadow_stream != nullptr) {
         ASSERT(std::find(shadow_streams_.begin(), shadow_streams_.end(), shadow_stream) ==
                shadow_streams_.end());
@@ -1214,13 +1225,20 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     }
   }
 
-  for (auto* shadow_stream : shadow_streams_) {
+  for (size_t i = 0; i < shadow_streams_.size();) {
+    auto* shadow_stream = shadow_streams_[i];
     if (end_stream) {
       shadow_stream->removeDestructorCallback();
       shadow_stream->removeWatermarkCallbacks();
     }
     Buffer::OwnedImpl copy(data);
     shadow_stream->sendData(copy, end_stream);
+    // Sending this chunk may overflow the mirror's pending buffer and remove it from the list.
+    // Removal moves the last mirror into this index. Keep the index unchanged so that
+    // mirror also receives the current data chunk.
+    if (i < shadow_streams_.size() && shadow_streams_[i] == shadow_stream) {
+      ++i;
+    }
   }
   if (end_stream) {
     shadow_streams_.clear();

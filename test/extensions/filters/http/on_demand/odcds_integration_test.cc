@@ -1,7 +1,11 @@
+#include <set>
 #include <string>
+#include <tuple>
+#include <vector>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
@@ -22,6 +26,7 @@
 #include "test/integration/scoped_rds.h"
 #include "test/integration/xdstp_config_sources_integration.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -882,6 +887,291 @@ TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtVirtualHostLevelWorks) {
   verifyResponse(std::move(response), "503", {}, {});
 
   cleanupUpstreamAndDownstream();
+}
+
+class OdCdsMirrorIntegrationTest : public Event::TestUsingSimulatedTime,
+                                   public AdsIntegrationTestBase,
+                                   public testing::TestWithParam<std::tuple<bool, uint32_t>> {
+public:
+  OdCdsMirrorIntegrationTest() : AdsIntegrationTestBase(ipVersion(), Grpc::SotwOrDelta::Delta) {
+    concurrency_ = std::get<1>(GetParam());
+  }
+
+  Network::Address::IpVersion ipVersion() const override { return Network::Address::IpVersion::v4; }
+  Grpc::ClientType clientType() const override { return Grpc::ClientType::EnvoyGrpc; }
+  bool withStats() const { return std::get<0>(GetParam()); }
+
+  void TearDown() override {
+    for (auto& client : clients_) {
+      client->close();
+    }
+    for (auto* connections : {&primary_connections_, &mirror_connections_}) {
+      for (auto& connection : *connections) {
+        if (connection != nullptr) {
+          EXPECT_TRUE(connection->close());
+          EXPECT_TRUE(connection->waitForDisconnect());
+        }
+      }
+    }
+    cleanUpXdsConnection();
+  }
+
+protected:
+  static constexpr uint32_t MirrorBufferLimit = 4096;
+
+  testing::AssertionResult compareRequest(const std::string& type_url,
+                                          const std::vector<std::string>& subscriptions,
+                                          const std::vector<std::string>& unsubscriptions,
+                                          bool expect_node = false) {
+    return compareDeltaDiscoveryRequest(type_url, subscriptions, unsubscriptions,
+                                        Grpc::Status::WellKnownGrpcStatus::Ok, "", expect_node);
+  }
+
+  void initializeWithMirrorDiscoveryDisabled() {
+    initialize();
+    mirror_upstream_index_ = fake_upstreams_.size();
+    addFakeUpstream(Http::CodecType::HTTP2);
+    primary_connections_.resize(concurrency_);
+    mirror_connections_.resize(concurrency_);
+
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}, true));
+    sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TestTypeUrl::get().Cluster, {}, {}, "1");
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().Listener, {}, {}));
+
+    OdCdsListenerBuilder builder(Network::Test::getLoopbackAddressString(ipVersion()));
+    auto* rds = builder.hcm().mutable_rds();
+    rds->set_route_config_name("mirror_routes");
+    rds->mutable_config_source()->mutable_ads();
+    rds->mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+    auto listener = builder.listener();
+    listener.mutable_connection_balance_config()->mutable_exact_balance();
+    sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(
+        Config::TestTypeUrl::get().Listener, {listener}, {}, "1");
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+    ASSERT_TRUE(
+        compareRequest(Config::TestTypeUrl::get().RouteConfiguration, {"mirror_routes"}, {}));
+
+    routes_ = buildRouteConfig("mirror_routes", "dummy_cluster");
+    routes_.mutable_validate_clusters()->set_value(false);
+    auto* route = routes_.mutable_virtual_hosts(0)->mutable_routes(0);
+    route->mutable_request_body_buffer_limit()->set_value(MirrorBufferLimit);
+    auto* mirror = route->mutable_route()->add_request_mirror_policies();
+    mirror->set_cluster("mirror");
+    if (withStats()) {
+      mirror->set_stat_prefix("test");
+    }
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        Config::TestTypeUrl::get().RouteConfiguration, {routes_}, {}, "1");
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().Listener, {}, {}));
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().RouteConfiguration, {}, {}));
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  void enableMirrorDiscovery() {
+    OdCdsIntegrationHelper::PerRouteConfig config;
+    *config.mutable_mirror_odcds()->mutable_config() =
+        OdCdsIntegrationHelper::createOnDemandCdsConfig(
+            OdCdsIntegrationHelper::createAdsOdCdsConfigSource(), 10000);
+    auto* route = routes_.mutable_virtual_hosts(0)->mutable_routes(0);
+    std::ignore =
+        (*route->mutable_typed_per_filter_config())[Extensions::HttpFilters::HttpFilterNames::get()
+                                                        .OnDemand]
+            .PackFrom(config);
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        Config::TestTypeUrl::get().RouteConfiguration, {routes_}, {}, "2");
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().RouteConfiguration, {}, {}));
+    test_server_->waitForCounter("http.config_test.rds.mirror_routes.config_reload", Eq(2));
+  }
+
+  void expectWorkerConnections() {
+    // Keep one connection on each worker so later requests exercise each worker's discovery client.
+    for (uint32_t worker = 0; worker < concurrency_; ++worker) {
+      test_server_->waitForGauge(
+          listenerStatPrefix(fmt::format("worker_{}.downstream_cx_active", worker)), Eq(1));
+    }
+  }
+
+  void publishMirror() {
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"mirror"}, {}));
+    const auto mirror_cluster = ConfigHelper::buildStaticCluster(
+        "mirror", fake_upstreams_[mirror_upstream_index_]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()));
+    sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TestTypeUrl::get().Cluster, {mirror_cluster}, {}, "2");
+    // The workers share one subscription; the next message is its ACK.
+    ASSERT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+  }
+
+  void completePrimary(uint32_t client_index, const std::string& body) {
+    auto response = clients_[client_index]->makeRequestWithBody(request_headers_, body);
+    auto& connection = primary_connections_[client_index];
+    if (connection == nullptr) {
+      ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection));
+    }
+    FakeStreamPtr request;
+    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, request));
+    ASSERT_TRUE(request->waitForEndStream(*dispatcher_));
+    EXPECT_EQ(body, request->body().toString());
+    request->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  void receiveMirrors(uint32_t requests_per_worker, const std::set<std::string>& expected_bodies) {
+    std::set<std::string> received_bodies;
+    for (auto& connection : mirror_connections_) {
+      if (connection == nullptr) {
+        ASSERT_TRUE(fake_upstreams_[mirror_upstream_index_]->waitForHttpConnection(*dispatcher_,
+                                                                                   connection));
+      }
+      for (uint32_t request_index = 0; request_index < requests_per_worker; ++request_index) {
+        FakeStreamPtr request;
+        ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, request));
+        ASSERT_TRUE(request->waitForEndStream(*dispatcher_));
+        EXPECT_EQ("mirror.example-shadow", request->headers().getHostValue());
+        EXPECT_TRUE(received_bodies.insert(request->body().toString()).second);
+        request->encodeHeaders(default_response_headers_, true);
+      }
+    }
+    EXPECT_EQ(expected_bodies, received_bodies);
+  }
+
+  envoy::config::route::v3::RouteConfiguration routes_;
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "mirror.example"}};
+  std::vector<IntegrationCodecClientPtr> clients_;
+  std::vector<FakeHttpConnectionPtr> primary_connections_;
+  std::vector<FakeHttpConnectionPtr> mirror_connections_;
+  size_t mirror_upstream_index_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    StatsAndWorkers, OdCdsMirrorIntegrationTest,
+    testing::Combine(testing::Bool(), testing::Values(1u, 2u)),
+    [](const testing::TestParamInfo<OdCdsMirrorIntegrationTest::ParamType>& info) {
+      return fmt::format("{}_{}Workers", std::get<0>(info.param) ? "WithStats" : "WithoutStats",
+                         std::get<1>(info.param));
+    });
+
+TEST_P(OdCdsMirrorIntegrationTest, RouteUpdateEnablesDiscoveryWithoutDroppingFirstMirrors) {
+  ASSERT_NO_FATAL_FAILURE(initializeWithMirrorDiscoveryDisabled());
+  for (uint32_t worker = 0; worker < concurrency_; ++worker) {
+    clients_.push_back(makeHttpConnection(makeClientConnection(lookupPort("http"))));
+    ASSERT_NO_FATAL_FAILURE(completePrimary(worker, fmt::format("disabled-{}", worker)));
+  }
+  ASSERT_NO_FATAL_FAILURE(expectWorkerConnections());
+  ASSERT_TRUE(fake_upstreams_[mirror_upstream_index_]->assertPendingConnectionsEmpty());
+  if (withStats()) {
+    test_server_->waitForCounter("mirror.test.rq_no_cluster", Eq(concurrency_));
+    EXPECT_EQ(0, test_server_->counter("mirror.test.discovery_attempt")->value());
+    EXPECT_EQ(0, test_server_->counter("mirror.test.rq_started")->value());
+  }
+
+  // No CDS request should precede the RDS ACK: discovery was disabled for earlier requests.
+  ASSERT_NO_FATAL_FAILURE(enableMirrorDiscovery());
+
+  std::set<std::string> pending_bodies;
+  for (uint32_t worker = 0; worker < concurrency_; ++worker) {
+    for (uint32_t request = 0; request < 2; ++request) {
+      const auto body = fmt::format("pending-{}-{}", worker, request);
+      pending_bodies.insert(body);
+      // The primary must finish while the mirror cluster is still undiscovered.
+      ASSERT_NO_FATAL_FAILURE(completePrimary(worker, body));
+    }
+  }
+  ASSERT_TRUE(fake_upstreams_[mirror_upstream_index_]->assertPendingConnectionsEmpty());
+  if (withStats()) {
+    test_server_->waitForGauge("mirror.test.discovery_pending", Eq(2 * concurrency_));
+    EXPECT_EQ(2 * concurrency_, test_server_->counter("mirror.test.discovery_attempt")->value());
+  }
+
+  ASSERT_NO_FATAL_FAILURE(publishMirror());
+  ASSERT_NO_FATAL_FAILURE(receiveMirrors(2, pending_bodies));
+
+  std::set<std::string> warm_bodies;
+  for (uint32_t worker = 0; worker < concurrency_; ++worker) {
+    const auto body = fmt::format("warm-{}", worker);
+    warm_bodies.insert(body);
+    ASSERT_NO_FATAL_FAILURE(completePrimary(worker, body));
+  }
+  ASSERT_NO_FATAL_FAILURE(receiveMirrors(1, warm_bodies));
+  test_server_->waitForCounter("cluster.mirror.upstream_rq_completed", Eq(3 * concurrency_));
+  if (withStats()) {
+    test_server_->waitForCounter("mirror.test.rq_success", Eq(3 * concurrency_));
+    test_server_->waitForGauge("mirror.test.discovery_pending", Eq(0));
+    EXPECT_EQ(4 * concurrency_, test_server_->counter("mirror.test.rq_sampled")->value());
+    EXPECT_EQ(concurrency_, test_server_->counter("mirror.test.rq_no_cluster")->value());
+    EXPECT_EQ(3 * concurrency_, test_server_->counter("mirror.test.rq_started")->value());
+    EXPECT_EQ(2 * concurrency_, test_server_->counter("mirror.test.discovery_attempt")->value());
+    EXPECT_EQ(2 * concurrency_, test_server_->counter("mirror.test.discovery_success")->value());
+    for (const auto* stat : {"discovery_missing", "discovery_timeout", "discovery_cancelled",
+                             "discovery_overflow", "rq_failure", "rq_cancelled"}) {
+      EXPECT_EQ(0, test_server_->counter(absl::StrCat("mirror.test.", stat))->value());
+    }
+    test_server_->waitForNumHistogramSamplesGe("mirror.test.discovery_time", 2 * concurrency_);
+  } else {
+    for (const auto& counter : test_server_->counters()) {
+      EXPECT_NE(0, counter->name().find("mirror."));
+    }
+  }
+}
+
+TEST_P(OdCdsMirrorIntegrationTest, BufferLimitDropsOnlyOversizedMirrors) {
+  ASSERT_NO_FATAL_FAILURE(initializeWithMirrorDiscoveryDisabled());
+  ASSERT_NO_FATAL_FAILURE(enableMirrorDiscovery());
+  std::set<std::string> pending_bodies;
+  for (uint32_t worker = 0; worker < concurrency_; ++worker) {
+    clients_.push_back(makeHttpConnection(makeClientConnection(lookupPort("http"))));
+    // Each mirror may fill its own buffer even when their combined size exceeds the limit.
+    for (uint32_t request = 0; request < 2; ++request) {
+      auto body = fmt::format("pending-{}-{}", worker, request);
+      body.resize(MirrorBufferLimit, 'a');
+      pending_bodies.insert(body);
+      ASSERT_NO_FATAL_FAILURE(completePrimary(worker, body));
+    }
+
+    auto oversized = clients_[worker]->startRequest(request_headers_);
+    clients_[worker]->sendData(oversized.first, MirrorBufferLimit, false);
+    FakeStreamPtr primary;
+    ASSERT_TRUE(primary_connections_[worker]->waitForNewStream(*dispatcher_, primary));
+    ASSERT_TRUE(primary->waitForData(*dispatcher_, MirrorBufferLimit));
+    if (withStats()) {
+      test_server_->waitForGauge("mirror.test.discovery_pending", Eq(2 * (worker + 1) + 1));
+    }
+    // Crossing the limit drops this mirror, but the whole upload still reaches the primary.
+    clients_[worker]->sendData(oversized.first, 1, true);
+    ASSERT_TRUE(primary->waitForEndStream(*dispatcher_));
+    EXPECT_EQ(MirrorBufferLimit + 1, primary->bodyLength());
+    primary->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(oversized.second->waitForEndStream());
+    EXPECT_EQ("200", oversized.second->headers().getStatusValue());
+  }
+  ASSERT_NO_FATAL_FAILURE(expectWorkerConnections());
+  ASSERT_TRUE(fake_upstreams_[mirror_upstream_index_]->assertPendingConnectionsEmpty());
+  if (withStats()) {
+    test_server_->waitForCounter("mirror.test.discovery_overflow", Eq(concurrency_));
+    test_server_->waitForGauge("mirror.test.discovery_pending", Eq(2 * concurrency_));
+    EXPECT_EQ(0, test_server_->counter("mirror.test.rq_started")->value());
+  }
+
+  ASSERT_NO_FATAL_FAILURE(publishMirror());
+  ASSERT_NO_FATAL_FAILURE(receiveMirrors(2, pending_bodies));
+  test_server_->waitForCounter("cluster.mirror.upstream_rq_completed", Eq(2 * concurrency_));
+  EXPECT_EQ(2 * concurrency_, test_server_->counter("cluster.mirror.upstream_rq_total")->value());
+  if (withStats()) {
+    test_server_->waitForCounter("mirror.test.rq_success", Eq(2 * concurrency_));
+    test_server_->waitForGauge("mirror.test.discovery_pending", Eq(0));
+    EXPECT_EQ(3 * concurrency_, test_server_->counter("mirror.test.rq_sampled")->value());
+    EXPECT_EQ(3 * concurrency_, test_server_->counter("mirror.test.discovery_attempt")->value());
+    EXPECT_EQ(2 * concurrency_, test_server_->counter("mirror.test.discovery_success")->value());
+    EXPECT_EQ(concurrency_, test_server_->counter("mirror.test.discovery_overflow")->value());
+    for (const auto* stat : {"rq_failure", "rq_cancelled", "rq_no_cluster", "discovery_missing",
+                             "discovery_timeout", "discovery_cancelled"}) {
+      EXPECT_EQ(0, test_server_->counter(absl::StrCat("mirror.test.", stat))->value());
+    }
+  }
 }
 
 class OdCdsAdsIntegrationTest

@@ -26,13 +26,65 @@ action must be present in the HTTP request.
 
 On-demand VHDS and on-demand S/RDS can not be used at the same time at this point.
 
-On-demand CDS can also be enabled or disabled per virtual host or route. Specifying an extension config
-in :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
-the :ref:`route's typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` without
-the :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` field disables
-the on demand CDS for requests using this virtual host or route. Conversely,
-if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
-on demand CDS is enabled for requests using this virtual host or route.
+Configuration
+-------------
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+* :ref:`v3 API reference for per route/virtual host config <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>`
+* The filter should be placed before *envoy.filters.http.router* filter in the HttpConnectionManager's filter chain.
+
+.. _config_http_filters_on_demand_mirrors:
+
+On-demand mirror clusters
+-------------------------
+
+The :ref:`mirror_odcds
+<envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.mirror_odcds>` field enables
+discovery for missing mirror clusters. Mirrored requests are buffered during discovery while
+the primary request continues. If this field is omitted, mirrors to missing clusters are skipped.
+
+To reuse the primary discovery settings, set ``inherit_primary: true``:
+
+.. code-block:: yaml
+
+  odcds:
+    source:
+      ads: {}
+  mirror_odcds:
+    inherit_primary: true
+
+To configure mirror discovery independently, use ``mirror_odcds.config``:
+
+.. code-block:: yaml
+
+  mirror_odcds:
+    config:
+      source:
+        ads: {}
+      timeout: 2s
+
+These settings apply to all sampled mirror policies, including those using
+:ref:`cluster_header
+<envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.cluster_header>`.
+
+For static routes with missing clusters, set :ref:`validate_clusters
+<envoy_v3_api_field_config.route.v3.RouteConfiguration.validate_clusters>` to ``false``
+(the default for RDS). See :ref:`mirror discovery behavior <config_http_filters_router_mirror_odcds>`
+for buffering, timeouts and cancellation.
+
+Per-route configuration
+-----------------------
+
+Use :ref:`PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>`
+in ``typed_per_filter_config`` under the filter's name to override settings for a virtual host,
+route or weighted cluster. The most specific configuration replaces all settings: include both
+``odcds`` and ``mirror_odcds`` to enable both discovery modes.
+
+Settings are selected when request headers are processed and refreshed after on-demand route
+discovery. Place filters that change routing inputs before this filter; later route changes
+do not reselect settings.
+
+.. _config_http_filters_on_demand_stats:
 
 Statistics
 ----------
@@ -71,6 +123,9 @@ about the configured timeout, so including it would make the high percentiles me
 plane is not answering, requests keep waiting and are not recorded in the histogram until the route is
 found; ``route_discovery_pending`` and ``route_discovery_cancelled`` are the signals to watch then.
 
+For mirror discovery statistics, see :ref:`mirror policy statistics
+<config_http_filters_router_mirror_stats>`.
+
 .. _config_http_filters_on_demand_filter_state:
 
 Filter state
@@ -103,10 +158,3 @@ long the request waited. For example, to log which cluster the request waited fo
 
 The cluster name and the host are only available in the filter state and in access logs, not in stat names,
 which keeps the number of stats independent of the number of clusters and hosts.
-
-Configuration
--------------
-* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand``.
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
-* :ref:`v3 API reference for per route/virtual host config <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>`
-* The filter should be placed before *envoy.filters.http.router* filter in the HttpConnectionManager's filter chain.

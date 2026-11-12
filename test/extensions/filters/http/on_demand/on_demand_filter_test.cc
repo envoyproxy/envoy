@@ -1,11 +1,13 @@
 #include <memory>
 
 #include "source/common/http/header_map_impl.h"
+#include "source/common/upstream/od_cds_context.h"
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -38,7 +40,8 @@ public:
     auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
     odcds_ = mock_odcds.get();
     auto config = std::make_shared<OnDemandFilterConfig>(
-        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
+        DecodeHeadersBehavior::cdsRds(std::make_shared<const Upstream::OdCdsContext>(
+            std::move(mock_odcds), std::chrono::milliseconds(5000))));
     setupWithConfig(std::move(config));
   }
 
@@ -456,7 +459,8 @@ public:
       auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
       odcds_ = mock_odcds.get();
       config = std::make_shared<OnDemandFilterConfig>(
-          DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)),
+          DecodeHeadersBehavior::cdsRds(std::make_shared<const Upstream::OdCdsContext>(
+              std::move(mock_odcds), std::chrono::milliseconds(5000))),
           *store_.rootScope(), "http.test.");
     } else {
       config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds(),
@@ -709,29 +713,29 @@ TEST_F(OnDemandFilterStatsTest, NoDiscoveryNoStats) {
 }
 
 TEST(OnDemandConfigTest, Basic) {
-  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::extensions::filters::http::on_demand::v3::OnDemand config;
 
   absl::Status status1 = absl::OkStatus();
-  OnDemandFilterConfig config1(config, cm, visitor, status1);
+  OnDemandFilterConfig config1(config, context, visitor, status1);
   EXPECT_THAT(status1, IsOk());
 
   config.mutable_odcds();
   absl::Status status2 = absl::OkStatus();
-  OnDemandFilterConfig config2(config, cm, visitor, status2);
+  OnDemandFilterConfig config2(config, context, visitor, status2);
   EXPECT_THAT(status2, IsOk());
 
   config.mutable_odcds()->set_resources_locator("foo");
   absl::Status status3 = absl::OkStatus();
-  OnDemandFilterConfig config3(config, cm, visitor, status3);
+  OnDemandFilterConfig config3(config, context, visitor, status3);
   EXPECT_THAT(status3, HasStatus(absl::StatusCode::kInvalidArgument,
                                  "foo does not have a xdstp:, http: or file: scheme"));
 
   // A valid xdstp resources_locator is decoded and an OdCds API is allocated with it.
   config.mutable_odcds()->set_resources_locator("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
   absl::Status status4 = absl::OkStatus();
-  OnDemandFilterConfig config4(config, cm, visitor, status4);
+  OnDemandFilterConfig config4(config, context, visitor, status4);
   EXPECT_THAT(status4, IsOk());
 }
 
