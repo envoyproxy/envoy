@@ -53,14 +53,13 @@ public:
   void logTrace() {
     if (log_to_stderr_) {
       // This is used in fatal signal handlers, so it is written with write(2) from a fixed buffer.
-      StderrWriter() << "Coroutine Backtrace:\n";
+      writeStderr("Coroutine Backtrace:\n");
       visitTrace([](int index, const char* symbol, const void* address) {
-        StderrWriter writer;
-        writer << "[backtrace] [stderr] #" << index << ": ";
         if (symbol != nullptr) {
-          writer << symbol << " ";
+          writeStderr("[backtrace] [stderr] #%d: %s [%p]\n", index, symbol, address);
+        } else {
+          writeStderr("[backtrace] [stderr] #%d: [%p]\n", index, address);
         }
-        writer << "[" << address << "]\n";
       });
       return;
     }

@@ -137,18 +137,17 @@ public:
    */
   void logTrace() {
     if (log_to_stderr_) {
-      StderrWriter() << "Backtrace (use tools/stack_decode.py to get line numbers):\n"
-                     << "Envoy version: " << VersionInfo::version() << "\n";
+      writeStderr("Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: %s\n",
+                  VersionInfo::version());
       if (!addrMapping().empty()) {
-        StderrWriter() << "[backtrace] [stderr] Address mapping: " << addrMapping() << "\n";
+        writeStderr("[backtrace] [stderr] Address mapping: %s\n", addrMapping());
       }
       visitTrace([](int index, const char* symbol, void* address) {
-        StderrWriter writer;
-        writer << "[backtrace] [stderr] #" << index << ": ";
         if (symbol != nullptr) {
-          writer << symbol << " ";
+          writeStderr("[backtrace] [stderr] #%d: %s [%p]\n", index, symbol, address);
+        } else {
+          writeStderr("[backtrace] [stderr] #%d: [%p]\n", index, address);
         }
-        writer << "[" << address << "]\n";
       });
       return;
     }
@@ -188,8 +187,7 @@ public:
 
   void logFault(const char* signame, const void* addr) {
     if (log_to_stderr_) {
-      StderrWriter() << "[backtrace] Caught " << signame << ", suspect faulting address " << addr
-                     << "\n";
+      writeStderr("[backtrace] Caught %s, suspect faulting address %p\n", signame, addr);
       return;
     }
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
