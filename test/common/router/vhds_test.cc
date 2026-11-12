@@ -878,10 +878,13 @@ public:
                               Server::Configuration::ServerFactoryContext&,
                               Server::Configuration::ExtraFactoryContext& extra_context) override {
     extra_context.init_manager->add(init_target_);
+    on_create_http_filter_route_config_.Call();
     return std::make_shared<Router::RouteSpecificFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.http.warming_test"; }
+
+  testing::MockFunction<void()> on_create_http_filter_route_config_;
 
 private:
   Init::TargetImpl& init_target_;
@@ -909,6 +912,7 @@ vhds:
   warming_blocks_unmatched_requests: {}
 )EOF");
   RouteConfigUpdatePtr config_update_info = makeReceiver();
+  EXPECT_CALL(filter_factory.on_create_http_filter_route_config_, Call());
   EXPECT_OK(config_update_info->onRdsUpdate(route_config, "rds_v1"));
 
   // The RDS update is still warming (waiting on the per-route filter's init target), so
@@ -918,12 +922,14 @@ vhds:
   EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
 
   // The initial VHDS fetch fails while the RDS update is still warming, and the per-route filter
-  // then finishes warming.
+  // then finishes warming. Failing VHDS must not rebuild or restart warming for the per-route
+  // filter.
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
       Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
   filter_init_target.ready();
 
   EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
   EXPECT_FALSE(config_update_info->configWarming());
   ASSERT_TRUE(config_update_info->configInfo().has_value());
   EXPECT_EQ("rds_v1", config_update_info->configInfo()->version_);

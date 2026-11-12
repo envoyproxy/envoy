@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <iterator>
@@ -1540,8 +1541,12 @@ public:
     return shared_config_->internalOnlyHeaders();
   }
   const std::string& name() const override { return shared_config_->name(); }
-  void setAwaitingInitialVhdsUpdate(bool awaiting) { awaiting_initial_vhds_update_ = awaiting; }
-  bool awaitingInitialVhdsUpdate() const override { return awaiting_initial_vhds_update_; }
+  void setAwaitingInitialVhdsUpdate(bool awaiting) {
+    awaiting_initial_vhds_update_.store(awaiting, std::memory_order_release);
+  }
+  bool awaitingInitialVhdsUpdate() const override {
+    return awaiting_initial_vhds_update_.load(std::memory_order_acquire);
+  }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
   bool warmingBlocksUnmatchedRequests() const override {
     return shared_config_->warmingBlocksUnmatchedRequests();
@@ -1577,7 +1582,7 @@ protected:
 private:
   CommonConfigSharedPtr shared_config_;
   std::unique_ptr<RouteMatcher> route_matcher_;
-  bool awaiting_initial_vhds_update_{false};
+  std::atomic<bool> awaiting_initial_vhds_update_{false};
 };
 
 /**

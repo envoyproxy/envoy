@@ -1828,6 +1828,46 @@ TEST_F(RdsVhdsOnDemandTest,
   rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
 }
 
+TEST_F(RdsVhdsOnDemandTest,
+       WarmingBlocksUnmatchedRequestsFailureAfterClusterRemovalDoesNotThrowAndWakesHeldRequests) {
+  server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+  setup();
+
+  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      warmingBlocksUnmatchedRequestsVhdsRdsConfigJson("1"));
+  envoy::config::route::v3::RouteConfiguration route_config;
+  ASSERT_TRUE(rds_response.resources(0).UnpackTo(&route_config));
+  route_config.mutable_validate_clusters()->set_value(true);
+  ASSERT_TRUE(rds_response.mutable_resources(0)->PackFrom(route_config));
+
+  const auto decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(
+      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+  auto* vhds_callbacks = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_TRUE(rds_->configCast()->awaitingInitialVhdsUpdate());
+
+  // Request for 'bar.com' arrives while initial wildcard VHDS is in flight.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Simulate CDS removing cluster 'foo' while the initial VHDS fetch is still in flight.
+  ON_CALL(server_factory_context_.cluster_manager_, hasCluster("foo")).WillByDefault(Return(false));
+
+  // Initial VHDS failure clears awaitingInitialVhdsUpdate in place and wakes held requests without
+  // re-validating clusters or spuriously reloading RDS.
+  EXPECT_CALL(mock_callback_, Call(false));
+  EXPECT_NO_THROW(vhds_callbacks->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, nullptr));
+  EXPECT_FALSE(rds_->configCast()->awaitingInitialVhdsUpdate());
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

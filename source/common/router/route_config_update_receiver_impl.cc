@@ -246,12 +246,20 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 }
 
 void RouteConfigUpdateReceiverImpl::onVhdsFailure() {
-  if (awaiting_initial_vhds_update_) {
-    const std::string version_info =
-        base_.warming_state_.route_config_any_.has_value()
-            ? base_.warming_state_.version_info_
-            : (base_.configInfo().has_value() ? base_.configInfo()->version_ : "");
-    onVhdsUpdate({}, {}, {}, version_info);
+  if (!awaiting_initial_vhds_update_) {
+    return;
+  }
+  awaiting_initial_vhds_update_ = false;
+  if (auto* warming_config = dynamic_cast<const ConfigImpl*>(base_.warming_state_.config_.get());
+      warming_config != nullptr) {
+    const_cast<ConfigImpl*>(warming_config)->setAwaitingInitialVhdsUpdate(false);
+  }
+  if (auto* published_config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+      published_config != nullptr) {
+    const_cast<ConfigImpl*>(published_config)->setAwaitingInitialVhdsUpdate(false);
+    if (!configWarming()) {
+      onVhdsConfigPublished();
+    }
   }
 }
 
