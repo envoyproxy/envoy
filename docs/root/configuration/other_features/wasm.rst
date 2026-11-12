@@ -24,6 +24,7 @@ Wasm runtime emits the following statistics:
 
   wasm.<runtime>.created, Counter, Total number of execution instances created
   wasm.<runtime>.active, Gauge, Number of active execution instances
+  wasm.<runtime>.crashed, Counter, "Total number of execution instances that failed with a runtime error, for example a panic or a trap in the plugin. Each instance is counted once. A failed instance is reloaded only with the ``FAIL_RELOAD`` failure policy"
   wasm.<runtime>.memory_size, Gauge, "Total linear memory size in bytes of all active execution instances. Wasm linear memory never shrinks, so an instance's share only drops when it is destroyed. Not reported for the ``null`` runtime"
   wasm.wasm_vm_count, Gauge, "Process-wide number of active Wasm VMs, across every runtime"
 
