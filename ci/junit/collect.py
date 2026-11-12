@@ -33,6 +33,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 
@@ -50,6 +51,10 @@ MAX_BATCH_READ_BYTES = 8 * 1024 * 1024
 MAX_BATCH_READ_BLOBS = 200
 # How many connections the EngFlow calls are spread over.
 CURL_CONNECTIONS = 32
+# How many tests' XML is fetched and written at a time, so that a big window's is never all held.
+FETCH_TESTS = 5000
+# How long to wait out a GitHub rate limit, at most, before giving up on a request.
+MAX_RATE_LIMIT_WAIT = 900
 # GitHub returns at most 1000 runs for a filtered listing, so list the window in slices.
 LIST_SLICE = datetime.timedelta(hours=1)
 
@@ -72,8 +77,23 @@ def _get(url, token=None, timeout=300):
     if token:
         req.add_header("Authorization", f"Bearer {token}")
         req.add_header("Accept", "application/vnd.github+json")
-    with _opener.open(req, timeout=timeout) as r:
-        return r.read()
+    for attempt in range(4):
+        try:
+            with _opener.open(req, timeout=timeout) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            # A big window is thousands of GitHub requests, and the token's limit is shared
+            # with every other workflow in the repo, so wait a limit out rather than drop data.
+            limited = e.code == 429 or (
+                e.code == 403 and e.headers.get("x-ratelimit-remaining") == "0")
+            if not token or not limited or attempt == 3:
+                raise
+            wait = int(e.headers.get("retry-after") or 0)
+            if not wait and e.headers.get("x-ratelimit-reset"):
+                wait = int(e.headers["x-ratelimit-reset"]) - int(time.time()) + 5
+            wait = max(10, min(wait or 60, MAX_RATE_LIMIT_WAIT))
+            print(f"  GitHub rate limit, waiting {wait}s")
+            time.sleep(wait)
 
 
 def _github(path, token, key):
@@ -340,6 +360,12 @@ def main():
         "--until-hours", type=float, default=0,
         help="End the window this many hours ago rather than now, to collect an older window "
              "in slices.")
+    parser.add_argument(
+        "--since", default="",
+        help="Start of the window, as an ISO 8601 UTC time, in place of --since-hours.")
+    parser.add_argument(
+        "--until", default="",
+        help="End of the window, as an ISO 8601 UTC time, in place of --until-hours.")
     parser.add_argument("--out", default="junit")
     parser.add_argument("--workers", type=int, default=16)
     args = parser.parse_args()
@@ -348,6 +374,11 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc)
     since = now - datetime.timedelta(hours=args.since_hours)
     until = now - datetime.timedelta(hours=args.until_hours)
+    # Fixed times, for the slices of a window, which do not all start at once.
+    if args.since:
+        since = datetime.datetime.fromisoformat(args.since.replace("Z", "+00:00"))
+    if args.until:
+        until = datetime.datetime.fromisoformat(args.until.replace("Z", "+00:00"))
 
     runs = {}
     start = since
@@ -420,29 +451,31 @@ def main():
                 with open(os.path.join(run_dir(args.out, run), "run.json"), "w") as f:
                     json.dump(metas[run["id"]], f)
 
-    # Each test's outputs, then the XML among them.
-    targets = get_targets([(invocation, label) for _, invocation, label in tests])
-    outputs = [
-        [digest for digest in _digests(target) if digest[1] <= MAX_XML_BYTES]
-        for target in targets]
-    blobs = read_blobs([digest for digests in outputs for digest in digests])
-    for (job_dir, invocation, label), digests in zip(tests, outputs):
-        written = 0
-        for digest in digests:
-            blob = blobs.get(digest, b"")
-            if not blob.lstrip().startswith(b"<?xml"):
-                continue
-            # Named after the test, as that is what the file's results are listed under once
-            # uploaded. A sharded or repeated test has several, hence the directory.
-            path = os.path.join(
-                job_dir, invocation, digest[0][:12], f"{_safe(label.lstrip('/'))}.xml")
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "wb") as f:
-                f.write(blob)
-            written += 1
-        totals["tests"] += 1
-        totals["xml"] += written
-        totals["missing"] += not written
+    # Each test's outputs, then the XML among them, some of the tests at a time.
+    for start in range(0, len(tests), FETCH_TESTS):
+        fetch = tests[start:start + FETCH_TESTS]
+        targets = get_targets([(invocation, label) for _, invocation, label in fetch])
+        outputs = [
+            [digest for digest in _digests(target) if digest[1] <= MAX_XML_BYTES]
+            for target in targets]
+        blobs = read_blobs([digest for digests in outputs for digest in digests])
+        for (job_dir, invocation, label), digests in zip(fetch, outputs):
+            written = 0
+            for digest in digests:
+                blob = blobs.get(digest, b"")
+                if not blob.lstrip().startswith(b"<?xml"):
+                    continue
+                # Named after the test, as that is what the file's results are listed under once
+                # uploaded. A sharded or repeated test has several, hence the directory.
+                path = os.path.join(
+                    job_dir, invocation, digest[0][:12], f"{_safe(label.lstrip('/'))}.xml")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as f:
+                    f.write(blob)
+                written += 1
+            totals["tests"] += 1
+            totals["xml"] += written
+            totals["missing"] += not written
 
     summary = ", ".join(f"{k}: {v}" for k, v in totals.items())
     print(summary)
