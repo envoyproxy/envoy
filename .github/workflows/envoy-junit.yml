@@ -22,8 +22,8 @@ on:
         default: 0
       max-parallel:
         description: How many of the window's jobs to run at once.
-        type: number
-        default: 2
+        type: string
+        default: "2"
       artifact:
         description: Keep the collected XML as an artifact.
         type: boolean
@@ -90,7 +90,7 @@ jobs:
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      max-parallel: ${{ inputs.max-parallel || 2 }}
+      max-parallel: ${{ fromJSON(inputs.max-parallel || '2') }}
       matrix:
         slice: ${{ fromJSON(needs.slices.outputs.slices) }}
     env:
