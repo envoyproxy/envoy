@@ -13,6 +13,7 @@ branch it was against (`envoy.target_branch`) and the job the tests ran in (`env
 """
 
 import argparse
+import concurrent.futures
 import datetime
 import json
 import os
@@ -25,6 +26,8 @@ DATADOG_CI = "@datadog/datadog-ci@5.25.0"
 # (which is all of them, if the command goes through a shell, as it does with npx), so they are
 # uploaded in batches whose paths fit well inside that.
 MAX_BATCH_BYTES = 60 * 1024
+# How many batches are uploaded at once. Each datadog-ci uploads 20 files at a time itself.
+UPLOADS = 8
 
 
 def run_dirs(junit_dir):
@@ -142,23 +145,28 @@ def upload(datadog_ci, repo, meta, run_dir, service, dry_run=False):
     env = run_env(repo, meta)
     print(f"  sha {meta.get('sha', '')[:12] or '?'}, branch {meta.get('branch', '?')}, "
           f"{meta.get('trigger', '?')} against {meta.get('target_branch', '?')}")
-    total = 0
+    uploads = []
     for job_dir, job in job_dirs(run_dir, meta):
         files = xml_files(job_dir)
         if not files:
             continue
         print(f"    {job.get('leg', '?')}: {len(files)} files")
-        for batch in batches(files):
-            command = [
-                datadog_ci, "junit", "upload", "--service", service,
-                *run_tags(meta, job), *(["--dry-run"] if dry_run else []), *batch]
-            result = subprocess.run(command, env=env, cwd=job_dir)
-            if result.returncode != 0:
-                print(f"    {job.get('leg', '?')}: datadog-ci exited {result.returncode} "
-                      f"uploading {len(batch)} files")
-                return False, total
-            total += len(batch)
-    return True, total
+        uploads += [(job_dir, job, batch) for batch in batches(files)]
+
+    def run(job_dir, job, batch):
+        command = [
+            datadog_ci, "junit", "upload", "--service", service,
+            *run_tags(meta, job), *(["--dry-run"] if dry_run else []), *batch]
+        # Its output is a line for every file, so only shown if it fails.
+        result = subprocess.run(command, env=env, cwd=job_dir, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"    {job.get('leg', '?')}: datadog-ci exited {result.returncode} "
+                  f"uploading {len(batch)} files\n{result.stdout[-2000:]}{result.stderr[-2000:]}")
+        return result.returncode == 0
+
+    with concurrent.futures.ThreadPoolExecutor(UPLOADS) as pool:
+        results = list(pool.map(lambda u: run(*u), uploads))
+    return all(results), sum(len(batch) for (_, _, batch), ok in zip(uploads, results) if ok)
 
 
 def main():

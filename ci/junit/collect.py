@@ -367,10 +367,14 @@ def main():
 
     run_job_names = {}
     jobs = []
-    for run in runs:
-        run_jobs = _github(f"/repos/{args.repo}/actions/runs/{run['id']}/jobs", token, "jobs")
-        run_job_names[run["id"]] = [job["name"] for job in run_jobs]
-        jobs += [(run, job) for job in run_jobs if job.get("conclusion") not in (None, "skipped")]
+    with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
+        listed = pool.map(
+            lambda run: _github(f"/repos/{args.repo}/actions/runs/{run['id']}/jobs", token, "jobs"),
+            runs)
+        for run, run_jobs in zip(runs, listed):
+            run_job_names[run["id"]] = [job["name"] for job in run_jobs]
+            jobs += [
+                (run, job) for job in run_jobs if job.get("conclusion") not in (None, "skipped")]
     totals = {"jobs": 0, "invocations": 0, "tests": 0, "xml": 0, "missing": 0}
 
     def find_tests(run, job):
