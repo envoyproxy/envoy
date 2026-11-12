@@ -18,11 +18,12 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 DATADOG_CI = "@datadog/datadog-ci@5.25.0"
-# npx runs the command through a shell as a single string, which the kernel caps at 128KiB, and a
-# job can have thousands of XML files, so they are uploaded in batches whose paths fit well
-# inside that.
+# A job can have thousands of XML files, and a single command line argument is capped at 128KiB
+# (which is all of them, if the command goes through a shell, as it does with npx), so they are
+# uploaded in batches whose paths fit well inside that.
 MAX_BATCH_BYTES = 60 * 1024
 
 
@@ -70,6 +71,15 @@ def save_watermark(path, uploaded, retention_hours):
         json.dump({"uploaded": pruned}, f)
 
 
+def install_datadog_ci():
+    # Once, rather than have npx work out what to run for every batch.
+    prefix = tempfile.mkdtemp(prefix="datadog-ci-")
+    subprocess.run(
+        ["npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", prefix, DATADOG_CI],
+        check=True)
+    return os.path.join(prefix, "node_modules", ".bin", "datadog-ci")
+
+
 def job_dirs(run_dir, meta):
     # <run dir>/<job>/, with the job as collect.py recorded it, or just its directory name for
     # output collected before it did.
@@ -81,9 +91,9 @@ def job_dirs(run_dir, meta):
 
 
 def xml_files(job_dir):
-    # collect.py names files <hash[:12]>.xml, with no "test" in the name - datadog-ci's own
-    # directory/--auto-discovery scan silently skips anything whose filename doesn't contain
-    # "test" (confirmed against datadog-ci 5.25.0), so pass each file explicitly instead of
+    # datadog-ci's own directory/--auto-discovery scan silently skips anything whose filename
+    # doesn't contain "test" (confirmed against datadog-ci 5.25.0), and collect.py names the
+    # files after their test targets, which need not, so pass each file explicitly instead of
     # letting it discover them. Relative to the job's directory, to keep the paths short.
     return sorted(
         os.path.relpath(os.path.join(root, f), job_dir)
@@ -127,7 +137,7 @@ def run_tags(meta, job):
     return [arg for key, value in tags.items() if value for arg in ("--tags", f"{key}:{value}")]
 
 
-def upload(repo, meta, run_dir, service, dry_run=False):
+def upload(datadog_ci, repo, meta, run_dir, service, dry_run=False):
     # True if all of the run's XML was uploaded, and how many files that was.
     env = run_env(repo, meta)
     print(f"  sha {meta.get('sha', '')[:12] or '?'}, branch {meta.get('branch', '?')}, "
@@ -140,7 +150,7 @@ def upload(repo, meta, run_dir, service, dry_run=False):
         print(f"    {job.get('leg', '?')}: {len(files)} files")
         for batch in batches(files):
             command = [
-                "npx", "--yes", DATADOG_CI, "junit", "upload", "--service", service,
+                datadog_ci, "junit", "upload", "--service", service,
                 *run_tags(meta, job), *(["--dry-run"] if dry_run else []), *batch]
             result = subprocess.run(command, env=env, cwd=job_dir)
             if result.returncode != 0:
@@ -171,6 +181,7 @@ def main():
         return 0
 
     watermark = load_watermark(args.watermark) if args.watermark else {}
+    datadog_ci = None
     uploaded = failed = skipped = already = 0
     for run_dir in run_dirs(args.junit_dir):
         run_id = os.path.basename(run_dir)
@@ -180,7 +191,8 @@ def main():
         with open(os.path.join(run_dir, "run.json")) as f:
             meta = json.load(f)
         print(f"  {run_dir}:")
-        ok, files = upload(args.repo, meta, run_dir, args.service, args.dry_run)
+        datadog_ci = datadog_ci or install_datadog_ci()
+        ok, files = upload(datadog_ci, args.repo, meta, run_dir, args.service, args.dry_run)
         if not ok:
             failed += 1
             print(f"  {run_dir}: upload failed")

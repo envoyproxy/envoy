@@ -9,6 +9,10 @@ results are skipped, which is what flake tracking wants), and downloads each tes
 The EngFlow calls are the ones its UI uses (no auth needed on this cluster), so treat them as
 best effort: anything that fails is logged and skipped.
 
+There is a call per executed test to find its test.xml, and there can be thousands of tests in
+a run, so the calls are spread over a few connections that are kept open, and the XML itself is
+read in batches.
+
 Output is grouped by workflow run (<out>/<workflow>/<run id>/...), alongside a run.json of that
 run's git metadata (commit, branch, PR) and its jobs, since each run is its own commit and
 whatever uploads this on needs that rather than whatever happens to be checked out when it runs.
@@ -38,7 +42,14 @@ INVOCATION_RE = re.compile(rb"mordenite\.cluster\.engflow\.com/invocation/([0-9a
 # The GetTarget response also lists the test binary and logs; test.xml files are far smaller.
 MAX_XML_BYTES = 20 * 1024 * 1024
 # `<kind> (pr/<number>/<target branch>@<sha>)` or `<kind> (postsubmit/<branch>@<sha>)`.
-JOB_REF_RE = re.compile(r"\((?:pr/(?P<pr>\d+)|postsubmit)/(?P<branch>[^@)]+)@(?P<sha>[0-9a-f]{7,40})\)")
+JOB_REF_RE = re.compile(
+    r"\((?:pr/(?P<pr>\d+)|postsubmit)/(?P<branch>[^@)]+)@(?P<sha>[0-9a-f]{7,40})\)")
+# The server's limit for a batch read is 10MB. Blobs are batched up to this, and anything bigger
+# than a batch is read on its own.
+MAX_BATCH_READ_BYTES = 8 * 1024 * 1024
+MAX_BATCH_READ_BLOBS = 200
+# How many connections the EngFlow calls are spread over.
+CURL_CONNECTIONS = 32
 # GitHub returns at most 1000 runs for a filtered listing, so list the window in slices.
 LIST_SLICE = datetime.timedelta(hours=1)
 
@@ -87,24 +98,148 @@ def _varint(b, i):
             return v, i
 
 
-def _get_target(invocation, label):
-    # gRPC-web, which EngFlow only serves over HTTP/2, hence curl.
-    def field(n, s):
-        s = s.encode()
-        return bytes([n << 3 | 2, len(s)]) + s
-    body = field(1, "default") + field(2, invocation) + field(3, label)
-    with tempfile.NamedTemporaryFile(delete=False) as f:
-        f.write(b"\x00" + struct.pack(">I", len(body)) + body)
-        req = f.name
-    try:
-        return subprocess.run(
-            ["curl", "-sf", "--http2", "--max-time", "60", "-X", "POST",
-             "-H", "Content-Type: application/grpc-web+proto", "-H", "X-Grpc-Web: 1",
-             "--data-binary", f"@{req}",
-             f"{ENGFLOW}/engflow.resultstore.v1alpha.ResultStore/GetTarget"],
-            capture_output=True, check=True).stdout
-    finally:
-        os.unlink(req)
+def _enc_varint(value):
+    out = b""
+    while True:
+        byte = value & 0x7f
+        value >>= 7
+        out += bytes([byte | (0x80 if value else 0)])
+        if not value:
+            return out
+
+
+def _field(number, value):
+    # A length-delimited field, or a varint one for an int.
+    if isinstance(value, int):
+        return _enc_varint(number << 3) + _enc_varint(value)
+    value = value.encode() if isinstance(value, str) else value
+    return _enc_varint(number << 3 | 2) + _enc_varint(len(value)) + value
+
+
+def _fields(data):
+    # (number, value) for each field of a message, with nested messages left as bytes.
+    i = 0
+    while i < len(data):
+        key, i = _varint(data, i)
+        wire = key & 7
+        if wire == 0:
+            value, i = _varint(data, i)
+        elif wire == 2:
+            size, i = _varint(data, i)
+            value = data[i:i + size]
+            i += size
+        elif wire == 1:
+            value = data[i:i + 8]
+            i += 8
+        elif wire == 5:
+            value = data[i:i + 4]
+            i += 4
+        else:
+            return
+        yield key >> 3, value
+
+
+def _grpc_web_messages(response):
+    # The messages of a gRPC-web response, without its trailers frame.
+    i = 0
+    while i + 5 <= len(response):
+        size = struct.unpack(">I", response[i + 1:i + 5])[0]
+        if not response[i] & 0x80:
+            yield response[i + 5:i + 5 + size]
+        i += 5 + size
+
+
+def _grpc_web_many(method, bodies):
+    # gRPC-web, which EngFlow only serves over HTTP/2, hence curl. There can be thousands of
+    # calls, and a process and a TLS handshake for each is most of what they would cost, so they
+    # are split between a few curl processes, each of which makes its share one after another on
+    # one connection. The responses are in the order of the requests, with b"" for any that
+    # failed.
+    responses = [b""] * len(bodies)
+    with tempfile.TemporaryDirectory() as tmp:
+        def run(share):
+            config = []
+            for n in range(share, len(bodies), CURL_CONNECTIONS):
+                with open(os.path.join(tmp, f"{n}.req"), "wb") as f:
+                    f.write(b"\x00" + struct.pack(">I", len(bodies[n])) + bodies[n])
+                config += [
+                    f'url = "{ENGFLOW}/{method}"',
+                    'header = "Content-Type: application/grpc-web+proto"',
+                    'header = "X-Grpc-Web: 1"',
+                    f'data-binary = "@{os.path.join(tmp, f"{n}.req")}"',
+                    f'output = "{os.path.join(tmp, f"{n}.resp")}"',
+                    "http2",
+                    "fail",
+                    "max-time = 120",
+                    "retry = 2",
+                    "next",
+                ]
+            if not config:
+                return
+            path = os.path.join(tmp, f"config.{share}")
+            with open(path, "w") as f:
+                f.write("\n".join(config) + "\n")
+            subprocess.run(["curl", "-s", "-K", path], capture_output=True)
+
+        with concurrent.futures.ThreadPoolExecutor(CURL_CONNECTIONS) as pool:
+            list(pool.map(run, range(CURL_CONNECTIONS)))
+        for n in range(len(bodies)):
+            try:
+                with open(os.path.join(tmp, f"{n}.resp"), "rb") as f:
+                    responses[n] = f.read()
+            except FileNotFoundError:
+                pass
+    return responses
+
+
+def get_targets(tests):
+    # The GetTarget response for each (invocation, label).
+    return _grpc_web_many(
+        "engflow.resultstore.v1alpha.ResultStore/GetTarget",
+        [_field(1, "default") + _field(2, invocation) + _field(3, label)
+         for invocation, label in tests])
+
+
+def read_blobs(digests):
+    # {(hash, size): contents} for as many of the digests as could be read.
+    batches, batch, size = [], [], 0
+    single = []
+    for digest in sorted(set(digests)):
+        if digest[1] > MAX_BATCH_READ_BYTES:
+            single.append(digest)
+            continue
+        full = size + digest[1] > MAX_BATCH_READ_BYTES or len(batch) >= MAX_BATCH_READ_BLOBS
+        if batch and full:
+            batches.append(batch)
+            batch, size = [], 0
+        batch.append(digest)
+        size += digest[1]
+    if batch:
+        batches.append(batch)
+    blobs = {}
+    responses = _grpc_web_many(
+        "build.bazel.remote.execution.v2.ContentAddressableStorage/BatchReadBlobs",
+        [_field(1, "default") + b"".join(
+            _field(2, _field(1, hash_) + _field(2, size)) for hash_, size in batch)
+         for batch in batches])
+    for response in responses:
+        for message in _grpc_web_messages(response):
+            for number, item in _fields(message):
+                if number != 1:
+                    continue
+                item = dict(_fields(item))
+                digest = dict(_fields(item.get(1, b"")))
+                if 2 in item and 1 in digest:
+                    blobs[(digest[1].decode(), digest.get(2, 0))] = item[2]
+    # Anything too big for a batch, or that a batch did not return.
+    for digest in single + [d for batch in batches for d in batch if d not in blobs]:
+        try:
+            blobs[digest] = _get(
+                f"{ENGFLOW}/api/contentaddressablestorage/v1/instances/default/blobs/"
+                f"{digest[0]}/{digest[1]}")
+        except urllib.error.URLError:
+            continue
+    return blobs
 
 
 def _digests(data):
@@ -127,18 +262,6 @@ def executed_tests(invocation):
         if event.get("cat") == "worker_time" and len(parts) > 2 and parts[1] == "TestRunner":
             labels.add(parts[0])
     return sorted(labels)
-
-
-def test_xmls(invocation, label):
-    for hash_, size in _digests(_get_target(invocation, label)):
-        if size > MAX_XML_BYTES:
-            continue
-        try:
-            blob = _get(f"{ENGFLOW}/api/contentaddressablestorage/v1/instances/default/blobs/{hash_}/{size}")
-        except urllib.error.URLError:
-            continue
-        if blob.lstrip().startswith(b"<?xml"):
-            yield hash_, blob
 
 
 def _safe(name):
@@ -269,19 +392,6 @@ def main():
                 found.append((invocation, labels))
         return found
 
-    def fetch_xml(job_dir, invocation, label):
-        written = 0
-        try:
-            for hash_, blob in test_xmls(invocation, label):
-                path = os.path.join(job_dir, invocation, _safe(label.lstrip("/")), f"{hash_[:12]}.xml")
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "wb") as f:
-                    f.write(blob)
-                written += 1
-        except (subprocess.CalledProcessError, urllib.error.URLError) as e:
-            print(f"  {invocation} {label}: {e}")
-        return written
-
     with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
         tests = []
         metas = {}
@@ -305,10 +415,30 @@ def main():
             if run["id"] in metas:
                 with open(os.path.join(run_dir(args.out, run), "run.json"), "w") as f:
                     json.dump(metas[run["id"]], f)
-        for written in pool.map(lambda t: fetch_xml(*t), tests):
-            totals["tests"] += 1
-            totals["xml"] += written
-            totals["missing"] += not written
+
+    # Each test's outputs, then the XML among them.
+    targets = get_targets([(invocation, label) for _, invocation, label in tests])
+    outputs = [
+        [digest for digest in _digests(target) if digest[1] <= MAX_XML_BYTES]
+        for target in targets]
+    blobs = read_blobs([digest for digests in outputs for digest in digests])
+    for (job_dir, invocation, label), digests in zip(tests, outputs):
+        written = 0
+        for digest in digests:
+            blob = blobs.get(digest, b"")
+            if not blob.lstrip().startswith(b"<?xml"):
+                continue
+            # Named after the test, as that is what the file's results are listed under once
+            # uploaded. A sharded or repeated test has several, hence the directory.
+            path = os.path.join(
+                job_dir, invocation, digest[0][:12], f"{_safe(label.lstrip('/'))}.xml")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as f:
+                f.write(blob)
+            written += 1
+        totals["tests"] += 1
+        totals["xml"] += written
+        totals["missing"] += not written
 
     summary = ", ".join(f"{k}: {v}" for k, v in totals.items())
     print(summary)
