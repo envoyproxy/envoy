@@ -1,9 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <iostream>
 #include <string>
 
 #include "source/common/common/logger.h"
+#include "source/common/common/stderr_writer.h"
 
 #include "absl/debugging/symbolize.h"
 
@@ -50,8 +52,16 @@ public:
    */
   void logTrace() {
     if (log_to_stderr_) {
-      std::cerr << "Coroutine Backtrace:\n";
-      printTrace(std::cerr, true);
+      // This is used in fatal signal handlers, so it is written with write(2) from a fixed buffer.
+      StderrWriter() << "Coroutine Backtrace:\n";
+      visitTrace([](int index, const char* symbol, const void* address) {
+        StderrWriter writer;
+        writer << "[backtrace] [stderr] #" << index << ": ";
+        if (symbol != nullptr) {
+          writer << symbol << " ";
+        }
+        writer << "[" << address << "]\n";
+      });
       return;
     }
 
@@ -79,9 +89,9 @@ public:
     });
   }
 
-  void printTrace(std::ostream& os, bool log_prefix = false) {
+  void printTrace(std::ostream& os) {
     visitTrace([&](int index, const char* symbol, const void* address) {
-      os << (log_prefix ? "[backtrace] [stderr] #" : "#") << index << (log_prefix ? ": " : " ");
+      os << "#" << index << " ";
       if (symbol != nullptr) {
         os << symbol << " [" << address << "]\n";
       } else {
@@ -91,7 +101,8 @@ public:
   }
 
 private:
-  static bool log_to_stderr_;
+  // Set from the fatal signal handler, which can run on several threads at once.
+  static std::atomic<bool> log_to_stderr_;
   static bool single_line_;
 
   // Hide coroutine implementation details from this header.

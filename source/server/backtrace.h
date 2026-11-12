@@ -1,10 +1,12 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <iostream>
 #include <ostream>
 
 #include "source/common/common/logger.h"
+#include "source/common/common/stderr_writer.h"
 #include "source/common/version/version.h"
 
 #include "absl/debugging/stacktrace.h"
@@ -79,6 +81,9 @@ public:
    * This is used in fatal signal handlers to bypass the logger mutex, and in coverage
    * tests where logs are sent to /dev/null to avoid accumulating too much data in CI.
    *
+   * As it is used in fatal signal handlers, this output is written with write(2) from a fixed
+   * buffer, and neither allocates nor takes the stdio or stream locks.
+   *
    * @param log_to_stderr Whether to log to stderr or the logging system.
    */
   static void setLogToStderr(bool log_to_stderr);
@@ -132,12 +137,19 @@ public:
    */
   void logTrace() {
     if (log_to_stderr_) {
-      std::cerr << "Backtrace (use tools/stack_decode.py to get line numbers):\n"
-                << "Envoy version: " << VersionInfo::version() << "\n";
+      StderrWriter() << "Backtrace (use tools/stack_decode.py to get line numbers):\n"
+                     << "Envoy version: " << VersionInfo::version() << "\n";
       if (!addrMapping().empty()) {
-        std::cerr << "[backtrace] [stderr] Address mapping: " << addrMapping() << "\n";
+        StderrWriter() << "[backtrace] [stderr] Address mapping: " << addrMapping() << "\n";
       }
-      printTrace(std::cerr, true);
+      visitTrace([](int index, const char* symbol, void* address) {
+        StderrWriter writer;
+        writer << "[backtrace] [stderr] #" << index << ": ";
+        if (symbol != nullptr) {
+          writer << symbol << " ";
+        }
+        writer << "[" << address << "]\n";
+      });
       return;
     }
 
@@ -176,16 +188,16 @@ public:
 
   void logFault(const char* signame, const void* addr) {
     if (log_to_stderr_) {
-      std::cerr << "[backtrace] Caught " << signame << ", suspect faulting address " << addr
-                << "\n";
+      StderrWriter() << "[backtrace] Caught " << signame << ", suspect faulting address " << addr
+                     << "\n";
       return;
     }
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
-  void printTrace(std::ostream& os, bool log_prefix = false) {
+  void printTrace(std::ostream& os) {
     visitTrace([&](int index, const char* symbol, void* address) {
-      os << (log_prefix ? "[backtrace] [stderr] #" : "#") << index << (log_prefix ? ": " : " ");
+      os << "#" << index << " ";
       if (symbol != nullptr) {
         os << symbol << " [" << address << "]\n";
       } else {
@@ -195,7 +207,8 @@ public:
   }
 
 private:
-  static bool log_to_stderr_;
+  // Set from the fatal signal handler, which can run on several threads at once.
+  static std::atomic<bool> log_to_stderr_;
   static bool single_line_;
 
   /**
