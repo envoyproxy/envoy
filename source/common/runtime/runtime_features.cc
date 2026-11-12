@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 // A SotW CDS update removes only the clusters received through that CDS subscription, so it no
 // longer removes the clusters added by ODCDS. Disable to remove every dynamic cluster not in the
