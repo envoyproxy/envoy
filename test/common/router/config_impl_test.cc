@@ -3284,6 +3284,7 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"local_service", "default_service"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
+  EXPECT_EQ("alternate", config.vhostHeader().get());
 
   std::pair<std::string, std::string> alternate_host = {"alternate", "foo.example.org"};
   OptionalGenHeadersArg optional_arg;
@@ -7772,6 +7773,7 @@ TEST(NullConfigImplTest, All) {
   EXPECT_EQ(nullptr, config.route(headers, stream_info, 0).route);
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ("", config.name());
+  EXPECT_EQ("", config.vhostHeader().get());
   EXPECT_FALSE(config.usesVhds());
   EXPECT_FALSE(config.mostSpecificHeaderMutationsWins());
   EXPECT_EQ(0Ul, config.maxDirectResponseBodySizeBytes());
@@ -13009,6 +13011,7 @@ virtual_hosts:
   EXPECT_EQ(&config.shadowPolicies(), &shared_config.shadowPolicies());
   EXPECT_EQ(config.ignorePathParametersInPathMatching(),
             shared_config.ignorePathParametersInPathMatching());
+  EXPECT_EQ(&config.vhostHeader(), &shared_config.vhostHeader());
 }
 
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithTraceSampled) {

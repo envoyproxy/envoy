@@ -1182,6 +1182,30 @@ public:
    * @return bool whether to ignore path parameters in path matching.
    */
   virtual bool ignorePathParametersInPathMatching() const PURE;
+
+  /**
+   * @return const Http::LowerCaseString& the header name used for virtual host matching, or an
+   * empty header name if the default :authority / Host header should be used.
+   */
+  virtual const Http::LowerCaseString& vhostHeader() const PURE;
+
+  /**
+   * Extract the virtual host header value from request headers, honoring vhostHeader() if
+   * non-empty and otherwise falling back to Host/:authority.
+   * @param headers supplies the request headers.
+   * @return absl::string_view the virtual host header value, or empty if absent or empty.
+   */
+  absl::string_view vhostHeaderValue(const Http::RequestHeaderMap& headers) const {
+    const Http::LowerCaseString& vhost_header = vhostHeader();
+    if (!vhost_header.get().empty()) {
+      const auto result = headers.get(vhost_header);
+      if (result.empty()) {
+        return {};
+      }
+      return result[0]->value().getStringView();
+    }
+    return headers.getHostValue();
+  }
 };
 
 struct VirtualHostRoute {
