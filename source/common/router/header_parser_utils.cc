@@ -30,51 +30,53 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   std::string new_header_value = header_value;
   absl::string_view matches[3];
   while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 3)) {
-    std::string new_format;
-    auto params_or_error = Json::Factory::loadFromString(std::string(matches[2]));
-    if (!params_or_error.status().ok()) {
-      return header_value;
-    }
-    Json::ObjectSharedPtr parsed_params = params_or_error.value();
-
-    // The given json string may be an invalid object or with an empty object array.
-    if (parsed_params == nullptr) {
-      // return original value
-      return header_value;
-    }
-    auto array_or_error = parsed_params->asObjectArray();
-    if (!array_or_error.status().ok() || array_or_error.value().empty()) {
-      // return original value
-      return header_value;
-    }
-    auto format_or_error = array_or_error.value()[0]->asString();
-    if (!format_or_error.status().ok()) {
-      return header_value;
-    }
-    new_format = format_or_error.value();
-    for (size_t i = 1; i < array_or_error.value().size(); i++) {
-      auto string_or_error = array_or_error.value()[i]->asString();
-      if (!string_or_error.status().ok()) {
+    {  // TODO(birenroy): extraneous block to reduce review diffs; remove in a future cleanup
+      std::string new_format;
+      auto params_or_error = Json::Factory::loadFromString(std::string(matches[2]));
+      if (!params_or_error.status().ok()) {
         return header_value;
       }
-      absl::StrAppend(&new_format, ":", string_or_error.value());
-    }
+      Json::ObjectSharedPtr parsed_params = params_or_error.value();
 
-    new_format = absl::StrCat("%", matches[1], "_METADATA(", new_format, ")%");
-    ENVOY_LOG_MISC(warn,
-                   "Header formatter: JSON format of {}_METADATA parameters has been obsoleted. "
-                   "Use colon format: {}",
-                   matches[1], new_format.c_str());
-    // The parsing should only happen on the main thread and the singleton context should be
-    // available. In case it is not set in tests or other non-standard Envoy usage, we skip
-    // counting the deprecated feature usage instead of crashing.
-    auto* context = Server::Configuration::ServerFactoryContextInstance::getExisting();
-    if (context != nullptr) {
-      context->runtime().countDeprecatedFeatureUse();
-    }
+      // The given json string may be an invalid object or with an empty object array.
+      if (parsed_params == nullptr) {
+        // return original value
+        return header_value;
+      }
+      auto array_or_error = parsed_params->asObjectArray();
+      if (!array_or_error.status().ok() || array_or_error.value().empty()) {
+        // return original value
+        return header_value;
+      }
+      auto format_or_error = array_or_error.value()[0]->asString();
+      if (!format_or_error.status().ok()) {
+        return header_value;
+      }
+      new_format = format_or_error.value();
+      for (size_t i = 1; i < array_or_error.value().size(); i++) {
+        auto string_or_error = array_or_error.value()[i]->asString();
+        if (!string_or_error.status().ok()) {
+          return header_value;
+        }
+        absl::StrAppend(&new_format, ":", string_or_error.value());
+      }
 
-    int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
-    ASSERT(subs > 0);
+      new_format = absl::StrCat("%", matches[1], "_METADATA(", new_format, ")%");
+      ENVOY_LOG_MISC(warn,
+                     "Header formatter: JSON format of {}_METADATA parameters has been obsoleted. "
+                     "Use colon format: {}",
+                     matches[1], new_format.c_str());
+      // The parsing should only happen on the main thread and the singleton context should be
+      // available. In case it is not set in tests or other non-standard Envoy usage, we skip
+      // counting the deprecated feature usage instead of crashing.
+      auto* context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+      if (context != nullptr) {
+        context->runtime().countDeprecatedFeatureUse();
+      }
+
+      int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
+      ASSERT(subs > 0);
+    }
   }
 
   return new_header_value;

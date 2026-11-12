@@ -1410,8 +1410,13 @@ private:
   // Unprefixed scope that only bounds the lifetime of the virtual cluster stats; see the
   // constructor.
   Stats::ScopeSharedPtr vhost_scope_;
+  // Backing arena for dormant VirtualHost protos when deferred creation is enabled. Declared
+  // before domain_entries_ so the protos outlive the entries that reference them.
   Protobuf::Arena deferred_proto_arena_;
+  // Contiguous storage for all virtual host slots in this route configuration, referenced by raw
+  // pointer from the domain lookup maps below.
   std::unique_ptr<DomainEntry[]> domain_entries_;
+  // Exact lower-case domain name to virtual host slot mapping (excluding wildcard domains).
   absl::flat_hash_map<std::string, const DomainEntry*> exact_domain_entries_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
