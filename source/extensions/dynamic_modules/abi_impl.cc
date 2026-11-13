@@ -522,6 +522,11 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_file_watcher_a
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 

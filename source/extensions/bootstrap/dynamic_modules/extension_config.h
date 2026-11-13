@@ -18,6 +18,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
 #include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -74,6 +75,8 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionConfigUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_config_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -155,6 +158,12 @@ public:
    * @return true if the callbacks were successfully registered, false if already registered.
    */
   bool enableClusterLifecycle();
+
+  /**
+   * Subscribes once to a named ECDS configuration after server initialization.
+   */
+  bool subscribeExtensionConfig(absl::string_view name, absl::string_view type_url,
+                                absl::string_view config_source_json);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -286,6 +295,7 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionConfigUpdateType on_bootstrap_extension_config_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
       nullptr;
@@ -392,6 +402,8 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
   bool cluster_lifecycle_enabled_ = false;
+
+  std::unique_ptr<ExtensionConfigSubscription> extension_config_subscription_;
 
   // True once the server is initialized, set when the listener manager is provided during
   // onServerInitialized. The cluster manager is only safe to access after this point.

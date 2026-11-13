@@ -66,6 +66,8 @@ test_program(name = "bootstrap_file_watcher_test")
 
 test_program(name = "bootstrap_admin_handler_test")
 
+test_program(name = "bootstrap_ecds_test")
+
 test_program(name = "bootstrap_cluster_lifecycle_test")
 
 test_program(name = "bootstrap_cluster_writer_test")

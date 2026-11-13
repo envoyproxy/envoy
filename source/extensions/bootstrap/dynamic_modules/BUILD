@@ -94,11 +94,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "extension_config_subscription_lib",
+    srcs = ["extension_config_subscription.cc"],
+    hdrs = ["extension_config_subscription.h"],
+    deps = [
+        "//envoy/config:subscription_interface",
+        "//envoy/config:xds_manager_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:config_tracker_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/config:resource_type_helper_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "extension_config_lib",
     srcs = ["extension_config.cc"],
     hdrs = ["extension_config.h"],
     deps = [
         ":cluster_writer_lib",
+        ":extension_config_subscription_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
@@ -114,9 +139,11 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/http:message_lib",
         "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

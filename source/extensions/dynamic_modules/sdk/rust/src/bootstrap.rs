@@ -21,6 +21,17 @@ use crate::{
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+/// The source of a bootstrap extension's ECDS configuration.
+#[derive(Debug, Clone, Copy)]
+pub struct ExtensionConfigSource<'a> {
+  /// The name of the `envoy.config.core.v3.TypedExtensionConfig` resource.
+  pub name: &'a str,
+  /// The required payload type URL, including the inner type of a `TypedStruct`.
+  pub type_url: &'a str,
+  /// A JSON-encoded `envoy.config.core.v3.ConfigSource`.
+  pub config_source_json: &'a str,
+}
+
 /// The kind of active resource to enumerate with
 /// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,6 +290,13 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
 
+  /// Subscribes to ECDS on the main thread after server initialization. Updates call
+  /// [`BootstrapExtensionConfig::on_config_update`]. The subscription lasts until shutdown.
+  /// Filesystem sources can deliver an update before this call returns.
+  /// Returns false if already subscribed, the source is invalid, server
+  /// state is unavailable, the update hook is missing, or the host was built without JSON support.
+  fn subscribe_extension_config<'a>(&self, source: ExtensionConfigSource<'a>) -> bool;
+
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
   /// [`BootstrapExtensionConfig::on_listener_removal`] callbacks when listeners are added, updated,
@@ -533,6 +551,20 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _timer: &dyn EnvoyBootstrapExtensionTimer,
   ) {
+  }
+
+  /// Validates and applies an ECDS configuration on the main thread. `Struct` and
+  /// `TypedStruct.value` become JSON, as with startup config. `None` means removal. Connection
+  /// failures retain the last accepted config without invoking this hook.
+  ///
+  /// Return true to accept the update, or false to reject it and retain the previous settings.
+  /// The hook must not block or reenter xDS processing.
+  fn on_config_update(
+    &self,
+    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    _config: Option<&[u8]>,
+  ) -> bool {
+    false
   }
 
   /// This is called when a file watched via
@@ -1446,6 +1478,22 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn subscribe_extension_config<'a>(&self, source: ExtensionConfigSource<'a>) -> bool {
+    let ExtensionConfigSource {
+      name,
+      type_url,
+      config_source_json,
+    } = source;
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
+        self.raw,
+        str_to_module_buffer(name),
+        str_to_module_buffer(type_url),
+        str_to_module_buffer(config_source_json),
+      )
+    }
+  }
+
   fn enable_listener_lifecycle(&self) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
@@ -2060,6 +2108,29 @@ ffi_export! {
       cluster_name_str.as_ref(),
     );
   }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when an ECDS configuration is updated or removed.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_config_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    has_config: bool,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> bool {
+    let module = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
+    let config = has_config.then(|| unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr.cast::<u8>(), config.length)
+    });
+    let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+    module.on_config_update(&mut envoy, config)
+  }
+  on_panic = false
 }
 
 ffi_export! {

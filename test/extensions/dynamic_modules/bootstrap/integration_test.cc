@@ -306,6 +306,77 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
 }
 
+TEST_P(DynamicModulesBootstrapIntegrationTest, EcdsConfigRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir("rust"), 1);
+  for (const auto* path : {"/ecds_a", "/ecds_b"}) {
+    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
+name: envoy.bootstrap.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+  dynamic_module_config:
+    name: bootstrap_ecds_test
+  extension_name: test
+  extension_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: {}
+)EOF",
+                                                     path));
+  }
+  HttpIntegrationTest::initialize();
+
+  const auto response = [](absl::string_view version, absl::string_view value) {
+    return fmt::format(R"EOF(
+version_info: "{}"
+resources:
+- "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+  name: test-config
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: "{}"
+)EOF",
+                       version, value);
+  };
+  const std::string config_path =
+      TestEnvironment::writeStringToFileForTest("bootstrap_ecds.yaml", response("1", "enabled"));
+  envoy::config::core::v3::ConfigSource source;
+  source.mutable_path_config_source()->set_path(config_path);
+  source.set_resource_api_version(envoy::config::core::v3::V3);
+  const auto source_json = MessageUtil::getJsonStringFromMessageOrError(source);
+  EXPECT_EQ(writerModuleRequest("/ecds_a", "subscribe", source_json), "enabled");
+  EXPECT_EQ(writerModuleRequest("/ecds_b", "subscribe", source_json), "enabled");
+
+  const auto replace_config = [&](const std::string& contents) {
+    TestEnvironment::renameFile(
+        TestEnvironment::writeStringToFileForTest("bootstrap_ecds_update.yaml", contents),
+        config_path);
+  };
+  const auto expect_config = [&](absl::string_view expected) {
+    EXPECT_EQ(writerModuleRequest("/ecds_a", "", ""), expected);
+    EXPECT_EQ(writerModuleRequest("/ecds_b", "", ""), expected);
+  };
+
+  replace_config(response("2", "disabled"));
+  test_server_->waitForCounter("extension_config_discovery.test-config.update_success",
+                               testing::Ge(4));
+  expect_config("disabled");
+
+  replace_config(response("3", "rejected"));
+  test_server_->waitForCounter("extension_config_discovery.test-config.update_rejected",
+                               testing::Ge(2));
+  expect_config("disabled");
+
+  replace_config("version_info: '4'\nresources: []\n");
+  test_server_->waitForCounter("extension_config_discovery.test-config.update_success",
+                               testing::Ge(6));
+  expect_config("removed");
+
+  replace_config(response("5", ""));
+  test_server_->waitForCounter("extension_config_discovery.test-config.update_success",
+                               testing::Ge(8));
+  expect_config("");
+}
+
 // This test verifies that the Rust bootstrap extension can receive listener lifecycle events
 // (add/update and removal) via the ListenerUpdateCallbacks mechanism.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {

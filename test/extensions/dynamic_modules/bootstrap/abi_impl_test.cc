@@ -1932,6 +1932,56 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
 }
 
+TEST_F(BootstrapAbiImplTest, ExtensionConfigSubscriptionValidatesLifecycleAndReleasesOnShutdown) {
+  auto config = newOptionalHooksConfig();
+  const std::string type_url = "type.googleapis.com/test.Config";
+  const std::string source = R"({"ads":{},"resource_api_version":"V3"})";
+  auto subscribe = [&]() {
+    return envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
+        config->thisAsVoidPtr(), {"test-config", 11}, {type_url.data(), type_url.size()},
+        {source.data(), source.size()});
+  };
+  EXPECT_FALSE(subscribe());
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_FALSE(subscribe());
+  config->on_bootstrap_extension_config_update_ = [](auto, auto, bool, auto) { return true; };
+  EXPECT_FALSE(config->subscribeExtensionConfig("test-config", "test.Config", "invalid-json"));
+  EXPECT_FALSE(
+      config->subscribeExtensionConfig("test-config", "test.Config", R"({"unknown":true})"));
+  EXPECT_FALSE(config->subscribeExtensionConfig("test-config", "test.Config", "{}"));
+  EXPECT_FALSE(config->subscribeExtensionConfig("test-config", "test.Config",
+                                                R"({"ads":{},"resource_api_version":99})"));
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource("test-config", _, _, _,
+                                           testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(testing::Return(absl::UnavailableError("subscription unavailable")))
+      .WillOnce(testing::Throw(EnvoyException("invalid source")));
+  EXPECT_FALSE(subscribe());
+  EXPECT_FALSE(subscribe());
+  struct TrackedSubscription : testing::StrictMock<Config::MockSubscription> {
+    explicit TrackedSubscription(bool& destroyed) : destroyed_(destroyed) {}
+    ~TrackedSubscription() override { destroyed_ = true; }
+    bool& destroyed_;
+  };
+  bool destroyed = false;
+  auto transport = std::make_unique<TrackedSubscription>(destroyed);
+  EXPECT_CALL(*transport, start(testing::ElementsAre("test-config")));
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource("test-config", _, _, _,
+                                           testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce([&](auto, auto, auto, auto&, auto&, auto, auto) -> Config::SubscriptionPtr {
+        return std::move(transport);
+      });
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  EXPECT_TRUE(subscribe());
+  EXPECT_FALSE(subscribe());
+  EXPECT_FALSE(destroyed);
+  config->onShutdown();
+  EXPECT_TRUE(destroyed);
+  EXPECT_FALSE(subscribe());
+}
+
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.
 TEST_F(BootstrapAbiImplTest, EnableClusterLifecycle) {
   auto dynamic_module =
@@ -2317,6 +2367,11 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        [] {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
+             nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {
