@@ -84,7 +84,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
   if (!socket_->isOpen()) {
-    IS_ENVOY_BUG("Client socket failure");
+    // Client socket creation failed, e.g. because the process is out of file descriptors. The
+    // failure is logged by the socket interface, and ClientConnectionImpl closes the connection.
     return;
   }
   if (!connected) {
@@ -1173,6 +1174,12 @@ ClientConnectionImpl::~ClientConnectionImpl() {
 }
 
 void ClientConnectionImpl::connect() {
+  if (!socket_->isOpen()) {
+    // Socket creation failed (e.g. with EMFILE). The constructor has already scheduled a
+    // LocalClose event, and there is neither a socket to connect nor upstream info to update.
+    ENVOY_CONN_LOG(debug, "not connecting: {}", *this, failureReason());
+    return;
+  }
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = transport_socket_->connect(*socket_);
