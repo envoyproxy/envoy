@@ -43,6 +43,9 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl BIO_ctrl_get_write_guarantee \
   --uncomment-func-decl BIO_shutdown_wr \
   --uncomment-func-decl BIO_meth_new \
+  --uncomment-func-decl BIO_get_new_index \
+  --uncomment-func-decl BIO_method_type \
+  --uncomment-func-decl BIO_meth_set_destroy \
   --uncomment-func-decl BIO_meth_set_read \
   --uncomment-func-decl BIO_meth_set_write \
   --uncomment-func-decl BIO_meth_set_ctrl \
@@ -54,6 +57,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro-redef BIO_CTRL_GET_CLOSE \
   --uncomment-macro-redef BIO_CTRL_SET_CLOSE \
   --uncomment-macro-redef BIO_CTRL_FLUSH \
+  --uncomment-macro-redef BIO_CTRL_PENDING \
   --uncomment-macro-redef BIO_CTRL_EOF \
   --uncomment-func-decl BIO_set_shutdown \
   --uncomment-func-decl BIO_get_shutdown \

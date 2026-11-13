@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/network/io_handle.h"
 
 #include "openssl/bio.h"
@@ -16,6 +18,16 @@ namespace Tls {
  */
 // NOLINTNEXTLINE(readability-identifier-naming)
 BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle);
+
+/**
+ * Sets the ciphertext read-ahead target on a BIO created by BIO_new_io_handle(). Call only after
+ * the TLS handshake completes. Buffered input is preserved when the target changes. Zero disables
+ * further read-ahead after buffered input drains. Reads are bounded by the target and the buffer's
+ * read reservation. Buffer slices are allocated on demand and released as their input drains.
+ *
+ * Returns true for an IoHandle BIO. Returns false without changes for null or other BIO types.
+ */
+bool setIoHandleBioReadAheadSize(BIO* bio, uint64_t size);
 
 } // namespace Tls
 } // namespace TransportSockets
