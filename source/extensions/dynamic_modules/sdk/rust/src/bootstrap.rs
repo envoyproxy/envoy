@@ -86,7 +86,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// When this completes the initialization of Envoy, it can run other hooks and start the workers
   /// before it returns, and it waits until every worker ran the worker events posted before it. Do
-  /// not hold a lock across this call that those hooks take.
+  /// not hold a lock across this call that those hooks take. With the listener writer enabled,
+  /// Envoy finishes initializing only once it applied the listener writes queued before this call,
+  /// or the module removed them. Writes can only be queued after the server is initialized, so a
+  /// module whose listeners must serve from the first connection calls this only after it queued
+  /// their writes.
   ///
   /// This must be called on the main thread. To call from other threads, use the scheduler
   /// mechanism to post an event to the main thread first.
@@ -297,8 +301,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// [`BootstrapExtensionConfig::on_run_on_all_workers_done`] on the main thread. The main thread
   /// does not run the worker event.
   ///
-  /// A worker runs the event after it applied every cluster and host change that Envoy posted to
-  /// it before this call. Host health, weight and metadata changes merged by the
+  /// A worker runs the event after it applied every cluster, host and listener change that Envoy
+  /// posted to it before this call. Host health, weight and metadata changes merged by the
   /// `update_merge_window` of a cluster may reach the workers later. The workers start only after
   /// initialization completes, so do not wait for the done hook before calling
   /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`]. That call can wait for the workers to
@@ -339,7 +343,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// the first request, call [`EnvoyBootstrapExtensionConfig::signal_init_complete`] only after
   /// their writes completed as active. While Envoy applies a burst of writes, it holds back the
   /// EDS, LEDS and SDS requests on the ADS stream and the xDS-TP authority streams, including their
-  /// ACKs, for about one second.
+  /// ACKs, for about one second. A burst of the listener writer extends this hold.
   ///
   /// This must be called on the main thread after the server is initialized, for example from
   /// [`BootstrapExtensionConfig::on_scheduled`].
@@ -364,6 +368,77 @@ pub trait EnvoyBootstrapExtensionConfig {
     &self,
     cluster_name: &str,
   ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result;
+
+  /// Enable the listener writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::listener_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::listener_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_listener_writer(&self) -> bool;
+
+  /// Queue a write of a listener. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_listener_writer`] first.
+  ///
+  /// * `listener_name` is the name of the listener, which must not be empty. Only write listeners
+  ///   that no other component writes. A write of a listener that exists and that this extension
+  ///   does not own completes as `Failed`.
+  /// * `listener` is the serialized `envoy.config.listener.v3.Listener`, whose name must equal
+  ///   `listener_name`.
+  /// * `version_info` is stored with the listener when the write changes it, and shown in the
+  ///   config dump. A change of only the filter chains of an active listener can keep the previous
+  ///   version.
+  ///
+  /// This returns a tuple of (result, update_id). When the result is `Success`, the update ID is
+  /// nonzero and increases with every accepted write, and the outcome arrives in
+  /// [`BootstrapExtensionConfig::on_listener_writer_update_done`] with the same update ID. The
+  /// result is `NotAllowed` and the update ID is 0 before the writer is enabled, before
+  /// [`BootstrapExtension::on_server_initialized`], after shutdown began, or off the main thread.
+  /// A call off the main thread also reports an Envoy bug.
+  ///
+  /// A State-of-the-World LDS update that leaves the written listeners out does not remove them.
+  /// Writes queued before Envoy finishes initializing its static and CDS clusters are applied once
+  /// it has. When the listener is written again before Envoy applied the previous write, Envoy
+  /// applies only the latest write and the previous one completes as `Superseded`. The cluster and
+  /// listener writers apply their writes independently, so write a listener whose inline routes
+  /// name a written cluster only after that cluster write completed as active. The writes queued
+  /// before [`EnvoyBootstrapExtensionConfig::signal_init_complete`] are applied before Envoy
+  /// finishes initializing, and Envoy starts its workers once their listeners warmed. Their writes
+  /// complete as active once the workers started, so do not wait for them before signaling. A
+  /// written listener has the same authority as a listener delivered by LDS, so build listeners
+  /// from a schema that the module owns. While Envoy applies a burst of writes, it holds back the
+  /// RDS, SRDS, VHDS, FCDS and SDS requests on the ADS stream and the xDS-TP authority streams,
+  /// including their ACKs, for about one second. A burst of the cluster writer extends this hold.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn listener_writer_add_or_update(
+    &self,
+    listener_name: &str,
+    listener: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
+    u64,
+  );
+
+  /// Queue the removal of a listener that this extension owns. A write of the listener that is
+  /// queued or warming completes as `Removed`, unless it becomes active before Envoy applies the
+  /// removal. Returns `NotFound` when the extension neither owns nor has queued a listener with
+  /// this name, and `NotAllowed` for the same reasons as a write. A removal has no outcome of its
+  /// own. Once Envoy applies it, the workers stop accepting connections on the listener and drain
+  /// its connections. With listener lifecycle events enabled,
+  /// [`BootstrapExtensionConfig::on_listener_removal`] reports the removal.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn listener_writer_remove(
+    &self,
+    listener_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -604,6 +679,44 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _error_details: &str,
   ) {
   }
+
+  /// This is called on the main thread with the outcome of a write accepted by
+  /// [`EnvoyBootstrapExtensionConfig::listener_writer_add_or_update`]. Envoy calls it at most once
+  /// per update ID, never from inside a call into Envoy, and not after shutdown began. It is called
+  /// exactly once unless shutdown began first, the listener never finishes warming, or the workers
+  /// never start. To end a write that stays warming, write the listener again or remove it. Once
+  /// Envoy stopped the listeners, only a removal ends the warming. Outcomes can arrive out of
+  /// update ID order. A listener that fails to listen after it warmed fails its write. If the write
+  /// added addresses in place, the workers keep serving the previous version. Otherwise Envoy
+  /// removes the listener and its previous version, and the extension no longer owns it. The error
+  /// details say which of the two happened. When Envoy fails to create the listener of a write, it
+  /// logs the error at most once every 10 seconds, and the extension keeps owning the listener if
+  /// it exists.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `update_id` is the ID returned by the write.
+  /// * `listener_name` is the name of the listener.
+  /// * `status` is the outcome of the write. `Active` means that the listener finished warming with
+  ///   this configuration or an identical one and that Envoy posted it to the workers. `Superseded`
+  ///   and `Removed` mean that a later write or a removal ended this write before it became active.
+  ///   `Failed` means that the listener failed to listen, or that Envoy rejected the write because
+  ///   the listener failed to parse or validate, its name differs from `listener_name`, it is an
+  ///   API listener, a listener with this name exists that this extension does not own, Envoy
+  ///   failed to create it, or Envoy stopped the listeners of its traffic direction and the write
+  ///   changes it. After a rejected write the workers keep serving the previous configuration, if
+  ///   any. `OwnershipLost` means that another component removed or replaced the listener before
+  ///   this write became active, so the extension no longer owns it.
+  /// * `error_details` describes the problem when the status is `Failed` or `OwnershipLost`, and is
+  ///   empty otherwise.
+  fn on_listener_writer_update_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update_id: u64,
+    _listener_name: &str,
+    _status: abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+    _error_details: &str,
+  ) {
+  }
 }
 
 /// A completion callback that must be invoked exactly once to signal that an asynchronous
@@ -686,10 +799,11 @@ pub trait BootstrapExtension: Send + Sync {
   /// completion to prevent Envoy from hanging.
   ///
   /// Shutdown has begun when Envoy calls this, so
-  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] returns false, the cluster writer calls
-  /// return `NotAllowed`, and Envoy drops the done hooks of pending worker events and the pending
-  /// cluster writer outcomes. A worker can still run the worker event hook of an event posted
-  /// before shutdown began, until the workers stop.
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] and the writer enable calls return
+  /// false, the other cluster and listener writer calls return `NotAllowed`, and Envoy drops the
+  /// done hooks of pending worker events and the pending cluster and listener writer outcomes. A
+  /// worker can still run the worker event hook of an event posted before shutdown began, until the
+  /// workers stop.
   fn on_shutdown(
     &mut self,
     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
@@ -1421,6 +1535,46 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       )
     }
   }
+
+  fn enable_listener_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(self.raw)
+    }
+  }
+
+  fn listener_writer_add_or_update(
+    &self,
+    listener_name: &str,
+    listener: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
+    u64,
+  ) {
+    let mut update_id: u64 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+        self.raw,
+        str_to_module_buffer(listener_name),
+        bytes_to_module_buffer(listener),
+        str_to_module_buffer(version_info),
+        &mut update_id,
+      )
+    };
+    (result, update_id)
+  }
+
+  fn listener_writer_remove(
+    &self,
+    listener_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+        self.raw,
+        str_to_module_buffer(listener_name),
+      )
+    }
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -2041,6 +2195,36 @@ ffi_export! {
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       update_id,
       cluster_name_str.as_ref(),
+      status,
+      error_details_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy with the outcome of a listener write by a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    update_id: u64,
+    listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let listener_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(listener_name.ptr as *const u8, listener_name.length)
+    };
+    let error_details_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr as *const u8, error_details.length)
+    };
+
+    extension_config.on_listener_writer_update_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      update_id,
+      listener_name_str.as_ref(),
       status,
       error_details_str.as_ref(),
     );
