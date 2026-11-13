@@ -20,7 +20,10 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:message_lib",
@@ -64,7 +67,10 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/common/router:string_accessor_lib",

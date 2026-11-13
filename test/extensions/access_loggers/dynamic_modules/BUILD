@@ -21,6 +21,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:access_log_no_op",
         "//test/extensions/dynamic_modules/test_data/rust:access_log_integration_test",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/access_loggers/dynamic_modules:config",
@@ -40,6 +41,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:access_log_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:access_log_no_op",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
@@ -55,6 +57,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
         "//test/extensions/dynamic_modules:util",
@@ -75,6 +78,10 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:access_log_integration_test",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/access_loggers/dynamic_modules:config",
         "//test/integration:http_integration_lib",

@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
     name = "conn_pool_impl_test",
     srcs = ["conn_pool_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
@@ -75,7 +75,10 @@ envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
@@ -97,7 +100,7 @@ envoy_extension_cc_test(
     name = "external_auth_test",
     srcs = ["external_auth_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":redis_mocks",
         "//source/extensions/filters/network/redis_proxy:external_auth_lib",
@@ -111,7 +114,7 @@ envoy_extension_cc_test(
     name = "aws_iam_auth_test",
     srcs = ["aws_iam_auth_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":redis_mocks",
         "//source/extensions/filters/network/common/redis:aws_iam_authenticator_lib",
@@ -149,7 +152,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -162,7 +165,7 @@ envoy_extension_cc_benchmark_binary(
     name = "command_lookup_speed_test",
     srcs = ["command_lookup_speed_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
@@ -186,7 +189,7 @@ envoy_extension_cc_test(
     name = "router_impl_test",
     srcs = ["router_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":redis_mocks",
         "//source/common/formatter:formatter_extension_lib",
@@ -207,7 +210,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -223,7 +229,7 @@ envoy_extension_cc_benchmark_binary(
     name = "command_split_speed_test",
     srcs = ["command_split_speed_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",

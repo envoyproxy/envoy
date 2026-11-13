@@ -17,7 +17,7 @@ envoy_extension_cc_test(
         "stateful_session_test.cc",
     ],
     extension_names = ["envoy.filters.http.stateful_session"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
         "//source/server:generic_factory_context_lib",
@@ -36,7 +36,10 @@ envoy_extension_cc_test(
         "stateful_session_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.stateful_session"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/stateful_session:config",
@@ -53,7 +56,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.stateful_session"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
         "//test/mocks/http:stateful_session_mock",

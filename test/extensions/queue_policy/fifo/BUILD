@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "fifo_queue_policy_test",
     srcs = ["fifo_queue_policy_test.cc"],
     extension_names = ["envoy.queue_policy.fifo"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/queue_policy/fifo:fifo_queue_policy_impl",

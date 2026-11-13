@@ -37,7 +37,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["health_checker_integration_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     tags = ["cpu:3"],
     deps = [
         "//source/extensions/health_checkers/udp:health_checker_lib",
