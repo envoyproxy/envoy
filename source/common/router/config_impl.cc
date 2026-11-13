@@ -2285,7 +2285,8 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator,
                                    Init::Manager& init_manager, absl::Status& creation_status)
-    : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
+    : name_(config.name()), vhost_header_(config.vhost_header()),
+      symbol_table_(factory_context.scope().symbolTable()),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(config.typed_per_filter_config(),
                                                          factory_context, validator, init_manager),

@@ -9,7 +9,7 @@ void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     std::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
     RequestHeaderMap& request_headers) {
   if (route_config.has_value() && route_config.value()->usesVhds()) {
-    const absl::string_view host = request_headers.getHostValue();
+    const absl::string_view host = route_config.value()->vhostHeaderValue(request_headers);
     if (!host.empty()) {
       requestVhdsUpdate(absl::AsciiStrToLower(host), dispatcher,
                         std::move(route_config_updated_cb));

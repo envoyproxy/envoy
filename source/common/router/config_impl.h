@@ -1476,6 +1476,7 @@ public:
   }
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
+  const Http::LowerCaseString& vhostHeader() const override { return vhost_header_; }
 
 private:
   CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1486,6 +1487,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
+  const Http::LowerCaseString vhost_header_;
   Stats::SymbolTable& symbol_table_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
@@ -1553,6 +1555,9 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return shared_config_->typedMetadata();
   }
+  const Http::LowerCaseString& vhostHeader() const override {
+    return shared_config_->vhostHeader();
+  }
 
 protected:
   ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1592,10 +1597,12 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   bool ignorePathParametersInPathMatching() const override { return false; }
+  const Http::LowerCaseString& vhostHeader() const override { return vhost_header_; }
 
 private:
   std::vector<Http::LowerCaseString> internal_only_headers_;
   const std::string name_;
+  const Http::LowerCaseString vhost_header_{""};
 };
 
 } // namespace Router

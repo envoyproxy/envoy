@@ -276,9 +276,14 @@ public:
   }
 
   void useRdsWithVhosts() { use_rds_with_vhosts = true; }
+  void setVhostHeader(absl::string_view vhost_header) { vhost_header_ = std::string(vhost_header); }
   const envoy::config::route::v3::RouteConfiguration rdsConfig() const {
-    return TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+    auto config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
         use_rds_with_vhosts ? RdsConfigWithVhosts : RdsConfig);
+    if (!vhost_header_.empty()) {
+      config.set_vhost_header(vhost_header_);
+    }
+    return config;
   }
 
   void notifyAboutAliasResolutionFailure(const std::string& version, FakeStreamPtr& stream,
@@ -334,6 +339,7 @@ public:
 
   FakeStreamPtr vhds_stream_;
   bool use_rds_with_vhosts{false};
+  std::string vhost_header_;
 };
 
 // VHDS Integration tests are similar to other xDS-dynamic config tests, but
