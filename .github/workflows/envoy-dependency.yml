@@ -14,6 +14,7 @@ on:
         default: bazel
         type: choice
         options:
+        - actions
         - bazel
         - build-image
         - check
@@ -29,7 +30,8 @@ on:
       version:
         description: >-
           Version to set (optional). bazel = module version (single dependency only),
-          registry = bazel-registry commit (default: tip of main)
+          registry = bazel-registry commit (default: tip of main), actions = toolshed actions
+          release, eg `0.4.30` (default: latest), or with `wip` any toolshed commit
       pr:
         type: boolean
         default: true
@@ -40,7 +42,9 @@ on:
         default: false
         description: >-
           Open the PR as a draft with a `[WIP] ` title prefix. For the `registry` task this also
-          allows a non-ancestor/untagged bazel-registry commit (sets ENVOY_REGISTRY_ALLOW_UNSAFE).
+          allows a non-ancestor/untagged bazel-registry commit (sets ENVOY_REGISTRY_ALLOW_UNSAFE),
+          and for the `actions` task a toolshed commit that is not a release
+          (sets ENVOY_ACTIONS_ALLOW_UNSAFE).
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
@@ -55,13 +59,14 @@ jobs:
     if: >-
       ${{
           github.event_name == 'workflow_dispatch'
-          && contains(fromJSON('["bazel", "lockfiles", "registry"]'), inputs.task)
+          && contains(fromJSON('["actions", "bazel", "lockfiles", "registry"]'), inputs.task)
       }}
     name: >
       Update
       (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task }}
       /${{ inputs.task == 'bazel' && inputs.dependency
            || inputs.task == 'registry' && 'bazel-registry'
+           || inputs.task == 'actions' && 'toolshed-actions'
            || 'lockfiles' }}
       /${{ inputs.version || 'latest' }}${{ inputs.task == 'registry' && inputs.dependency && format(' +{0}', inputs.dependency) || '' }})
     runs-on: ubuntu-24.04
@@ -98,6 +103,7 @@ jobs:
         ENVOY_DOCKER_CI: 1
         ENVOY_REGISTRY_HASH: ${{ inputs.task == 'registry' && inputs.version || '' }}
         ENVOY_REGISTRY_ALLOW_UNSAFE: ${{ inputs.task == 'registry' && inputs.wip && '1' || '' }}
+        ENVOY_ACTIONS_ALLOW_UNSAFE: ${{ inputs.task == 'actions' && inputs.wip && '1' || '' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - id: result
       name: Update result

@@ -6,6 +6,7 @@
 #   update.sh bazel <name[=version]>... [version]   update the given modules
 #   update.sh registry [<name[=version]>...|*] [commit]  bump the registry pin, then apply updates
 #   update.sh lockfiles                             regenerate lockfiles
+#   update.sh actions [release|commit]              bump the toolshed actions pins
 
 set -e -o pipefail
 
@@ -37,7 +38,63 @@ module_diff_hash() {
     git diff -- ':(glob)**/MODULE.bazel' | sha256sum | cut -c1-7
 }
 
+TOOLSHED_REPO=envoyproxy/toolshed
+
+# Pin every `envoyproxy/toolshed/actions/...` used by the workflows to one toolshed commit: the
+# latest actions release, a given release (`0.4.30` or `actions-v0.4.30`), or, with
+# ENVOY_ACTIONS_ALLOW_UNSAFE (wip), any commit, eg to try an unreleased change. Pins are commented
+# with the release (`actions-v0.4.30`), or the commit (`0b8831c (unreleased)`).
+update_actions() {
+    local ref sha comment tag files
+    (( ${#specs[@]} == 0 )) || fail 'dependency is not supported by the actions task'
+    if [[ "$version" =~ ^[0-9a-f]{40}$ ]]; then
+        [[ -n "$ENVOY_ACTIONS_ALLOW_UNSAFE" ]] \
+            || fail 'a commit that is not a release can only be pinned with wip'
+        sha="$version"
+        gh api "repos/${TOOLSHED_REPO}/commits/${sha}" --jq .sha >/dev/null \
+            || fail "Commit not found in ${TOOLSHED_REPO}: ${sha}"
+        comment="${sha:0:7} (unreleased)"
+        output="${sha:0:7}"
+    else
+        if [[ -z "$version" ]]; then
+            tag="$(git ls-remote --tags --refs "https://github.com/${TOOLSHED_REPO}.git" 'refs/tags/actions-v*' \
+                       | sed 's#.*refs/tags/##' \
+                       | sort -V \
+                       | tail -n1)"
+            [[ -n "$tag" ]] || fail 'No toolshed actions release found'
+        else
+            tag="actions-v${version#actions-v}"
+            tag="${tag/actions-vv/actions-v}"
+        fi
+        ref="$(git ls-remote "https://github.com/${TOOLSHED_REPO}.git" "refs/tags/${tag}^{}" "refs/tags/${tag}")"
+        # An annotated tag points at the tag object: the peeled (`^{}`) line is the commit.
+        sha="$(awk -v peeled="refs/tags/${tag}^{}" -v plain="refs/tags/${tag}" \
+                   '$2 == peeled {p = $1} $2 == plain {l = $1} END {print (p ? p : l)}' <<< "$ref")"
+        [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "Toolshed actions release not found: ${tag}"
+        comment="$tag"
+        output="$tag"
+    fi
+    echo "Updating(actions): ${TOOLSHED_REPO} actions -> ${comment} (${sha})" >&2
+    mapfile -t files < <(git grep -l -E "${TOOLSHED_REPO}/actions/[^@ ]+@[0-9a-f]{40}" -- '*.yml' '*.yaml')
+    (( ${#files[@]} > 0 )) || fail 'No toolshed actions pins found'
+    sed -i -E \
+        "s#(${TOOLSHED_REPO}/actions/[^@ ]+)@[0-9a-f]{40}( +\#.*)?\$#\1@${sha}  \# ${comment}#" \
+        "${files[@]}"
+    [[ -n "$(git status --porcelain)" ]] \
+        || fail "Toolshed actions are already pinned to ${comment} (${sha})"
+    jq -n -c \
+       --arg name toolshed-actions \
+       --arg output "$output" \
+       --arg title "deps: Bump toolshed actions -> ${comment}" \
+       --arg summary "- \`${TOOLSHED_REPO}/actions\` -> ${comment} (${sha})"$'\n' \
+       '{name: $name, output: $output, title: $title, summary: $summary}'
+}
+
 case "$task" in
+    actions)
+        update_actions
+        exit 0
+        ;;
     bazel)
         (( ${#specs[@]} > 0 )) || fail 'dependency is required for the bazel task'
         if [[ -n "$version" ]]; then
@@ -72,7 +129,7 @@ case "$task" in
         command='./ci/do_ci.sh lockfiles'
         ;;
     *)
-        echo "Usage: $0 <bazel|registry|lockfiles> [dependency...] [version]" >&2
+        echo "Usage: $0 <actions|bazel|registry|lockfiles> [dependency...] [version]" >&2
         exit 1
         ;;
 esac
