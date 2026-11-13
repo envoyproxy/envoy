@@ -75,7 +75,7 @@ TEST_F(FileSystemImplTest, DirectoryExists) {
 }
 
 TEST_F(FileSystemImplTest, FileSize) {
-  EXPECT_EQ(0, file_system_.fileSize(std::string(Platform::null_device_path)));
+  EXPECT_EQ(0, file_system_.fileSize(Platform::null_device_path));
   EXPECT_EQ(-1, file_system_.fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
@@ -207,7 +207,7 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("C:/foo/b*ar/baz"));
   EXPECT_TRUE(file_system_.illegalPath("C:/foo/b?ar/baz"));
   EXPECT_TRUE(file_system_.illegalPath(R"EOF(C:/i/x"x)EOF"));
-  EXPECT_TRUE(file_system_.illegalPath(std::string("C:/i\0j", 6)));
+  EXPECT_TRUE(file_system_.illegalPath(absl::string_view("C:/i\0j", 6)));
   EXPECT_TRUE(file_system_.illegalPath("C:/i/\177"));
   EXPECT_TRUE(file_system_.illegalPath("C:/i/\alarm"));
   EXPECT_FALSE(file_system_.illegalPath("C:/i/../j"));
