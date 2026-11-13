@@ -9468,7 +9468,8 @@ typedef void (*envoy_dynamic_module_type_config_snapshot_json_fn)(
 
 /**
  * Collects and redacts the named providers on the main thread after server initialization.
- * Missing providers are omitted; an empty selection collects nothing. Returns null before
+ * Missing providers are omitted; an empty selection collects nothing. Selecting "endpoint" includes
+ * active cluster endpoint assignments, as /config_dump?include_eds does. Returns null before
  * initialization, after shutdown, without admin, or if collection fails. Must not run during an
  * xDS callback.
  */

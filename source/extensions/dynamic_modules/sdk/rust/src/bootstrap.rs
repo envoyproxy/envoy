@@ -29,6 +29,8 @@ pub enum ConfigSnapshotProvider<'a> {
   Bootstrap,
   /// Cluster configurations.
   Clusters,
+  /// Endpoint assignments for active clusters.
+  Endpoints,
   /// Listener configurations.
   Listeners,
   /// Route configurations.
@@ -62,6 +64,7 @@ impl ConfigSnapshotProvider<'_> {
     match self {
       Self::Bootstrap => "bootstrap",
       Self::Clusters => "clusters",
+      Self::Endpoints => "endpoint",
       Self::Listeners => "listeners",
       Self::Routes => "routes",
       Self::RouteScopes => "route_scopes",
@@ -405,6 +408,7 @@ pub trait EnvoyBootstrapExtensionConfig {
 
   /// Collects and redacts the selected providers on the main thread after initialization.
   /// Missing providers are omitted; an empty selection collects nothing.
+  /// [`ConfigSnapshotProvider::Endpoints`] includes active cluster endpoint assignments.
   /// Must not run during an xDS callback.
   fn get_config_snapshot<'a>(
     &self,
@@ -2491,6 +2495,7 @@ mod snapshot_tests {
     let cases = [
       (ConfigSnapshotProvider::Bootstrap, "bootstrap"),
       (ConfigSnapshotProvider::Clusters, "clusters"),
+      (ConfigSnapshotProvider::Endpoints, "endpoint"),
       (ConfigSnapshotProvider::Listeners, "listeners"),
       (ConfigSnapshotProvider::Routes, "routes"),
       (ConfigSnapshotProvider::RouteScopes, "route_scopes"),

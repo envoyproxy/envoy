@@ -4,6 +4,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/upstream/endpoint_config_dump.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -14,6 +15,7 @@ namespace DynamicModules {
 
 absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
 ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
+                        const Upstream::ClusterManager& cluster_manager,
                         absl::Span<const absl::string_view> providers) {
   auto snapshot = std::make_unique<ConfigSnapshot>();
   const auto& callbacks = tracker.getCallbacksMap();
@@ -25,10 +27,14 @@ ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
         continue;
       }
       auto it = callbacks.find(std::string(provider));
-      if (it == callbacks.end()) {
+      ProtobufTypes::MessagePtr message;
+      if (it != callbacks.end()) {
+        message = it->second(matcher);
+      } else if (provider == "endpoint" && cluster_manager.hasActiveClusters()) {
+        message = Upstream::dumpEndpointConfigs(cluster_manager, matcher);
+      } else {
         continue;
       }
-      auto message = it->second(matcher);
       if (message == nullptr) {
         return absl::InternalError("config provider returned no message");
       }

@@ -102,7 +102,8 @@ DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
   if (!server_admin.has_value()) {
     return absl::FailedPreconditionError("admin config tracker is unavailable");
   }
-  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers);
+  return ConfigSnapshot::collect(server_admin->getConfigTracker(), context_.clusterManager(),
+                                 providers);
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(

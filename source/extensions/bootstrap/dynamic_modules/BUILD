@@ -16,8 +16,10 @@ envoy_cc_library(
     deps = [
         "//envoy/common:exception_lib",
         "//envoy/server:config_tracker_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:matchers_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:endpoint_config_dump_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

@@ -1973,6 +1973,30 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   EXPECT_THAT(json, testing::HasSubstr("test-node"));
 }
 
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotIncludesEndpointAssignments) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  EXPECT_CALL(context_.cluster_manager_, hasActiveClusters()).WillOnce(testing::Return(true));
+  EXPECT_CALL(context_.cluster_manager_, forEachActiveCluster(_)).WillOnce([](auto) {});
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"endpoint", 8}};
+  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+      config->thisAsVoidPtr(), providers, 1);
+  ASSERT_NE(snapshot, nullptr);
+  std::string json;
+  EXPECT_TRUE(envoy_dynamic_module_callback_config_snapshot_serialize(
+      snapshot,
+      [](envoy_dynamic_module_type_envoy_buffer buffer, void* result) {
+        static_cast<std::string*>(result)->assign(buffer.ptr, buffer.length);
+      },
+      &json));
+  envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
+  EXPECT_THAT(json, testing::HasSubstr("EndpointsConfigDump"));
+}
+
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.
 TEST_F(BootstrapAbiImplTest, EnableClusterLifecycle) {
   auto dynamic_module =
