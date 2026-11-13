@@ -229,6 +229,12 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quiche_balsa_balsa_headers_test",
     srcs = envoy_select_enable_http3(["@quiche//:quiche_balsa_balsa_headers_test_srcs"]),
+    args = select({
+        # The MSVC runtime prints a null pointer as "0000000000000000", which this test does not
+        # accept.
+        "//bazel:windows_x86_64": ["--gtest_filter=-BalsaHeaders.IteratorWorksWithOStreamAsExpected"],
+        "//conditions:default": [],
+    }),
     copts = quiche_copts,
     tags = ["quiche"],
     deps = envoy_select_enable_http3([
