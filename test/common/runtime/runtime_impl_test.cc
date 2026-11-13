@@ -1130,6 +1130,28 @@ TEST_F(RtdsLoaderImplTest, FrozenRestartFeaturesIgnoreRtds) {
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
 }
 
+TEST_F(RtdsLoaderImplTest, FrozenRestartFeatureRemovalKeepsValue) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.restart_features.test_feature: true
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+
+  loader_->freezeRestartFeatures();
+  runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer: {}
+  )EOF");
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+}
+
 // Successful update.
 TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   setup();
