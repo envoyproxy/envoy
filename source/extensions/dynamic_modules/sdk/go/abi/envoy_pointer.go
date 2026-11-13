@@ -52,9 +52,10 @@ func HttpFilterEnvoyPointer(h shared.HttpFilterHandle) (unsafe.Pointer, bool) {
 //     the filter config keeps it alive, so the pointer is valid during the
 //     callbacks of that stream.
 //   - Envoy destroys a filter config when it is no longer used, for example
-//     after a listener update, and the destroy can happen during a function
-//     scheduled on that config. Native code gets no notice of the destroy. A
-//     pointer kept outside the life of its filter config is invalid.
+//     after a listener update. The destroy can happen inside a commit to that
+//     config's scheduler, on the thread that called it. Native code gets no
+//     notice of the destroy. A pointer kept outside the life of its filter
+//     config is invalid.
 //
 // Two examples of a use after the destroy: defining a metric on a destroyed
 // filter config crashes Envoy, and recording a value of a metric on one reads
