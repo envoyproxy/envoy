@@ -40,7 +40,7 @@ public:
 /**
  * Describes the authentication type used by the client when communicating with the auth server.
  */
-enum class AuthType { UrlEncodedBody, BasicAuth, TlsClientAuth, PrivateKeyJwt };
+enum class AuthType { UrlEncodedBody, BasicAuth, TlsClientAuth, PrivateKeyJwt, ClientAssertion };
 
 /**
  * Returns the log tags attached to the OAuth2 application logs so that they can be correlated with

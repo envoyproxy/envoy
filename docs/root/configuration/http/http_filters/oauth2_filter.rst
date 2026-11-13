@@ -82,6 +82,36 @@ are also left undecoded. Specifically the following characters are left in the e
 
   The OAuth2 filter is currently under active development.
 
+Federated client authentication
+-------------------------------
+
+Set :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
+to ``CLIENT_ASSERTION`` to authenticate the OAuth client using an externally issued JWT, such as a
+Kubernetes projected service account token. Unlike ``PRIVATE_KEY_JWT``, this mode does not require
+Envoy to hold a signing key. Envoy sends the JWT from
+:ref:`token_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.token_secret>`
+as ``client_assertion`` with
+``client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`` for both authorization
+code exchanges and refresh token requests. No ``client_secret`` or HTTP Basic credentials are sent.
+
+Configure ``token_secret`` to reference a dynamic SDS secret containing the JWT. For example, an
+SDS response can supply a file-backed secret:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.transport_sockets.tls.v3.Secret
+
+  name: workload-token
+  generic_secret:
+    secret:
+      filename: /var/run/secrets/tokens/service-account-token
+
+The secret must be delivered through SDS, rather than as a static bootstrap secret, to pick up file
+updates. Envoy uses the latest secret value for each token request. The token issuer or SDS provider
+is responsible for rotating the JWT before it expires. The authorization server must trust the
+external issuer and accept the token's subject and audience. The JWT is forwarded unchanged; Envoy
+does not validate it or obtain a replacement token. The separate ``hmac_secret`` is still required
+to protect the browser session cookies.
+
 Example configuration
 ---------------------
 

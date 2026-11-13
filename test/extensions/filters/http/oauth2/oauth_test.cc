@@ -602,7 +602,13 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkErrorAllowFailedContinu
   }));
 }
 
-TEST_F(OAuth2ClientTest, RequestAccessTokenPrivateKeyJwtHasClientAssertion) {
+class OAuth2ClientAssertionTest : public OAuth2ClientTest,
+                                  public testing::WithParamInterface<AuthType> {};
+
+INSTANTIATE_TEST_SUITE_P(AuthTypes, OAuth2ClientAssertionTest,
+                         testing::Values(AuthType::PrivateKeyJwt, AuthType::ClientAssertion));
+
+TEST_P(OAuth2ClientAssertionTest, RequestAccessTokenHasClientAssertion) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
@@ -612,20 +618,19 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenPrivateKeyJwtHasClientAssertion) {
         EXPECT_THAT(body, HasSubstr("client_id=client_id"));
         EXPECT_THAT(body, HasSubstr("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
                                     "assertion-type%3Ajwt-bearer"));
-        EXPECT_THAT(body, HasSubstr("client_assertion=test_jwt_assertion"));
+        EXPECT_THAT(body, HasSubstr("client_assertion=test.jwt.assertion%2B%2F%3D"));
         EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
         callbacks_.push_back(&cb);
         return &request_;
       });
 
   client_->setCallbacks(*mock_callbacks_);
-  // For PrivateKeyJwt, the "secret" parameter holds the pre-built JWT assertion.
-  client_->asyncGetAccessToken("auth_code", "client_id", "test_jwt_assertion", "cb", "verifier",
-                               AuthType::PrivateKeyJwt);
+  client_->asyncGetAccessToken("auth_code", "client_id", "test.jwt.assertion+/=", "cb", "verifier",
+                               GetParam());
   EXPECT_EQ(1, callbacks_.size());
 }
 
-TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenPrivateKeyJwtHasClientAssertion) {
+TEST_P(OAuth2ClientAssertionTest, RequestRefreshAccessTokenHasClientAssertion) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
@@ -635,15 +640,14 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenPrivateKeyJwtHasClientAssertio
         EXPECT_THAT(body, HasSubstr("client_id=client_id"));
         EXPECT_THAT(body, HasSubstr("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
                                     "assertion-type%3Ajwt-bearer"));
-        EXPECT_THAT(body, HasSubstr("client_assertion=test_jwt_assertion"));
+        EXPECT_THAT(body, HasSubstr("client_assertion=test.jwt.assertion%2B%2F%3D"));
         EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
         callbacks_.push_back(&cb);
         return &request_;
       });
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncRefreshAccessToken("refresh", "client_id", "test_jwt_assertion",
-                                   AuthType::PrivateKeyJwt);
+  client_->asyncRefreshAccessToken("refresh", "client_id", "test.jwt.assertion+/=", GetParam());
   EXPECT_EQ(1, callbacks_.size());
 }
 
