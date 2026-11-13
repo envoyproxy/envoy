@@ -218,6 +218,7 @@ public:
   // GenericUpstream
   bool readDisable(bool disable) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
+  bool accountsForUpstreamBytes() const override { return true; }
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event,
                                                          absl::string_view details = "") override;
@@ -322,6 +323,7 @@ public:
   void setRouterUpstreamRequest(UpstreamRequestPtr);
   void newStream(GenericConnectionPoolCallbacks& callbacks);
   void encodeData(Buffer::Instance& data, bool end_stream) override;
+  bool accountsForUpstreamBytes() const override { return true; }
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event,
                                                          absl::string_view details = "") override;
   bool isValidResponse(const Http::ResponseHeaderMap&);
