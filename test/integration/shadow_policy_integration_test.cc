@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 
 #include "test/integration/filters/add_body_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
@@ -122,13 +123,15 @@ typed_config:
             if (cluster.name() != "cluster_1") {
               continue;
             }
+            envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config;
             TestUtility::loadFromYaml(R"EOF(
             fallback_policy: NO_FALLBACK
             subsetSelectors:
               - keys:
                 - "version"
           )EOF",
-                                      *cluster.mutable_lb_subset_config());
+                                      subset_config);
+            ConfigHelper::setSubsetLbPolicy(cluster, subset_config);
 
             auto* locality = cluster.mutable_load_assignment()->mutable_endpoints(0);
             auto* endpoint_v1 = locality->mutable_lb_endpoints(0);
@@ -1238,12 +1241,14 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto clusters = bootstrap.mutable_static_resources()->mutable_clusters();
     for (auto& cluster : *clusters) {
+      envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config;
       TestUtility::loadFromYaml(R"EOF(
             subsetSelectors:
               - keys:
                 - "stack"
           )EOF",
-                                *cluster.mutable_lb_subset_config());
+                                subset_config);
+      ConfigHelper::setSubsetLbPolicy(cluster, subset_config);
 
       auto lb_endpoint =
           cluster.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);

@@ -35,17 +35,21 @@ public:
           std::string cluster_yaml = R"EOF(
             name: cluster_0
             connect_timeout: 1.250s
-            type: ORIGINAL_DST
             lb_policy: CLUSTER_PROVIDED
-            original_dst_lb_config:
-              use_http_header: true
+            cluster_type:
+              name: envoy.cluster.original_dst
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
+                use_http_header: true
           )EOF";
 
           TestUtility::loadFromYaml(cluster_yaml, *cluster_0);
 
           // If legacy API is used, set the LB policy by the old way.
           if (legacy_api) {
-            cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+            cluster_0->clear_cluster_type();
+            cluster_0->set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+            cluster_0->mutable_original_dst_lb_config()->set_use_http_header(true);
             return;
           }
 
@@ -111,7 +115,7 @@ TEST_P(ClusterProvidedIntegrationTest, NormalLoadBalancing) {
 
 // Test the case where the cluster provided load balancer is configured by the legacy cluster LB
 // policy API and it works as expected.
-TEST_P(ClusterProvidedIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
+TEST_P(ClusterProvidedIntegrationTest, DEPRECATED_FEATURE_TEST(NormalLoadBalancingWithLegacyAPI)) {
   initializeConfig(true);
   runNormalLoadBalancing();
 }

@@ -2,6 +2,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
@@ -36,7 +37,9 @@ public:
       auto* cluster = static_resources->mutable_clusters(0);
 
       // Configure load balancing with subset.
-      cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
+      envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config;
+      subset_config.add_subset_selectors()->add_keys(type_key_);
+      ConfigHelper::setSubsetLbPolicy(*cluster, subset_config);
 
       // Setup transport socket matches.
       setupTransportSocketMatches(*cluster);
