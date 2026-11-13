@@ -15,20 +15,24 @@ absl::string_view stringViewFromGoPointer(void* p, int len) {
   return {static_cast<const char*>(p), static_cast<size_t>(len)};
 }
 
-extern "C" {
+namespace {
 
-CAPIStatus envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
-    void* s, std::function<CAPIStatus(HttpTcpBridge&, ProcessorState&)> f) {
+// The handlers are templates rather than std::function parameters: a callback that captures more
+// than the std::function small buffer can hold would heap allocate on every cgo call.
+template <class F> CAPIStatus envoyGoHttpTcpBridgeProcessStateHandlerWrapper(void* s, const F& f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
   auto req = static_cast<HttpTcpBridge*>(state->req);
   return f(*req, *state);
 }
 
-CAPIStatus envoyGoHttpTcpBridgeHandlerWrapper(void* r,
-                                              std::function<CAPIStatus(HttpTcpBridge&)> f) {
+template <class F> CAPIStatus envoyGoHttpTcpBridgeHandlerWrapper(void* r, const F& f) {
   auto req = static_cast<HttpTcpBridge*>(reinterpret_cast<httpRequest*>(r));
   return f(*req);
 }
+
+} // namespace
+
+extern "C" {
 
 CAPIStatus envoyGoHttpTcpBridgeCopyHeaders(void* s, void* strs, void* buf) {
   return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
