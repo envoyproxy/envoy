@@ -11,6 +11,7 @@ involved and how Envoy plays a role, read the CNCF
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/envoyproxy/envoy/badge)](https://securityscorecards.dev/viewer/?uri=github.com/envoyproxy/envoy)
 [![CLOMonitor](https://img.shields.io/endpoint?url=https://clomonitor.io/api/projects/cncf/envoy/badge)](https://clomonitor.io/projects/cncf/envoy)
+[![Monitoring donated by Datadog](https://img.shields.io/badge/Monitoring-donated%20by%20Datadog-632CA6?logo=datadog&logoColor=white)](https://p.datadoghq.com/sb/b215c84e-9ca8-11f1-ae9a-6aa082f120f0-4b41476abae06a93f73bf7120da9d94c)
 
 ## Documentation
 
