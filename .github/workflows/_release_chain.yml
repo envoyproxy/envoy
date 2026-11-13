@@ -32,7 +32,7 @@ jobs:
       next-branch: ${{ steps.plan.outputs.next-branch }}
     steps:
     - name: Checkout repository
-      uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
       with:
         branch: main
         config: |
