@@ -150,11 +150,21 @@ build:gcc --test_env=HEAPCHECK=
 # option not play well with fission:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
 build:gcc --copt=-fno-debug-types-section
+# With `--gc-sections` (`-c opt`), LLD drops the link array sections upb's GCC build registers
+# extensions in, and their `__start_`/`__stop_` symbols are then undefined. Keep sections referenced
+# by those symbols, as LLD did before 13.
+# TODO(phlax): move this to the toolshed GCC toolchain's link flags.
+build:gcc --linkopt=-Wl,-z,nostart-stop-gc
 # These trigger errors in multiple places both in Envoy dependecies
 # and in Envoy code itself when using GCC.
 # And in all cases the reports appear to be clear false positives.
 build:gcc --copt=-Wno-error=restrict
 build:gcc --copt=-Wno-error=uninitialized
+# With optimization (`-c opt`), GCC inlines through null checks and casts and reports the null
+# branch, eg a null source copied from in a death test, or a store through the result of a
+# `dynamic_cast` it cannot prove non-null.
+build:gcc --copt=-Wno-error=nonnull
+build:gcc --copt=-Wno-error=stringop-overflow
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
@@ -185,6 +195,15 @@ build:gcc --per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_
 build:gcc --host_per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
 build:gcc --per_file_copt=external/tcmalloc.*@-Wno-sign-compare
 build:gcc --per_file_copt=external/v8.*@-Wno-dangling-else
+
+# The GCC reference build as Envoy CI builds and tests it: with `-c opt`, as the Clang release build
+# is, but without debug info. With GCC, the split debug info `-c opt` adds (and `-ggdb3` on
+# libraries) takes compiles over the small RBE pool and the larger links over the large one, and
+# makes the binaries about 6x the size, for output that CI never publishes.
+build:gcc-ci --config=gcc
+build:gcc-ci --compilation_mode=opt
+build:gcc-ci --fission=no
+build:gcc-ci --per_file_copt=.*@-g0
 
 #############################################################################
 # tests
