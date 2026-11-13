@@ -3578,6 +3578,117 @@ TEST_P(SslSocketTest, NoCertUntrustedPermitted) {
                .setExpectNoCertChain());
 }
 
+TEST_P(SslSocketTest, RequireClientCertificateWithoutCaAcceptUntrustedNoClientCert) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF";
+
+  for (const std::string runtime_value : {"", "true", "false"}) {
+    SCOPED_TRACE(runtime_value.empty() ? "default" : runtime_value);
+    TestScopedRuntime scoped_runtime;
+    if (!runtime_value.empty()) {
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.require_client_certificate_without_ca", runtime_value}});
+    }
+    const bool expect_success = runtime_value == "false";
+    for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+      SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+      TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, expect_success, version_);
+      testUtil(
+          test_options.setClientTlsVersion(tls_version)
+              .setExpectedServerStats(expect_success ? "ssl.handshake" : "ssl.fail_verify_no_cert")
+              .setExpectNoCert()
+              .setExpectNoCertChain());
+    }
+  }
+}
+
+TEST_P(SslSocketTest, RequireClientCertificateWithoutCaAcceptUntrustedSelfSignedClientCert) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF";
+
+  for (const std::string runtime_value : {"", "true", "false"}) {
+    SCOPED_TRACE(runtime_value.empty() ? "default" : runtime_value);
+    TestScopedRuntime scoped_runtime;
+    if (!runtime_value.empty()) {
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.require_client_certificate_without_ca", runtime_value}});
+    }
+    for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+      SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+      TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+      testUtil(test_options.setClientTlsVersion(tls_version)
+                   .setExpectedSha256Digest(TEST_SELFSIGNED_CERT_256_HASH)
+                   .setExpectedSerialNumber(TEST_SELFSIGNED_CERT_SERIAL));
+    }
+  }
+}
+
+TEST_P(SslSocketTest, RequireClientCertificateWithoutValidationContextNoClientCert) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  for (const std::string runtime_value : {"", "true", "false"}) {
+    SCOPED_TRACE(runtime_value.empty() ? "default" : runtime_value);
+    TestScopedRuntime scoped_runtime;
+    if (!runtime_value.empty()) {
+      scoped_runtime.mergeValues(
+          {{"envoy.reloadable_features.require_client_certificate_without_ca", runtime_value}});
+    }
+    const bool expect_success = runtime_value == "false";
+    for (const auto tls_version : {TlsParameters::TLSv1_2, TlsParameters::TLSv1_3}) {
+      SCOPED_TRACE(TlsParameters::TlsProtocol_Name(tls_version));
+      TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, expect_success, version_);
+      testUtil(
+          test_options.setClientTlsVersion(tls_version)
+              .setExpectedServerStats(expect_success ? "ssl.handshake" : "ssl.fail_verify_no_cert")
+              .setExpectNoCert()
+              .setExpectNoCertChain());
+    }
+  }
+}
+
 TEST_P(SslSocketTest, GetPeerCertChain) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
