@@ -1010,7 +1010,9 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
   THROW_IF_NOT_OK_REF(loader.status());
-  (*loader)->freezeRestartFeatures();
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.freeze_restart_features")) {
+    (*loader)->freezeRestartFeatures();
+  }
   return std::move(loader.value());
 }
 
