@@ -1783,10 +1783,14 @@ TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
   test_server_->waitForGauge("server.state", Ge(0));
   test_server_->waitForGauge("server.live", Ge(1));
 
-  // Validate that the secret was never fetched: the cluster warmed on the fetch timeout. (The
-  // stream to a non-existent cluster also fails, but with Google gRPC the target is the fake
-  // upstream, which simply never answers.)
+  // The secret is never fetched, so the cluster warms on the fetch timeout. With Envoy gRPC the
+  // SDS stream goes to the non-existent cluster and fails. Google gRPC has no cluster to look up:
+  // it targets the fake upstream directly, which never answers, so there is no stream failure.
   test_server_->waitForCounter("sds.client_cert.init_fetch_timeout", Ge(1));
+  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+    // Validate that the secret update failed because SDS cluster is not found.
+    test_server_->waitForCounter("sds.client_cert.update_failure", Ge(1));
+  }
 
   // The 3 clusters are CDS, static and dynamic cluster.
   test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
@@ -1821,7 +1825,13 @@ TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
   // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
   test_server_->waitForGauge("server.state", Ge(0));
   test_server_->waitForGauge("server.live", Ge(1));
+  // The secret is never fetched, so the cluster warms on the fetch timeout. With Envoy gRPC the
+  // SDS stream goes to the dynamic cluster, which is not up yet, and fails. Google gRPC targets
+  // the fake upstream directly, which never answers, so there is no stream failure.
   test_server_->waitForCounter("sds.client_cert.init_fetch_timeout", Ge(1));
+  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+    test_server_->waitForCounter("sds.client_cert.update_failure", Ge(1));
+  }
 
   // The 3 clusters are CDS, static and dynamic cluster.
   test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
