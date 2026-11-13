@@ -486,6 +486,48 @@ providers:
                         HasSubstr("does not set exactly one of claim_name and claim_path")));
 }
 
+TEST(HttpJwtAuthnFilterConfigTest, AllowedCriticalHeadersWithoutJwtHeader) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    allowed_critical_headers:
+    - exp-extension
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
+                                 makeOptRef<Init::Manager>(context.init_manager_), creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("sets allowed_critical_headers but neither forward nor "
+                                  "header_in_metadata")));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, AllowedCriticalHeadersWithHeaderInMetadata) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    allowed_critical_headers:
+    - exp-extension
+    header_in_metadata: jwt_header
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
+                                 makeOptRef<Init::Manager>(context.init_manager_), creation_status);
+  EXPECT_TRUE(creation_status.ok()) << creation_status;
+}
+
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
   // failed_refetch_duration.duration.seconds should be less than:
   // 9223372036 = max_int64 / 1e9, which is about 300 years.

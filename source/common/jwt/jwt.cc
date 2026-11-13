@@ -28,6 +28,28 @@ bool isImplemented(absl::string_view alg) {
   return implemented_algs.contains(alg);
 }
 
+// "crit" must be a non-empty list of extension parameters that are present in the header.
+// https://tools.ietf.org/html/rfc7515#section-4.1.11
+bool parseCrit(const Protobuf::Value& value, const Protobuf::Struct& header,
+               std::vector<std::string>* crit) {
+  static const absl::flat_hash_set<absl::string_view> registered_params = {
+      {"alg"}, {"jku"},      {"jwk"}, {"kid"}, {"x5u"},  {"x5c"},
+      {"x5t"}, {"x5t#S256"}, {"typ"}, {"cty"}, {"crit"},
+  };
+  if (value.kind_case() != Protobuf::Value::kListValue || value.list_value().values().empty()) {
+    return false;
+  }
+  for (const auto& param : value.list_value().values()) {
+    if (param.kind_case() != Protobuf::Value::kStringValue ||
+        registered_params.contains(param.string_value()) ||
+        !header.fields().contains(param.string_value())) {
+      return false;
+    }
+    crit->push_back(param.string_value());
+  }
+  return true;
+}
+
 } // namespace
 
 Jwt::Jwt(const Jwt& instance) { *this = instance; }
@@ -145,6 +167,14 @@ Status Jwt::verifyTimeConstraint(uint64_t now, uint64_t clock_skew) const {
   // Check JWT has not expired (exp).
   if (exp_ && now > exp_ + clock_skew) {
     return Status::JwtExpired;
+  }
+  return Status::Ok;
+}
+
+Status Jwt::getCriticalHeaders(std::vector<std::string>* crit) const {
+  const auto it = header_pb_.fields().find("crit");
+  if (it != header_pb_.fields().end() && !parseCrit(it->second, header_pb_, crit)) {
+    return Status::JwtHeaderBadCrit;
   }
   return Status::Ok;
 }

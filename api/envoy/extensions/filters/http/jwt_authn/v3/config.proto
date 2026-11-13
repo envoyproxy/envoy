@@ -54,7 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -207,6 +207,28 @@ message JwtProvider {
   //
   repeated Algorithm allowed_algorithms = 22
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+
+  // Extension header parameters a JWT may list in its ``crit`` header
+  // (`RFC 7515 <https://tools.ietf.org/html/rfc7515#section-4.1.11>`_). A JWT is rejected if
+  // ``crit`` is not a non-empty list of extension parameters present in the header, or lists a
+  // parameter outside this list. If empty, any JWT with ``crit`` is rejected.
+  //
+  // Envoy does not process any extension parameter itself, so list only those handled after this
+  // filter. They need the JWT header, so either
+  // :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
+  // or :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.header_in_metadata>`
+  // must be set.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     allowed_critical_headers:
+  //     - exp-extension
+  //     forward: true
+  //
+  repeated string allowed_critical_headers = 23
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

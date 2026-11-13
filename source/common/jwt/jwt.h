@@ -95,6 +95,13 @@ struct Jwt {
    * @return the verification status.
    */
   Status verifyTimeConstraint(uint64_t now, uint64_t clock_skew = kClockSkewInSecond) const;
+
+  /**
+   * Get the extension parameters listed in the "crit" header, none if it is absent.
+   * @return JwtHeaderBadCrit if "crit" is not a non-empty list of extension parameters present in
+   * the header.
+   */
+  Status getCriticalHeaders(std::vector<std::string>* crit) const;
 };
 
 } // namespace JwtVerify
