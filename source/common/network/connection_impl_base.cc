@@ -66,7 +66,7 @@ void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
 
 void ConnectionImplBase::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
   // Validate that this is only called prior to issuing a close() or closeSocket().
-  ASSERT(delayed_close_timer_ == nullptr && state() == State::Open);
+  ASSERT(delayed_close_timer_ == nullptr && (state() == State::Open || connecting()));
   delayed_close_timeout_ = timeout;
 }
 

@@ -83,12 +83,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
+  if (!connected) {
+    connecting_ = true;
+  }
   if (!socket_->isOpen()) {
     IS_ENVOY_BUG("Client socket failure");
     return;
-  }
-  if (!connected) {
-    connecting_ = true;
   }
 
   Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -155,6 +155,11 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
     ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
                          *this);
+    if (socket_creation_failure_close_pending_) {
+      socket_creation_failure_close_pending_ = false;
+      connecting_ = false;
+      ConnectionImpl::raiseEvent(ConnectionEvent::LocalClose);
+    }
     return;
   }
 
@@ -482,7 +487,7 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 
 Connection::ReadDisableStatus ConnectionImpl::readDisable(bool disable) {
   // Calls to readEnabled on a closed socket are considered to be an error.
-  ASSERT(state() == State::Open);
+  ASSERT(state() == State::Open || socket_creation_failure_close_pending_);
 
   ENVOY_CONN_LOG(trace, "readDisable: disable={} disable_count={} state={} buffer_length={}", *this,
                  disable, read_disable_count_, static_cast<int>(state()), read_buffer_->length());
@@ -625,7 +630,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
-    if (!connecting_) {
+    if (!connecting_ && socket_->isOpen()) {
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
@@ -1107,15 +1112,23 @@ ClientConnectionImpl::ClientConnectionImpl(
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr(),
                    StreamInfo::FilterState::LifeSpan::Connection) {
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+
   if (!socket_->isOpen()) {
     setFailureReason("socket creation failure");
+    socket_creation_failure_close_pending_ = true;
+    alive_guard_ = std::make_shared<bool>(true);
     // Set up the dispatcher to "close" the connection on the next loop after
     // the owner has a chance to add callbacks.
-    dispatcher_.post([this]() { raiseEvent(ConnectionEvent::LocalClose); });
+    dispatcher_.post([this, weak_alive = std::weak_ptr<bool>(alive_guard_)]() {
+      if (!weak_alive.expired() && socket_creation_failure_close_pending_) {
+        socket_creation_failure_close_pending_ = false;
+        connecting_ = false;
+        raiseEvent(ConnectionEvent::LocalClose);
+      }
+    });
     return;
   }
-
-  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
@@ -1175,6 +1188,9 @@ ClientConnectionImpl::~ClientConnectionImpl() {
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
+  if (!socket_->isOpen()) {
+    return;
+  }
   const Api::SysCallIntResult result = transport_socket_->connect(*socket_);
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {

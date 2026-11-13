@@ -14,6 +14,9 @@ QuicClientPacketWriterFactoryImpl::createSocketAndQuicPacketWriter(
     const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocketPtr connection_socket =
       createConnectionSocket(server_addr, local_addr, options);
+  if (!connection_socket->isOpen()) {
+    return {nullptr, nullptr};
+  }
   Network::IoHandle& io_handle = connection_socket->ioHandle();
   return {std::make_unique<EnvoyQuicPacketWriter>(
               std::make_unique<Network::UdpDefaultWriter>(io_handle)),
