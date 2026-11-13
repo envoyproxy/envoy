@@ -27,6 +27,9 @@ public:
 
   // RedisProxy::Decoder
   void decode(Buffer::Instance& data) override;
+  // ValueRootStart is the only state with nothing pending, whether freshly constructed or
+  // between two complete top-level values.
+  bool hasBufferedData() const override { return state_ != State::ValueRootStart; }
 
   // DoS-defense limits applied to a single decoded message. Exposed for tests so limit-boundary
   // cases reference them by name instead of hardcoding these implementation values; they are not a

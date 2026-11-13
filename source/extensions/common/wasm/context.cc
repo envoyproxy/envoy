@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstring>
 #include <ctime>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <string>
@@ -28,13 +29,18 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/common/wasm/ext/redis_call.pb.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/common/expr/context.h"
+#include "source/extensions/filters/network/common/redis/codec_impl.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
 
 #include "absl/base/casts.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 
@@ -75,6 +81,33 @@ constexpr absl::string_view CelStateKeyPrefix = "wasm.";
 // a return value from onRequestHeaders() or onResponseHeaders() plugin
 // callbacks.
 constexpr bool DefaultAllowOnHeadersStopIteration = false;
+
+// redisCall() rejects 0 (and anything above this) so a stalled connection can't pin resources
+// forever, including after the originating Context is destroyed.
+constexpr uint32_t kMaxRedisCallTimeoutMillis = 300000; // 5 minutes.
+
+// redis_call() releases its connection back to the shared pool after exactly one reply, so
+// commands that mutate per-connection state (auth, selected DB, transactions, tracking/reply
+// mode, cluster-routing mode) or switch the connection into a mode with more than one reply
+// (pub/sub, MONITOR, replication streaming) are rejected by name before a connection is ever
+// acquired.
+bool isUnsafeRedisCommand(absl::string_view command) {
+  static const absl::flat_hash_set<std::string> unsafe_commands{
+      "AUTH",         "HELLO",      "SELECT",       "RESET",     "MULTI",       "EXEC",
+      "DISCARD",      "WATCH",      "UNWATCH",      "SUBSCRIBE", "UNSUBSCRIBE", "PSUBSCRIBE",
+      "PUNSUBSCRIBE", "SSUBSCRIBE", "SUNSUBSCRIBE", "MONITOR",
+      "QUIT",   // Closes the connection after its reply.
+      "CLIENT", // Rejected wholesale: TRACKING/REPLY/PAUSE mutate per-connection state too.
+      "READONLY",     "READWRITE",  "ASKING",       "SYNC",      "PSYNC",       "REPLCONF",
+  };
+  return unsafe_commands.contains(absl::AsciiStrToUpper(command));
+}
+
+// Caps the RESP2-re-encoded reply size enqueued per redis_call result. A reply over this cap is
+// reported as Failure rather than truncated, since truncated RESP2 would desync the module's
+// parser. Bounds wire bytes only -- DecoderImpl's own element-count limits separately bound
+// transient host-side allocation while decoding.
+constexpr uint32_t kMaxRedisResponseBytes = 10 * 1024 * 1024; // 10 MiB.
 
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
@@ -934,6 +967,197 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   return WasmResult::Ok;
 }
 
+std::string Context::redisCallQueueName(uint64_t wasm_instance_id, std::string_view root_id,
+                                        std::string_view plugin_key) {
+  // Length-prefixed, not delimited: root_id/plugin_key can contain any character, so a
+  // delimiter-based encoding could let two distinct pairs collide on the same queue_name.
+  return absl::StrCat("redis_call_", wasm_instance_id, "_", root_id.size(), ":", root_id,
+                      plugin_key.size(), ":", plugin_key);
+}
+
+void Context::setNextRedisCallIdForTesting(uint32_t next_call_id) {
+  envoyWasm()->redisCallState(root_id(), plugin()->key()).next_call_id = next_call_id;
+}
+
+WasmResult Context::redisCall(std::string_view cluster, std::vector<std::string> command_args,
+                              uint32_t timeout_millis, uint32_t* queue_token_ptr,
+                              uint32_t* call_id_ptr) {
+  if (command_args.empty() || isUnsafeRedisCommand(command_args[0])) {
+    return WasmResult::BadArgument;
+  }
+  if (timeout_millis == 0 || timeout_millis > kMaxRedisCallTimeoutMillis) {
+    return WasmResult::BadArgument;
+  }
+  auto cluster_string = std::string(cluster);
+  auto* thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_string);
+  if (thread_local_cluster == nullptr) {
+    return WasmResult::BadArgument;
+  }
+  // No LoadBalancerContext: `cluster` is a single logical destination; host-key routing, if any,
+  // is the responsibility of whatever the cluster points at.
+  auto pool_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
+  if (!pool_data.has_value()) {
+    return WasmResult::BadArgument;
+  }
+
+  // The queue registration and redis_call_request_ map live on root, not `this`: a per-stream
+  // Context's registration would be unbounded under real traffic (proxy-wasm has no per-queue
+  // unregister API).
+  Context* root = rootContext();
+  // Keyed by (root_id(), plugin()->key()), not just root_id(): two PluginConfigs can share a
+  // root_id, and plugin()->key() additionally distinguishes concurrently-alive configuration
+  // generations. Lives on the Wasm VM (see Wasm::RedisCallState) so it survives RootContext
+  // replacement.
+  auto& redis_state = root->envoyWasm()->redisCallState(root->root_id(), root->plugin()->key());
+
+  // No admission-time reservation: an outstanding call holds no reserved buffer, so it isn't
+  // charged any bytes here -- only a completed-but-undrained result is (see finishRedisCall()).
+  // In-flight concurrency is therefore bounded only by the target cluster's own circuit breakers,
+  // same as httpCall/grpcCall, not by this budget.
+  if (redis_state.queued_bytes >= root->max_queued_redis_call_bytes_for_testing_) {
+    return WasmResult::InternalFailure;
+  }
+
+  // Re-registered on every call, not just the first: this is what retargets delivery at the
+  // *current* root once reconfiguration replaces it with a fresh RootContext of the same
+  // generation. registerSharedQueue() repoints the queue's dispatch target while preserving any
+  // queued data, and has no failure path today.
+  auto queue_name =
+      redisCallQueueName(envoyWasm()->wasmInstanceId(), root->root_id(), root->plugin()->key());
+  root->registerSharedQueue(queue_name, &redis_state.queue_token);
+  // Skip a call_id still in use rather than reissuing it: next_call_id wraps at 2^32 and a
+  // long-lived plugin instance can make far more calls than that over its lifetime.
+  uint32_t call_id;
+  do {
+    call_id = redis_state.next_call_id++;
+  } while (call_id == 0 || root->redis_call_request_.count(call_id) != 0 ||
+           redis_state.queued_results.count(call_id) != 0);
+
+  auto& handler = root->redis_call_request_[call_id];
+  handler.context_ = root;
+  handler.call_id_ = call_id;
+  handler.origin_context_id_ = id();
+  handler.timer_ = envoyWasm()->dispatcher().createTimer(
+      [root, call_id]() { root->onRedisCallTimeout(call_id); });
+  handler.timer_->enableTimer(std::chrono::milliseconds(timeout_millis));
+
+  std::vector<std::string> args(std::make_move_iterator(command_args.begin() + 1),
+                                std::make_move_iterator(command_args.end()));
+  auto request = ::Envoy::Extensions::NetworkFilters::Common::Redis::Utility::makeRequest(
+      command_args[0], args);
+  ::Envoy::Extensions::NetworkFilters::Common::Redis::EncoderImpl().encode(
+      request, handler.encoded_request_);
+
+  // newConnection() may invoke handler.onPoolReady/onPoolFailure synchronously; on failure,
+  // `handler` is already erased from redis_call_request_ by the time control returns here, so
+  // it must not be touched below in that case.
+  auto* cancel_handle = pool_data->newConnection(handler);
+  if (cancel_handle != nullptr) {
+    handler.cancel_handle_ = cancel_handle;
+  }
+
+  *queue_token_ptr = redis_state.queue_token;
+  *call_id_ptr = call_id;
+  return WasmResult::Ok;
+}
+
+void Context::RedisCallHandler::onUpstreamData(::Envoy::Buffer::Instance& data, bool) {
+  // Checked cumulatively, before decode() has a chance to finish, since onRedisCallSuccess's
+  // size check only runs post-parse and would never catch an oversized or never-completing
+  // value delivered in many sub-cap chunks.
+  received_bytes_ += data.length();
+  if (received_bytes_ > kMaxRedisResponseBytes) {
+    if (conn_data_ != nullptr) {
+      conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+      conn_data_ = nullptr;
+    }
+    context_->onRedisCallFailure(call_id_); // May destroy *this*; nothing may follow.
+    return;
+  }
+  if (decoder_ == nullptr) {
+    decoder_ =
+        std::make_unique<::Envoy::Extensions::NetworkFilters::Common::Redis::DecoderImpl>(*this);
+  }
+  TRY_NEEDS_AUDIT { decoder_->decode(data); }
+  END_TRY
+  catch (::Envoy::Extensions::NetworkFilters::Common::Redis::ProtocolError&) {
+    // decode() leaves the malformed/partial bytes that caused this unread on the connection, so
+    // it must be closed rather than released back to the pool as reusable.
+    if (conn_data_ != nullptr) {
+      conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+      conn_data_ = nullptr;
+    }
+    // completing_ true means onRespValue() already decoded a valid first reply and posted its
+    // completion for an earlier, unsolicited extra value in this same decode() call; that
+    // deferred success must be left alone, so don't also call onRedisCallFailure() here.
+    if (!completing_) {
+      context_->onRedisCallFailure(call_id_); // May destroy *this*; nothing may follow.
+    }
+    return;
+  }
+  // decode() returning normally with completing_ set means exactly one value was already
+  // delivered via onRespValue(). hasBufferedData() distinguishes conn_data_ still being safe to
+  // reuse from decode() having consumed a partial second frame the peer still owes bytes for.
+  if (completing_ && conn_data_ != nullptr) {
+    if (decoder_->hasBufferedData()) {
+      conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
+    conn_data_ = nullptr;
+  }
+}
+
+void Context::RedisCallHandler::onEvent(Network::ConnectionEvent event) {
+  // conn_data_ already null means the call has completed; this is a stale close to ignore.
+  if (event == Network::ConnectionEvent::Connected || conn_data_ == nullptr) {
+    return;
+  }
+  deferredFailure();
+}
+
+void Context::RedisCallHandler::onRespValue(
+    ::Envoy::Extensions::NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  if (completing_) {
+    // decode() invoked onRespValue() more than once; the peer sent an extra reply, violating the
+    // single-reply invariant the pool relies on for safe reuse, so close rather than reuse.
+    if (conn_data_ != nullptr) {
+      conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+      conn_data_ = nullptr;
+    }
+    return;
+  }
+  // decode() (called from onUpstreamData, a method of *this*) is still on the stack here, so
+  // completing synchronously -- which would erase *this* -- is unsafe; post instead. Disable the
+  // timer and set completing_ synchronously, not from the posted lambda, so a timer racing this
+  // no-ops instead of delivering a bogus Failure ahead of the real result.
+  timer_->disableTimer();
+  completing_ = true;
+  Context* context = context_;
+  uint32_t call_id = call_id_;
+  auto alive = context->alive_; // context_ is always rootContext(), see redisCall().
+  context->envoyWasm()->dispatcher().post(
+      [context, alive, call_id, value = std::move(value)]() mutable {
+        if (*alive) {
+          context->onRedisCallSuccess(call_id, std::move(value));
+        }
+      });
+}
+
+void Context::RedisCallHandler::deferredFailure() {
+  // See onRespValue() above: disable the timer and set completing_ synchronously, before
+  // conn_data_ is nulled and completion posted, to close the same race window.
+  timer_->disableTimer();
+  completing_ = true;
+  conn_data_ = nullptr;
+  Context* context = context_;
+  uint32_t call_id = call_id_;
+  auto alive = context->alive_; // context_ is always rootContext(), see redisCall().
+  context->envoyWasm()->dispatcher().post([context, alive, call_id]() {
+    if (*alive) {
+      context->onRedisCallFailure(call_id);
+    }
+  });
+}
+
 WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view service_name,
                              std::string_view method_name, const Pairs& initial_metadata,
                              std::string_view request, std::chrono::milliseconds timeout,
@@ -1191,6 +1415,26 @@ bool Context::validateConfiguration(std::string_view configuration,
   return result;
 }
 
+bool Context::onConfigure(std::shared_ptr<PluginBase> plugin_base) {
+  bool result = ContextBase::onConfigure(std::move(plugin_base));
+  if (!isRootContext()) {
+    return result;
+  }
+  // A call still outstanding when reconfiguration destroys its root, completing only afterward,
+  // enqueues against the destroyed root's context_id and is silently dropped if no new
+  // redisCall() retargeted the queue first. Retarget here as the new root starts up, and
+  // immediately flush once to redeliver anything a prior root's late completion left stranded
+  // (a no-op if nothing is queued, or if this plugin instance never called redisCall()).
+  auto& redis_state = envoyWasm()->redisCallState(root_id(), plugin()->key());
+  if (redis_state.queue_token == 0) {
+    return result;
+  }
+  auto queue_name = redisCallQueueName(envoyWasm()->wasmInstanceId(), root_id(), plugin()->key());
+  registerSharedQueue(queue_name, &redis_state.queue_token);
+  onQueueReady(redis_state.queue_token);
+  return result;
+}
+
 std::string_view Context::getConfiguration() {
   if (temp_plugin_) {
     return temp_plugin_->plugin_configuration_;
@@ -1327,6 +1571,8 @@ WasmResult Context::getMetric(uint32_t metric_id, uint64_t* result_uint64_ptr) {
 }
 
 Context::~Context() {
+  *alive_ = false; // Tells any already-posted RedisCallHandler completion not to run.
+
   // Cancel any outstanding requests.
   for (auto& p : http_request_) {
     if (p.second.request_ != nullptr) {
@@ -1342,6 +1588,45 @@ Context::~Context() {
     if (p.second.stream_ != nullptr) {
       p.second.stream_->resetStream();
     }
+  }
+  cancelOutstandingRedisCalls();
+}
+
+bool Context::onDone() {
+  bool done = ContextBase::onDone();
+  // A root whose onDone() returns false is parked in pending_done_ and may survive indefinitely,
+  // so resolve outstanding redis_call()s now rather than waiting for ~Context().
+  cancelOutstandingRedisCalls();
+  return done;
+}
+
+void Context::cancelOutstandingRedisCalls() {
+  if (redis_call_request_.empty()) {
+    return;
+  }
+  // A call still outstanding when reconfiguration tears down its root has no replacement root to
+  // hand off to, and won't time out on its own since handler.timer_ is destroyed below with the
+  // handler -- deliver a definite Failure now instead of leaving it to never complete.
+  //
+  // Collect the ids first: finishRedisCall() erases its handler from redis_call_request_, which
+  // would invalidate an iterator over the map being erased from.
+  std::vector<uint32_t> outstanding_call_ids;
+  outstanding_call_ids.reserve(redis_call_request_.size());
+  for (auto& p : redis_call_request_) {
+    outstanding_call_ids.push_back(p.first);
+  }
+  for (uint32_t call_id : outstanding_call_ids) {
+    auto& handler = redis_call_request_.find(call_id)->second;
+    if (handler.completing_) {
+      // Real outcome already decided and posted; forcing Failure here would discard it.
+      continue;
+    }
+    if (handler.cancel_handle_ != nullptr) {
+      handler.cancel_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+    } else if (handler.conn_data_ != nullptr) {
+      handler.conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
+    finishRedisCall(call_id, envoy::source::extensions::common::wasm::RedisCallResult::Failure);
   }
 }
 
@@ -1870,6 +2155,102 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     http_request_.erase(handler);
   });
   ContextBase::onHttpCallResponse(token, 0, 0, 0);
+}
+
+void Context::finishRedisCall(
+    uint32_t call_id, envoy::source::extensions::common::wasm::RedisCallResult::Status status,
+    std::string response) {
+  auto handler = redis_call_request_.find(call_id);
+  if (handler == redis_call_request_.end()) {
+    return;
+  }
+  envoy::source::extensions::common::wasm::RedisCallResult result;
+  result.set_status(status);
+  if (!response.empty()) {
+    result.set_response(std::move(response));
+  }
+  result.set_call_id(call_id);
+  result.set_origin_context_id(handler->second.origin_context_id_);
+  std::string serialized;
+  std::ignore = result.SerializeToString(&serialized);
+  // This is the only place queued_bytes is ever charged for this call -- see redisCall()'s
+  // admission check for why an outstanding call isn't charged anything up front. A call that
+  // fails to enqueue holds nothing afterward, so there's nothing to charge or release.
+  auto& redis_state = envoyWasm()->redisCallState(root_id(), plugin()->key());
+  if (enqueueSharedQueue(redis_state.queue_token, serialized) == WasmResult::Ok) {
+    redis_state.queued_bytes += serialized.size();
+    // Lets dequeueSharedQueue() tell this host-produced entry apart from anything a module
+    // injects directly on the same (guest-writable) token, and release exactly these bytes.
+    redis_state.queued_results.emplace(call_id, serialized.size());
+  }
+  redis_call_request_.erase(handler);
+}
+
+void Context::onRedisCallSuccess(
+    uint32_t call_id, ::Envoy::Extensions::NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  ::Envoy::Buffer::OwnedImpl buffer;
+  ::Envoy::Extensions::NetworkFilters::Common::Redis::EncoderImpl().encode(*value, buffer);
+  if (buffer.length() > kMaxRedisResponseBytes) {
+    finishRedisCall(call_id, envoy::source::extensions::common::wasm::RedisCallResult::Failure);
+  } else {
+    finishRedisCall(call_id, envoy::source::extensions::common::wasm::RedisCallResult::Ok,
+                    buffer.toString());
+  }
+}
+
+void Context::onRedisCallFailure(uint32_t call_id) {
+  finishRedisCall(call_id, envoy::source::extensions::common::wasm::RedisCallResult::Failure);
+}
+
+WasmResult Context::dequeueSharedQueue(uint32_t token, std::string* data) {
+  auto result = ContextBase::dequeueSharedQueue(token, data);
+  if (result == WasmResult::Ok) {
+    // Always check against root's counters: the queue is keyed purely by token, not by caller.
+    Context* root = rootContext();
+    auto& redis_state = root->envoyWasm()->redisCallState(root->root_id(), root->plugin()->key());
+    if (redis_state.queue_token != 0 && token == redis_state.queue_token) {
+      // The token is also directly writable by the module, so only decrement for an entry this
+      // code actually put there -- require call_id still be a key in queued_results -- to avoid
+      // a module defeating the admission bounds by injecting/draining its own data on the token.
+      envoy::source::extensions::common::wasm::RedisCallResult parsed;
+      if (parsed.ParseFromString(*data)) {
+        auto queued = redis_state.queued_results.find(parsed.call_id());
+        if (queued != redis_state.queued_results.end()) {
+          size_t reserved_bytes = queued->second;
+          if (reserved_bytes <= redis_state.queued_bytes) {
+            redis_state.queued_bytes -= reserved_bytes;
+          } else {
+            redis_state.queued_bytes = 0;
+          }
+          redis_state.queued_results.erase(queued);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+void Context::onRedisCallTimeout(uint32_t call_id) {
+  auto handler = redis_call_request_.find(call_id);
+  if (handler == redis_call_request_.end()) {
+    return;
+  }
+  if (handler->second.completing_) {
+    // Real outcome already decided and posted (see completing_'s comment); the timer should have
+    // been disabled before this could run, but don't deliver a bogus Failure if it somehow does.
+    return;
+  }
+  if (handler->second.cancel_handle_ != nullptr) {
+    // Connection not established yet.
+    handler->second.cancel_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+    handler->second.cancel_handle_ = nullptr;
+  } else if (handler->second.conn_data_ != nullptr) {
+    // Close rather than release to the pool -- whatever's on the wire for this timed-out request
+    // shouldn't be attributed to a future call on the same connection.
+    handler->second.conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    handler->second.conn_data_ = nullptr;
+  }
+  onRedisCallFailure(call_id);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {

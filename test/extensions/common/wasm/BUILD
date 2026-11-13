@@ -186,6 +186,55 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "redis_call_foreign_test",
+    srcs = ["redis_call_foreign_test.cc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/tcp:conn_pool_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/common/wasm/ext:redis_call_cc_proto",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/wasm_runtime/null:config",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "redis_call_null_vm_test",
+    srcs = ["redis_call_null_vm_test.cc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/tcp:conn_pool_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/common/wasm/ext:redis_call_cc_proto",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/wasm_runtime/null:config",
+        "//test/extensions/common/wasm/test_data:test_redis_call_cpp_plugin",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/server:server_lifecycle_notifier_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "//test/test_common:wasm_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "remote_async_datasource_test",
     srcs = ["remote_async_datasource_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},

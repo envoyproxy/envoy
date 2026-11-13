@@ -5,19 +5,25 @@
 #include <map>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
 #include "envoy/stats/sink.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/extensions/common/wasm/ext/redis_call.pb.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 
 #include "include/proxy-wasm/wasm.h"
 
@@ -149,6 +155,13 @@ public:
   virtual bool validateConfiguration(std::string_view configuration,
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
+  // Retargets/flushes this plugin instance's redis_call shared queue on (re)configuration.
+  bool onConfigure(std::shared_ptr<PluginBase> plugin) override;
+
+  // Resolves outstanding redis_call()s as Failure at shutdown, which may be well before
+  // ~Context() runs.
+  bool onDone() override;
+
   // AccessLog::Instance
   void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override;
 
@@ -247,6 +260,26 @@ public:
                       std::string_view request_body, const Pairs& request_trailers,
                       int timeout_milliseconds, uint32_t* token_ptr) override;
 
+  // Sends one Redis command to `cluster` (must speak RESP2) and asynchronously delivers one
+  // reply via the shared queue identified by *queue_token_ptr. onQueueReady fires on the
+  // *root* context, not necessarily the caller, so route by RedisCallResult::origin_context_id.
+  // *call_id_ptr* identifies this call among others delivered on that queue. timeout_millis is
+  // mandatory and bounded by kMaxRedisCallTimeoutMillis in context.cc.
+  WasmResult redisCall(std::string_view cluster, std::vector<std::string> command_args,
+                       uint32_t timeout_millis, uint32_t* queue_token_ptr, uint32_t* call_id_ptr);
+
+  void setMaxQueuedRedisCallBytesForTesting(uint64_t max) {
+    max_queued_redis_call_bytes_for_testing_ = max;
+  }
+  // Defined in context.cc since it needs Wasm::redisCallState(), and Wasm is only
+  // forward-declared in this header.
+  void setNextRedisCallIdForTesting(uint32_t next_call_id);
+  void onRedisCallTimeoutForTesting(uint32_t call_id) { onRedisCallTimeout(call_id); }
+
+  // Releases a drained redis_call result's queue slot/bytes; other shared-queue tokens fall
+  // through to the base behavior.
+  WasmResult dequeueSharedQueue(uint32_t token, std::string* data) override;
+
   // Stats/Metrics
   WasmResult defineMetric(uint32_t type, std::string_view name, uint32_t* metric_id_ptr) override;
   WasmResult incrementMetric(uint32_t metric_id, int64_t offset) override;
@@ -295,6 +328,10 @@ protected:
 
   void addAfterVmCallAction(std::function<void()> f);
   void onCloseTCP();
+
+  // Shared by redisCall() and onConfigure() so both derive the same queue name.
+  static std::string redisCallQueueName(uint64_t wasm_instance_id, std::string_view root_id,
+                                        std::string_view plugin_key);
 
   struct AsyncClientHandler : public Http::AsyncClient::Callbacks {
     // Http::AsyncClient::Callbacks
@@ -367,8 +404,68 @@ protected:
     bool remote_closed_ = false;
   };
 
+  // Speaks RESP2 over a pooled Tcp::ConnectionPool connection; one request/reply per handler.
+  struct RedisCallHandler
+      : public Tcp::ConnectionPool::Callbacks,
+        public Tcp::ConnectionPool::UpstreamCallbacks,
+        public ::Envoy::Extensions::NetworkFilters::Common::Redis::DecoderCallbacks {
+    void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason, absl::string_view,
+                       Upstream::HostDescriptionConstSharedPtr) override {
+      cancel_handle_ = nullptr;
+      context_->onRedisCallFailure(call_id_); // May destroy *this*; nothing may follow.
+    }
+    void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                     Upstream::HostDescriptionConstSharedPtr) override {
+      cancel_handle_ = nullptr;
+      conn_data_ = std::move(conn);
+      conn_data_->addUpstreamCallbacks(*this);
+      conn_data_->connection().write(encoded_request_, false);
+    }
+
+    // Tcp::ConnectionPool::UpstreamCallbacks / Network::ConnectionCallbacks
+    void onUpstreamData(::Envoy::Buffer::Instance& data, bool) override;
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+
+    // Common::Redis::DecoderCallbacks
+    void
+    onRespValue(::Envoy::Extensions::NetworkFilters::Common::Redis::RespValuePtr&& value) override;
+
+    void deferredFailure();
+
+    Context* context_; // Always rootContext(); the queue is owned by root regardless of caller.
+    uint32_t call_id_;
+    uint32_t origin_context_id_; // Context::id() that issued the call; see RedisCallResult.
+    ::Envoy::Buffer::OwnedImpl encoded_request_;
+    Tcp::ConnectionPool::Cancellable* cancel_handle_ = nullptr;
+    // Null until onPoolReady; closed and nulled once the call completes, or sooner if the
+    // connection becomes unsafe to reuse (see completing_ for the extra-reply case).
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
+    ::Envoy::Extensions::NetworkFilters::Common::Redis::DecoderPtr decoder_;
+    uint64_t received_bytes_ = 0; // Checked against kMaxRedisResponseBytes before each decode().
+    Event::TimerPtr timer_;
+    // Guards against a timer racing a just-posted completion, and against decode() reporting a
+    // second, unsolicited reply on the same connection.
+    bool completing_ = false;
+  };
+
   void onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&& response);
   void onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason);
+
+  void onRedisCallSuccess(uint32_t call_id,
+                          ::Envoy::Extensions::NetworkFilters::Common::Redis::RespValuePtr&& value);
+  void onRedisCallFailure(uint32_t call_id);
+  void onRedisCallTimeout(uint32_t call_id);
+  // Builds and enqueues a RedisCallResult for call_id, then erases its handler. `response` is
+  // only meaningful when status is Ok.
+  void finishRedisCall(uint32_t call_id,
+                       envoy::source::extensions::common::wasm::RedisCallResult::Status status,
+                       std::string response = "");
+  // Cancels and resolves every outstanding redis_call as Failure. Shared by ~Context() and
+  // onDone() so a call outstanding at shutdown is resolved exactly once regardless of which
+  // runs first.
+  void cancelOutstandingRedisCalls();
 
   void onGrpcCreateInitialMetadata(uint32_t token, Http::RequestHeaderMap& metadata);
   void onGrpcReceiveInitialMetadataWrapper(uint32_t token, Http::HeaderMapPtr&& metadata);
@@ -450,6 +547,21 @@ protected:
   std::map<uint32_t, AsyncClientHandler> http_request_;
   std::map<uint32_t, GrpcCallClientHandler> grpc_call_request_;
   std::map<uint32_t, GrpcStreamClientHandler> grpc_stream_;
+  // Only populated on rootContext(); keyed by call_id since every call under a root shares one
+  // queue. Not persisted across RootContext replacement (unlike Wasm::RedisCallState): ~Context()
+  // cancels/cleans up everything still outstanding here.
+  std::map<uint32_t, RedisCallHandler> redis_call_request_;
+
+  // Per-plugin-instance bound on completed-but-undrained redis_call result bytes sitting on the
+  // shared queue (the actual counter, Wasm::RedisCallState::queued_bytes, lives on the Wasm VM so
+  // it survives RootContext replacement). In-flight (not yet completed) calls are bounded only by
+  // the target cluster's own circuit breakers, the same as httpCall/grpcCall.
+  static constexpr uint64_t kMaxQueuedRedisCallBytes = 100 * 1024 * 1024; // 100 MiB.
+  uint64_t max_queued_redis_call_bytes_for_testing_ = kMaxQueuedRedisCallBytes;
+
+  // Set false by ~Context(); a completion posted from RedisCallHandler captures this by value to
+  // detect a destroyed root before delivering.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 
   // Opaque state.
   absl::flat_hash_map<std::string, std::unique_ptr<StorageObject>> data_storage_;

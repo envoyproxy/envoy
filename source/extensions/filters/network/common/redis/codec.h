@@ -263,6 +263,13 @@ public:
    *        ProtocolError will be thrown.
    */
   virtual void decode(Buffer::Instance& data) PURE;
+
+  /**
+   * @return true if the decoder is mid-parse on an incomplete value. Defaults to false so
+   *         existing (and mock) decoders that never buffer across decode() calls need not
+   *         implement this.
+   */
+  virtual bool hasBufferedData() const { return false; }
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;

@@ -132,3 +132,15 @@ cc_proto_library(
     name = "sign_cc_proto",
     deps = [":sign_proto"],
 )
+
+# NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
+proto_library(
+    name = "redis_call_proto",
+    srcs = ["redis_call.proto"],
+)
+
+# NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
+cc_proto_library(
+    name = "redis_call_cc_proto",
+    deps = [":redis_call_proto"],
+)
