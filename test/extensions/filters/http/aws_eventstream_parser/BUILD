@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.aws_eventstream_parser"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/filters/http/aws_eventstream_parser:config",
         "//test/mocks/server:factory_context_mocks",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.aws_eventstream_parser"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//bazel:zlib",
         "//source/common/common:base64_lib",
@@ -47,6 +49,10 @@ envoy_extension_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.aws_eventstream_parser"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//bazel:zlib",
         "//source/extensions/filters/http/aws_eventstream_parser:config",

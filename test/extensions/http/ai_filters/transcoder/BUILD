@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     data = ["testdata/response_goldens.json"],
     extension_names = ["envoy.http.ai_filters.transcoder"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -41,7 +40,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",

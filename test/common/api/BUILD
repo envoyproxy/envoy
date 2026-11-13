@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "os_sys_calls_test",
     srcs = ["os_sys_calls_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:os_sys_calls_lib",
     ],

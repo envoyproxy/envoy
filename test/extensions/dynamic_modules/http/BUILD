@@ -16,6 +16,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
@@ -59,7 +60,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op_no_optional_abi",
     ],
     # factory_context_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -90,7 +91,7 @@ envoy_cc_dyn_module_test(
         "GODEBUG": "cgocheck=0",
     },
     # http_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/common/network:utility_lib",
@@ -118,7 +119,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # http_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/common:logger",
         "//envoy/registry",
@@ -164,7 +165,10 @@ envoy_cc_dyn_module_test(
     env = {
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//envoy/registry",
         "//envoy/server:tracer_config_interface",

@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/extensions/formatter/dynamic_modules:formatter_lib",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -32,6 +33,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:formatter_no_op",
         "//test/extensions/dynamic_modules/test_data/rust:formatter_integration_test",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/formatter/dynamic_modules:config",
@@ -53,6 +55,10 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:formatter_integration_test",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/formatter/dynamic_modules:config",
         "//test/integration:http_integration_lib",

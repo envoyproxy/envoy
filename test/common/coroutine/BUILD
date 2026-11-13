@@ -26,7 +26,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "coroutine_test",
     srcs = ["coroutine_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":manual_executor_lib",
         "//source/common/coroutine:context_lib",
@@ -46,7 +45,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_executor_test",
     srcs = ["dispatcher_executor_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
@@ -61,7 +59,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":manual_executor_lib",
         "//source/common/coroutine:coroutine_lib",
@@ -76,7 +73,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_queue_test",
     srcs = ["async_queue_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":manual_executor_lib",
         "//source/common/coroutine:async_queue_lib",
@@ -96,7 +92,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "perf_test",
     srcs = ["perf_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

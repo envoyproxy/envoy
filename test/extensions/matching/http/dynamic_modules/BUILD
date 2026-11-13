@@ -15,6 +15,10 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_string_input_echo",
     ],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/matching/http/dynamic_modules:string_data_input_lib",
         "//test/extensions/dynamic_modules:util",
