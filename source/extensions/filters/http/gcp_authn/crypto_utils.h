@@ -13,12 +13,14 @@ class CertFingerprinter {
 public:
   virtual ~CertFingerprinter() = default;
   virtual absl::StatusOr<std::string> getFingerprintFromPem(const std::string& pem) const = 0;
+  virtual absl::StatusOr<std::string> getCertChainFromPem(const std::string& pem) const = 0;
 };
 using CertFingerprinterSharedPtr = std::shared_ptr<const CertFingerprinter>;
 
 class CertFingerprinterImpl : public CertFingerprinter {
 public:
   absl::StatusOr<std::string> getFingerprintFromPem(const std::string& pem) const override;
+  absl::StatusOr<std::string> getCertChainFromPem(const std::string& pem) const override;
 };
 
 } // namespace GcpAuthn

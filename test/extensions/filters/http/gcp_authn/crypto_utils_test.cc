@@ -57,6 +57,80 @@ TEST_F(CryptoUtilsTest, GetFingerprintFromPemInvalid) {
   EXPECT_THAT(fingerprint, HasStatusMessage("Failed to parse certificate from PEM"));
 }
 
+TEST_F(CryptoUtilsTest, GetCertChainFromPemSuccess) {
+  CertFingerprinterImpl fingerprinter;
+  std::string cert_path =
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
+  std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
+
+  auto chain = fingerprinter.getCertChainFromPem(cert_pem);
+  ASSERT_OK(chain);
+  EXPECT_EQ(chain.value(), cert_pem);
+}
+
+TEST_F(CryptoUtilsTest, GetCertChainFromPemMultiCertChain) {
+  CertFingerprinterImpl fingerprinter;
+  std::string client_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  std::string full_chain = absl::StrCat(client_cert, ca_cert);
+
+  auto chain = fingerprinter.getCertChainFromPem(full_chain);
+  ASSERT_OK(chain);
+  EXPECT_EQ(chain.value(), full_chain);
+}
+
+TEST_F(CryptoUtilsTest, GetCertChainFromPemStripsPrivateKeyAndExtraData) {
+  CertFingerprinterImpl fingerprinter;
+  std::string client_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  std::string client_key = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+
+  std::string bundle_pem =
+      absl::StrCat("# Extra metadata comment\n", client_key, "\n", client_cert, ca_cert);
+
+  auto chain = fingerprinter.getCertChainFromPem(bundle_pem);
+  ASSERT_OK(chain);
+  EXPECT_EQ(chain.value(), absl::StrCat(client_cert, ca_cert));
+  EXPECT_THAT(chain.value(), testing::Not(testing::HasSubstr("PRIVATE KEY")));
+}
+
+TEST_F(CryptoUtilsTest, GetCertChainFromPemEmpty) {
+  CertFingerprinterImpl fingerprinter;
+  auto chain = fingerprinter.getCertChainFromPem("");
+  EXPECT_THAT(chain, HasStatusMessage("Certificate PEM content is empty"));
+}
+
+TEST_F(CryptoUtilsTest, GetCertChainFromPemInvalid) {
+  CertFingerprinterImpl fingerprinter;
+  auto chain = fingerprinter.getCertChainFromPem("invalid cert content");
+  EXPECT_THAT(chain, HasStatusMessage("Failed to parse certificate chain from PEM"));
+}
+
+TEST_F(CryptoUtilsTest, GetCertChainFromPemOnlyPrivateKeyFails) {
+  CertFingerprinterImpl fingerprinter;
+  std::string client_key = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+
+  auto chain = fingerprinter.getCertChainFromPem(client_key);
+  EXPECT_THAT(chain, HasStatusMessage("Failed to parse certificate chain from PEM"));
+}
+
+TEST_F(CryptoUtilsTest, GetCertChainFromPemMalformedSecondCertFails) {
+  CertFingerprinterImpl fingerprinter;
+  std::string client_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+  std::string malformed_chain = absl::StrCat(
+      client_cert, "-----BEGIN CERTIFICATE-----\ninvalid_base64!\n-----END CERTIFICATE-----\n");
+
+  auto chain = fingerprinter.getCertChainFromPem(malformed_chain);
+  EXPECT_THAT(chain, HasStatusMessage("Failed to parse certificate chain from PEM"));
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters
