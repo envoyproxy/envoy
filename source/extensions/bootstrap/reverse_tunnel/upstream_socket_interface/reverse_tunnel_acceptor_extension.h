@@ -127,6 +127,8 @@ public:
     }
   }
 
+  ~ReverseTunnelAcceptorExtension() override;
+
   /**
    * Called when the server is initialized.
    */

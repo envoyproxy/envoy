@@ -110,6 +110,7 @@ public:
   // Set up the upstream extension components (socket interface and extension).
   void setupUpstreamExtension() {
     // Create the socket interface.
+    extension_.reset();
     socket_interface_ =
         std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
 
@@ -1121,6 +1122,7 @@ public:
   // Set up the upstream extension components (socket interface and extension).
   void setupUpstreamExtension() {
     // Create the socket interface.
+    extension_.reset();
     socket_interface_ =
         std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
 
