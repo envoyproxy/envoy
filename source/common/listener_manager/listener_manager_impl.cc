@@ -439,7 +439,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 
   if (bind_type != BindType::NoBind) {
     // Create the socket here rather than in the listen socket constructor, which cannot report a
-    // failure, so that socket(2) failing (e.g. with EMFILE) fails the listener instead of crashing.
+    // failure, so that socket(2) failing (e.g. with `EMFILE`) fails the listener instead of crashing.
     Network::IoHandlePtr io_handle =
         Network::ioHandleForAddr(socket_type, address, creation_options);
     if (io_handle == nullptr || !io_handle->isOpen()) {
