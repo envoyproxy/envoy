@@ -626,7 +626,10 @@ The following optional features can be disabled on the Bazel build command-line:
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
-* tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
+* tcmalloc with `--//bazel:use_system_allocator=True` or `--define tcmalloc=disabled`.
+  The build setting can also be set by a Starlark transition to use the embedding process's allocator
+  for a shared library without changing the allocator of other targets in the same build.
+  Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 * http3/quic with `--//bazel:http3=False`

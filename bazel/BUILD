@@ -358,8 +358,26 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_tcmalloc",
+    name = "disable_tcmalloc_by_define",
     values = {"define": "tcmalloc=disabled"},
+)
+
+bool_flag(
+    name = "use_system_allocator",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "system_allocator_enabled",
+    flag_values = {":use_system_allocator": "True"},
+)
+
+selects.config_setting_group(
+    name = "disable_tcmalloc",
+    match_any = [
+        ":disable_tcmalloc_by_define",
+        ":system_allocator_enabled",
+    ],
 )
 
 config_setting(
