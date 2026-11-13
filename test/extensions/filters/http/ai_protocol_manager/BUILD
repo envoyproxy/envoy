@@ -70,6 +70,7 @@ envoy_extension_cc_test(
     srcs = ["schema_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_parser_lib",
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
         "//test/test_common:status_utility_lib",
     ],
