@@ -27,12 +27,12 @@ protected:
 
 TEST_F(EndStreamResponseTest, StatusCodeToConnectUnaryStatus) {
   const std::vector<std::pair<Grpc::Status::GrpcStatus, uint64_t>> test_set = {
-      {GrpcStatus::Canceled, 408},           {GrpcStatus::DeadlineExceeded, 408},
+      {GrpcStatus::Canceled, 499},           {GrpcStatus::DeadlineExceeded, 504},
       {GrpcStatus::InvalidArgument, 400},    {GrpcStatus::OutOfRange, 400},
-      {GrpcStatus::NotFound, 404},           {GrpcStatus::Unimplemented, 404},
+      {GrpcStatus::NotFound, 404},           {GrpcStatus::Unimplemented, 501},
       {GrpcStatus::AlreadyExists, 409},      {GrpcStatus::Aborted, 409},
       {GrpcStatus::PermissionDenied, 403},   {GrpcStatus::ResourceExhausted, 429},
-      {GrpcStatus::FailedPrecondition, 412}, {GrpcStatus::Unavailable, 503},
+      {GrpcStatus::FailedPrecondition, 400}, {GrpcStatus::Unavailable, 503},
       {GrpcStatus::Unauthenticated, 401},    {GrpcStatus::Unknown, 500},
       {GrpcStatus::Internal, 500},           {GrpcStatus::DataLoss, 500},
       {GrpcStatus::InvalidCode, 500},

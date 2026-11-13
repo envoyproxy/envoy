@@ -1756,19 +1756,21 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, RoundRobinLoadBalancer
                                            LoadBalancerTestParam{false}));
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
+  const auto initial_time = simTime().monotonicTime();
   init(false);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
+  EXPECT_EQ(initial_time, latest_host_added_time);
   const auto slow_start_min_weight_percent =
       EdfLoadBalancerBasePeer::slowStartMinWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_DOUBLE_EQ(slow_start_min_weight_percent, 0.1);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
+  const auto initial_time = simTime().monotonicTime();
   round_robin_lb_config_.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(30);
   init(false);
   const auto slow_start_window =
@@ -1776,13 +1778,14 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithMinWeightPercent) {
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
+  EXPECT_EQ(initial_time, latest_host_added_time);
   const auto slow_start_min_weight_percent =
       EdfLoadBalancerBasePeer::slowStartMinWeightPercent(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_DOUBLE_EQ(slow_start_min_weight_percent, 0.3);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
+  const auto initial_time = simTime().monotonicTime();
   round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80");
@@ -1796,9 +1799,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   hosts_added.push_back(host1);
   simTime().advanceTimeWait(std::chrono::seconds(5));
   hostSet().runCallbacks(hosts_added, empty);
-  auto latest_host_added_time_ms =
+  auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(1000), latest_host_added_time);
 
   // Advance time, so that host is no longer in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(56));
@@ -1812,9 +1815,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks(hosts_added, empty);
 
-  latest_host_added_time_ms =
+  latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(62000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(62000), latest_host_added_time);
 
   // host2 is 12 secs in slow start, the weight is scaled with time factor max(12 / 60, 0.1) = 0.2.
   simTime().advanceTimeWait(std::chrono::seconds(12));
@@ -1856,6 +1859,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
+  const auto initial_time = simTime().monotonicTime();
   round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80");
@@ -1867,9 +1871,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
   hosts_added.push_back(host1);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   hostSet().runCallbacks(hosts_added, empty);
-  auto latest_host_added_time_ms =
+  auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(1000), latest_host_added_time);
   simTime().advanceTimeWait(std::chrono::seconds(5));
   hosts_added.clear();
   auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90");
@@ -1879,18 +1883,18 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
   hostSet().hosts_ = {host1, host2};
   hostSet().runCallbacks(hosts_added, empty);
   // As host1 has not passed first HC, it should not enter slow start mode.
-  latest_host_added_time_ms =
+  latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(8000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(8000), latest_host_added_time);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   hostSet().healthy_hosts_ = {host1, host2};
   // Trigger callbacks to add host1 to slow start mode.
   hostSet().runCallbacks({}, {});
   // Host1 entered slow start after transitioning to healthy state via an active healthchecking.
-  latest_host_added_time_ms =
+  latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(9000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(9000), latest_host_added_time);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   // Trigger callbacks to remove host1 from slow start mode due to health change.
@@ -1931,6 +1935,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
+  const auto initial_time = simTime().monotonicTime();
   round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
   round_robin_lb_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key(
       "aggression");
@@ -1952,9 +1957,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
   hostSet().healthy_hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hostSet().runCallbacks({}, {});
 
-  auto latest_host_added_time_ms =
+  auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(1000), latest_host_added_time);
 
   // We should see 2:1:1 ratio, as hosts 2 and 3 are in slow start, their weights are scaled with
   // max(0.5,0.1)=0.5 factor.
@@ -1973,9 +1978,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
   // Recompute edf schedulers.
   hostSet().runCallbacks(hosts_added, {});
 
-  latest_host_added_time_ms =
+  latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(10000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(10000), latest_host_added_time);
 
   // We should see 1:1:1:0 ratio, as host 2 and 3 weight is scaled with max((9/10)^(1/1.5),0.1)=0.93
   // factor, host4 weight is 1*max(0.002,0.1)=0.1.
@@ -2072,6 +2077,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
+  const auto initial_time = simTime().monotonicTime();
   round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   round_robin_lb_config_.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(35);
   simTime().advanceTimeWait(std::chrono::seconds(1));
@@ -2086,9 +2092,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   hosts_added.push_back(host1);
   simTime().advanceTimeWait(std::chrono::seconds(5));
   hostSet().runCallbacks(hosts_added, empty);
-  auto latest_host_added_time_ms =
+  auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(1000), latest_host_added_time);
 
   // Advance time, so that host is no longer in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(56));
@@ -2102,9 +2108,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks(hosts_added, empty);
 
-  latest_host_added_time_ms =
+  latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(std::chrono::milliseconds(62000), latest_host_added_time_ms);
+  EXPECT_EQ(initial_time + std::chrono::milliseconds(62000), latest_host_added_time);
 
   // host2 is 12 secs in slow start, the weight is scaled with time factor max(12 / 60, 0.35) =
   // 0.35.

@@ -19,6 +19,9 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/stream_info:filter_state_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
@@ -27,6 +30,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/upstream:od_cds_api_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
     ],
 )

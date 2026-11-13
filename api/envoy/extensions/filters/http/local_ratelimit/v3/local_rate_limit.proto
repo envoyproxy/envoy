@@ -180,6 +180,11 @@ message LocalRateLimit {
   //   2. :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>`.
   //   3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
   //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
+  //
+  //   :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>`
+  //   updates descriptor buckets from response context at completion without enforcing the current
+  //   request, in both the filter-level and per-route configuration. Use request-path actions for the
+  //   same descriptor to enforce subsequent requests.
   repeated config.route.v3.RateLimit rate_limits = 17;
 
   // Specifies the max dynamic descriptors kept in the cache for a particular wildcard descriptor

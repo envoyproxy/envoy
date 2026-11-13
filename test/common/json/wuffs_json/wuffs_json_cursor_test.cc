@@ -276,6 +276,70 @@ TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectRejected) {
   EXPECT_THAT(parse(R"({"x":{"a":1,"a":2}})", h), Not(IsOk()));
 }
 
+// Sticky errors: after any failure, further feed() calls return the same
+// status and never re-enter the decoder. Errors raised inside the token loop
+// are the risky case, since undrained tokens still refer to the old chunk.
+
+TEST(WuffsJsonCursorTest, HandlerErrorIsStickyAcrossFurtherChunks) {
+  AbortOnNumberHandler h;
+  WuffsJsonCursor cursor(h);
+  // Fails on `1` with more tokens already queued behind it.
+  const absl::Status first = cursor.feed(R"({"a":1,"b":2,"c":3,"d":"xyz","e":[4,5,6]})",
+                                         /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(first.code(), absl::StatusCode::kInternal);
+
+  // Keep feeding, including chunks shorter than the queued token lengths.
+  const std::vector<std::string> more_chunks = {"", "}", R"({"f":7})", std::string(300, ' ')};
+  for (const std::string& more : more_chunks) {
+    const absl::Status again = cursor.feed(more, /*closed=*/false);
+    EXPECT_EQ(again.code(), first.code());
+    EXPECT_EQ(again.message(), first.message());
+  }
+  EXPECT_EQ(cursor.feed("", /*closed=*/true).message(), first.message());
+}
+
+TEST(WuffsJsonCursorTest, DepthLimitErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  // One level past the deepest legal nesting fails mid-chunk.
+  const std::string too_deep = std::string(WuffsJsonCursor::kMaxTrackedDepth, '[') + "1,2,3" +
+                               std::string(WuffsJsonCursor::kMaxTrackedDepth, ']');
+  const absl::Status first = cursor.feed(too_deep, /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed(R"({"ok":true})", /*closed=*/true).message(), first.message());
+  EXPECT_TRUE(h.fields.empty());
+}
+
+TEST(WuffsJsonCursorTest, MalformedJsonErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  const absl::Status first = cursor.feed(R"({"a" 1)", /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed(R"(,"b":2})", /*closed=*/true).message(), first.message());
+}
+
+TEST(WuffsJsonCursorTest, DuplicateKeyErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  const absl::Status first = cursor.feed(R"({"a":1,"a":2,"b":3)", /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed(R"(,"c":4})", /*closed=*/true).message(), first.message());
+  // Nothing after the duplicate reached the handler.
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].key, "a");
+}
+
+// An over-long split number also latches.
+TEST(WuffsJsonCursorTest, OversizedPendingNumberErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
+  const absl::Status first = cursor.feed(std::string(65, '1'), /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed("}", /*closed=*/true).message(), first.message());
+}
+
 // Same key name at different nesting depths must not trigger a false positive.
 TEST(WuffsJsonCursorTest, SameKeyNameAtDifferentDepthsAllowed) {
   CapturingHandler h;
@@ -763,32 +827,49 @@ TEST(WuffsJsonCursorTest, UnicodeEscapeSplitChunkCorrectValue) {
   EXPECT_EQ(h.fields[0].str_val, "aAb"); // U+0041 = 'A'
 }
 
-// A NUMBER token that straddles a chunk boundary causes Wuffs to rewind its
-// read cursor and the cursor to save the unread bytes in pending_bytes_.
-// If those bytes exceed kMaxPendingBytes the cursor must reject immediately.
+// Number-length enforcement tests
 
-// A number whose in-flight byte count equals kMaxPendingBytes (64) must not
-// trigger the cap: the next chunk completes it normally.
-TEST(WuffsJsonCursorTest, NumberAtPendingCapAccepted) {
+// A number at kMaxNumberBytes (64) must be accepted.
+TEST(WuffsJsonCursorTest, NumberAtMaxBytesAccepted) {
+  CapturingHandler h;
+  const std::string num(64, '1');
+  ASSERT_OK(parse(absl::StrCat("{\"n\":", num, "}"), h));
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].raw_val, num);
+}
+
+// A number one byte over kMaxNumberBytes (65) must be rejected.
+TEST(WuffsJsonCursorTest, NumberExceedsMaxBytesRejected) {
+  CapturingHandler h;
+  const std::string num(65, '1');
+  EXPECT_THAT(parse(absl::StrCat("{\"n\":", num, "}"), h), Not(IsOk()));
+}
+
+// A 64-byte number split across two chunks must be accepted.
+TEST(WuffsJsonCursorTest, NumberAtMaxBytesAcceptedSplitAcrossChunks) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  // Feed structure first; no number in flight yet.
-  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
-  // Feed exactly 64 digit bytes with no terminator — pending_bytes_ = 64, not over cap.
-  ASSERT_OK(cursor.feed(std::string(64, '1'), /*closed=*/false));
-  // Close with '}': Wuffs now sees terminator and completes the NUMBER token.
-  ASSERT_OK(cursor.feed("}", /*closed=*/true));
+  ASSERT_OK(cursor.feed(absl::StrCat("{\"n\":", std::string(32, '1')), /*closed=*/false));
+  ASSERT_OK(cursor.feed(absl::StrCat(std::string(32, '1'), "}"), /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].raw_val, std::string(64, '1'));
 }
 
-// A number with 65 in-flight bytes (one over kMaxPendingBytes) must be rejected.
-TEST(WuffsJsonCursorTest, NumberOverPendingCapRejected) {
+// A 65-byte number split across two chunks must be rejected once reassembled.
+TEST(WuffsJsonCursorTest, NumberExceedsMaxBytesRejectedSplitAcrossChunks) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
-  // 65 digit bytes with no terminator — leftover = 65 > 64 → error.
-  EXPECT_THAT(cursor.feed(std::string(65, '1'), /*closed=*/false), Not(IsOk()));
+  ASSERT_OK(cursor.feed(absl::StrCat("{\"n\":", std::string(32, '1')), /*closed=*/false));
+  EXPECT_THAT(cursor.feed(absl::StrCat(std::string(33, '1'), "}"), /*closed=*/true), Not(IsOk()));
+}
+
+// An unterminated number chunk that already exceeds kMaxNumberBytes (65) must
+// be rejected immediately before buffering into pending_bytes_.
+TEST(WuffsJsonCursorTest, NumberExceedsMaxBytesRejectedInPendingChunk) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_THAT(cursor.feed(absl::StrCat("{\"n\":", std::string(65, '1')), /*closed=*/false),
+              Not(IsOk()));
 }
 
 } // namespace

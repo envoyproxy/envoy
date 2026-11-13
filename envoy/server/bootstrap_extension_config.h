@@ -7,6 +7,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -30,6 +32,11 @@ public:
 
 using BootstrapExtensionPtr = std::unique_ptr<BootstrapExtension>;
 
+/**
+ * Successfully constructed extension, or the error encountered while constructing it.
+ */
+using BootstrapExtensionCreationResult = absl::StatusOr<BootstrapExtensionPtr>;
+
 namespace Configuration {
 
 /**
@@ -41,15 +48,14 @@ public:
   ~BootstrapExtensionFactory() override = default;
 
   /**
-   * Create a particular bootstrap extension implementation from a config proto. If the
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
+   * Create a particular bootstrap extension implementation from a config proto.
    * @param config the custom configuration for this bootstrap extension type.
    * @param context is the context to use for the extension. Note that the clusterManager is not
    *    yet initialized at this point and **must not** be used.
+   * @return BootstrapExtensionCreationResult the constructed extension, or an error status.
    */
-  virtual BootstrapExtensionPtr createBootstrapExtension(const Protobuf::Message& config,
-                                                         ServerFactoryContext& context) PURE;
+  virtual BootstrapExtensionCreationResult
+  createBootstrapExtension(const Protobuf::Message& config, ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.bootstrap"; }
 };

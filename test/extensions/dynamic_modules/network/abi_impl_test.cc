@@ -9,18 +9,23 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/host_lookup_map.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
@@ -98,9 +103,24 @@ void testOnBelowWriteBufferLowWatermark(envoy_dynamic_module_type_network_filter
   g_below_watermark_called = true;
 }
 
+size_t g_http_callout_done_calls = 0;
+uint64_t g_last_http_callout_id = 0;
+envoy_dynamic_module_type_http_callout_result g_last_http_callout_result{};
+
+void testOnHttpCalloutDone(envoy_dynamic_module_type_network_filter_envoy_ptr,
+                           envoy_dynamic_module_type_network_filter_module_ptr, uint64_t callout_id,
+                           envoy_dynamic_module_type_http_callout_result result,
+                           envoy_dynamic_module_type_envoy_http_header*, size_t,
+                           envoy_dynamic_module_type_envoy_buffer*, size_t) {
+  g_http_callout_done_calls++;
+  g_last_http_callout_id = callout_id;
+  g_last_http_callout_result = result;
+}
+
 } // namespace
 
-class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
+class DynamicModuleNetworkFilterAbiCallbackTest : public Event::TestUsingSimulatedTime,
+                                                  public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
@@ -2120,6 +2140,58 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutFailureReset) {
   filter_.reset();
 }
 
+// A callout failure reaches the module from a posted callback, which does nothing once the filter
+// is gone.
+TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutFailureIsPosted) {
+  filter_config_->on_network_filter_http_callout_done_ = testOnHttpCalloutDone;
+  g_http_callout_done_calls = 0;
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillRepeatedly(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillRepeatedly(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillRepeatedly(
+          testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                           captured_callback = &cb;
+                         }),
+                         testing::Return(&request)));
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+  for (const bool destroy_filter : {false, true}) {
+    uint64_t callout_id = 0;
+    EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+              envoy_dynamic_module_callback_network_filter_http_callout(
+                  filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(),
+                  {nullptr, 0}, 5000));
+    ASSERT_NE(nullptr, captured_callback);
+
+    Event::PostCb posted_cb;
+    EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+      posted_cb = std::move(cb);
+    });
+    const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+        ->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    ASSERT_NE(nullptr, posted_cb);
+    if (destroy_filter) {
+      filter_.reset();
+    }
+    EXPECT_EQ(0, g_http_callout_done_calls);
+    posted_cb();
+    EXPECT_EQ(destroy_filter ? 0 : 1, g_http_callout_done_calls);
+    if (!destroy_filter) {
+      EXPECT_EQ(callout_id, g_last_http_callout_id);
+      EXPECT_EQ(envoy_dynamic_module_type_http_callout_result_Reset, g_last_http_callout_result);
+    }
+    g_http_callout_done_calls = 0;
+  }
+}
+
 TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutFailureExceedResponseBufferLimit) {
   NiceMock<Upstream::MockThreadLocalCluster> cluster;
   NiceMock<Http::MockAsyncClient> async_client;
@@ -2585,6 +2657,406 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamConnectionIdNullCal
 }
 
 // =============================================================================
+// Tests for the stream info reporting callbacks.
+// =============================================================================
+
+// Reports made before the filter sees the new connection leave the connection untouched.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReportingIgnoredBeforeNewConnection) {
+  EXPECT_CALL(connection_, streamInfo()).Times(0);
+  EXPECT_CALL(read_callbacks_, upstreamHost(testing::_)).Times(0);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(testing::_)).Times(0);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"10.1.2.3", 8}, 5432));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_cluster(filterPtr(),
+                                                                                 {"compute", 7}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+      filterPtr(), {"10.1.2.4", 8}, 41000));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+      filterPtr(), {"refused", 7}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+      filterPtr(), {"idle", 4}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+      filterPtr(), envoy_dynamic_module_type_detected_close_type_RemoteReset));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+      filterPtr(), 2));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+      filterPtr(), envoy_dynamic_module_type_upstream_timing_event_ConnectStart));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(filterPtr(), 1, 2));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(filterPtr(), 3, 4));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_response_flag(
+      filterPtr(), envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"retried", 7}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_flush_access_log(
+      filterPtr(), envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected));
+}
+
+// A buffer with a null pointer and a non-zero length is rejected before it is read.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReportingRejectsInvalidBuffers) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"compute"}))
+      .WillOnce(testing::Return(&cluster));
+  connection_.stream_info_.upstream_info_ = nullptr;
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  const envoy_dynamic_module_type_module_buffer invalid_buffer{nullptr, 1};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), invalid_buffer, {"10.1.2.3", 8}, 5432));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, invalid_buffer, 5432));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_cluster(filterPtr(),
+                                                                                 invalid_buffer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+      filterPtr(), invalid_buffer, 41000));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+      filterPtr(), invalid_buffer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+      filterPtr(), invalid_buffer));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), invalid_buffer));
+  EXPECT_EQ(nullptr, read_callbacks_.upstreamHost());
+  EXPECT_EQ(nullptr, connection_.stream_info_.upstream_info_);
+  EXPECT_EQ("", connection_.stream_info_.customFlags());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamHostNotInCluster) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"compute"}))
+      .Times(2)
+      .WillRepeatedly(testing::Return(&cluster));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"10.1.2.3", 8}, 5432));
+  const Upstream::HostDescriptionConstSharedPtr host = read_callbacks_.upstreamHost();
+  ASSERT_NE(nullptr, host);
+  EXPECT_EQ("10.1.2.3:5432", host->address()->asString());
+  EXPECT_EQ("", host->hostname());
+  EXPECT_EQ(cluster.cluster_.info_.get(), &host->cluster());
+  EXPECT_EQ(host, connection_.stream_info_.upstreamInfo()->upstreamHost());
+  EXPECT_EQ("10.1.2.3:5432",
+            connection_.stream_info_.upstreamInfo()->upstreamRemoteAddress()->asString());
+  EXPECT_EQ(cluster.cluster_.info_, connection_.stream_info_.upstream_cluster_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_has_upstream_host(filterPtr()));
+
+  // An IPv6 address is given without brackets, and each host is an attempt.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"::1", 3}, 5432));
+  EXPECT_EQ("[::1]:5432", read_callbacks_.upstreamHost()->address()->asString());
+  EXPECT_THAT(connection_.stream_info_.upstreamInfo()->upstreamHostsAttempted(),
+              testing::ElementsAre(host, read_callbacks_.upstreamHost()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamHostCreatesUpstreamInfo) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"compute"}))
+      .WillOnce(testing::Return(&cluster));
+  connection_.stream_info_.upstream_info_ = nullptr;
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"10.1.2.3", 8}, 5432));
+  ASSERT_NE(nullptr, connection_.stream_info_.upstream_info_);
+  EXPECT_EQ(read_callbacks_.upstreamHost(),
+            connection_.stream_info_.upstream_info_->upstreamHost());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamHostReusesClusterMember) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  auto member = std::make_shared<NiceMock<Upstream::MockHost>>();
+  const std::string member_hostname = "compute-0";
+  ON_CALL(*member, hostname()).WillByDefault(testing::ReturnRef(member_hostname));
+  // A logical host that moved keeps the map key of the address it was added with, and the
+  // connection keeps the address that the module reported.
+  ON_CALL(*member, address())
+      .WillByDefault(
+          testing::Return(Network::Utility::parseInternetAddressNoThrow("10.9.8.7", 5432)));
+  auto hosts = std::make_shared<Upstream::HostMap>();
+  hosts->emplace("10.1.2.3:5432", member);
+  cluster.cluster_.priority_set_.cross_priority_host_map_ =
+      std::make_shared<Upstream::FlatHostLookupMap>(hosts);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"compute"}))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"10.1.2.3", 8}, 5432));
+  envoy_dynamic_module_type_envoy_buffer hostname_out = {nullptr, 0};
+  ASSERT_TRUE(envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+      filterPtr(), &hostname_out));
+  EXPECT_EQ(member_hostname, absl::string_view(hostname_out.ptr, hostname_out.length));
+  EXPECT_EQ("10.1.2.3:5432", read_callbacks_.upstreamHost()->address()->asString());
+  EXPECT_EQ("10.1.2.3:5432",
+            connection_.stream_info_.upstreamInfo()->upstreamHost()->address()->asString());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamHostRejectsInvalidArguments) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  ON_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"compute"}))
+      .WillByDefault(testing::Return(&cluster));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"missing", 7}, {"10.1.2.3", 8}, 5432));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"compute-0", 9}, 5432));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"[::1]", 5}, 5432));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_host(
+      filterPtr(), {"compute", 7}, {"10.1.2.3", 8}, 65536));
+  EXPECT_EQ(nullptr, read_callbacks_.upstreamHost());
+  EXPECT_EQ(nullptr, connection_.stream_info_.upstream_cluster_info_);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamCluster) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  ON_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"compute"}))
+      .WillByDefault(testing::Return(&cluster));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_cluster(filterPtr(),
+                                                                                 {"missing", 7}));
+  EXPECT_EQ(nullptr, connection_.stream_info_.upstream_cluster_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_cluster(filterPtr(),
+                                                                                {"compute", 7}));
+  EXPECT_EQ(cluster.cluster_.info_, connection_.stream_info_.upstream_cluster_info_);
+  EXPECT_EQ(nullptr, read_callbacks_.upstreamHost());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamLocalAddress) {
+  connection_.stream_info_.upstream_info_ = nullptr;
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+      filterPtr(), {"compute-0", 9}, 41000));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+      filterPtr(), {"10.1.2.4", 8}, 65536));
+  EXPECT_EQ(nullptr, connection_.stream_info_.upstream_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+      filterPtr(), {"10.1.2.4", 8}, 65535));
+  ASSERT_NE(nullptr, connection_.stream_info_.upstream_info_);
+  EXPECT_EQ("10.1.2.4:65535",
+            connection_.stream_info_.upstream_info_->upstreamLocalAddress()->asString());
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+      filterPtr(), {"::1", 3}, 41000));
+  EXPECT_EQ("[::1]:41000",
+            connection_.stream_info_.upstream_info_->upstreamLocalAddress()->asString());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamFailureAndCloseReasons) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+      filterPtr(), {"connection refused", 18}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+      filterPtr(), {"idle timeout", 12}));
+  EXPECT_EQ("connection refused",
+            connection_.stream_info_.upstreamInfo()->upstreamTransportFailureReason());
+  EXPECT_EQ("idle timeout", connection_.stream_info_.upstreamInfo()->upstreamLocalCloseReason());
+  // An empty reason may come with a null pointer.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+      filterPtr(), {nullptr, 0}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+      filterPtr(), {nullptr, 0}));
+  EXPECT_EQ("", connection_.stream_info_.upstreamInfo()->upstreamTransportFailureReason());
+  EXPECT_EQ("", connection_.stream_info_.upstreamInfo()->upstreamLocalCloseReason());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamDetectedCloseType) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  for (const auto& [close_type, detected_close_type] : std::vector<
+           std::pair<envoy_dynamic_module_type_detected_close_type, StreamInfo::DetectedCloseType>>{
+           {envoy_dynamic_module_type_detected_close_type_Normal,
+            StreamInfo::DetectedCloseType::Normal},
+           {envoy_dynamic_module_type_detected_close_type_LocalReset,
+            StreamInfo::DetectedCloseType::LocalReset},
+           {envoy_dynamic_module_type_detected_close_type_RemoteReset,
+            StreamInfo::DetectedCloseType::RemoteReset}}) {
+    SCOPED_TRACE(static_cast<int>(close_type));
+    EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+        filterPtr(), close_type));
+    EXPECT_EQ(detected_close_type,
+              connection_.stream_info_.upstreamInfo()->upstreamDetectedCloseType());
+  }
+  // A value past the last close type is rejected and leaves the close type unchanged.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+      filterPtr(), static_cast<envoy_dynamic_module_type_detected_close_type>(
+                       envoy_dynamic_module_type_detected_close_type_RemoteReset + 1)));
+  EXPECT_EQ(StreamInfo::DetectedCloseType::RemoteReset,
+            connection_.stream_info_.upstreamInfo()->upstreamDetectedCloseType());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetUpstreamRequestAttemptCount) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+      filterPtr(), 3));
+  EXPECT_EQ(3U, connection_.stream_info_.attemptCount().value());
+}
+
+// Each event records the time of the worker, and a later record replaces the earlier one.
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, RecordUpstreamTiming) {
+  connection_.stream_info_.upstream_info_ = nullptr;
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  // An unknown event is rejected without creating the upstream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+      filterPtr(), static_cast<envoy_dynamic_module_type_upstream_timing_event>(
+                       envoy_dynamic_module_type_upstream_timing_event_LastByteReceived + 1)));
+  EXPECT_EQ(nullptr, connection_.stream_info_.upstream_info_);
+
+  auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+  connection_.stream_info_.upstream_info_ = upstream_info;
+  StreamInfo::UpstreamTiming& timing = upstream_info->upstreamTiming();
+  for (const auto& [event, time] :
+       std::vector<std::pair<envoy_dynamic_module_type_upstream_timing_event,
+                             std::optional<MonotonicTime>*>>{
+           {envoy_dynamic_module_type_upstream_timing_event_ConnectStart,
+            &timing.upstream_connect_start_},
+           {envoy_dynamic_module_type_upstream_timing_event_ConnectComplete,
+            &timing.upstream_connect_complete_},
+           {envoy_dynamic_module_type_upstream_timing_event_HandshakeComplete,
+            &timing.upstream_handshake_complete_},
+           {envoy_dynamic_module_type_upstream_timing_event_FirstByteSent,
+            &timing.first_upstream_tx_byte_sent_},
+           {envoy_dynamic_module_type_upstream_timing_event_LastByteSent,
+            &timing.last_upstream_tx_byte_sent_},
+           {envoy_dynamic_module_type_upstream_timing_event_FirstByteReceived,
+            &timing.first_upstream_rx_byte_received_},
+           {envoy_dynamic_module_type_upstream_timing_event_LastByteReceived,
+            &timing.last_upstream_rx_byte_received_}}) {
+    SCOPED_TRACE(static_cast<int>(event));
+    EXPECT_TRUE(
+        envoy_dynamic_module_callback_network_filter_record_upstream_timing(filterPtr(), event));
+    EXPECT_EQ(simTime().monotonicTime(), *time);
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    EXPECT_TRUE(
+        envoy_dynamic_module_callback_network_filter_record_upstream_timing(filterPtr(), event));
+    EXPECT_EQ(simTime().monotonicTime(), *time);
+  }
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AddUpstreamWireBytes) {
+  auto upstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  connection_.stream_info_.upstream_bytes_meter_ = upstream_bytes_meter;
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(filterPtr(), 10, 20));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(filterPtr(), 1, 2));
+  EXPECT_EQ(11, upstream_bytes_meter->wireBytesReceived());
+  EXPECT_EQ(22, upstream_bytes_meter->wireBytesSent());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AddUpstreamWireBytesWithoutMeter) {
+  connection_.stream_info_.upstream_bytes_meter_ = nullptr;
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(filterPtr(), 10, 20));
+  EXPECT_EQ(nullptr, connection_.stream_info_.upstream_bytes_meter_);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AddDownstreamWireBytesCreatesMeter) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(filterPtr(), 10, 20));
+  const StreamInfo::BytesMeterSharedPtr downstream_bytes_meter =
+      connection_.stream_info_.downstream_bytes_meter_;
+  ASSERT_NE(nullptr, downstream_bytes_meter);
+  // A later report adds to the same meter.
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(filterPtr(), 1, 2));
+  EXPECT_EQ(downstream_bytes_meter, connection_.stream_info_.downstream_bytes_meter_);
+  EXPECT_EQ(11, downstream_bytes_meter->wireBytesReceived());
+  EXPECT_EQ(22, downstream_bytes_meter->wireBytesSent());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetResponseFlag) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_response_flag(
+      filterPtr(), envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_set_response_flag(
+      filterPtr(), envoy_dynamic_module_type_response_flag_UnconditionalDropOverload));
+  // A value past the last core flag is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_set_response_flag(
+      filterPtr(), static_cast<envoy_dynamic_module_type_response_flag>(
+                       StreamInfo::CoreResponseFlag::LastFlag + 1)));
+  EXPECT_TRUE(connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::UpstreamConnectionFailure));
+  EXPECT_TRUE(connection_.stream_info_.hasResponseFlag(
+      StreamInfo::CoreResponseFlag::UnconditionalDropOverload));
+  EXPECT_EQ(2, connection_.stream_info_.response_flags_.size());
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AddCustomFlag) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"retried", 7}));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"slow", 4}));
+  // Empty flags, flags with whitespace and the short names of response flags are rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"", 0}));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"has space", 9}));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"new\nline", 8}));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filterPtr(), {"UF", 2}));
+  EXPECT_EQ("retried,slow", connection_.stream_info_.customFlags());
+}
+
+// =============================================================================
+// Tests for the access log callbacks.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, FlushAccessLog) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  auto downstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  connection_.stream_info_.downstream_bytes_meter_ = downstream_bytes_meter;
+  // Without access logs a flush writes nothing and takes no snapshot, and the type is still
+  // checked.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_flush_access_log(
+      filterPtr(), envoy_dynamic_module_type_access_log_type_TcpPeriodic));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_flush_access_log(
+      filterPtr(), envoy_dynamic_module_type_access_log_type_TcpConnectionEnd));
+  EXPECT_EQ(nullptr, downstream_bytes_meter->bytesAtLastDownstreamPeriodicLog());
+
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {access_log};
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(AccessLog::AccessLogType::TcpUpstreamConnected, log_context.accessLogType());
+      })
+      .WillOnce([&](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(AccessLog::AccessLogType::TcpPeriodic, log_context.accessLogType());
+        // The TcpUpstreamConnected flush before this one took no snapshot.
+        EXPECT_EQ(nullptr, downstream_bytes_meter->bytesAtLastDownstreamPeriodicLog());
+      });
+  // Only TcpUpstreamConnected and TcpPeriodic are flushed. The connection itself flushes
+  // TcpConnectionEnd.
+  for (int access_log_type = envoy_dynamic_module_type_access_log_type_NotSet;
+       access_log_type <= envoy_dynamic_module_type_access_log_type_UdpSessionEnd;
+       ++access_log_type) {
+    SCOPED_TRACE(access_log_type);
+    const bool flushed =
+        access_log_type == envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected ||
+        access_log_type == envoy_dynamic_module_type_access_log_type_TcpPeriodic;
+    EXPECT_EQ(flushed, envoy_dynamic_module_callback_network_filter_flush_access_log(
+                           filterPtr(), static_cast<envoy_dynamic_module_type_access_log_type>(
+                                            access_log_type)));
+  }
+  EXPECT_NE(nullptr, downstream_bytes_meter->bytesAtLastDownstreamPeriodicLog());
+}
+
+// =============================================================================
 // Tests for StartTLS callbacks.
 // =============================================================================
 
@@ -2681,6 +3153,34 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterConfigSchedulerCo
 
   // Clean up.
   envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetLoadShedPointWithoutProvider) {
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+                         filter_config_.get(), {name.data(), name.size()}));
+}
+
+TEST(DynamicModuleNetworkFilterConfigTest, GetLoadShedPoint) {
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("network_no_op", "c"), /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  Stats::IsolatedStoreImpl stats;
+  testing::StrictMock<Upstream::MockClusterManager> cluster_manager;
+  testing::StrictMock<Event::MockDispatcher> main_thread_dispatcher;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher, overload_manager);
+  ASSERT_OK(filter_config);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point,
+            envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+                filter_config.value().get(), {name.data(), name.size()}));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitInvokesOnScheduled) {

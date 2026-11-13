@@ -40,6 +40,7 @@ envoy_cc_library(
     deps = [
         ":filter_interface",
         ":message_interface",
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:tracer_interface",

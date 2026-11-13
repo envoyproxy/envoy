@@ -28,6 +28,9 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
+  void setIoDispatcher(Dispatcher* dispatcher) override;
+  Dispatcher* ioDispatcher() override { return io_dispatcher_; }
+  void advanceTimeForIoImpl(Dispatcher& dispatcher, const Duration& elapsed) override;
   void advanceTimeWaitImpl(const Duration& duration) override;
   void advanceTimeAsyncImpl(const Duration& duration) override;
 
@@ -98,7 +101,8 @@ private:
 
   void maybeLogTimerWarning();
 
-  RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
+  Dispatcher* io_dispatcher_{nullptr};
+  RealTimeSource real_time_source_; // Used to initialize system_time_.
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);

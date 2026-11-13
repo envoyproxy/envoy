@@ -3,11 +3,13 @@ use crate::{
   abi,
   drop_wrapped_c_void_ptr,
   ffi_export,
+  new_load_shed_point,
   str_to_module_buffer,
   wrap_into_c_void_ptr,
   EnvoyCounterId,
   EnvoyGaugeId,
   EnvoyHistogramId,
+  EnvoyLoadShedPoint,
   NewListenerFilterConfigFunction,
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
@@ -78,6 +80,13 @@ pub trait EnvoyListenerFilterConfig {
 
   /// Create a new implementation of the [`EnvoyListenerFilterConfigScheduler`] trait.
   fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static;
+
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the connection processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name or the listener
+  /// of the filter bypasses the overload manager.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
 }
 
 /// The trait that represents the configuration for an Envoy listener filter configuration.
@@ -146,6 +155,7 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
   fn on_close(&mut self, _envoy_filter: &mut ELF) {}
 
   /// This is called when the HTTP callout response is received initiated by a listener filter.
+  /// Envoy reports a failure of a callout in flight from a later callback on the same thread.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   /// * `callout_id` is the ID of the callout. This is used to differentiate between multiple calls.
@@ -772,6 +782,15 @@ impl EnvoyListenerFilterConfig for EnvoyListenerFilterConfigImpl {
         raw_ptr: scheduler_ptr,
       }
     }
+  }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+        self.raw,
+        str_to_module_buffer(name),
+      )
+    })
   }
 }
 

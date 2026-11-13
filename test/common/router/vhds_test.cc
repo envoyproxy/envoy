@@ -532,6 +532,15 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription
   EXPECT_THAT(vhost_names, ::testing::UnorderedElementsAre("vhost_rds1", "vhost1"));
 }
 
+TEST_F(VhdsTest, AliasToDomainName) {
+  EXPECT_EQ("my_route/example.com", VhdsSubscription::domainNameToAlias("my_route", "example.com"));
+  EXPECT_EQ("example.com", VhdsSubscription::aliasToDomainName("my_route/example.com"));
+  EXPECT_EQ("example.com", VhdsSubscription::aliasToDomainName("prefix/my_route/example.com"));
+  EXPECT_EQ("example.com", VhdsSubscription::aliasToDomainName("example.com"));
+  EXPECT_EQ("", VhdsSubscription::aliasToDomainName("my_route/"));
+  EXPECT_EQ("", VhdsSubscription::aliasToDomainName(""));
+}
+
 // verify that when RDS and VHDS define virtual hosts with the same name, VHDS takes precedence
 TEST_F(VhdsTest, VhdsOverridesRdsVirtualHostWithSameName) {
   const auto route_config =

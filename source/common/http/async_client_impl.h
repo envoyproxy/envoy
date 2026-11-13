@@ -347,6 +347,9 @@ class AsyncRequestSharedImpl : public virtual AsyncClient::Request,
                                protected AsyncClient::StreamCallbacks {
 public:
   void cancel() final;
+  OptRef<AsyncClient::RequestContext> context() const final {
+    return makeOptRefFromPtr(context_.get());
+  }
 
 protected:
   AsyncRequestSharedImpl(AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
@@ -358,6 +361,7 @@ protected:
   void onReset() final;
 
   AsyncClient::Callbacks& callbacks_;
+  const AsyncClient::RequestContextSharedPtr context_;
   Tracing::SpanPtr child_span_;
   std::unique_ptr<ResponseMessageImpl> response_;
   bool cancelled_{};

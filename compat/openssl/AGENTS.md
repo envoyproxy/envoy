@@ -11,9 +11,10 @@ Envoy-side handling (`ENVOY_SSL_OPENSSL`, `//bazel:using_openssl`, skipped tests
 
 OpenSSL builds use `--config=openssl` (see `.bazelrc`). It swaps `//bazel:ssl` and
 `//bazel:crypto` to this compat layer, defines `ENVOY_SSL_OPENSSL`, disables HTTP/3, and skips
-tests tagged `nofips` or `quiche`. In CI, the openssl check is allowed to fail. It runs
-`ci/do_ci.sh openssl.presubmit` on PRs (only tests affected by the change) and
-`ci/do_ci.sh openssl` post-submit (the full suite plus `//compat/openssl/test/...`).
+tests tagged `nofips` or `quiche`. In CI, the openssl check is allowed to fail. On PRs it runs
+`ci/do_ci.sh openssl.build` and `ci/do_ci.sh openssl.test_affected` (only tests affected by the
+change), and post-submit `ci/do_ci.sh openssl.build`, `ci/do_ci.sh openssl.test` (the full suite
+plus `//compat/openssl/test/...`) and `ci/do_ci.sh openssl.asan`.
 
 ```bash
 bazel build --config=openssl //source/exe:envoy-static
@@ -50,7 +51,7 @@ Envoy is built against the BoringSSL API. The compat layer lets it run on OpenSS
 
 The BoringSSL sources come from the `@boringssl-source` repo
 (`bazel-envoy/external/boringssl-source+/`), **not** `@boringssl`. OpenSSL headers come
-from `bazel-envoy/external/openssl+/include/openssl/`.
+from `bazel-bin/compat/openssl/openssl_include/openssl/`.
 
 ## Key files to modify
 
@@ -152,7 +153,7 @@ since OpenSSL will never produce these BoringSSL-specific error codes.
 
 If a constant must exist but its value collides with another constant's value (e.g.,
 `ERR_R_OVERFLOW` aliased to `ERR_R_INTERNAL_ERROR`), give it a unique value. Check
-OpenSSL's range for the constant family in `bazel-envoy/external/openssl+/include/openssl/`
+OpenSSL's range for the constant family in `bazel-bin/compat/openssl/openssl_include/openssl/`
 and pick a value above the highest used one.
 
 ## Adapting to upstream refactors in BoringSSL
@@ -264,7 +265,7 @@ Check the `ossl.h` struct to see which OpenSSL functions are available as functi
 
 3. **For each undeclared function:**
    - Check if it exists in BoringSSL (`bazel-envoy/external/boringssl-source+/include/openssl/`)
-   - Check if it exists in OpenSSL (`bazel-envoy/external/openssl+/include/openssl/`)
+   - Check if it exists in OpenSSL (`bazel-bin/compat/openssl/openssl_include/openssl/`)
    - Add `--uncomment-func-decl` to the patch script + entry in BUILD
    - If OpenSSL's semantics differ, or it has no OpenSSL equivalent, write a handwritten
      source file (and a test in `test/`)

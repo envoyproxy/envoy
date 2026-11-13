@@ -4,7 +4,7 @@ use crate::abi;
 /// fields are nanosecond offsets from request start. Each field is `None` when unavailable; zero is
 /// valid. Connection and handshake offsets can be negative when the connection predates the
 /// request.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TimingInfo {
   /// Request start time as Unix timestamp in nanoseconds.
   pub start_time_unix_ns: Option<i64>,
@@ -210,5 +210,13 @@ mod tests {
     let timing = TimingInfo::from(info);
     assert_eq!(timing.downstream_connection_begin_ns, Some(-1));
     assert_eq!(timing.downstream_handshake_start_ns, None);
+  }
+
+  #[test]
+  fn timing_info_equality() {
+    assert_eq!(TimingInfo::default(), TimingInfo::default());
+    let mut t = TimingInfo::default();
+    t.start_time_unix_ns = Some(42);
+    assert_ne!(t, TimingInfo::default());
   }
 }

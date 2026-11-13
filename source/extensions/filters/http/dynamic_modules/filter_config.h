@@ -5,6 +5,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/secret/secret_provider_impl.h"
@@ -92,13 +93,15 @@ public:
    * @param init_manager the init manager to register dynamic secret subscriptions with, if any.
    * This is only valid for the duration of ``envoy_dynamic_module_on_http_filter_config_new`` and
    * is cleared afterwards.
+   * @param load_shed_point_provider the provider of the load shed points the module can check, if
+   * any.
    */
-  DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
-                                const absl::string_view filter_config,
-                                const absl::string_view metrics_namespace,
-                                DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-                                Server::Configuration::ServerFactoryContext& context,
-                                OptRef<Init::Manager> init_manager = std::nullopt);
+  DynamicModuleHttpFilterConfig(
+      const absl::string_view filter_name, const absl::string_view filter_config,
+      const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+      Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context,
+      OptRef<Init::Manager> init_manager = std::nullopt,
+      OptRef<Server::LoadShedPointProvider> load_shed_point_provider = std::nullopt);
 
   ~DynamicModuleHttpFilterConfig();
 
@@ -169,6 +172,10 @@ public:
   // ``config_new`` hook is running: the referenced init manager belongs to the filter chain factory
   // context, so the factory clears this right after the hook returns.
   OptRef<Init::Manager> init_manager_;
+
+  // The provider of the load shed points that the module can check. It is empty for upstream
+  // filters and when the factory context of the filter bypasses the overload manager.
+  const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
 
   bool terminal_filter_ = false;
 
@@ -268,8 +275,9 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id)
-        : config_(config), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id,
+                        Event::Dispatcher& dispatcher)
+        : config_(config), callout_id_(id), dispatcher_(dispatcher) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -284,6 +292,8 @@ private:
   private:
     DynamicModuleHttpFilterConfig& config_;
     const uint64_t callout_id_{};
+    // The dispatcher of the thread that runs the callout.
+    Event::Dispatcher& dispatcher_;
   };
 
   /**
@@ -292,8 +302,9 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id)
-        : callout_id_(callout_id), config_(config) {}
+    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id,
+                              Event::Dispatcher& dispatcher)
+        : callout_id_(callout_id), config_(config), dispatcher_(dispatcher) {}
     ~HttpStreamCalloutCallback() override = default;
 
     void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
@@ -307,9 +318,13 @@ private:
     Http::RequestTrailerMapPtr request_trailers_ = nullptr;
     const uint64_t callout_id_{};
     bool cleaned_up_ = false;
+    // Set when the module resets the stream.
+    bool reset_by_module_ = false;
 
   private:
     DynamicModuleHttpFilterConfig& config_;
+    // The dispatcher of the thread that runs the stream.
+    Event::Dispatcher& dispatcher_;
   };
 
   /**
@@ -317,6 +332,11 @@ private:
    * various event hooks.
    */
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  /**
+   * Removes the stream and reports its reset to the module.
+   */
+  void reportHttpStreamReset(uint64_t stream_id);
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
@@ -393,6 +413,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
  * @param init_manager the init manager that dynamic secret subscriptions created by the module are
  * registered with. When absent, such subscriptions start immediately instead of gating the owner's
  * initialization.
+ * @param load_shed_point_provider the provider of the load shed points the module can check, if
+ * any.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
@@ -400,7 +422,8 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
     const absl::string_view metrics_namespace, const bool terminal_filter,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Server::Configuration::ServerFactoryContext& context,
-    OptRef<Init::Manager> init_manager = std::nullopt);
+    OptRef<Init::Manager> init_manager = std::nullopt,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider = std::nullopt);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

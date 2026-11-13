@@ -413,6 +413,11 @@ absl::Status ActiveQuicListenerFactory::initializeWorkerRouting(
 
   RETURN_IF_NOT_OK(initializeCidGeneratorAndWorkerRouting());
 
+  // Server validation creates no sockets.
+  if (context_.serverFactoryContext().options().mode() == Server::Mode::Validate) {
+    return absl::OkStatus();
+  }
+
   for (const auto& factory : socket_factories) {
     for (uint32_t i = 0; i < concurrency_; i++) {
       auto socket = factory->getListenSocket(i);

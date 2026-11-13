@@ -37,6 +37,7 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
+using testing::InSequence;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -1770,6 +1771,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   AsyncClient::Request* request =
       client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_FALSE(request->context().has_value());
   request->cancel();
 }
 
@@ -2001,6 +2003,155 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
   EXPECT_EQ(
       1UL,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+}
+
+class MockRequestContext : public AsyncClient::RequestContext {
+public:
+  ~MockRequestContext() override { onDestroy(); }
+  MOCK_METHOD(void, onDestroy, ());
+};
+
+TEST_F(AsyncClientImplTest, ContextSuccess) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::Request* request = client_.send(
+      std::move(message_), callbacks, AsyncClient::RequestOptions().setContext(std::move(context)));
+  ASSERT_NE(nullptr, request);
+  EXPECT_EQ(&context_ref, request->context().ptr());
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks, onSuccess_(_, _))
+      .WillOnce([&](const AsyncClient::Request& inner_request, ResponseMessage*) {
+        EXPECT_EQ(&context_ref, inner_request.context().ptr());
+      });
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), true);
+
+  // The request is the last owner of the context and is deferred deleted.
+  EXPECT_CALL(context_ref, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, ContextCancel) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::Request* request = client_.send(
+      std::move(message_), callbacks, AsyncClient::RequestOptions().setContext(std::move(context)));
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  request->cancel();
+
+  EXPECT_CALL(context_ref, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, ContextOngoingRequestReset) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::OngoingRequest* request = client_.startRequest(
+      std::move(headers), callbacks, AsyncClient::RequestOptions().setContext(std::move(context)));
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks, onFailure(_, AsyncClient::FailureReason::Reset))
+      .WillOnce([&](const AsyncClient::Request& inner_request, AsyncClient::FailureReason) {
+        EXPECT_EQ(&context_ref, inner_request.context().ptr());
+      });
+  request->reset();
+
+  EXPECT_CALL(context_ref, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// The request fails while it is being started and is destroyed before send() returns.
+TEST_F(AsyncClientImplTest, ContextImmediateFailure) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow,
+                                    absl::string_view(), nullptr);
+            return nullptr;
+          });
+
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::RequestOptions options;
+  options.setContext(std::move(context));
+  {
+    InSequence s;
+    EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+    EXPECT_CALL(callbacks, onSuccess_(_, _))
+        .WillOnce([&](const AsyncClient::Request& inner_request, ResponseMessage* response) {
+          EXPECT_EQ(&context_ref, inner_request.context().ptr());
+          EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
+        });
+  }
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks, options));
+
+  // The options are now the last owner of the context.
+  EXPECT_CALL(context_ref, onDestroy());
+  options.setContext(nullptr);
+}
+
+// The request cannot be created: the callbacks are not called and the context is released.
+TEST_F(AsyncClientImplTest, ContextCreationFailure) {
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  TestUtility::loadFromYaml(R"EOF(
+retry_back_off:
+  base_interval: 10s
+  max_interval: 3s
+)EOF",
+                            retry_policy);
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::RequestOptions options;
+  options.setRetryPolicy(retry_policy).setContext(std::move(context));
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks, options));
+
+  EXPECT_CALL(context_ref, onDestroy());
+  options.setContext(nullptr);
 }
 
 TEST_F(AsyncClientImplTest, StreamTimeout) {

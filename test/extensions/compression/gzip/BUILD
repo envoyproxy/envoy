@@ -25,7 +25,7 @@ envoy_extension_cc_fuzz_test(
         "envoy.compression.gzip.compressor",
         "envoy.compression.gzip.decompressor",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":compressor_fuzz_input_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

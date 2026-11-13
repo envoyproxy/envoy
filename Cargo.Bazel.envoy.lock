@@ -1,5 +1,5 @@
 {
-  "checksum": "57f80681498aa30b6c87c6e650813ecf6121189e0575f5be0d5bfdb1a2cb17d0",
+  "checksum": "e90ec3d33710f71609a514ee4eb2717be7728e514c7dba4f097daee2474afce8",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -1228,6 +1228,26 @@
       ],
       "version": "1.15.0"
     },
+    "envoy-dynamic-modules-bindgen 0.1.0": {
+      "common_attrs": {
+        "deps": [
+          {
+            "id": "bindgen 0.73.2",
+            "target": "bindgen"
+          }
+        ],
+        "edition": "2021"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "name": "envoy-dynamic-modules-bindgen",
+      "package_url": "https://github.com/envoyproxy/envoy",
+      "repository": null,
+      "targets": [],
+      "version": "0.1.0"
+    },
     "envoy-dynamic-modules-builtin-extensions 0.1.0": {
       "common_attrs": {
         "deps": [
@@ -1277,14 +1297,7 @@
       "version": "0.1.0"
     },
     "envoy-proxy-dynamic-modules-rust-sdk 0.1.0": {
-      "build_script_attrs": {
-        "deps": [
-          {
-            "id": "bindgen 0.73.2",
-            "target": "bindgen"
-          }
-        ]
-      },
+      "build_script_attrs": {},
       "common_attrs": {
         "crate_features": [
           "default",
@@ -1298,11 +1311,21 @@
           {
             "id": "smallvec 1.16.3",
             "target": "smallvec"
+          },
+          {
+            "id": "strum 0.26.3",
+            "target": "strum"
           }
         ],
         "edition": "2021",
         "extra_deps": [
           ":build_script_build"
+        ],
+        "proc_macro_deps": [
+          {
+            "id": "strum_macros 0.26.4",
+            "target": "strum_macros"
+          }
         ]
       },
       "library_target_name": "envoy_proxy_dynamic_modules_rust_sdk",
@@ -4942,10 +4965,28 @@
     "quote 1.0.45": {
       "build_script_attrs": {},
       "common_attrs": {
-        "crate_features": [
-          "default",
-          "proc-macro"
-        ],
+        "crate_features": {
+          "common": [
+            "proc-macro"
+          ],
+          "selects": {
+            "aarch64-apple-darwin": [
+              "default"
+            ],
+            "aarch64-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-pc-windows-msvc": [
+              "default"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-unknown-nixos-gnu": [
+              "default"
+            ]
+          }
+        },
         "deps": [
           {
             "id": "proc-macro2 1.0.106",
@@ -6300,6 +6341,90 @@
       ],
       "version": "1.2.1"
     },
+    "strum 0.26.3": {
+      "common_attrs": {
+        "crate_features": [
+          "default",
+          "std"
+        ],
+        "edition": "2018"
+      },
+      "library_target_name": "strum",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "license_ids": [
+        "MIT"
+      ],
+      "name": "strum",
+      "package_url": "https://github.com/Peternator7/strum",
+      "repository": {
+        "Http": {
+          "sha256": "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06",
+          "url": "https://static.crates.io/crates/strum/0.26.3/download"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "strum",
+            "crate_root": "src/lib.rs"
+          }
+        }
+      ],
+      "version": "0.26.3"
+    },
+    "strum_macros 0.26.4": {
+      "common_attrs": {
+        "deps": [
+          {
+            "id": "heck 0.5.0",
+            "target": "heck"
+          },
+          {
+            "id": "proc-macro2 1.0.106",
+            "target": "proc_macro2"
+          },
+          {
+            "id": "quote 1.0.45",
+            "target": "quote"
+          },
+          {
+            "id": "syn 2.0.117",
+            "target": "syn"
+          }
+        ],
+        "edition": "2018",
+        "proc_macro_deps": [
+          {
+            "id": "rustversion 1.0.22",
+            "target": "rustversion"
+          }
+        ]
+      },
+      "library_target_name": "strum_macros",
+      "license": "MIT",
+      "license_file": "LICENSE",
+      "license_ids": [
+        "MIT"
+      ],
+      "name": "strum_macros",
+      "package_url": "https://github.com/Peternator7/strum",
+      "repository": {
+        "Http": {
+          "sha256": "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be",
+          "url": "https://static.crates.io/crates/strum_macros/0.26.4/download"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "strum_macros",
+            "crate_root": "src/lib.rs"
+          }
+        }
+      ],
+      "version": "0.26.4"
+    },
     "subtle 2.6.1": {
       "common_attrs": {
         "edition": "2018"
@@ -6330,19 +6455,41 @@
     },
     "syn 2.0.117": {
       "common_attrs": {
-        "crate_features": [
-          "clone-impls",
-          "default",
-          "derive",
-          "extra-traits",
-          "fold",
-          "full",
-          "parsing",
-          "printing",
-          "proc-macro",
-          "visit",
-          "visit-mut"
-        ],
+        "crate_features": {
+          "common": [
+            "clone-impls",
+            "default",
+            "derive",
+            "extra-traits",
+            "full",
+            "parsing",
+            "printing",
+            "proc-macro",
+            "visit-mut"
+          ],
+          "selects": {
+            "aarch64-apple-darwin": [
+              "fold",
+              "visit"
+            ],
+            "aarch64-unknown-linux-gnu": [
+              "fold",
+              "visit"
+            ],
+            "x86_64-pc-windows-msvc": [
+              "fold",
+              "visit"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "fold",
+              "visit"
+            ],
+            "x86_64-unknown-nixos-gnu": [
+              "fold",
+              "visit"
+            ]
+          }
+        },
         "deps": [
           {
             "id": "proc-macro2 1.0.106",
@@ -9526,12 +9673,15 @@
     "serde 1.0.228",
     "serde_json 1.0.149",
     "smallvec 1.16.3",
+    "strum 0.26.3",
+    "strum_macros 0.26.4",
     "time 0.3.47",
     "tokio 1.50.0",
     "url 2.5.8"
   ],
   "direct_dev_deps": [],
   "workspace_members": {
+    "envoy-dynamic-modules-bindgen 0.1.0": "tools/dynamic_modules/bindgen",
     "envoy-dynamic-modules-builtin-extensions 0.1.0": "source/extensions/dynamic_modules/builtin_extensions",
     "envoy-proxy-dynamic-modules-rust-sdk 0.1.0": "source/extensions/dynamic_modules/sdk/rust",
     "test-programs 0.1.0": "test/extensions/dynamic_modules/test_data/rust"

@@ -192,6 +192,21 @@ ContextImpl::ContextImpl(
     }
   }
 
+  // Share parsed certificate material across contexts referencing identical PEM,
+  // so a cluster carrying a distinct certificate per endpoint - or a resend of
+  // such a cluster - parses each distinct certificate only once. Null caches
+  // select the per-context parse.
+  CertChainCache* cert_chain_cache = nullptr;
+  PrivateKeyCache* private_key_cache = nullptr;
+  std::shared_ptr<CertChainCache> cert_chain_cache_holder;
+  std::shared_ptr<PrivateKeyCache> private_key_cache_holder;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cache_parsed_tls_certificates")) {
+    cert_chain_cache_holder = getCertChainCache(factory_context.singletonManager());
+    private_key_cache_holder = getPrivateKeyCache(factory_context.singletonManager());
+    cert_chain_cache = cert_chain_cache_holder.get();
+    private_key_cache = private_key_cache_holder.get();
+  }
+
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
       auto& ctx = tls_contexts_[i];
@@ -201,8 +216,9 @@ ContextImpl::ContextImpl(
         creation_status = ctx.loadPkcs12(tls_certificate.pkcs12(), tls_certificate.pkcs12Path(),
                                          tls_certificate.password(), fips_mode);
       } else {
-        creation_status = ctx.loadCertificateChain(tls_certificate.certificateChain(),
-                                                   tls_certificate.certificateChainPath());
+        creation_status =
+            ctx.loadCertificateChain(tls_certificate.certificateChain(),
+                                     tls_certificate.certificateChainPath(), cert_chain_cache);
       }
       if (!creation_status.ok()) {
         return;
@@ -303,7 +319,7 @@ ContextImpl::ContextImpl(
         // Load private key.
         creation_status =
             ctx.loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
-                               tls_certificate.password(), fips_mode);
+                               tls_certificate.password(), fips_mode, private_key_cache);
         if (!creation_status.ok()) {
           return;
         }
@@ -685,56 +701,64 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) co
   return false;
 }
 
-absl::Status TlsContext::loadCertificateChain(const std::string& data,
-                                              const std::string& data_path) {
+absl::Status
+TlsContext::loadCertificateChain(const std::string& data, const std::string& data_path,
+                                 Extensions::TransportSockets::Tls::CertChainCache* cache) {
   cert_chain_file_path_ = data_path;
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
-  if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
+  auto parse = [&] { return Extensions::TransportSockets::Tls::parseCertChain(data, data_path); };
+  absl::StatusOr<Extensions::TransportSockets::Tls::CertChainSharedPtr> chain_or_error;
+  if (cache != nullptr) {
+    chain_or_error = cache->getOrCreate(data, parse);
+  } else {
+    chain_or_error = parse();
+  }
+  if (!chain_or_error.ok()) {
+    logSslErrorChain();
+    return chain_or_error.status();
+  }
+  shared_cert_chain_ = std::move(*chain_or_error);
+
+  cert_chain_ = bssl::UpRef(shared_cert_chain_->leaf.get());
+  if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
     logSslErrorChain();
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
   }
-  // Read rest of the certificate chain.
-  while (true) {
-    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-    if (cert == nullptr) {
-      break;
-    }
+  for (const bssl::UniquePtr<X509>& intermediate : shared_cert_chain_->intermediates) {
+    bssl::UniquePtr<X509> cert = bssl::UpRef(intermediate.get());
     if (!SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), cert.get())) {
+      logSslErrorChain();
       return absl::InvalidArgumentError(
           absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
     }
     // SSL_CTX_add_extra_chain_cert() takes ownership.
     cert.release();
   }
-  // Check for EOF.
-  const uint32_t err = ERR_peek_last_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-    ERR_clear_error();
-  } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
-  }
   return absl::OkStatus();
 }
 
 absl::Status TlsContext::loadPrivateKey(const std::string& data, const std::string& data_path,
-                                        const std::string& password, bool fips_mode) {
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  bssl::UniquePtr<EVP_PKEY> pkey(
-      PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr,
-                              !password.empty() ? const_cast<char*>(password.c_str()) : nullptr));
+                                        const std::string& password, bool fips_mode,
+                                        Extensions::TransportSockets::Tls::PrivateKeyCache* cache) {
+  auto parse = [&] {
+    return Extensions::TransportSockets::Tls::parsePrivateKey(data, data_path, password, fips_mode);
+  };
+  absl::StatusOr<Extensions::TransportSockets::Tls::PrivateKeySharedPtr> pkey_or_error;
+  // Only unencrypted keys are shared through the cache.
+  if (cache != nullptr && password.empty()) {
+    pkey_or_error = cache->getOrCreate(data, parse);
+  } else {
+    pkey_or_error = parse();
+  }
+  RETURN_IF_NOT_OK_REF(pkey_or_error.status());
+  shared_private_key_ = std::move(*pkey_or_error);
 
-  if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
+  if (!SSL_CTX_use_PrivateKey(ssl_ctx_.get(), shared_private_key_.get())) {
     return absl::InvalidArgumentError(fmt::format(
         "Failed to load private key from {}, Cause: {}", data_path,
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
-
-  return checkPrivateKey(pkey, data_path, fips_mode);
+  return absl::OkStatus();
 }
 
 absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& data_path,
@@ -773,35 +797,7 @@ absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& 
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  return checkPrivateKey(pkey, data_path, fips_mode);
-}
-
-absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
-                                         const std::string& key_path, bool fips_mode) {
-  if (fips_mode) {
-    // Verify that private keys are passing FIPS pairwise consistency tests.
-    switch (EVP_PKEY_id(pkey.get())) {
-    case EVP_PKEY_EC: {
-      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
-      if (!EC_KEY_check_fips(ecdsa_private_key)) {
-        return absl::InvalidArgumentError(
-            fmt::format("Failed to load private key from {}, ECDSA key failed "
-                        "pairwise consistency test required in FIPS mode",
-                        key_path));
-      }
-    } break;
-    case EVP_PKEY_RSA: {
-      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
-      if (!RSA_check_fips(rsa_private_key)) {
-        return absl::InvalidArgumentError(
-            fmt::format("Failed to load private key from {}, RSA key failed "
-                        "pairwise consistency test required in FIPS mode",
-                        key_path));
-      }
-    } break;
-    }
-  }
-  return absl::OkStatus();
+  return Extensions::TransportSockets::Tls::checkPrivateKey(pkey, data_path, fips_mode);
 }
 
 } // namespace Ssl

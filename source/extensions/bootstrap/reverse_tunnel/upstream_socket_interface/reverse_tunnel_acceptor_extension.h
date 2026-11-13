@@ -51,7 +51,7 @@ public:
    * @param extension the upstream extension for stats integration.
    */
   UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
-                            ReverseTunnelAcceptorExtension* extension = nullptr);
+                            ReverseTunnelAcceptorExtension& extension);
 
   /**
    * @return reference to the thread-local dispatcher.
@@ -116,7 +116,7 @@ public:
   /**
    * Called when a worker thread is initialized.
    */
-  void onWorkerThreadInitialized() override {}
+  void onWorkerThreadInitialized() override;
 
   /**
    * @return pointer to the thread-local registry, or nullptr if not available.

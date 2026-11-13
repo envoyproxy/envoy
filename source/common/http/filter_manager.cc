@@ -537,8 +537,8 @@ Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
     return std::make_unique<PerFilterBuffer>(parent_.request_buffer_tracker_);
   }
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
-      [this]() -> void { this->requestDataDrained(); },
-      [this]() -> void { this->requestDataTooLarge(); },
+      [this]() -> void { parent_.requestDataDrained(); },
+      [this]() -> void { parent_.requestDataTooLarge(this); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
@@ -716,15 +716,21 @@ void ActiveStreamDecoderFilter::onDecoderFilterAboveWriteBufferHighWatermark() {
   parent_.filter_manager_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark();
 }
 
-void ActiveStreamDecoderFilter::requestDataTooLarge() {
-  ENVOY_STREAM_LOG(debug, "request data too large watermark exceeded", parent_);
-  if (parent_.state_.decoder_filters_streaming_) {
-    parent_.state_.request_buffer_backpressure_applied_ = true;
-    onDecoderFilterAboveWriteBufferHighWatermark();
+void FilterManager::requestDataTooLarge(ActiveStreamFilterBase* owner) {
+  ENVOY_STREAM_LOG(debug, "request data too large watermark exceeded", *this);
+  if (state_.decoder_filters_streaming_) {
+    state_.request_buffer_backpressure_applied_ = true;
+    filter_manager_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
-    parent_.filter_manager_callbacks_.onRequestDataTooLarge();
-    sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr,
-                   std::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+    filter_manager_callbacks_.onRequestDataTooLarge();
+    if (owner != nullptr) {
+      owner->sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge),
+                            nullptr, std::nullopt,
+                            StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+    } else {
+      sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr,
+                     std::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
+    }
   }
 }
 
@@ -2201,13 +2207,13 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   return state_.create_chain_result_;
 }
 
-void ActiveStreamDecoderFilter::requestDataDrained() {
-  // Only release the backpressure requestDataTooLarge() applied; it sends a 413 instead when the
-  // filters are not streaming, and the buffer may still drop below the low watermark afterwards.
-  if (!std::exchange(parent_.state_.request_buffer_backpressure_applied_, false)) {
-    return;
+void FilterManager::requestDataDrained() {
+  // If this is called it means the call to requestDataTooLarge() was a
+  // streaming call, or a 413 would have been sent. Only release the backpressure if it applied it.
+  if (state_.request_buffer_backpressure_applied_) {
+    state_.request_buffer_backpressure_applied_ = false;
+    filter_manager_callbacks_.onDecoderFilterBelowWriteBufferLowWatermark();
   }
-  onDecoderFilterBelowWriteBufferLowWatermark();
 }
 
 void ActiveStreamDecoderFilter::onDecoderFilterBelowWriteBufferLowWatermark() {
@@ -2312,8 +2318,8 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
     return std::make_unique<PerFilterBuffer>(parent_.response_buffer_tracker_);
   }
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
-      [this]() -> void { this->responseDataDrained(); },
-      [this]() -> void { this->responseDataTooLarge(); },
+      [this]() -> void { parent_.responseDataDrained(); },
+      [this]() -> void { parent_.responseDataTooLarge(nullptr); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
@@ -2452,28 +2458,36 @@ void ActiveStreamEncoderFilter::sendLocalReply(
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-void ActiveStreamEncoderFilter::responseDataTooLarge() {
-  ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", parent_);
-  if (parent_.state_.encoder_filters_streaming_) {
-    parent_.state_.response_buffer_backpressure_applied_ = true;
-    onEncoderFilterAboveWriteBufferHighWatermark();
+void FilterManager::responseDataTooLarge(ActiveStreamFilterBase* owner) {
+  ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", *this);
+  if (state_.encoder_filters_streaming_) {
+    state_.response_buffer_backpressure_applied_ = true;
+    ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", *this);
+    callHighWatermarkCallbacks();
   } else {
-    parent_.filter_manager_callbacks_.onResponseDataTooLarge();
+    filter_manager_callbacks_.onResponseDataTooLarge();
 
     // In this case, sendLocalReply will either send a response directly to the encoder, or
     // reset the stream.
-    parent_.sendLocalReply(
-        Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
-        nullptr, std::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+    if (owner != nullptr) {
+      owner->sendLocalReply(
+          Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
+          nullptr, std::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+    } else {
+      sendLocalReply(Http::Code::InternalServerError,
+                     CodeUtility::toString(Http::Code::InternalServerError), nullptr, std::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+    }
   }
 }
 
-void ActiveStreamEncoderFilter::responseDataDrained() {
-  // Only release the backpressure responseDataTooLarge() applied; see requestDataDrained().
-  if (!std::exchange(parent_.state_.response_buffer_backpressure_applied_, false)) {
-    return;
+void FilterManager::responseDataDrained() {
+  // Only release the backpressure if responseDataTooLarge() applied it.
+  if (state_.response_buffer_backpressure_applied_) {
+    state_.response_buffer_backpressure_applied_ = false;
+    ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", *this);
+    callLowWatermarkCallbacks();
   }
-  onEncoderFilterBelowWriteBufferLowWatermark();
 }
 
 void FilterManager::resetStream(StreamResetReason reason,

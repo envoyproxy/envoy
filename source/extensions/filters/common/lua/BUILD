@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/common:hex_lib",
         "//source/common/protobuf",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 

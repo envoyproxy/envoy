@@ -5113,6 +5113,9 @@ TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormal) {
 }
 
 TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithHeaderDelay) {
+  // The header response is delayed past this timeout; FULL_DUPLEX_STREAMED must not have a
+  // message timer running.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   performStandAloneModeOverrideNormal(ProcessingMode::STREAMED, /*delay_header_response=*/true);
 }
 

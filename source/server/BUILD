@@ -17,6 +17,7 @@ envoy_cc_library(
     tags = ["backtrace"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stderr_writer_lib",
         "//source/common/version:version_lib",
         "@abseil-cpp//absl/debugging:stacktrace",
         "@abseil-cpp//absl/debugging:symbolize",
@@ -422,7 +423,6 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":cgroup_cpu_util_lib",
         ":configuration_lib",
