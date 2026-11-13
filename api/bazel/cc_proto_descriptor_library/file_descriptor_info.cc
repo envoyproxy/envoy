@@ -1,6 +1,5 @@
 #include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 
-#include "absl/strings/escaping.h"
 #include "google/protobuf/descriptor.h"
 #include "net/proto2/proto/descriptor.proto.h"
 
@@ -19,9 +18,7 @@ void loadFileDescriptors(const FileDescriptorInfo& descriptor_info,
   }
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;
-  std::string file_descriptor_bytes;
-  absl::Base64Unescape(descriptor_info.file_descriptor_bytes_base64, &file_descriptor_bytes);
-  file_descriptor_proto.ParseFromString(file_descriptor_bytes);
+  file_descriptor_proto.ParseFromString(descriptor_info.file_descriptor_bytes);
   descriptor_pool->BuildFile(file_descriptor_proto);
 }
 
