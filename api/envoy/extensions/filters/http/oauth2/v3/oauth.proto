@@ -265,7 +265,7 @@ message TokenCookieChunking {
 
 // OAuth config
 //
-// [#next-free-field: 35]
+// [#next-free-field: 37]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -496,6 +496,14 @@ message OAuth2Config {
   // Only used when :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``PRIVATE_KEY_JWT``.
   PrivateKeyJwtConfig private_key_jwt_config = 32;
+
+  // Pushed Authorization Request (PAR) endpoint on the authorization server. Required when
+  // ``use_par`` is true.
+  config.core.v3.HttpUri par_endpoint = 35;
+
+  // If true, the filter first sends the authorization parameters to ``par_endpoint`` (RFC 9126)
+  // and redirects the user with only the returned ``request_uri``. Default is false.
+  bool use_par = 36;
 
   // If set, an access, ID or refresh token cookie that is larger than
   // :ref:`max_cookie_size <envoy_v3_api_field_extensions.filters.http.oauth2.v3.TokenCookieChunking.max_cookie_size>`

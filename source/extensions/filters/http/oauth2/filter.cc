@@ -784,6 +784,7 @@ FilterConfig::FilterConfig(
     std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
     const std::string& stats_prefix, absl::Status& creation_status)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
+      par_endpoint_(proto_config.par_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
       disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),
@@ -886,6 +887,17 @@ FilterConfig::FilterConfig(
     auto formatter_or_error = Formatter::FormatterImpl::create(proto_config.original_request_uri());
     SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
     original_request_uri_formatter_ = std::move(formatter_or_error.value());
+  }
+
+  use_par_ = proto_config.use_par();
+  if (use_par_ && !proto_config.has_par_endpoint()) {
+    creation_status = absl::InvalidArgumentError("use_par requires par_endpoint to be set");
+    return;
+  }
+  if (proto_config.has_par_endpoint() &&
+      !context.clusterManager().hasCluster(par_endpoint_.cluster())) {
+    ENVOY_LOG(warn, "OAuth2 filter: unknown cluster '{}' in par_endpoint.",
+              par_endpoint_.cluster());
   }
 
   if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {
@@ -1531,6 +1543,33 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string path_and_query_params = query_params.replaceQueryString(
       Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()));
   authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
+  if (config_->usePar()) {
+    // Send the authorization parameters to the PAR endpoint. The redirect is sent later from
+    // onPushAuthorizationRequestSuccess(), which uses the cookies stored here.
+    auto client_credential = getClientCredential();
+    if (!client_credential.ok()) {
+      sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                           client_credential.status().message()));
+      return;
+    }
+    OAuth2Client::FormParams par_params;
+    for (const auto& [key, values] : query_params.data()) {
+      for (const auto& value : values) {
+        if (key == "client_id") {
+          // The client adds client_id itself.
+          continue;
+        }
+        // redirect_uri was percent-encoded above for the browser URL; the client encodes form
+        // values, so send the raw value here.
+        par_params.emplace_back(key, key == queryParamsRedirectUri ? redirect_uri : value);
+      }
+    }
+    pending_par_response_headers_ = std::move(response_headers);
+    oauthClient().asyncPushAuthorizationRequest(par_params, config_->clientId(),
+                                                client_credential.value(), config_->authType());
+    return;
+  }
+
   const std::string new_url = authorization_endpoint_url.toString();
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
 
@@ -1834,6 +1873,15 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   // Remove OAuth flow cookies to prevent them from being sent upstream.
   removeOAuthFlowCookies(*request_headers_);
   decoder_callbacks_->continueDecoding();
+}
+
+void OAuth2Filter::onPushAuthorizationRequestSuccess() {
+  // TODO: send the redirect with client_id and request_uri (redirect work is in progress).
+  sendServiceUnavailableResponse("PAR redirect is not implemented yet");
+}
+
+void OAuth2Filter::onPushAuthorizationRequestFailure() {
+  sendUnauthorizedResponse("Failed to push authorization request");
 }
 
 Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
