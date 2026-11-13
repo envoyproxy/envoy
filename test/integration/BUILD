@@ -2148,7 +2148,6 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_dynamic_integration_test",
-    size = "large",
     srcs = [
         "sds_dynamic_integration_test.cc",
     ],
