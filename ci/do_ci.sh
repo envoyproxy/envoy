@@ -133,13 +133,27 @@ function cto_subtask() {
                 --@envoy//bazel:jemalloc=True \
                 "${TEST_TARGETS[@]}"
             ;;
-        cto.wamr|cto.wasmtime)
-            local engine="${subtask#cto.}"
-            echo "Testing with wasm engine=${engine}: ${CTO_WASM_TARGETS[*]}"
+        cto.wamr)
+            echo "Testing with wasm engine=wamr: ${CTO_WASM_TARGETS[*]}"
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
-                --define wasm="${engine}" \
+                --define wasm=wamr \
                 "${CTO_WASM_TARGETS[@]}"
+            ;;
+        cto.wasmtime)
+            # The wasmtime engine is a Rust staticlib, as are the built-in Rust dynamic modules
+            # (hickory DNS) and the static test modules; each bundles its own Rust runtime and they
+            # cannot be linked into one binary. Nothing outside this target links wasmtime, so those
+            # modules are left out of it rather than reworking how Rust is linked (main does the
+            # latter, #48473).
+            echo "Testing with wasm engine=wasmtime: ${CTO_WASM_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
+                --define wasm=wasmtime \
+                --@envoy//source/extensions/network/dns_resolver/hickory:enabled=false \
+                -- \
+                "${CTO_WASM_TARGETS[@]}" \
+                -@envoy//test/extensions/dynamic_modules/http:integration_test
             ;;
         cto.gperftools)
             echo "Testing with gperftools: ${CTO_ALLOCATOR_TEST_TARGETS[*]}"
@@ -716,9 +730,7 @@ case $CI_TARGET in
         fi
         case "$CI_TARGET" in
             compile_time_options|cto|cto.all)
-                # TODO(phlax): add `cto.wasmtime` back once the wasmtime tests are re-enabled on this branch.
-                # for subtask in cto.asserts cto.gperftools cto.jemalloc cto.noadmin cto.nolog cto.wamr cto.wasmtime; do
-                for subtask in cto.asserts cto.gperftools cto.jemalloc cto.noadmin cto.nolog cto.wamr; do
+                for subtask in cto.asserts cto.gperftools cto.jemalloc cto.noadmin cto.nolog cto.wamr cto.wasmtime; do
                     cto_subtask "$subtask"
                 done
                 ;;
