@@ -4,6 +4,7 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
@@ -19,6 +20,7 @@
 #include "source/extensions/transport_sockets/alts/tsi_handshaker.h"
 #include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
+#include "test/extensions/transport_sockets/alts/fake_async_handshaker.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
@@ -57,6 +59,7 @@ using ::grpc::gcp::HandshakerResp;
 using ::grpc::gcp::HandshakerResult;
 using ::grpc::gcp::HandshakerService;
 using ::testing::_;
+using ::testing::AtLeast;
 using ::testing::NotNull;
 using ::testing::Return;
 using ::testing::ReturnRefOfCopy;
@@ -81,6 +84,15 @@ void populateHandshakeResult(HandshakerResult* result) {
   result->set_application_protocol(ApplicationProtocol);
   result->set_record_protocol(RecordProtocol);
   result->set_key_data(KeyData);
+}
+
+// The handshaker service's response to the server's request with the ClientFinished: the handshake
+// is complete, and any bytes after the ClientFinished are unused.
+HandshakerResp clientFinishedResponse() {
+  HandshakerResp response;
+  response.set_bytes_consumed(ClientFinished.size());
+  populateHandshakeResult(response.mutable_result());
+  return response;
 }
 
 class FakeHandshakerService final : public HandshakerService::Service {
@@ -361,6 +373,60 @@ protected:
     EXPECT_EQ(server_.read_buffer_.toString(), data);
   }
 
+  // Makes the server's handshaker asynchronous. It talks to the handshaker service through
+  // async_handshaker_client_, and the test delivers the handshaker service's responses.
+  void useAsyncServerHandshaker() {
+    server_.handshaker_factory_ =
+        [handshaker_client = async_handshaker_client_](
+            Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr&,
+            const Network::Address::InstanceConstSharedPtr&, absl::string_view) {
+          return std::make_unique<TsiHandshaker>(
+              AltsTsiHandshaker::createAsyncForServer(handshaker_client), dispatcher);
+        };
+  }
+
+  // Runs a handshake with an asynchronous server handshaker until the client has written its
+  // ClientFinished, which completes the client's side of the handshake.
+  void doAsyncHandshakeUntilClientFinished() {
+    // On the client side, get the ClientInit and write it to the server.
+    EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+    client_.tsi_socket_->onConnected();
+    EXPECT_EQ(client_to_server_.toString(), ClientInit);
+
+    // On the server side, read the ClientInit. The ServerInit and the ServerFinished are written
+    // once the handshaker service responds.
+    EXPECT_CALL(*server_.raw_socket_, doRead(_));
+    expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                   server_.tsi_socket_->doRead(server_.read_buffer_), "While reading ClientInit.");
+    EXPECT_EQ(server_to_client_.length(), 0);
+    ASSERT_EQ(async_handshaker_client_->streams().size(), 1);
+    HandshakerResp server_start_response;
+    server_start_response.set_out_frames(absl::StrCat(ServerInit, ServerFinished));
+    server_start_response.set_bytes_consumed(ClientInit.size());
+    EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+    EXPECT_TRUE(async_handshaker_client_->lastStream().deliverResponse(server_start_response));
+    EXPECT_EQ(server_to_client_.toString(), absl::StrCat(ServerInit, ServerFinished));
+
+    // On the client side, read the ServerInit and the ServerFinished, and write the
+    // ClientFinished.
+    EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(2);
+    EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+    EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+    expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                   client_.tsi_socket_->doRead(client_.read_buffer_),
+                   "While reading ServerInit and ServerFinished.");
+    EXPECT_EQ(client_to_server_.toString(), ClientFinished);
+  }
+
+  // The client writes application data to the server.
+  void clientWrite(absl::string_view data) {
+    EXPECT_CALL(*client_.raw_socket_, doWrite(_, false)).Times(AtLeast(1));
+    client_.write_buffer_.add(data);
+    expectIoResult({Network::PostIoAction::KeepOpen, data.size(), false},
+                   client_.tsi_socket_->doWrite(client_.write_buffer_, false),
+                   "While the client is writing application data.");
+  }
+
   struct SocketForTest {
     HandshakerFactory handshaker_factory_;
     std::unique_ptr<TsiSocket> tsi_socket_;
@@ -379,6 +445,8 @@ protected:
   Buffer::OwnedImpl server_to_client_;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
+  std::shared_ptr<FakeAsyncHandshakerClient> async_handshaker_client_ =
+      std::make_shared<FakeAsyncHandshakerClient>();
 
   std::string handshaker_server_address_;
   std::unique_ptr<grpc::Server> handshaker_server_;
@@ -753,6 +821,245 @@ TEST_P(TsiSocketTest, HandshakeSuccessWithUnusedDataAndShortWrite) {
   expectIoResult(server_.tsi_socket_->doRead(server_.read_buffer_),
                  {Envoy::Network::PostIoAction::KeepOpen, ApplicationData.size(), false},
                  "While reading ClientFinished.");
+  EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
+}
+
+// The client's end of stream arrives together with its ClientFinished. The server's handshake
+// result is posted, so it is processed after doRead() returns; the server then asks to be read
+// again and reports the end of stream.
+TEST_P(TsiSocketTest, HandshakeWithEndOfStreamAfterClientFinished) {
+  startFakeHandshakerService();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+
+  // On the client side, get the ClientInit and write it to the server.
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  client_.tsi_socket_->onConnected();
+  EXPECT_EQ(client_to_server_.toString(), ClientInit);
+
+  // On the server side, read the ClientInit and write the ServerInit and the ServerFinished to the
+  // client.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_), "While reading ClientInit.");
+  EXPECT_EQ(server_to_client_.toString(), absl::StrCat(ServerInit, ServerFinished));
+
+  // On the client side, read the ServerInit and the ServerFinished, and write the ClientFinished.
+  EXPECT_CALL(*client_.raw_socket_, doRead(_)).Times(2);
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_),
+                 "While reading ServerInit and ServerFinished.");
+  EXPECT_EQ(client_to_server_.toString(), ClientFinished);
+
+  // From now on, posted callbacks run when the test runs them, as they would after doRead()
+  // returns on a real dispatcher.
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher_, post(_)).WillByDefault([&posted](Event::PostCb callback) {
+    posted.push_back(std::move(callback));
+  });
+
+  // On the server side, read the ClientFinished together with the end of stream.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
+    buffer.move(client_to_server_);
+    return result;
+  });
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading ClientFinished and the end of stream.");
+
+  // The server processes the handshake result. It asks to be read again, and reports the end of
+  // stream without reading any more.
+  ASSERT_EQ(posted.size(), 1);
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  posted[0]();
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reporting the end of stream.");
+}
+
+// While an asynchronous handshaker waits for the handshaker service, the server keeps reading from
+// the network. The application data that arrives then is kept, after the data that came with the
+// ClientFinished, which the handshake leaves unused.
+TEST_P(TsiSocketTest, AsyncHandshakeWithDataReceivedWhileWaiting) {
+  constexpr absl::string_view FirstData = "first";
+  constexpr absl::string_view SecondData = "second";
+  startFakeHandshakerService();
+  useAsyncServerHandshaker();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  ASSERT_NO_FATAL_FAILURE(doAsyncHandshakeUntilClientFinished());
+  FakeAsyncHandshakerStream& stream = async_handshaker_client_->lastStream();
+
+  // The server reads the ClientFinished together with the first application data, and waits for
+  // the handshaker service.
+  clientWrite(FirstData);
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading ClientFinished.");
+  ASSERT_EQ(stream.requests().size(), 2);
+  EXPECT_TRUE(absl::StartsWith(stream.requests()[1].next().in_bytes(), ClientFinished));
+  EXPECT_EQ(stream.requests()[1].next().in_bytes().size(),
+            ClientFinished.size() + AltsFrameOverhead + FirstData.size());
+
+  // The second application data arrives while the server waits.
+  clientWrite(SecondData);
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading the second application data.");
+
+  // The handshaker service completes the handshake, which leaves the first application data
+  // unused. The server asks to be read again.
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  EXPECT_TRUE(stream.deliverResponse(clientFinishedResponse()));
+
+  // The server reads both application data, in the order they were sent.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, FirstData.size() + SecondData.size(), false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading application data.");
+  EXPECT_EQ(server_.read_buffer_.toString(), absl::StrCat(FirstData, SecondData));
+}
+
+// While the server waits for the handshaker service, it stops reading once default_max_frame_size_
+// bytes are buffered. It reads the rest once the handshake completes.
+TEST_P(TsiSocketTest, AsyncHandshakeStopsReadingWhileWaitingWithFullBuffer) {
+  const std::string large_data(20 * 1024, 'a');
+  startFakeHandshakerService();
+  useAsyncServerHandshaker();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  ASSERT_NO_FATAL_FAILURE(doAsyncHandshakeUntilClientFinished());
+  FakeAsyncHandshakerStream& stream = async_handshaker_client_->lastStream();
+
+  // The server reads the ClientFinished and waits for the handshaker service.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading ClientFinished.");
+
+  // The server reads more than default_max_frame_size_ bytes of application data, and then stops
+  // reading.
+  clientWrite(large_data);
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading the large application data.");
+  clientWrite(ApplicationData);
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While the read buffer is full.");
+
+  // The handshaker service completes the handshake. The server asks to be read again, and reads
+  // all the application data, in order.
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  EXPECT_TRUE(stream.deliverResponse(clientFinishedResponse()));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(2);
+  expectIoResult(
+      {Network::PostIoAction::KeepOpen, large_data.size() + ApplicationData.size(), false},
+      server_.tsi_socket_->doRead(server_.read_buffer_), "While reading application data.");
+  EXPECT_EQ(server_.read_buffer_.toString(), absl::StrCat(large_data, ApplicationData));
+}
+
+// The client's end of stream arrives together with its ClientFinished. Once the handshaker service
+// completes the handshake, the server reports the end of stream.
+TEST_P(TsiSocketTest, AsyncHandshakeWithEndOfStreamAfterClientFinished) {
+  startFakeHandshakerService();
+  useAsyncServerHandshaker();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  ASSERT_NO_FATAL_FAILURE(doAsyncHandshakeUntilClientFinished());
+  FakeAsyncHandshakerStream& stream = async_handshaker_client_->lastStream();
+
+  // The server reads the ClientFinished and the end of stream, and waits for the handshaker
+  // service.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
+    buffer.move(client_to_server_);
+    return result;
+  });
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading ClientFinished and the end of stream.");
+
+  // The handshaker service completes the handshake. The server asks to be read again, and reports
+  // the end of stream without reading any more.
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  EXPECT_TRUE(stream.deliverResponse(clientFinishedResponse()));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reporting the end of stream.");
+}
+
+// Without half-close, an end of stream that arrives while the server waits for the handshaker
+// service closes the connection right away, which cancels the call to the handshaker service.
+TEST_P(TsiSocketTest, AsyncHandshakeEndOfStreamWhileWaitingCloses) {
+  startFakeHandshakerService();
+  useAsyncServerHandshaker();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  ASSERT_NO_FATAL_FAILURE(doAsyncHandshakeUntilClientFinished());
+  FakeAsyncHandshakerStream& stream = async_handshaker_client_->lastStream();
+
+  // The server reads the ClientFinished and waits for the handshaker service.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading ClientFinished.");
+
+  // The end of stream arrives on its own.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, true}));
+  expectIoResult({Network::PostIoAction::Close, 0UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading the end of stream.");
+  server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
+  EXPECT_TRUE(stream.closed());
+  EXPECT_TRUE(stream.waitingForRemoteClose());
+}
+
+// With half-close, the client may close its side while the server still waits for the handshaker
+// service. The server keeps the connection, and once the handshake completes, it reports the
+// client's application data and then the end of stream.
+TEST_P(TsiSocketTest, AsyncHandshakeEndOfStreamWhileWaitingWithHalfClose) {
+  startFakeHandshakerService();
+  useAsyncServerHandshaker();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  ON_CALL(server_.callbacks_.connection_, isHalfCloseEnabled()).WillByDefault(Return(true));
+  ASSERT_NO_FATAL_FAILURE(doAsyncHandshakeUntilClientFinished());
+  FakeAsyncHandshakerStream& stream = async_handshaker_client_->lastStream();
+
+  // The server reads the ClientFinished together with the application data, and waits for the
+  // handshaker service.
+  clientWrite(ApplicationData);
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading ClientFinished.");
+
+  // The end of stream arrives on its own, and the server keeps the connection.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_))
+      .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, true}));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading the end of stream.");
+
+  // The handshaker service completes the handshake. The server asks to be read again, and reports
+  // the application data and the end of stream.
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  EXPECT_TRUE(stream.deliverResponse(clientFinishedResponse()));
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, ApplicationData.size(), true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading application data.");
   EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
 }
 

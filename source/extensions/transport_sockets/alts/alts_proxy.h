@@ -4,6 +4,8 @@
 #include <memory>
 
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "grpcpp/channel.h"
 #include "grpcpp/client_context.h"
@@ -25,13 +27,18 @@ constexpr std::size_t MaxMinorRpcVersion = 1;
 constexpr std::size_t MinMajorRpcVersion = 2;
 constexpr std::size_t MinMinorRpcVersion = 1;
 
+// The deadline of a stream to the ALTS handshaker service, i.e. of one ALTS
+// handshake.
+// TODO(matthewstevenson88): Make this deadline configurable.
+constexpr absl::Duration AltsClientContextDeadline = absl::Seconds(30);
+
 // Manages a bidirectional stream to the ALTS handshaker service. An AltsProxy
 // instance is tied to a single ALTS handshake and must not be reused.
 //
 // WARNING: Several methods block the worker thread performing the ALTS
 // handshake to make a gRPC call to the ALTS handshaker service. This can slow
 // down or halt the proxy if the ALTS handshaker service is unavailable or
-// experiencing high latency.
+// experiencing high latency. AltsAsyncProxy does the same without blocking.
 class AltsProxy {
 public:
   static absl::StatusOr<std::unique_ptr<AltsProxy>>
@@ -68,6 +75,17 @@ public:
   // latency.
   absl::StatusOr<grpc::gcp::HandshakerResp>
   sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
+
+  // Build the requests sent to the ALTS handshaker service. Shared with
+  // AltsAsyncProxy.
+  static grpc::gcp::HandshakerReq makeStartClientHandshakeReq(absl::string_view target_name);
+  static grpc::gcp::HandshakerReq makeStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes);
+  static grpc::gcp::HandshakerReq makeNextHandshakeReq(absl::Span<const uint8_t> in_bytes);
+
+  // Returns the response, or the error status it carries if the ALTS handshaker
+  // service reported an error. Shared with AltsAsyncProxy.
+  static absl::StatusOr<grpc::gcp::HandshakerResp>
+  checkResponse(grpc::gcp::HandshakerResp response);
 
 private:
   static void setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions);

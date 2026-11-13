@@ -3,6 +3,7 @@
 #include <thread>
 #include <utility>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -10,6 +11,7 @@
 #include "source/extensions/transport_sockets/alts/alts_tsi_handshaker.h"
 #include "source/extensions/transport_sockets/alts/tsi_handshaker.h"
 
+#include "test/extensions/transport_sockets/alts/fake_async_handshaker.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -343,6 +345,90 @@ TEST_P(AltsTsiHandshakerTest, ServerSideError) {
     EXPECT_EQ(result->to_send_->toString(), "");
     EXPECT_THAT(result->result_, IsNull());
   }
+}
+
+// Tests of a TsiHandshaker whose handshaker talks to the handshaker service
+// asynchronously. The fake handshaker service only responds when the test
+// delivers the response.
+class TsiHandshakerAsyncTest : public testing::Test {
+protected:
+  TsiHandshakerAsyncTest()
+      : tsi_handshaker_(std::make_unique<TsiHandshaker>(
+            AltsTsiHandshaker::createAsyncForServer(client_), dispatcher_)) {
+    tsi_handshaker_->setHandshakerCallbacks(capturing_callbacks_);
+  }
+
+  // Starts the handshake: next() with the peer's ClientInit.
+  void startHandshake() {
+    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    Buffer::OwnedImpl received_bytes(FakeHandshake::ClientInit);
+    EXPECT_OK(tsi_handshaker_->next(received_bytes));
+    EXPECT_EQ(received_bytes.length(), 0);
+    testing::Mock::VerifyAndClearExpectations(&dispatcher_);
+  }
+
+  std::shared_ptr<FakeAsyncHandshakerClient> client_ =
+      std::make_shared<FakeAsyncHandshakerClient>();
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  CapturingTsiHandshakerCallbacks capturing_callbacks_;
+  std::unique_ptr<TsiHandshaker> tsi_handshaker_;
+};
+
+TEST_F(TsiHandshakerAsyncTest, ResultIsPostedWhenHandshakerServiceResponds) {
+  // next() returns without posting anything: the handshaker service has not
+  // responded yet.
+  startHandshake();
+
+  // The result is posted once the response arrives, and handed to the
+  // callbacks when the posted callback runs.
+  Event::PostCb posted;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&posted](Event::PostCb cb) {
+    posted = std::move(cb);
+  });
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  ASSERT_TRUE(posted);
+  posted();
+  auto result = capturing_callbacks_.getNextResult();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_OK(result->status_);
+  EXPECT_EQ(result->to_send_->toString(), FakeHandshake::ServerInitAndFinished);
+  EXPECT_THAT(result->result_, IsNull());
+}
+
+TEST_F(TsiHandshakerAsyncTest, DeferredDeleteCancelsCallWaitingForHandshakerService) {
+  startHandshake();
+  FakeAsyncHandshakerStream& stream = client_->lastStream();
+
+  // The connection closes before the handshaker service responds. The call is
+  // cancelled and the handshaker is deleted without waiting for the response.
+  EXPECT_CALL(dispatcher_, post(_)).Times(0);
+  tsi_handshaker_.release()->deferredDelete();
+  EXPECT_EQ(dispatcher_.to_delete_.size(), 1);
+  EXPECT_TRUE(stream.closed());
+  EXPECT_TRUE(stream.waitingForRemoteClose());
+  EXPECT_FALSE(stream.deliverResponse());
+  dispatcher_.to_delete_.clear();
+  EXPECT_THAT(capturing_callbacks_.getNextResult(), IsNull());
+}
+
+TEST_F(TsiHandshakerAsyncTest, DeferredDeleteAfterResultIsPostedWaitsForIt) {
+  startHandshake();
+
+  Event::PostCb posted;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&posted](Event::PostCb cb) {
+    posted = std::move(cb);
+  });
+  EXPECT_TRUE(client_->lastStream().deliverResponse());
+  ASSERT_TRUE(posted);
+
+  // The connection closes after the result was posted. The handshaker is
+  // deleted once the posted callback has run, and the result is dropped.
+  tsi_handshaker_.release()->deferredDelete();
+  EXPECT_TRUE(dispatcher_.to_delete_.empty());
+  posted();
+  EXPECT_EQ(dispatcher_.to_delete_.size(), 1);
+  dispatcher_.to_delete_.clear();
+  EXPECT_THAT(capturing_callbacks_.getNextResult(), IsNull());
 }
 
 } // namespace
