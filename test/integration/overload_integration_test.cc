@@ -406,9 +406,18 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   test_server_->waitForGauge("overload.envoy.overload_actions.close_idle_http_connections.active",
                              Eq(1));
 
-  // 3. Advance time past the 10s saturated min_time_before_termination_allowed
-  // and trigger the check_idle_connection_timer (which runs every 100ms).
-  timeSystem().advanceTimeWait(std::chrono::seconds(10));
+  // 3. Wait past the 10s saturated min_time_before_termination_allowed for the
+  // worker's idle connection timer (which runs every 100ms) to close the idle
+  // QUIC session. Pass dispatcher_ so the client's 25ms delayed-ACK timer can
+  // fire and ACK the response FIN, closing the QUIC stream on the server and
+  // adding the session back to the idle list.
+  const std::string close_idle_counter_name =
+      version_ == Network::Address::IpVersion::v4
+          ? "listener.127.0.0.1_0.downstream_cx_overload_close_idle"
+          : "listener.[__1]_0.downstream_cx_overload_close_idle";
+  test_server_->waitForCounter(close_idle_counter_name, Eq(1),
+                               std::chrono::milliseconds(15000) * TIMEOUT_FACTOR,
+                               dispatcher_.get());
 
   // 4. Wait for the connection to be closed by the server.
   ASSERT_TRUE(codec_client_->waitForDisconnect());

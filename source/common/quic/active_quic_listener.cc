@@ -101,7 +101,8 @@ ActiveQuicListener::ActiveQuicListener(
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
       *connection_id_generator_, debug_visitor_factory,
-      enable_session_idle_list ? std::make_unique<Http::SessionIdleList>(dispatcher) : nullptr);
+      enable_session_idle_list ? std::make_unique<Http::SessionIdleList>(dispatcher, stats_)
+                               : nullptr);
 
   absl::AnyInvocable<void()> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
