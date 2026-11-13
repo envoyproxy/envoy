@@ -662,6 +662,7 @@ envoy_extension_cc_test(
         "skip_on_windows",
     ],
     deps = [
+        ":ext_proc_integration_common_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",

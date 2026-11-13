@@ -400,9 +400,7 @@ void AsyncStreamImpl::cleanup() {
     options_.sidestream_watermark_callbacks = nullptr;
   }
 
-  // Do not reset if the stream is being cleaning up after server has half-closed. The stream may
-  // also be null if it was never successfully started.
-  if (!http_reset_ && !waiting_to_delete_on_remote_close_) {
+  if (!http_reset_) {
     http_reset_ = true;
     if (stream_ != nullptr) {
       stream_->reset();

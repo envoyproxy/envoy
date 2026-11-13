@@ -8,6 +8,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -823,6 +824,49 @@ TEST_F(WaitForRemoteCloseTest, StreamSurvivesCallbacksDestroyedAfterWaitForRemot
 
   // Must be a no-op rather than a use-after-free.
   deliverServerEvents(http_callbacks);
+}
+
+TEST_F(EnvoyAsyncClientImplTest, ClientDestroyedWhileWaitingForGracefulClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+  RawAsyncClientPtr grpc_client_impl = *AsyncClientImpl::create(config, context_);
+  auto grpc_client_ptr =
+      std::make_unique<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
+          std::move(grpc_client_impl));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  {
+    NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+    auto grpc_stream = grpc_client_ptr->start(*method_descriptor_, grpc_callbacks,
+                                              Http::AsyncClient::StreamOptions());
+
+    grpc_stream.waitForRemoteCloseAndDelete();
+    // At this point both the stream and callback are deleted.
+  }
+
+  EXPECT_CALL(http_stream, reset());
+  // Simulate the AsyncGrpcClient deletion. This can happen if the it is getting evicted from a
+  // its cache in the cluster manager.
+  // Expect that the stream is reset even if the stream is waiting for a graceful close.
+  // Resetting the stream prevents any events from the sidestream server, possibly calling
+  // deleted callbacks.
+  grpc_client_ptr.reset();
 }
 
 } // namespace
