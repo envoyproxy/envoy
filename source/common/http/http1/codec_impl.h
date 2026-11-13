@@ -96,7 +96,8 @@ public:
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, std::optional<uint64_t> status,
-                         bool end_stream, bool bodiless_request);
+                         bool end_stream, bool bodiless_request,
+                         absl::string_view generated_websocket_key);
   void encodeTrailersBase(const HeaderMap& headers);
 
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
@@ -197,6 +198,7 @@ public:
   bool upgradeRequest() const { return upgrade_request_; }
   bool headRequest() const { return head_request_; }
   bool connectRequest() const { return connect_request_; }
+  absl::string_view generatedWebsocketKey() const { return generated_websocket_key_; }
 
   // Http::RequestEncoder
   Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
@@ -206,6 +208,7 @@ public:
 private:
   bool upgrade_request_{};
   bool head_request_{};
+  std::string generated_websocket_key_;
 };
 
 /**
