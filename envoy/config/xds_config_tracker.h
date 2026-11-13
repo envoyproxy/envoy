@@ -35,6 +35,11 @@ public:
   virtual ~XdsConfigTracker() = default;
 
   /**
+   * Returns whether xDS notifications are needed. May change between updates.
+   */
+  virtual bool enabled() const { return true; }
+
+  /**
    * Invoked when SotW xDS configuration updates have been successfully parsed, applied on
    * the Envoy instance, and are about to be ACK'ed.
    *

@@ -119,6 +119,7 @@ envoy_extension_cc_dyn_module_test(
         "link": "linux_x64_small",
     },
     deps = [
+        "//source/common/config:xds_manager_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
@@ -219,6 +220,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_writer_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_xds_test",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
@@ -230,6 +232,7 @@ envoy_extension_cc_dyn_module_test(
     },
     deps = [
         "//source/common/common:base64_lib",
+        "//source/common/config:resource_name_lib",
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",

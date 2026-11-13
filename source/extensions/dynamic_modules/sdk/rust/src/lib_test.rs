@@ -15703,3 +15703,116 @@ fn noop_scheduler_as_boxed_trait_object() {
   cluster::EnvoyClusterScheduler::commit(&NoopScheduler, 2);
   stats_sink::EnvoyStatSinkConfigScheduler::commit(&NoopScheduler, 3);
 }
+
+mod xds_tests {
+  use crate::abi;
+  use crate::bootstrap::*;
+  use std::sync::{Arc, Mutex};
+
+  #[derive(Default)]
+  struct TestHost {
+    enabled: bool,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    enabled: bool,
+  ) -> bool {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    host.enabled = enabled;
+    true
+  }
+
+  #[test]
+  fn notification_opt_in_crosses_abi() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    assert!(envoy.set_xds_notifications(true));
+    assert!(host.enabled);
+    assert!(envoy.set_xds_notifications(false));
+    assert!(!host.enabled);
+  }
+
+  #[test]
+  fn xds_hook_forwards_outcomes_and_rejects_invalid_utf8() {
+    struct Observer(Arc<Mutex<Vec<(String, XdsUpdateStatus, String)>>>);
+    impl BootstrapExtensionConfig for Observer {
+      fn new_bootstrap_extension(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtension,
+      ) -> Box<dyn BootstrapExtension> {
+        panic!("not used by the xDS hook test")
+      }
+      fn on_xds_update(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtensionConfig,
+        type_url: &str,
+        status: XdsUpdateStatus,
+        error_details: &str,
+      ) {
+        self
+          .0
+          .lock()
+          .unwrap()
+          .push((type_url.to_owned(), status, error_details.to_owned()));
+      }
+    }
+    let observed = Arc::new(Mutex::new(Vec::new()));
+    let config: Box<dyn BootstrapExtensionConfig> = Box::new(Observer(Arc::clone(&observed)));
+    let config_ptr = std::ptr::from_ref(&config).cast();
+    for (status, error_details) in [
+      (XdsUpdateStatus::Accepted, b"".as_slice()),
+      (XdsUpdateStatus::Rejected, b"rejected".as_slice()),
+      (XdsUpdateStatus::Rejected, b"".as_slice()),
+      (XdsUpdateStatus::Rejected, b"\xff".as_slice()),
+      (XdsUpdateStatus::Unsubscribed, b"".as_slice()),
+    ] {
+      // the live boxed trait object and URL outlive the synchronous hook
+      unsafe {
+        envoy_dynamic_module_on_bootstrap_extension_xds_update(
+          std::ptr::null_mut(),
+          config_ptr,
+          abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: b"type".as_ptr().cast(),
+            length: 4,
+          },
+          status,
+          abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: if error_details.is_empty() {
+              std::ptr::null()
+            } else {
+              error_details.as_ptr().cast()
+            },
+            length: error_details.len(),
+          },
+        );
+      }
+    }
+    unsafe {
+      envoy_dynamic_module_on_bootstrap_extension_xds_update(
+        std::ptr::null_mut(),
+        config_ptr,
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: b"\xff".as_ptr().cast(),
+          length: 1,
+        },
+        XdsUpdateStatus::Accepted,
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: std::ptr::null(),
+          length: 0,
+        },
+      );
+    }
+    assert_eq!(
+      *observed.lock().unwrap(),
+      [
+        ("type".into(), XdsUpdateStatus::Accepted, "".into()),
+        ("type".into(), XdsUpdateStatus::Rejected, "rejected".into()),
+        ("type".into(), XdsUpdateStatus::Rejected, "".into()),
+        ("type".into(), XdsUpdateStatus::Rejected, "\u{fffd}".into()),
+        ("type".into(), XdsUpdateStatus::Unsubscribed, "".into()),
+      ]
+    );
+  }
+}

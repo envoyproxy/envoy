@@ -155,12 +155,14 @@ absl::Status XdsManagerImpl::initialize(const envoy::config::bootstrap::v3::Boot
     xds_config_tracker_ = tracker_factory.createXdsConfigTracker(
         bootstrap.xds_config_tracker_extension().typed_config(),
         validation_context_.dynamicValidationVisitor(), api_, main_thread_dispatcher_);
+    if (xds_config_tracker_ != nullptr) {
+      xds_config_tracker_handle_ = addXdsConfigTracker(*xds_config_tracker_);
+    }
   }
 
   OptRef<XdsResourcesDelegate> xds_resources_delegate =
       makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
-  OptRef<XdsConfigTracker> xds_config_tracker =
-      makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
+  OptRef<XdsConfigTracker> xds_config_tracker{xds_config_trackers_};
 
   subscription_factory_ = std::make_unique<SubscriptionFactoryImpl>(
       local_info_, main_thread_dispatcher_, *cm_, validation_context_.dynamicValidationVisitor(),
@@ -207,8 +209,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
     RETURN_IF_NOT_OK_REF(strategy_or_error.status());
     JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
-    OptRef<XdsConfigTracker> xds_config_tracker =
-        makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
+    OptRef<XdsConfigTracker> xds_config_tracker{xds_config_trackers_};
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
@@ -457,8 +458,7 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
   RETURN_IF_NOT_OK_REF(strategy_or_error.status());
   JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
-  OptRef<XdsConfigTracker> xds_config_tracker =
-      makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
+  OptRef<XdsConfigTracker> xds_config_tracker{xds_config_trackers_};
 
   GrpcMuxSharedPtr authority_mux = nullptr;
   if (api_config_source.api_type() ==
@@ -615,6 +615,66 @@ XdsManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ad
                                      *stats_.rootScope(), std::move(backoff_strategy), ads_config,
                                      lrs_factory);
   return status;
+}
+
+class XdsConfigTrackers::Registration : public Common::CallbackHandle {
+public:
+  Registration(const std::shared_ptr<Trackers>& trackers, XdsConfigTracker& tracker)
+      : trackers_(trackers), it_(trackers_->insert(trackers_->end(), tracker)) {}
+  ~Registration() override { trackers_->erase(it_); }
+
+private:
+  const std::shared_ptr<Trackers> trackers_;
+  const Trackers::iterator it_;
+};
+
+Common::CallbackHandlePtr XdsConfigTrackers::add(XdsConfigTracker& tracker) {
+  return std::make_unique<Registration>(trackers_, tracker);
+}
+
+bool XdsConfigTrackers::enabled() const {
+  return std::any_of(trackers_->begin(), trackers_->end(),
+                     [](const auto& tracker) { return tracker.get().enabled(); });
+}
+
+void XdsConfigTrackers::forEach(absl::FunctionRef<void(XdsConfigTracker&)> callback) {
+  for (auto it = trackers_->begin(); it != trackers_->end();) {
+    auto& tracker = (it++)->get();
+    if (tracker.enabled()) {
+      callback(tracker);
+    }
+  }
+}
+
+void XdsConfigTrackers::onConfigAccepted(absl::string_view type_url,
+                                         const std::vector<DecodedResourcePtr>& resources) {
+  forEach([&](XdsConfigTracker& tracker) { tracker.onConfigAccepted(type_url, resources); });
+}
+
+void XdsConfigTrackers::onConfigAccepted(
+    absl::string_view type_url,
+    absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+  forEach([&](XdsConfigTracker& tracker) {
+    tracker.onConfigAccepted(type_url, added_resources, removed_resources);
+  });
+}
+
+void XdsConfigTrackers::onConfigRejected(
+    const envoy::service::discovery::v3::DiscoveryResponse& message,
+    absl::string_view error_detail) {
+  forEach([&](XdsConfigTracker& tracker) { tracker.onConfigRejected(message, error_detail); });
+}
+
+void XdsConfigTrackers::onConfigRejected(
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+    absl::string_view error_detail) {
+  forEach([&](XdsConfigTracker& tracker) { tracker.onConfigRejected(message, error_detail); });
+}
+
+void XdsConfigTrackers::onResourceUnsubscribed(absl::string_view type_url,
+                                               absl::string_view resource) {
+  forEach([&](XdsConfigTracker& tracker) { tracker.onResourceUnsubscribed(type_url, resource); });
 }
 
 } // namespace Config

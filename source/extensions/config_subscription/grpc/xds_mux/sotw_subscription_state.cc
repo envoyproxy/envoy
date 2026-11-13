@@ -79,7 +79,7 @@ void SotwSubscriptionState::handleGoodResponse(
   last_good_nonce_ = message.nonce();
 
   // Processing point when resources are successfully ingested.
-  if (xds_config_tracker_.has_value()) {
+  if (xds_config_tracker_.has_value() && xds_config_tracker_->enabled()) {
     xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources);
   }
 

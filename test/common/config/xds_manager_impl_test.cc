@@ -1,3 +1,5 @@
+#include <array>
+
 #include "envoy/config/config_validator.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/registry/registry.h"
@@ -124,6 +126,23 @@ public:
     ASSERT_OK(xds_manager_impl_.initialize(server_.bootstrap_, &cm_));
   }
 
+  void initializeWithTracker() {
+    auto* ads_config = server_.bootstrap_.mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    ads_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("ads_cluster");
+    NiceMock<MockGrpcMuxFactory> mux_factory;
+    Registry::InjectFactory<Config::MuxFactory> registration(mux_factory);
+    EXPECT_CALL(mux_factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+        .WillOnce(testing::WithArg<9>([this](XdsConfigTrackerOptRef tracker) {
+          tracker_ = tracker;
+          return std::make_shared<NiceMock<MockGrpcMux>>();
+        }));
+    initialize();
+    ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+    ASSERT_TRUE(tracker_.has_value());
+  }
+
+  XdsConfigTrackerOptRef tracker_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
@@ -139,6 +158,127 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(XdsManagerImplTest, XdsManagerImplTest,
                          ::testing::ValuesIn({false, true}));
+
+class ObservingTrackerFactory : public MockXdsConfigTrackerFactory {
+public:
+  XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
+                                             ProtobufMessage::ValidationVisitor&, Api::Api&,
+                                             Event::Dispatcher&) override {
+    auto tracker = std::make_unique<testing::StrictMock<MockXdsConfigTracker>>();
+    tracker_ = tracker.get();
+    return tracker;
+  }
+  MockXdsConfigTracker* tracker_ = nullptr;
+};
+
+TEST_P(XdsManagerImplTest, ConfigTrackersPreserveNativeTrackerAndUnregister) {
+  ObservingTrackerFactory factory;
+  Registry::InjectFactory<XdsConfigTrackerFactory> registration(factory);
+  auto* tracker_config = server_.bootstrap_.mutable_xds_config_tracker_extension();
+  tracker_config->set_name(factory.name());
+  ASSERT_TRUE(tracker_config->mutable_typed_config()->PackFrom(Protobuf::Empty{}));
+  initializeWithTracker();
+  ASSERT_NE(factory.tracker_, nullptr);
+  EXPECT_TRUE(tracker_->enabled());
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = xds_manager_impl_.addXdsConfigTracker(first);
+  auto second_handle = xds_manager_impl_.addXdsConfigTracker(second);
+
+  const std::vector<DecodedResourcePtr> resources;
+  envoy::service::discovery::v3::Resource added_resource;
+  std::vector<const envoy::service::discovery::v3::Resource*> added_resources{&added_resource};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("removed");
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  const testing::Matcher<const envoy::service::discovery::v3::DiscoveryResponse&> sotw_message =
+      testing::Ref(sotw);
+  const testing::Matcher<const envoy::service::discovery::v3::DeltaDiscoveryResponse&>
+      delta_message = testing::Ref(delta);
+  const std::array<MockXdsConfigTracker*, 3> trackers{factory.tracker_, &first, &second};
+  for (auto* tracker : trackers) {
+    EXPECT_CALL(*tracker, onConfigAccepted("test-type", testing::Ref(resources)));
+    EXPECT_CALL(*tracker, onConfigAccepted("test-type", testing::ElementsAre(&added_resource),
+                                           testing::Ref(removed_resources)));
+    EXPECT_CALL(*tracker, onConfigRejected(sotw_message, "sotw rejected"));
+    EXPECT_CALL(*tracker, onConfigRejected(delta_message, "delta rejected"));
+    EXPECT_CALL(*tracker, onResourceUnsubscribed("test-type", "resource"));
+  }
+  tracker_->onConfigAccepted("test-type", resources);
+  tracker_->onConfigAccepted("test-type", added_resources, removed_resources);
+  tracker_->onConfigRejected(sotw, "sotw rejected");
+  tracker_->onConfigRejected(delta, "delta rejected");
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+
+  first_handle.reset();
+  EXPECT_CALL(*factory.tracker_, onResourceUnsubscribed("test-type", "resource"));
+  EXPECT_CALL(second, onResourceUnsubscribed("test-type", "resource"));
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+
+  second_handle.reset();
+  EXPECT_TRUE(tracker_->enabled());
+  EXPECT_CALL(*factory.tracker_, onResourceUnsubscribed("test-type", "resource"));
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+  factory.tracker_->enabled_ = false;
+  EXPECT_FALSE(tracker_->enabled());
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+}
+
+TEST_P(XdsManagerImplTest, ConfigTrackersEnableTrackingWhileRegistered) {
+  initializeWithTracker();
+  EXPECT_FALSE(tracker_->enabled());
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = xds_manager_impl_.addXdsConfigTracker(first);
+  auto second_handle = xds_manager_impl_.addXdsConfigTracker(second);
+  EXPECT_TRUE(tracker_->enabled());
+  first.enabled_ = false;
+  EXPECT_TRUE(tracker_->enabled());
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  tracker_->onResourceUnsubscribed("type", "name");
+  second_handle.reset();
+  EXPECT_FALSE(tracker_->enabled());
+  first.enabled_ = true;
+  EXPECT_TRUE(tracker_->enabled());
+  first_handle.reset();
+  EXPECT_FALSE(tracker_->enabled());
+  first_handle = xds_manager_impl_.addXdsConfigTracker(first);
+  EXPECT_TRUE(tracker_->enabled());
+  first_handle.reset();
+  EXPECT_FALSE(tracker_->enabled());
+}
+
+TEST(XdsConfigTrackersTest, RegistrationMayOutliveManager) {
+  testing::StrictMock<MockXdsConfigTracker> tracker;
+  Common::CallbackHandlePtr handle;
+  {
+    XdsConfigTrackers trackers;
+    handle = trackers.add(tracker);
+  }
+  handle.reset();
+}
+
+TEST(XdsConfigTrackersTest, TrackerCanUnregisterItselfDuringCallback) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    first_handle.reset();
+  });
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_TRUE(trackers.enabled());
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+  });
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_FALSE(trackers.enabled());
+}
 
 // Validates that a call to shutdown succeeds.
 TEST_P(XdsManagerImplTest, ShutdownSuccessful) {

@@ -1,3 +1,4 @@
+pub use crate::abi::envoy_dynamic_module_type_bootstrap_xds_update_status as XdsUpdateStatus;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
@@ -291,6 +292,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// also returns `false` once the server began to shut down and when Envoy runs with
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications. Main thread
+  /// only, after server initialization. Calls are idempotent. Enabling fails after shutdown or
+  /// when the module does not implement the xDS hook.
+  fn set_xds_notifications(&self, enabled: bool) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See
   /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
@@ -626,6 +632,17 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _listener_name: &str,
+  ) {
+  }
+
+  /// Called during xDS processing on the main thread. Must not block or reenter xDS processing.
+  /// Error details contain the rejection reason and are empty for other outcomes.
+  fn on_xds_update(
+    &self,
+    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    _type_url: &str,
+    _status: XdsUpdateStatus,
+    _error_details: &str,
   ) {
   }
 
@@ -1452,6 +1469,14 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn set_xds_notifications(&self, enabled: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+        self.raw, enabled,
+      )
+    }
+  }
+
   fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
     extern "C" fn name_trampoline(
       name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -2137,6 +2162,33 @@ ffi_export! {
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
     );
+  }
+}
+
+ffi_export! {
+  /// Forwards an xDS outcome to the bootstrap config.
+  ///
+  /// # Safety
+  /// All pointers and the status must satisfy the Envoy dynamic module ABI. The URL and error
+  /// details are valid only during this call; the module config remains live until it returns.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_xds_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    type_url: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: XdsUpdateStatus,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let config = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
+    let bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(type_url.ptr.cast::<u8>(), type_url.length)
+    };
+    if let Ok(type_url) = std::str::from_utf8(bytes) {
+      let error_details = unsafe {
+        crate::ffi_helpers::str_lossy_from_raw(error_details.ptr.cast::<u8>(), error_details.length)
+      };
+      let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+      config.on_xds_update(&mut envoy, type_url, status, error_details.as_ref());
+    }
   }
 }
 

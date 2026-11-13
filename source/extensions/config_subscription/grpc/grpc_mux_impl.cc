@@ -443,7 +443,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
                               /*call_delegate=*/true);
 
     // Processing point when resources are successfully ingested.
-    if (xds_config_tracker_.has_value()) {
+    if (xds_config_tracker_.has_value() && xds_config_tracker_->enabled()) {
       xds_config_tracker_->onConfigAccepted(type_url, resources);
     }
   }
@@ -458,7 +458,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
 
     // Processing point when there is any exception during the parse and ingestion process.
-    if (xds_config_tracker_.has_value()) {
+    if (xds_config_tracker_.has_value() && xds_config_tracker_->enabled()) {
       xds_config_tracker_->onConfigRejected(*message, error_detail->message());
     }
   });

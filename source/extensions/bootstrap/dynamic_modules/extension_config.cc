@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "envoy/config/xds_manager.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
@@ -32,6 +33,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 }
 
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
+  xds_update_handle_.reset();
   // Cancel any pending HTTP callouts before destroying the config.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -140,6 +142,60 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
     on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
                                              {listener_name.data(), listener_name.size()});
   }
+}
+
+bool DynamicModuleBootstrapExtensionConfig::setXdsNotifications(bool enabled) {
+  if (!enabled) {
+    xds_update_handle_.reset();
+    return true;
+  }
+  if (!server_initialized_ || extension_destroyed_ || !shutdownNotificationExpected() ||
+      on_bootstrap_extension_xds_update_ == nullptr) {
+    return false;
+  }
+  if (xds_update_handle_ != nullptr) {
+    return true;
+  }
+  xds_update_handle_ = context_.xdsManager().addXdsConfigTracker(*this);
+  return xds_update_handle_ != nullptr;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onConfigAccepted(
+    absl::string_view type_url, const std::vector<Config::DecodedResourcePtr>&) {
+  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted);
+}
+
+void DynamicModuleBootstrapExtensionConfig::onConfigAccepted(
+    absl::string_view type_url, absl::Span<const envoy::service::discovery::v3::Resource* const>,
+    const Protobuf::RepeatedPtrField<std::string>&) {
+  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted);
+}
+
+void DynamicModuleBootstrapExtensionConfig::onConfigRejected(
+    const envoy::service::discovery::v3::DiscoveryResponse& message,
+    absl::string_view error_detail) {
+  notifyXdsUpdate(message.type_url(),
+                  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected, error_detail);
+}
+
+void DynamicModuleBootstrapExtensionConfig::onConfigRejected(
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+    absl::string_view error_detail) {
+  notifyXdsUpdate(message.type_url(),
+                  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected, error_detail);
+}
+
+void DynamicModuleBootstrapExtensionConfig::onResourceUnsubscribed(absl::string_view type_url,
+                                                                   absl::string_view) {
+  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
+}
+
+void DynamicModuleBootstrapExtensionConfig::notifyXdsUpdate(
+    absl::string_view type_url, envoy_dynamic_module_type_bootstrap_xds_update_status status,
+    absl::string_view error_detail) {
+  on_bootstrap_extension_xds_update_(thisAsVoidPtr(), in_module_config_,
+                                     {type_url.data(), type_url.size()}, status,
+                                     {error_detail.data(), error_detail.size()});
 }
 
 void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
@@ -323,6 +379,7 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
+  xds_update_handle_.reset();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
@@ -597,6 +654,10 @@ newDynamicModuleBootstrapExtensionConfig(
 
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
+  auto on_xds_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionXdsUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_xds_update");
+  config->on_bootstrap_extension_xds_update_ = on_xds_update.ok() ? on_xds_update.value() : nullptr;
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");

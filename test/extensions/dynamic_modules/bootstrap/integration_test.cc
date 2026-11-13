@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/config/resource_name.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -23,6 +24,8 @@ class DynamicModulesBootstrapIntegrationTest
 public:
   DynamicModulesBootstrapIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initializeWithBootstrapExtension(const std::string& module_dir,
                                         const std::string& module_name = "test",
@@ -313,6 +316,54 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
       Envoy::ExpectedLogMessages({{"info", "Bootstrap listener lifecycle test: server initialized"},
                                   {"info", "Listener lifecycle enabled: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, XdsOutcomesRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  use_lds_ = false;
+  defer_listener_finalization_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* dynamic_resources = bootstrap.mutable_dynamic_resources();
+    auto* ads = dynamic_resources->mutable_ads_config();
+    ads->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    ads->set_transport_api_version(envoy::config::core::v3::V3);
+    ads->set_set_node_on_first_message_only(true);
+    ads->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_0");
+    auto* cds = dynamic_resources->mutable_cds_config();
+    cds->mutable_ads();
+    cds->set_resource_api_version(envoy::config::core::v3::V3);
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_xds_test");
+  registerTestServerPorts({});
+  EXPECT_EQ(writerModuleRequest("/xds", "enable", ""), "");
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_));
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+  const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  ASSERT_TRUE(compareSotwDiscoveryRequest(type_url, "", {}, true));
+  sendSotwDiscoveryResponse<envoy::config::cluster::v3::Cluster>(type_url, {}, "1");
+  ASSERT_TRUE(compareSotwDiscoveryRequest(type_url, "1", {}));
+  test_server_->waitUntilListenersReady();
+  const auto accepted = fmt::format("Accepted: {}: \n", type_url);
+  EXPECT_EQ(writerModuleRequest("/xds", "", ""), accepted);
+
+  sendSotwDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      type_url, {envoy::config::listener::v3::Listener()}, "2");
+  envoy::service::discovery::v3::DiscoveryRequest nack;
+  ASSERT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, nack));
+  EXPECT_EQ(nack.type_url(), type_url);
+  EXPECT_EQ(nack.version_info(), "1");
+  ASSERT_FALSE(nack.error_detail().message().empty());
+  const auto rejected =
+      absl::StrCat(accepted, "Rejected: ", type_url, ": ", nack.error_detail().message(), "\n");
+  EXPECT_EQ(writerModuleRequest("/xds", "", ""), rejected);
+
+  EXPECT_EQ(writerModuleRequest("/xds", "disable", ""), rejected);
+  sendSotwDiscoveryResponse<envoy::config::cluster::v3::Cluster>(type_url, {}, "3");
+  ASSERT_TRUE(compareSotwDiscoveryRequest(type_url, "3", {}));
+  EXPECT_EQ(writerModuleRequest("/xds", "", ""), rejected);
 }
 
 // This test verifies that a bootstrap extension can register a function in the process-wide
