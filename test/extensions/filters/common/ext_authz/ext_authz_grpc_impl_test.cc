@@ -12,7 +12,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/test_common/test_runtime.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -38,6 +37,12 @@ public:
 
   void initialize() {
     client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_);
+  }
+
+  void initializeWithRawHeaderValue() {
+    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
+                                               /*emit_client_span=*/true,
+                                               /*read_raw_header_value=*/true);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -758,7 +763,7 @@ TEST_F(ExtAuthzGrpcClientTest, SetEmitClientSpan) {
 
 // Test the client when an ok response uses raw_value with fallback to value.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithRawValue) {
-  initialize();
+  initializeWithRawHeaderValue();
 
   const std::string non_utf8_bytes = std::string("raw-\xc0\xc0", 6);
   const std::string raw_append_bytes = std::string("append-\xc3\x28", 9);
@@ -880,7 +885,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithRawValue) {
 
 // Test the client when a denied response uses raw_value with fallback to value.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithRawValue) {
-  initialize();
+  initializeWithRawHeaderValue();
 
   const std::string non_utf8_bytes = std::string("denied-\xc0\xc0", 9);
   const std::string raw_append_bytes = std::string("denied-append-\xc3\x28", 16);
@@ -943,7 +948,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithRawValue) {
 
 // Test the client when an error response uses raw_value with fallback to value.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithRawValue) {
-  initialize();
+  initializeWithRawHeaderValue();
 
   const std::string non_utf8_bytes = std::string("error-\xc0\xc0", 8);
 
@@ -1003,45 +1008,10 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithRawValue) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-// Test that the runtime guard for reading raw_value can be dynamically toggled across calls.
-TEST_F(ExtAuthzGrpcClientTest, ReadRawHeaderValueRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  const std::string guard = "envoy.reloadable_features.ext_authz_read_raw_header_value";
+// Test that by default (read_raw_header_value = false), raw_value is ignored and only value is
+// read across OK, denied, and error responses.
+TEST_F(ExtAuthzGrpcClientTest, ReadRawHeaderValueDisabledByDefault) {
   initialize();
-
-  // Phase 1: guard enabled ("true") reads raw_value on the live client instance.
-  scoped_runtime.mergeValues({{guard, "true"}});
-  {
-    auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
-    check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
-    auto* ok_response = check_response->mutable_ok_response();
-
-    auto* raw_only = ok_response->add_headers();
-    raw_only->mutable_header()->set_key("x-raw-only");
-    raw_only->mutable_header()->set_raw_value("raw-enabled");
-
-    auto* both = ok_response->add_headers();
-    both->mutable_header()->set_key("x-both");
-    both->mutable_header()->set_value("legacy-value");
-    both->mutable_header()->set_raw_value("raw-preferred");
-
-    envoy::service::auth::v3::CheckRequest request;
-    expectCallSend(request);
-    client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
-
-    EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-    EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
-      EXPECT_EQ(CheckStatus::OK, response->status);
-      EXPECT_EQ(static_cast<Http::Code>(0), response->status_code);
-      EXPECT_FALSE(response->saw_invalid_append_actions);
-      EXPECT_TRUE(TestCommon::compareHeaderVector(
-          response->headers_to_set, {{"x-raw-only", "raw-enabled"}, {"x-both", "raw-preferred"}}));
-    });
-    client_->onSuccess(std::move(check_response), span_);
-  }
-
-  // Phase 2: dynamically flip guard to "false" on the same live client instance.
-  scoped_runtime.mergeValues({{guard, "false"}});
 
   // OK response: only value is read across headers, headers_to_append, and response_headers_to_add.
   {
@@ -1133,7 +1103,7 @@ TEST_F(ExtAuthzGrpcClientTest, ReadRawHeaderValueRuntimeGuardDisabled) {
     client_->onSuccess(std::move(check_response), span_);
   }
 
-  // Denied response: only value is read when runtime guard is false.
+  // Denied response: only value is read when read_raw_header_value is false.
   {
     auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
     check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
@@ -1172,7 +1142,7 @@ TEST_F(ExtAuthzGrpcClientTest, ReadRawHeaderValueRuntimeGuardDisabled) {
     client_->onSuccess(std::move(check_response), span_);
   }
 
-  // Error response: only value is read when runtime guard is false.
+  // Error response: only value is read when read_raw_header_value is false.
   {
     auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
     check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
@@ -1206,45 +1176,6 @@ TEST_F(ExtAuthzGrpcClientTest, ReadRawHeaderValueRuntimeGuardDisabled) {
           response->headers_to_set, {{"x-error-raw-only", ""}, {"x-error-both", "legacy-error"}}));
       EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_append,
                                                   {{"x-error-append", "legacy-error-append"}}));
-    });
-    client_->onSuccess(std::move(check_response), span_);
-  }
-
-  // Phase 3: dynamically flip guard back to "true" on the same live client instance.
-  scoped_runtime.mergeValues({{guard, "true"}});
-  {
-    auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
-    check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
-    auto* ok_response = check_response->mutable_ok_response();
-
-    auto* raw_only = ok_response->add_headers();
-    raw_only->mutable_header()->set_key("x-raw-only");
-    raw_only->mutable_header()->set_raw_value("raw-re-enabled");
-
-    auto* both = ok_response->add_headers();
-    both->mutable_header()->set_key("x-both");
-    both->mutable_header()->set_value("legacy-value");
-    both->mutable_header()->set_raw_value("raw-re-enabled-preferred");
-
-    auto* resp_hdr = ok_response->add_response_headers_to_add();
-    resp_hdr->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-    resp_hdr->mutable_header()->set_key("x-resp");
-    resp_hdr->mutable_header()->set_value("legacy-resp");
-    resp_hdr->mutable_header()->set_raw_value("raw-resp-re-enabled");
-
-    envoy::service::auth::v3::CheckRequest request;
-    expectCallSend(request);
-    client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
-
-    EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-    EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
-      EXPECT_EQ(CheckStatus::OK, response->status);
-      EXPECT_EQ(static_cast<Http::Code>(0), response->status_code);
-      EXPECT_TRUE(TestCommon::compareHeaderVector(
-          response->headers_to_set,
-          {{"x-raw-only", "raw-re-enabled"}, {"x-both", "raw-re-enabled-preferred"}}));
-      EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_set,
-                                                  {{"x-resp", "raw-resp-re-enabled"}}));
     });
     client_->onSuccess(std::move(check_response), span_);
   }

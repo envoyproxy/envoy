@@ -191,6 +191,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
       encode_raw_headers_(config.encode_raw_headers()),
+      read_raw_header_value_(config.read_raw_header_value()),
 
       status_on_error_(toErrorCode(config.status_on_error().code())),
       validate_mutations_(config.validate_mutations()), scope_(scope),
@@ -354,8 +355,8 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
                    grpc_service.has_envoy_grpc() ? grpc_service.envoy_grpc().cluster_name()
                                                  : "google_grpc");
 
-  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(client_or_error.value(),
-                                                                     timeout);
+  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+      client_or_error.value(), timeout, config_->emitClientSpan(), config_->readRawHeaderValue());
 }
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(

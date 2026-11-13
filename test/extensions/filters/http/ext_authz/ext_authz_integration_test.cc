@@ -51,6 +51,7 @@ struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
+  bool read_raw_header_value = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
@@ -193,6 +194,7 @@ public:
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+      proto_config_.set_read_raw_header_value(opts.read_raw_header_value);
       proto_config_.set_max_denied_response_body_bytes(opts.max_denied_response_body_bytes);
 
       if (emitFilterStateStats()) {
@@ -3660,9 +3662,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
 }
 
 // Verify that gRPC CheckResponse OK headers read raw_value (including non-UTF-8 bytes) and fall
-// back to value when raw_value is empty.
+// back to value when raw_value is empty when read_raw_header_value is enabled.
 TEST_P(ExtAuthzGrpcIntegrationTest, OkResponseWithRawValueAndValueFallback) {
   GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
   opts.validate_mutations = true;
   initializeConfig(opts);
   setDownstreamProtocol(Http::CodecType::HTTP1);
@@ -3746,6 +3749,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, OkResponseWithRawValueAndValueFallback) {
 // Verify that non-UTF-8 obs-text raw_value headers flow end-to-end over HTTP/2 downstream.
 TEST_P(ExtAuthzGrpcIntegrationTest, OkResponseWithRawValueHttp2Downstream) {
   GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
   opts.validate_mutations = true;
   initializeConfig(opts);
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -3790,9 +3794,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, OkResponseWithRawValueHttp2Downstream) {
 }
 
 // Verify that gRPC CheckResponse denied headers read raw_value (including non-UTF-8 bytes) and
-// fall back to value when raw_value is empty.
+// fall back to value when raw_value is empty when read_raw_header_value is enabled.
 TEST_P(ExtAuthzGrpcIntegrationTest, DeniedResponseWithRawValueAndValueFallback) {
   GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
   opts.validate_mutations = true;
   ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
   initializeConfig(opts);
@@ -3833,9 +3838,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DeniedResponseWithRawValueAndValueFallback) 
 }
 
 // Verify that gRPC CheckResponse error_response headers read raw_value (including non-UTF-8 bytes)
-// and fall back to value when raw_value is empty for both append=false and append=true.
+// and fall back to value when raw_value is empty for both append=false and append=true when
+// read_raw_header_value is enabled.
 TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithRawValueAndValueFallback) {
   GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
   opts.validate_mutations = true;
   ext_authz_grpc_status_ = LoggingTestFilterConfig::INTERNAL;
   initializeConfig(opts);
@@ -3900,9 +3907,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithRawValueAndValueFallback) {
 }
 
 // Verify that disallowed bytes (e.g. \r) in raw_value are rejected with 500 when
-// validate_mutations is enabled.
+// read_raw_header_value and validate_mutations are enabled.
 TEST_P(ExtAuthzGrpcIntegrationTest, InvalidRawValueRejectedWhenValidateMutationsEnabled) {
   GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
   opts.validate_mutations = true;
   initializeConfig(opts);
   setDownstreamProtocol(Http::CodecType::HTTP1);
@@ -3930,14 +3938,12 @@ TEST_P(ExtAuthzGrpcIntegrationTest, InvalidRawValueRejectedWhenValidateMutations
   cleanup();
 }
 
-// Verify that when the ext_authz_read_raw_header_value runtime guard is disabled, raw_value is
-// ignored and only value is read.
-TEST_P(ExtAuthzGrpcIntegrationTest, ReadRawHeaderValueRuntimeGuardDisabled) {
+// Verify that by default (read_raw_header_value = false), raw_value is ignored and only value is
+// read.
+TEST_P(ExtAuthzGrpcIntegrationTest, ReadRawHeaderValueDisabledByDefault) {
   GrpcInitializeConfigOpts opts;
   opts.validate_mutations = true;
   initializeConfig(opts);
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.ext_authz_read_raw_header_value",
-                                    "false");
   setDownstreamProtocol(Http::CodecType::HTTP1);
   HttpIntegrationTest::initialize();
 
@@ -3988,6 +3994,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ReadRawHeaderValueRuntimeGuardDisabled) {
 TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedWithRawValue) {
   GrpcInitializeConfigOpts opts;
   opts.shadow_mode = true;
+  opts.read_raw_header_value = true;
   opts.validate_mutations = true;
   ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
   initializeConfig(opts);

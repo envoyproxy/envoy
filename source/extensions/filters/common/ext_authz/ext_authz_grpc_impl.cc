@@ -9,7 +9,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -94,10 +93,11 @@ void copyOkResponseMutations(ResponsePtr& response,
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const std::optional<std::chrono::milliseconds>& timeout,
-                               bool emit_client_span)
+                               bool emit_client_span, bool read_raw_header_value)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.auth.v3.Authorization.Check")) {
+          "envoy.service.auth.v3.Authorization.Check")),
+      read_raw_header_value_(read_raw_header_value) {
   emit_client_span_ = emit_client_span;
 }
 
@@ -128,14 +128,12 @@ void GrpcClientImpl::onSuccess(
   ENVOY_LOG(trace, "Received CheckResponse: {}", response->DebugString());
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
   authz_response->grpc_status = response->status().code();
-  const bool read_raw_value =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_authz_read_raw_header_value");
   if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       const auto& ok_response = response->ok_response();
-      copyOkResponseMutations(authz_response, ok_response, read_raw_value);
+      copyOkResponseMutations(authz_response, ok_response, read_raw_header_value_);
     }
   } else if (response->has_error_response()) {
     // If error_response is present, treat it as an error and not denial.
@@ -145,7 +143,7 @@ void GrpcClientImpl::onSuccess(
     // For error responses, don't set a default status_code.
     // Let the filter use status_on_error configuration.
     const auto& error_response = response->error_response();
-    copyHeaderFieldIntoResponse(authz_response, error_response.headers(), read_raw_value);
+    copyHeaderFieldIntoResponse(authz_response, error_response.headers(), read_raw_header_value_);
 
     const uint32_t status_code = error_response.status().code();
     if (status_code > 0) {
@@ -160,7 +158,7 @@ void GrpcClientImpl::onSuccess(
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
       copyHeaderFieldIntoResponse(authz_response, response->denied_response().headers(),
-                                  read_raw_value);
+                                  read_raw_header_value_);
 
       const uint32_t status_code = response->denied_response().status().code();
       if (status_code > 0) {

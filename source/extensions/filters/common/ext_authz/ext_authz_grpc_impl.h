@@ -45,7 +45,7 @@ class GrpcClientImpl : public Client,
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                  const std::optional<std::chrono::milliseconds>& timeout,
-                 bool emit_client_span = true);
+                 bool emit_client_span = true, bool read_raw_header_value = false);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
@@ -70,6 +70,7 @@ private:
   std::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
+  const bool read_raw_header_value_{false};
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;
