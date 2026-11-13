@@ -12,6 +12,22 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_extension_cc_test(
+    name = "config_snapshot_test",
+    srcs = ["config_snapshot_test.cc"],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/extensions/bootstrap/dynamic_modules:config_snapshot_lib",
+        "//source/server/admin:config_tracker_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:status_utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_dyn_module_test(
     name = "extension_config_test",
     srcs = ["extension_config_test.cc"],
@@ -115,6 +131,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
         "//source/extensions/bootstrap/dynamic_modules:extension_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/server/admin:config_tracker_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/http:http_mocks",
@@ -133,6 +150,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],

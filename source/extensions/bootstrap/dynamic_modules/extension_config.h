@@ -18,6 +18,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
 #include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -155,6 +156,12 @@ public:
    * @return true if the callbacks were successfully registered, false if already registered.
    */
   bool enableClusterLifecycle();
+
+  /**
+   * Collects and redacts the selected configuration providers on the main thread.
+   */
+  absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+  getConfigSnapshot(absl::Span<const absl::string_view> providers);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,

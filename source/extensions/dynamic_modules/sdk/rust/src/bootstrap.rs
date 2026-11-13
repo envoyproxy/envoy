@@ -20,6 +20,133 @@ use crate::{
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::ptr::NonNull;
+
+/// A config dump provider to include in a snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ConfigSnapshotProvider<'a> {
+  /// The server's bootstrap configuration.
+  Bootstrap,
+  /// Cluster configurations.
+  Clusters,
+  /// Endpoint assignments for active clusters.
+  Endpoints,
+  /// Listener configurations.
+  Listeners,
+  /// Route configurations.
+  Routes,
+  /// Scoped route configurations.
+  RouteScopes,
+  /// Secret configurations.
+  Secrets,
+  /// HTTP filters configured through ECDS.
+  EcdsHttpFilters,
+  /// Upstream HTTP filters configured through ECDS.
+  EcdsUpstreamHttpFilters,
+  /// Network filters configured through ECDS.
+  EcdsNetworkFilters,
+  /// Upstream network filters configured through ECDS.
+  EcdsUpstreamNetworkFilters,
+  /// TCP listener filters configured through ECDS.
+  EcdsTcpListenerFilters,
+  /// UDP listener filters configured through ECDS.
+  EcdsUdpListenerFilters,
+  /// UDP session filters configured through ECDS.
+  EcdsUdpSessionFilters,
+  /// QUIC listener filters configured through ECDS.
+  EcdsQuicListenerFilters,
+  /// A provider registered by another extension.
+  Custom(&'a str),
+}
+
+impl ConfigSnapshotProvider<'_> {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::Bootstrap => "bootstrap",
+      Self::Clusters => "clusters",
+      Self::Endpoints => "endpoint",
+      Self::Listeners => "listeners",
+      Self::Routes => "routes",
+      Self::RouteScopes => "route_scopes",
+      Self::Secrets => "secrets",
+      Self::EcdsHttpFilters => "ecds_filter_http",
+      Self::EcdsUpstreamHttpFilters => "ecds_filter_upstream_http",
+      Self::EcdsNetworkFilters => "ecds_filter_network",
+      Self::EcdsUpstreamNetworkFilters => "ecds_filter_upstream_network",
+      Self::EcdsTcpListenerFilters => "ecds_filter_tcp_listener",
+      Self::EcdsUdpListenerFilters => "ecds_filter_udp_listener",
+      Self::EcdsUdpSessionFilters => "ecds_filter_udp_session",
+      Self::EcdsQuicListenerFilters => "ecds_filter_quic_listener",
+      Self::Custom(name) => name,
+    }
+  }
+}
+
+/// A snapshot of the selected configuration providers.
+/// Can move between threads. Drop it before unloading the module.
+#[derive(Debug)]
+pub struct ConfigSnapshot {
+  raw: NonNull<std::ffi::c_void>,
+}
+
+// snapshot messages contain no server references or thread-local state
+unsafe impl Send for ConfigSnapshot {}
+
+impl ConfigSnapshot {
+  /// Encodes the redacted snapshot as ConfigDump JSON.
+  /// Sensitive application metadata requires additional caller redaction.
+  pub fn into_json(self) -> Result<Vec<u8>, ConfigSnapshotError> {
+    extern "C" fn receive_json(
+      json: abi::envoy_dynamic_module_type_envoy_buffer,
+      user_data: *mut std::ffi::c_void,
+    ) {
+      let output = unsafe { &mut *user_data.cast::<Vec<u8>>() };
+      let bytes =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(json.ptr.cast::<u8>(), json.length) };
+      output.extend_from_slice(bytes);
+    }
+
+    let mut output = Vec::new();
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_config_snapshot_serialize(
+        self.raw.as_ptr(),
+        Some(receive_json),
+        std::ptr::from_mut(&mut output).cast(),
+      )
+    };
+    if success {
+      Ok(output)
+    } else {
+      Err(ConfigSnapshotError::EncodingFailed)
+    }
+  }
+}
+
+impl Drop for ConfigSnapshot {
+  fn drop(&mut self) {
+    unsafe { abi::envoy_dynamic_module_callback_config_snapshot_delete(self.raw.as_ptr()) }
+  }
+}
+
+/// A collection or encoding failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigSnapshotError {
+  /// The server or a selected config provider is unavailable.
+  Unavailable,
+  /// The collected messages could not be encoded as JSON.
+  EncodingFailed,
+}
+
+impl std::fmt::Display for ConfigSnapshotError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(match self {
+      Self::Unavailable => "config snapshot unavailable",
+      Self::EncodingFailed => "config snapshot encoding failed",
+    })
+  }
+}
+
+impl std::error::Error for ConfigSnapshotError {}
 
 /// The kind of active resource to enumerate with
 /// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
@@ -278,6 +405,15 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// also returns `false` once the server began to shut down and when Envoy runs with
   /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
+
+  /// Collects and redacts the selected providers on the main thread after initialization.
+  /// Missing providers are omitted; an empty selection collects nothing.
+  /// [`ConfigSnapshotProvider::Endpoints`] includes active cluster endpoint assignments.
+  /// Must not run during an xDS callback.
+  fn get_config_snapshot<'a>(
+    &self,
+    providers: &[ConfigSnapshotProvider<'a>],
+  ) -> Result<ConfigSnapshot, ConfigSnapshotError>;
 
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
@@ -1446,6 +1582,26 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn get_config_snapshot(
+    &self,
+    providers: &[ConfigSnapshotProvider<'_>],
+  ) -> Result<ConfigSnapshot, ConfigSnapshotError> {
+    let providers: smallvec::SmallVec<[_; 4]> = providers
+      .iter()
+      .map(|provider| str_to_module_buffer(provider.as_str()))
+      .collect();
+    let raw = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+        self.raw,
+        providers.as_ptr(),
+        providers.len(),
+      )
+    };
+    NonNull::new(raw)
+      .map(|raw| ConfigSnapshot { raw })
+      .ok_or(ConfigSnapshotError::Unavailable)
+  }
+
   fn enable_listener_lifecycle(&self) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
@@ -2228,5 +2384,171 @@ ffi_export! {
       status,
       error_details_str.as_ref(),
     );
+  }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+  use super::*;
+  use std::cell::RefCell;
+  use std::sync::atomic::{AtomicUsize, Ordering};
+  use std::sync::Arc;
+
+  #[derive(Default)]
+  struct TestHost {
+    providers: RefCell<Vec<String>>,
+  }
+
+  struct TestSnapshot {
+    json: Option<Vec<u8>>,
+    drops: Arc<AtomicUsize>,
+  }
+
+  impl Drop for TestSnapshot {
+    fn drop(&mut self) {
+      self.drops.fetch_add(1, Ordering::Relaxed);
+    }
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    providers: *const abi::envoy_dynamic_module_type_module_buffer,
+    count: usize,
+  ) -> abi::envoy_dynamic_module_type_config_snapshot_ptr {
+    let host = unsafe { &*host.cast::<TestHost>() };
+    let providers = unsafe { crate::ffi_helpers::slice_from_raw_or_empty(providers, count) };
+    *host.providers.borrow_mut() = providers
+      .iter()
+      .map(|provider| {
+        let bytes = unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(provider.ptr.cast::<u8>(), provider.length)
+        };
+        std::str::from_utf8(bytes).unwrap().to_owned()
+      })
+      .collect();
+    std::ptr::null_mut()
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_config_snapshot_serialize(
+    raw: abi::envoy_dynamic_module_type_config_snapshot_ptr,
+    callback: abi::envoy_dynamic_module_type_config_snapshot_json_fn,
+    user_data: *mut std::ffi::c_void,
+  ) -> bool {
+    let snapshot = unsafe { &*raw.cast::<TestSnapshot>() };
+    let Some(json) = &snapshot.json else {
+      return false;
+    };
+    unsafe {
+      callback.unwrap()(
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: json.as_ptr().cast(),
+          length: json.len(),
+        },
+        user_data,
+      );
+    }
+    true
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_config_snapshot_delete(
+    raw: abi::envoy_dynamic_module_type_config_snapshot_ptr,
+  ) {
+    drop(unsafe { Box::from_raw(raw.cast::<TestSnapshot>()) });
+  }
+
+  fn snapshot(json: Option<Vec<u8>>, drops: Arc<AtomicUsize>) -> ConfigSnapshot {
+    let raw = Box::into_raw(Box::new(TestSnapshot { json, drops })).cast();
+    ConfigSnapshot {
+      raw: NonNull::new(raw).unwrap(),
+    }
+  }
+
+  #[test]
+  fn config_snapshot_can_move_to_worker_and_releases_after_encoding() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let owned = snapshot(Some(b"{\"configs\":[]}".to_vec()), Arc::clone(&drops));
+    let encoded = std::thread::spawn(move || owned.into_json())
+      .join()
+      .unwrap();
+    assert_eq!(encoded.unwrap(), b"{\"configs\":[]}");
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
+  }
+
+  #[test]
+  fn config_snapshot_releases_on_encoding_failure_and_without_encoding() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    assert_eq!(
+      snapshot(None, Arc::clone(&drops)).into_json(),
+      Err(ConfigSnapshotError::EncodingFailed)
+    );
+    drop(snapshot(Some(Vec::new()), Arc::clone(&drops)));
+    assert_eq!(drops.load(Ordering::Relaxed), 2);
+  }
+
+  #[test]
+  fn config_snapshot_selection_crosses_abi() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let cases = [
+      (ConfigSnapshotProvider::Bootstrap, "bootstrap"),
+      (ConfigSnapshotProvider::Clusters, "clusters"),
+      (ConfigSnapshotProvider::Endpoints, "endpoint"),
+      (ConfigSnapshotProvider::Listeners, "listeners"),
+      (ConfigSnapshotProvider::Routes, "routes"),
+      (ConfigSnapshotProvider::RouteScopes, "route_scopes"),
+      (ConfigSnapshotProvider::Secrets, "secrets"),
+      (ConfigSnapshotProvider::EcdsHttpFilters, "ecds_filter_http"),
+      (
+        ConfigSnapshotProvider::EcdsUpstreamHttpFilters,
+        "ecds_filter_upstream_http",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsNetworkFilters,
+        "ecds_filter_network",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsUpstreamNetworkFilters,
+        "ecds_filter_upstream_network",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsTcpListenerFilters,
+        "ecds_filter_tcp_listener",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsUdpListenerFilters,
+        "ecds_filter_udp_listener",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsUdpSessionFilters,
+        "ecds_filter_udp_session",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsQuicListenerFilters,
+        "ecds_filter_quic_listener",
+      ),
+      (
+        ConfigSnapshotProvider::Custom("extension-provider"),
+        "extension-provider",
+      ),
+    ];
+    let providers: Vec<_> = cases.iter().map(|(provider, _)| *provider).collect();
+    assert!(matches!(
+      envoy.get_config_snapshot(&providers),
+      Err(ConfigSnapshotError::Unavailable)
+    ));
+    assert!(host
+      .providers
+      .borrow()
+      .iter()
+      .map(String::as_str)
+      .eq(cases.iter().map(|(_, name)| *name)));
+    assert!(matches!(
+      envoy.get_config_snapshot(&[]),
+      Err(ConfigSnapshotError::Unavailable)
+    ));
+    assert!(host.providers.borrow().is_empty());
   }
 }
