@@ -39,6 +39,17 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
 }
 
 // ReverseTunnelAcceptorExtension implementation
+ReverseTunnelAcceptorExtension::~ReverseTunnelAcceptorExtension() {
+  // Tear down the per-worker socket managers first: their destructors report back through this
+  // extension (stats and the reporter), whose members would otherwise already be destroyed.
+  tls_slot_.reset();
+
+  // Do not leave the acceptor singleton pointing at a destroyed extension.
+  if (socket_interface_ != nullptr && socket_interface_->extension_ == this) {
+    socket_interface_->extension_ = nullptr;
+  }
+}
+
 void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Initialize the reporter.
   if (reporter_) {
