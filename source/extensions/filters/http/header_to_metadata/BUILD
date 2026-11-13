@@ -21,9 +21,13 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/matcher:regex_replace_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],
 )

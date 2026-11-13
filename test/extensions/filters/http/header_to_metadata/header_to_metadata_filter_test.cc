@@ -15,6 +15,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -23,6 +24,7 @@ using testing::_;
 using testing::Contains;
 using testing::NiceMock;
 using testing::Return;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -56,6 +58,22 @@ MATCHER_P(MapEqValue, rhs, "") {
   }
   return true;
 }
+
+// Counts header lookups, which shows whether the filter walked the headers or applied every rule.
+template <class HeaderMapType> class CountingHeaderMap : public HeaderMapType {
+public:
+  using HeaderMapType::HeaderMapType;
+
+  Http::HeaderMap::GetResult get(const Http::LowerCaseString& key) const override {
+    lookups_++;
+    return HeaderMapType::get(key);
+  }
+
+  mutable uint32_t lookups_{0};
+};
+
+using CountingRequestHeaderMap = CountingHeaderMap<Http::TestRequestHeaderMapImpl>;
+using CountingResponseHeaderMap = CountingHeaderMap<Http::TestResponseHeaderMapImpl>;
 
 } // namespace
 
@@ -1031,6 +1049,370 @@ request_rules:
   EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.regex_substitution_failed"));
   EXPECT_EQ(
       0U, findCounter("http_filter_name.test_prefix.request_metadata_added")); // No metadata added.
+}
+
+/**
+ * With few headers, the matched rules are still applied in rule order.
+ */
+TEST_F(HeaderToMetadataTest, FewHeadersKeepsRuleOrder) {
+  const std::string config_yaml = R"EOF(
+request_rules:
+  - header: x-second
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+  - header: x-first
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+  - header: x-absent-1
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_1
+      type: STRING
+  - header: x-absent-2
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_2
+      type: STRING
+  - header: x-absent-3
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_3
+      type: STRING
+)EOF";
+  EXPECT_OK(initializeFilter(config_yaml));
+  CountingRequestHeaderMap headers{{"x-first", "first"}, {"x-second", "second"}};
+  const std::map<std::string, std::string> expected = {{"version", "first"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(2U, headers.lookups_);
+}
+
+/**
+ * With few headers, a repeated header applies each rule once, a rule sees a header removed by an
+ * earlier rule, a rule with on_header_missing still runs, and every rule counts as processed.
+ */
+TEST_F(HeaderToMetadataTest, FewHeadersSeesEarlierRemoval) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+response_rules:
+  - header: x-internal
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: kept
+      type: STRING
+  - header: x-internal
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: removed
+      type: STRING
+    remove: true
+  - header: x-internal
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: after_removal
+      type: STRING
+  - header: x-absent-1
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_1
+      type: STRING
+  - header: x-absent-2
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_2
+      type: STRING
+  - header: x-absent-3
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_3
+      type: STRING
+  - header: x-absent-4
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_4
+      type: STRING
+  - header: x-missing
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: 'true'
+      type: STRING
+)EOF";
+  EXPECT_OK(initializeFilter(config_yaml));
+  CountingResponseHeaderMap headers{{"x-internal", "1"}, {"x-internal", "2"}};
+  Protobuf::Struct metadata;
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", _)).WillOnce(SaveArg<1>(&metadata));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  EXPECT_EQ(3, metadata.fields().size());
+  EXPECT_EQ("1,2", metadata.fields().at("kept").string_value());
+  EXPECT_EQ("1,2", metadata.fields().at("removed").string_value());
+  EXPECT_EQ("true", metadata.fields().at("missing").string_value());
+  EXPECT_EQ(4U, headers.lookups_);
+  EXPECT_FALSE(headers.has("x-internal"));
+  EXPECT_EQ(8U, findCounter("http_filter_name.test_prefix.response_rules_processed"));
+  EXPECT_EQ(3U, findCounter("http_filter_name.test_prefix.response_metadata_added"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.response_header_not_found"));
+}
+
+/**
+ * With few headers, cookie rules and rules with on_header_missing still run, and a mixed-case rule
+ * header still matches.
+ */
+TEST_F(HeaderToMetadataTest, FewHeadersRunsUnindexedRules) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: X-Mixed-Case
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: mixed_case
+      type: STRING
+  - header: x-absent
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent
+      type: STRING
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'true'
+      type: STRING
+  - cookie: session
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: session
+      type: STRING
+  - header: x-absent-1
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_1
+      type: STRING
+  - header: x-absent-2
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_2
+      type: STRING
+  - header: x-absent-3
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_3
+      type: STRING
+  - header: x-absent-4
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_4
+      type: STRING
+)EOF";
+  EXPECT_OK(initializeFilter(config_yaml));
+  CountingRequestHeaderMap headers{{"x-mixed-case", "mixed"}, {"cookie", "session=abc"}};
+  const std::map<std::string, std::string> expected = {
+      {"mixed_case", "mixed"}, {"default", "true"}, {"session", "abc"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  EXPECT_EQ(3U, headers.lookups_);
+  EXPECT_EQ(7U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_header_not_found"));
+  EXPECT_EQ(3U, findCounter("http_filter_name.test_prefix.request_metadata_added"));
+}
+
+/**
+ * With few headers, a rule on host still reads and removes :authority.
+ */
+TEST_F(HeaderToMetadataTest, FewHeadersAppliesHostRules) {
+  const std::string config_yaml = R"EOF(
+request_rules:
+  - header: host
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: host
+      type: STRING
+  - header: Host
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: removed_host
+      type: STRING
+    remove: true
+  - header: x-absent-1
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_1
+      type: STRING
+  - header: x-absent-2
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_2
+      type: STRING
+  - header: x-absent-3
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent_3
+      type: STRING
+)EOF";
+  EXPECT_OK(initializeFilter(config_yaml));
+  CountingRequestHeaderMap headers{{":authority", "example.com"}};
+  const std::map<std::string, std::string> expected = {{"host", "example.com"},
+                                                       {"removed_host", "example.com"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(2U, headers.lookups_);
+  EXPECT_FALSE(headers.has(":authority"));
+}
+
+/**
+ * Walking the headers gives the same metadata, headers and stats as applying every rule.
+ */
+TEST_F(HeaderToMetadataTest, WalkingHeadersMatchesApplyingEveryRule) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: host
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: host
+      type: STRING
+  - header: user-agent
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: user_agent
+      type: STRING
+    remove: true
+  - header: x-repeated
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: repeated
+      type: STRING
+  - header: x-removed
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: removed
+      type: STRING
+    remove: true
+  - header: x-removed
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: after_removal
+      type: STRING
+  - header: cookie
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: cookie
+      type: STRING
+    remove: true
+  - cookie: session
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: session
+      type: STRING
+  - header: x-missing
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: 'true'
+      type: STRING
+  - header: X-Mixed-Case
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: mixed_case
+      type: STRING
+  - header: x-absent
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: absent
+      type: STRING
+)EOF";
+  // The filter indexes six header names, all but host, the session cookie and x-missing.
+  const size_t indexed_names = 6;
+  EXPECT_OK(initializeFilter(config_yaml));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  Protobuf::Struct metadata;
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", _)).WillRepeatedly(SaveArg<1>(&metadata));
+
+  // Applies the rules and returns the metadata and the change of each counter.
+  const auto apply_rules = [&](CountingRequestHeaderMap& headers) {
+    const std::vector<std::string> names = {"request_rules_processed", "request_metadata_added",
+                                            "request_header_not_found"};
+    std::vector<uint64_t> counts;
+    for (const auto& name : names) {
+      counts.push_back(findCounter(absl::StrCat("http_filter_name.test_prefix.", name)));
+    }
+    metadata.Clear();
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+    for (size_t i = 0; i < names.size(); i++) {
+      counts[i] = findCounter(absl::StrCat("http_filter_name.test_prefix.", names[i])) - counts[i];
+    }
+    return std::make_pair(metadata, counts);
+  };
+
+  const std::vector<std::vector<std::pair<std::string, std::string>>> requests = {
+      {},
+      {{":authority", "example.com"}, {"user-agent", "agent"}},
+      {{"x-repeated", "1"}, {"x-repeated", "2"}},
+      {{"x-removed", "1"}},
+      {{"cookie", "session=abc"}},
+      {{"cookie", "session=abc"}, {"x-mixed-case", "mixed"}},
+      {{"x-other", "1"}},
+  };
+  for (const auto& request : requests) {
+    CountingRequestHeaderMap walked;
+    for (const auto& [key, value] : request) {
+      walked.addCopy(Http::LowerCaseString(key), value);
+    }
+    // Adds headers that no rule names until the filter applies every rule.
+    CountingRequestHeaderMap padded(walked);
+    for (size_t i = 0; 2 * padded.size() < indexed_names; i++) {
+      padded.addCopy(Http::LowerCaseString(absl::StrCat("x-padding-", i)), "1");
+    }
+
+    const auto walked_result = apply_rules(walked);
+    const auto padded_result = apply_rules(padded);
+    padded.removePrefix(Http::LowerCaseString("x-padding-"));
+
+    EXPECT_EQ(walked, padded);
+    EXPECT_TRUE(TestUtility::protoEqual(walked_result.first, padded_result.first));
+    EXPECT_EQ(walked_result.second, padded_result.second);
+    EXPECT_LT(walked.lookups_, padded.lookups_);
+  }
+}
+
+/**
+ * With few headers, the walk applies rules past the first 64.
+ */
+TEST_F(HeaderToMetadataTest, FewHeadersAppliesRulesPastSixtyFour) {
+  envoy::extensions::filters::http::header_to_metadata::v3::Config config;
+  for (int i = 0; i < 70; i++) {
+    auto* rule = config.add_request_rules();
+    rule->set_header(absl::StrCat("x-internal-", i));
+    rule->mutable_on_header_present()->set_metadata_namespace("envoy.lb");
+    rule->mutable_on_header_present()->set_key(absl::StrCat("internal_", i));
+  }
+  auto* missing_rule = config.add_request_rules();
+  missing_rule->set_header("x-missing");
+  missing_rule->mutable_on_header_missing()->set_metadata_namespace("envoy.lb");
+  missing_rule->mutable_on_header_missing()->set_key("missing");
+  missing_rule->mutable_on_header_missing()->set_value("default");
+  EXPECT_OK(initializeFilter(MessageUtil::getYamlStringFromMessage(config)));
+  CountingRequestHeaderMap headers{{"x-internal-1", "1"}, {"x-internal-66", "66"}};
+  const std::map<std::string, std::string> expected = {
+      {"internal_1", "1"}, {"internal_66", "66"}, {"missing", "default"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(3U, headers.lookups_);
 }
 
 } // namespace HeaderToMetadataFilter
