@@ -516,7 +516,7 @@ public:
 };
 
 TEST_F(AllowMissingFilterTest, NoAuthHeaderPassesThrough) {
-  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers{{"x-username", "spoofed"}};
   request_headers.setScheme("http");
   request_headers.setHost("host");
   request_headers.setPath("/");
@@ -524,18 +524,21 @@ TEST_F(AllowMissingFilterTest, NoAuthHeaderPassesThrough) {
   // No sendLocalReply should be called.
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-username")).empty());
 }
 
 TEST_F(AllowMissingFilterTest, BearerTokenPassesThrough) {
   // A request with a Bearer token (intended for JWT filter) should pass through BasicAuth
   // when allow_missing is true, so JWT filter can handle it downstream.
-  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Bearer some.jwt.token"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"Authorization", "Bearer some.jwt.token"}, {"x-username", "spoofed"}};
   request_headers.setScheme("http");
   request_headers.setHost("host");
   request_headers.setPath("/");
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("x-username")).empty());
 }
 
 TEST_F(AllowMissingFilterTest, ValidBasicCredentialsAuthenticated) {
