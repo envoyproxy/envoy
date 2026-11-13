@@ -533,6 +533,63 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
   }
 }
 
+TEST_P(CacheIntegrationTest, UncacheableValidationDoesNotSharePrivateResponse) {
+  initializeFilter(default_config);
+  int case_index = 0;
+  for (const std::string cache_control : {"private, max-age=60", "no-store, max-age=60",
+                                          "PrIvAtE, max-age=60", "No-StOrE, max-age=60"}) {
+    SCOPED_TRACE(cache_control);
+    auto bob_request =
+        httpRequestHeader("GET", absl::StrCat("UncacheableValidation", case_index++));
+    const std::string public_body = "public response";
+    auto public_headers =
+        httpResponseHeadersForBody(public_body, "public, max-age=0", {{"etag", "\"v1\""}});
+    auto prime_response = sendHeaderOnlyRequestAwaitResponse(
+        bob_request,
+        simulateUpstreamResponse(public_headers, makeOptRef(public_body), no_trailers_));
+    EXPECT_EQ(prime_response->body(), public_body);
+    simTime().advanceTimeWait(Seconds(1));
+
+    auto alice_request = bob_request;
+    alice_request.addCopy("cookie", "user=alice");
+    auto alice_response = sendHeaderOnlyRequest(alice_request);
+    waitForNextUpstreamRequest();
+    EXPECT_THAT(upstream_request_->headers(), ContainsHeader("if-none-match", "\"v1\""));
+    const Http::TestResponseHeaderMapImpl validation_headers{{":status", "304"},
+                                                             {"etag", "\"v1\""},
+                                                             {"cache-control", cache_control},
+                                                             {"set-cookie", "sid=alice-secret"}};
+    upstream_request_->encodeHeaders(validation_headers, true);
+
+    // Discard the uncacheable validation and fetch a full response for Alice.
+    waitForNextUpstreamRequest();
+    EXPECT_THAT(upstream_request_->headers(), AllOf(ContainsHeader("cookie", "user=alice"),
+                                                    Not(ContainsHeader("if-none-match", _))));
+    const std::string private_body = "alice response";
+    const auto private_headers = httpResponseHeadersForBody(private_body, cache_control,
+                                                            {{"set-cookie", "sid=alice-secret"}});
+    upstream_request_->encodeHeaders(private_headers, false);
+    upstream_request_->encodeData(private_body, true);
+    awaitResponse(alice_response);
+    EXPECT_THAT(alice_response->headers(), ContainsHeader("set-cookie", "sid=alice-secret"));
+    EXPECT_EQ(alice_response->body(), private_body);
+
+    // Bob must reach the origin and must not receive Alice's headers or cached body.
+    auto bob_response = sendHeaderOnlyRequest(bob_request);
+    waitForNextUpstreamRequest();
+    EXPECT_THAT(upstream_request_->headers(),
+                AllOf(Not(ContainsHeader("cookie", _)), Not(ContainsHeader("if-none-match", _))));
+    const std::string bob_body = "bob response";
+    const auto bob_headers = httpResponseHeadersForBody(bob_body);
+    upstream_request_->encodeHeaders(bob_headers, false);
+    upstream_request_->encodeData(bob_body, true);
+    awaitResponse(bob_response);
+    EXPECT_THAT(bob_response->headers(), Not(ContainsHeader("set-cookie", _)));
+    EXPECT_THAT(bob_response->headers(), ContainsHeader("cache-control", "public,max-age=3600"));
+    EXPECT_EQ(bob_response->body(), bob_body);
+  }
+}
+
 TEST_P(CacheIntegrationTest, ExpiredByExpiresHeaderValidated) {
   initializeFilter(default_config);
 
