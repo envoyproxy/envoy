@@ -107,6 +107,7 @@ envoy_cc_library(
     srcs = ["uri_pattern.cc"],
     hdrs = ["uri_pattern.h"],
     deps = [
+        "//source/common/http:header_utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/extensions/path/uri_template_lib",
         "@abseil-cpp//absl/container:flat_hash_map",

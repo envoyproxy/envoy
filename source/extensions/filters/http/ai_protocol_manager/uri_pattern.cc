@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "source/common/http/header_utility.h"
 #include "source/common/http/path_utility.h"
 #include "source/extensions/path/uri_template_lib/uri_template.h"
 
@@ -87,6 +88,11 @@ absl::StatusOr<UriPattern::Layout> UriPattern::parseLayout(absl::string_view lay
         absl::StrSplit(text, absl::MaxSplits('?', 1));
     if (path_and_query.second.find_first_of("{}") != absl::string_view::npos) {
       return absl::InvalidArgumentError("a query cannot hold a variable");
+    }
+    // The rewritten URI is written to the `:path` header, and `UriTemplate` below only
+    // validates the path part (`path_and_query.first`).
+    if (!Http::HeaderUtility::headerValueIsValid(path_and_query.second)) {
+      return absl::InvalidArgumentError("invalid query string");
     }
     absl::StatusOr<std::string> regex =
         UriTemplate::convertPathPatternSyntaxToRegex(path_and_query.first);
