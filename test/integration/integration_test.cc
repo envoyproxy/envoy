@@ -9,6 +9,7 @@
 #include "envoy/registry/registry.h"
 
 #if defined(__linux__)
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
 #include "source/common/common/cpu_affinity.h"
@@ -172,6 +173,63 @@ TEST_P(IntegrationTest, BindFailureInNetworkNamespace) {
   // One call enters the network namespace and one leaves it.
   EXPECT_EQ(2, fake_setns.calls());
   // Shut down the server before linux_os_calls and fake_setns go out of scope.
+  test_server_.reset();
+}
+
+// Whether the calling thread is inside the network namespace faked by ToggleFakeNetns.
+thread_local bool in_fake_netns = false;
+
+// Fakes setns() like FakeSetns and tracks whether the calling thread is inside the namespace. Each
+// execInNetworkNamespace() calls setns() once to enter the namespace and once to leave it.
+class ToggleFakeNetns : public Api::LinuxOsSysCallsImpl {
+public:
+  Api::SysCallIntResult setns(int, int) const override {
+    in_fake_netns = !in_fake_netns;
+    return {0, 0};
+  }
+};
+
+// Fails socket(2) with EMFILE inside the faked network namespace, as when the process is out of
+// file descriptors.
+class FailSocketInFakeNetns : public Api::OsSysCallsImpl {
+public:
+  Api::SysCallSocketResult socket(int domain, int type, int protocol) override {
+    if (in_fake_netns) {
+      failures_++;
+      return {INVALID_SOCKET, EMFILE};
+    }
+    return Api::OsSysCallsImpl::socket(domain, type, protocol);
+  }
+
+  uint32_t failures() const { return failures_; }
+
+private:
+  std::atomic<uint32_t> failures_{0};
+};
+
+// Verify that a listener whose socket cannot be created in its network namespace (e.g. because the
+// process is out of file descriptors) fails gracefully instead of crashing the server.
+TEST_P(IntegrationTest, ListenerSocketExhaustionInNetworkNamespace) {
+  ToggleFakeNetns fake_setns;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&fake_setns};
+  FailSocketInFakeNetns fail_socket;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket};
+  // The namespace file only has to exist since setns() is faked.
+  const std::string netns_path = TestEnvironment::writeStringToFileForTest("netns", "");
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* socket_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_network_namespace_filepath(netns_path);
+  });
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
+  EXPECT_GE(fail_socket.failures(), 1);
+  // Shut down the server before the injected syscalls go out of scope.
   test_server_.reset();
 }
 #endif
