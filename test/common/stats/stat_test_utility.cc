@@ -131,6 +131,7 @@ TestScope::TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr ma
 // Stats::Scope
 Counter& TestScope::counterFromString(const std::string& leaf_name) {
   std::string name = prefix_str_ + leaf_name;
+  Thread::LockGuard lock(store_.lock_);
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromString(leaf_name);
@@ -140,6 +141,7 @@ Counter& TestScope::counterFromString(const std::string& leaf_name) {
 
 Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMode import_mode) {
   std::string name = prefix_str_ + leaf_name;
+  Thread::LockGuard lock(store_.lock_);
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedScopeImpl::gaugeFromString(leaf_name, import_mode);
@@ -149,6 +151,7 @@ Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMod
 
 Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogram::Unit unit) {
   std::string name = prefix_str_ + leaf_name;
+  Thread::LockGuard lock(store_.lock_);
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedScopeImpl::histogramFromString(leaf_name, unit);
@@ -186,6 +189,7 @@ Counter& TestScope::counterFromTaggedName(StatName base_name,
                                           std::optional<StatNameTagSpan> name_tags,
                                           StatName tagged_name) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
+  Thread::LockGuard lock(store_.lock_);
   Counter*& counter_ref = store_.counter_map_[flat_name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromTaggedName(base_name, name_tags, tagged_name);
@@ -198,6 +202,7 @@ Counter& TestScope::counterFromTaggedName(StatName base_name,
 Gauge& TestScope::gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                       StatName tagged_name, Gauge::ImportMode import_mode) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
+  Thread::LockGuard lock(store_.lock_);
   Gauge*& gauge_ref = store_.gauge_map_[flat_name];
   if (gauge_ref == nullptr) {
     gauge_ref =
@@ -212,6 +217,7 @@ Histogram& TestScope::histogramFromTaggedName(StatName base_name,
                                               std::optional<StatNameTagSpan> name_tags,
                                               StatName tagged_name, Histogram::Unit unit) {
   std::string flat_name = statNameWithTags(base_name, name_tags, tagged_name);
+  Thread::LockGuard lock(store_.lock_);
   Histogram*& histogram_ref = store_.histogram_map_[flat_name];
   if (histogram_ref == nullptr) {
     histogram_ref =
@@ -244,18 +250,22 @@ findByString(const std::string& name, const absl::flat_hash_map<std::string, Sta
 }
 
 CounterOptConstRef TestStore::findCounterByString(const std::string& name) const {
+  Thread::LockGuard lock(lock_);
   return findByString<Counter>(name, counter_map_);
 }
 
 GaugeOptConstRef TestStore::findGaugeByString(const std::string& name) const {
+  Thread::LockGuard lock(lock_);
   return findByString<Gauge>(name, gauge_map_);
 }
 
 HistogramOptConstRef TestStore::findHistogramByString(const std::string& name) const {
+  Thread::LockGuard lock(lock_);
   return findByString<Histogram>(name, histogram_map_);
 }
 
 std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool clear) {
+  Thread::LockGuard lock(lock_);
   auto it = histogram_values_map_.find(name);
   ASSERT(it != histogram_values_map_.end(), absl::StrCat("Couldn't find histogram ", name));
   std::vector<uint64_t> copy = it->second;
@@ -266,6 +276,7 @@ std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool c
 }
 
 bool TestStore::histogramRecordedValues(const std::string& name) const {
+  Thread::LockGuard lock(lock_);
   return histogram_values_map_.contains(name);
 }
 
