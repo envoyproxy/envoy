@@ -1121,6 +1121,18 @@ TEST_F(McpFilterClientCapabilitiesTest, BodyModeRejectsMissingClientCapabilities
   EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
 }
 
+TEST_F(McpFilterClientCapabilitiesTest, RequestWithResultFieldRequiresClientCapabilities) {
+  setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  auto headers = newSpecHeaders("tasks/get", "task-123");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  expectMissingClientCapabilitiesReply();
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}},"result":{}})");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
 TEST_F(McpFilterClientCapabilitiesTest, HeadersModeRejectsMissingClientCapabilities) {
   setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
   auto headers = newSpecHeaders("tasks/get", "task-123");
@@ -1537,6 +1549,25 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
                              Property(&Protobuf::Struct::fields,
                                       Contains(Pair("name", Property(&Protobuf::Value::string_value,
                                                                      "test")))))))));
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, RequestWithResultFieldKeepsRequestMethodInMetadata) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"test"},"result":{}})");
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("tools/call", metadata.fields().at("method").string_value());
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
