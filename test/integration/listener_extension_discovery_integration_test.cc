@@ -454,7 +454,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   // The config failure completes warming, but the listener only starts listening once the
   // workers add it, so wait for that before connecting.
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
   // The missing config filter will be installed and close the connection when a correction is
   // created.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
