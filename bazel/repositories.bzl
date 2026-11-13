@@ -229,7 +229,14 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_host()
     _emsdk()
     _rules_fuzzing()
-    external_http_archive("proxy_wasm_rust_sdk")
+    external_http_archive(
+        name = "proxy_wasm_rust_sdk",
+        patch_args = ["-p1"],
+        # Declares the import module of the host functions, as proxy-wasm-rust-sdk 0.2.5 does
+        # (proxy-wasm/proxy-wasm-rust-sdk#365). Newer Rust no longer lets wasm targets link with
+        # undefined symbols, so without it every Rust wasm module fails to link.
+        patches = ["@envoy//bazel:proxy_wasm_rust_sdk.patch"],
+    )
     _cel_cpp()
     _perfetto()
     _rules_ruby()
@@ -908,10 +915,7 @@ def _proxy_wasm_cpp_host():
     external_http_archive(
         name = "proxy_wasm_cpp_host",
         patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel:proxy_wasm_cpp_host.patch",
-            "@envoy//bazel:proxy_wasm_cpp_host-s390x.patch",
-        ],
+        patches = ["@envoy//bazel:proxy_wasm_cpp_host.patch"],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
@@ -972,8 +976,7 @@ def _toolchains_llvm():
 def _wasmtime():
     external_http_archive(
         name = "wasmtime",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        build_file = "@envoy//bazel/external:wasmtime.BUILD",
     )
 
 def _dlb():

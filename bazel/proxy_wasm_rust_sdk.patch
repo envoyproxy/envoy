@@ -1,0 +1,298 @@
+--- a/src/hostcalls.rs
++++ b/src/hostcalls.rs
+@@ -17,6 +17,7 @@
+ use std::ptr::{null, null_mut};
+ use std::time::{Duration, SystemTime, UNIX_EPOCH};
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_log(level: LogLevel, message_data: *const u8, message_size: usize) -> Status;
+ }
+@@ -30,6 +31,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_log_level(return_level: *mut LogLevel) -> Status;
+ }
+@@ -44,6 +46,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_current_time_nanoseconds(return_time: *mut u64) -> Status;
+ }
+@@ -58,6 +61,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_set_tick_period_milliseconds(period: u32) -> Status;
+ }
+@@ -71,6 +75,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_buffer_bytes(
+         buffer_type: BufferType,
+@@ -113,6 +118,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_set_buffer_bytes(
+         buffer_type: BufferType,
+@@ -138,6 +144,7 @@
+ }
+ 
+ #[cfg(not(test))]
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_header_map_pairs(
+         map_type: MapType,
+@@ -191,6 +198,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_set_header_map_pairs(
+         map_type: MapType,
+@@ -219,6 +227,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_header_map_value(
+         map_type: MapType,
+@@ -288,6 +297,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_remove_header_map_value(
+         map_type: MapType,
+@@ -305,6 +315,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_replace_header_map_value(
+         map_type: MapType,
+@@ -363,6 +374,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_add_header_map_value(
+         map_type: MapType,
+@@ -403,6 +415,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_property(
+         path_data: *const u8,
+@@ -442,6 +455,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_set_property(
+         path_data: *const u8,
+@@ -466,6 +480,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_shared_data(
+         key_data: *const u8,
+@@ -508,6 +523,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_set_shared_data(
+         key_data: *const u8,
+@@ -534,6 +550,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_register_shared_queue(
+         name_data: *const u8,
+@@ -552,6 +569,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_resolve_shared_queue(
+         vm_id_data: *const u8,
+@@ -579,6 +597,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_dequeue_shared_queue(
+         queue_id: u32,
+@@ -610,6 +629,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_enqueue_shared_queue(
+         queue_id: u32,
+@@ -632,6 +652,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_continue_stream(stream_type: StreamType) -> Status;
+ }
+@@ -672,6 +693,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_close_stream(stream_type: StreamType) -> Status;
+ }
+@@ -711,6 +733,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_send_local_response(
+         status_code: u32,
+@@ -770,6 +793,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_http_call(
+         upstream_data: *const u8,
+@@ -819,6 +843,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_grpc_call(
+         upstream_data: *const u8,
+@@ -872,6 +897,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_grpc_stream(
+         upstream_data: *const u8,
+@@ -917,6 +943,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_grpc_send(
+         token: u32,
+@@ -946,6 +973,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_grpc_cancel(token_id: u32) -> Status;
+ }
+@@ -970,6 +998,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_grpc_close(token_id: u32) -> Status;
+ }
+@@ -984,6 +1013,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_status(
+         return_code: *mut u32,
+@@ -1020,6 +1050,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_set_effective_context(context_id: u32) -> Status;
+ }
+@@ -1034,6 +1065,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_call_foreign_function(
+         function_name_data: *const u8,
+@@ -1080,6 +1112,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_done() -> Status;
+ }
+@@ -1093,6 +1126,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_define_metric(
+         metric_type: MetricType,
+@@ -1112,6 +1146,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_get_metric(metric_id: u32, return_value: *mut u64) -> Status;
+ }
+@@ -1128,6 +1163,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_record_metric(metric_id: u32, value: u64) -> Status;
+ }
+@@ -1142,6 +1178,7 @@
+     }
+ }
+ 
++#[link(wasm_import_module = "env")]
+ extern "C" {
+     fn proxy_increment_metric(metric_id: u32, offset: i64) -> Status;
+ }

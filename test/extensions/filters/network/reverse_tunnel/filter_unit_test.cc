@@ -103,6 +103,12 @@ public:
   void setupUpstreamExtension() {
     upstream_config_.set_stat_prefix("reverse_connections");
     // Create the upstream socket interface and extension.
+    if (upstream_extension_) {
+      upstream_extension_->setTestOnlyTLSRegistry(nullptr);
+    }
+    upstream_tls_slot_.reset();
+    upstream_thread_local_registry_.reset();
+    upstream_extension_.reset();
     upstream_socket_interface_ =
         std::make_unique<ReverseConnection::ReverseTunnelAcceptor>(context_);
     upstream_extension_ = std::make_unique<ReverseConnection::ReverseTunnelAcceptorExtension>(
@@ -233,6 +239,9 @@ public:
 
   void TearDown() override {
     // Clean up thread local components to avoid issues during destruction.
+    if (upstream_extension_) {
+      upstream_extension_->setTestOnlyTLSRegistry(nullptr);
+    }
     upstream_tls_slot_.reset();
     upstream_thread_local_registry_.reset();
     upstream_extension_.reset();
@@ -251,6 +260,9 @@ public:
   }
 
   void TearDown() override {
+    if (upstream_extension_) {
+      upstream_extension_->setTestOnlyTLSRegistry(nullptr);
+    }
     upstream_tls_slot_.reset();
     upstream_thread_local_registry_.reset();
     upstream_extension_.reset();
@@ -1947,6 +1959,9 @@ public:
   }
 
   void TearDown() override {
+    if (upstream_extension_) {
+      upstream_extension_->setTestOnlyTLSRegistry(nullptr);
+    }
     upstream_tls_slot_.reset();
     upstream_thread_local_registry_.reset();
     upstream_extension_.reset();

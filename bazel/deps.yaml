@@ -140,11 +140,13 @@ c_ares:
   project_name: "c-ares"
   project_desc: "C library for asynchronous DNS requests"
   project_url: "https://c-ares.haxx.se/"
-  release_date: "2025-12-08"
+  release_date: "2026-10-20"
   use_category:
   - dataplane_core
   - controlplane
-  cpe: "cpe:2.3:a:c-ares_project:c-ares:*"
+  # TODO(phlax): add this back when the scanner supports a cpe list
+  # cpe: "cpe:2.3:a:c-ares_project:c-ares:*"
+  cpe: "cpe:2.3:a:c-ares:c-ares:*"
   license: "c-ares"
   license_url: "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md"
 
@@ -568,7 +570,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2026-06-15"
+  release_date: "2026-10-29"
   use_category:
   - dataplane_ext
   extensions:
@@ -819,7 +821,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-09-29"
+  release_date: "2026-11-13"
   use_category:
   - build
   - controlplane
@@ -1215,7 +1217,7 @@ proxy_wasm_cpp_host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host"
-  release_date: "2026-01-15"
+  release_date: "2026-06-23"
   use_category:
   - dataplane_ext
   extensions:

@@ -42,7 +42,7 @@ using Http::LowerCaseString;
 struct ConfigOptions {
   bool downstream_filter = true;
   bool failure_mode_allow = false;
-  int64_t timeout_ms = 900;
+  int64_t timeout_ms = 5000;
   std::string cluster = "ext_proc_server_0";
   bool add_log_filter = false;
 };
@@ -84,6 +84,14 @@ public:
         [&total_cluster_endpoints](const auto& item) { total_cluster_endpoints += item.second; });
     ASSERT_EQ(total_cluster_endpoints, side_stream_count_);
 
+    // The filter's default message timeout (200ms) is shorter than a round trip through the
+    // fake ext_proc server can take under the sanitizers. A timeout fails the request with a 504
+    // (or passes it through unprocessed with failure_mode_allow), and the test then fails on
+    // whatever it expected next. Tests that rely on the timeout set their own.
+    if (!proto_config_.has_message_timeout()) {
+      proto_config_.mutable_message_timeout()->set_seconds(5);
+    }
+
     config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge."
@@ -110,7 +118,8 @@ public:
           proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
       http_uri->set_uri("ext_proc_server_0:9000");
       http_uri->set_cluster(config_option.cluster);
-      http_uri->mutable_timeout()->set_nanos(config_option.timeout_ms * 1000000);
+      *http_uri->mutable_timeout() =
+          Protobuf::util::TimeUtil::MillisecondsToDuration(config_option.timeout_ms);
 
       if (config_option.failure_mode_allow) {
         proto_config_.set_failure_mode_allow(true);
@@ -368,10 +377,11 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Ext_proc filter timeout is set to default value which is 200ms. HTTP Async client timeout
-// is set to a much larger number 900ms. Test the case that the side stream server does not
+// Ext_proc filter timeout is set to its default value, which is 200ms. HTTP Async client timeout
+// is set to a much larger number 5s. Test the case that the side stream server does not
 // send response in time which triggers ext_proc filter timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -387,12 +397,13 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   verifyDownstreamResponse(*response, 504);
 }
 
-// Ext_proc filter timeout is set to default value which is 200ms. HTTP Async client timeout
+// Ext_proc filter timeout is set to its default value, which is 200ms. HTTP Async client timeout
 // is set to a smaller number 100ms. Test the case that the side stream server does not
 // send response in time which triggers HTTP async client timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
   ConfigOptions config_option = {};
   config_option.timeout_ms = 100;
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig(config_option);
@@ -484,6 +495,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, WrongClusterConfigWithFailClose) {
   ConfigOptions config_option = {};
   config_option.failure_mode_allow = false;
   config_option.cluster = "foo";
+  // There is no response from the wrong cluster, so this relies on the message timeout.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig(config_option);
@@ -497,6 +510,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, WrongClusterConfigWithFailOpen) {
   ConfigOptions config_option = {};
   config_option.failure_mode_allow = true;
   config_option.cluster = "foo";
+  // There is no response from the wrong cluster, so this relies on the message timeout.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig(config_option);

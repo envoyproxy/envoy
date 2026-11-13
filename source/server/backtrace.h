@@ -1,10 +1,13 @@
 #pragma once
 
+#include <algorithm>
+#include <atomic>
 #include <functional>
 #include <iostream>
 #include <ostream>
 
 #include "source/common/common/logger.h"
+#include "source/common/common/stderr_writer.h"
 #include "source/common/version/version.h"
 
 #include "absl/debugging/stacktrace.h"
@@ -61,11 +64,14 @@ public:
   static absl::string_view addrMapping(bool setup = false);
 
   /**
-   * Directs the output of logTrace() to directly stderr rather than the
+   * Directs the output of logFault() and logTrace() directly to stderr rather than the
    * logging infrastructure.
    *
-   * This is intended for coverage tests, where we enable trace logs, but send
-   * them to /dev/null to avoid accumulating too much data in CI.
+   * This is used in fatal signal handlers to bypass the logger mutex, and in coverage
+   * tests where logs are sent to /dev/null to avoid accumulating too much data in CI.
+   *
+   * As it is used in fatal signal handlers, this output is written with write(2) from a fixed
+   * buffer, and neither allocates nor takes the stdio or stream locks.
    *
    * @param log_to_stderr Whether to log to stderr or the logging system.
    */
@@ -106,7 +112,12 @@ public:
    */
   void logTrace() {
     if (log_to_stderr_) {
-      printTrace(std::cerr);
+      writeStderr("Backtrace (use tools/stack_decode.py to get line numbers):\nEnvoy version: %s\n",
+                  VersionInfo::version());
+      if (!addrMapping().empty()) {
+        writeStderr("[backtrace] [stderr] Address mapping: %s\n", addrMapping());
+      }
+      visitTrace(writeStderrFrame);
       return;
     }
 
@@ -126,21 +137,27 @@ public:
   }
 
   void logFault(const char* signame, const void* addr) {
+    if (log_to_stderr_) {
+      writeStderr("[backtrace] Caught %s, suspect faulting address %p\n", signame, addr);
+      return;
+    }
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
   void printTrace(std::ostream& os) {
     visitTrace([&](int index, const char* symbol, void* address) {
+      os << "#" << index << " ";
       if (symbol != nullptr) {
-        os << "#" << index << " " << symbol << " [" << address << "]\n";
+        os << symbol << " [" << address << "]\n";
       } else {
-        os << "#" << index << " [" << address << "]\n";
+        os << "[" << address << "]\n";
       }
     });
   }
 
 private:
-  static bool log_to_stderr_;
+  // Set from the fatal signal handler, which can run on several threads at once.
+  static std::atomic<bool> log_to_stderr_;
 
   /**
    * Visit the previously captured stack trace.

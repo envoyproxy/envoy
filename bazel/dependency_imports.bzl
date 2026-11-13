@@ -4,6 +4,7 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@cel-cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
+load("@cve_pip3//:requirements.bzl", pip_cve_dependencies = "install_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
@@ -18,14 +19,49 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 load("@shellcheck//:deps.bzl", "shellcheck_dependencies")
+load("//bazel:repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 # go version for rules_go
 GO_VERSION = "1.24.6"
+
+RUST_VERSION = "1.96.1"
+
+# rules_rust only ships checksums for the Rust releases that predate it, so the archives for
+# `RUST_VERSION` are pinned here (from `https://static.rust-lang.org/dist/<archive>.sha256`).
+# Archives for platforms that are not listed are fetched unverified.
+RUST_SHA256S = {
+    "cargo-1.96.1-aarch64-apple-darwin.tar.xz": "2f43d75e9ad3febae5022c6f295cf93b74131cfdb1293a83e291f878ea9585a0",
+    "cargo-1.96.1-aarch64-unknown-linux-gnu.tar.xz": "02a4d7bf424ea28d574fe5b5d29e7ae99b0bc11a5920d8f28fa7408aa6a37992",
+    "cargo-1.96.1-x86_64-apple-darwin.tar.xz": "128041aa757a6bbc60664079ff294281cdbabd51cc4b7c1f7d40cd1b1ea955f5",
+    "cargo-1.96.1-x86_64-unknown-linux-gnu.tar.xz": "ecc53a3c49fab5ab8c9301b3bbc8fb1dff9be6c65287add3f57a0fe8fddfea9e",
+    "clippy-1.96.1-aarch64-apple-darwin.tar.xz": "538299b07171a8110a1beedcaf26aac6292e4e032a399639e1959f0c405a67fe",
+    "clippy-1.96.1-aarch64-unknown-linux-gnu.tar.xz": "998c5a8e2e938b7f229a053779f91a7b3e0fefaa834a4e2ced5e2fb7710553a9",
+    "clippy-1.96.1-x86_64-apple-darwin.tar.xz": "11c4ebe061a1df5275d8cc0f0407d135d91aebbce2fc782a3ec4805ce2b01db6",
+    "clippy-1.96.1-x86_64-unknown-linux-gnu.tar.xz": "385644867534c30c490f4507d61485a799f81dfaec7e2a91290a41bf43d8286a",
+    "llvm-tools-1.96.1-aarch64-apple-darwin.tar.xz": "3778f19dde00252cfd25e3ef32c1c79ed128a80e9f11df7c4c659df3a61bef55",
+    "llvm-tools-1.96.1-aarch64-unknown-linux-gnu.tar.xz": "0c8efc2c7ff4543ef93ed972e4dcf121528e9c71ab758afb086d4855b17307f9",
+    "llvm-tools-1.96.1-x86_64-apple-darwin.tar.xz": "3edd3fed5f05a81b06bf7a5d32dce7490e896a4662b8abd47a91a8488e841bc5",
+    "llvm-tools-1.96.1-x86_64-unknown-linux-gnu.tar.xz": "dfa558e9608471a6f6510abc27dc9dd759f629973ea458ca44e5e94e7c0fe293",
+    "rust-std-1.96.1-aarch64-apple-darwin.tar.xz": "0d433a74c303febc915f8fa1091ef166445706461d0c96984ecb7303aa8208f5",
+    "rust-std-1.96.1-aarch64-unknown-linux-gnu.tar.xz": "24bd362ff484421cae8be8c4d326fde143a086782e59e21fc7f353a5d04cd630",
+    "rust-std-1.96.1-wasm32-unknown-unknown.tar.xz": "0504b6fd6ec756ab5c32d35d8c9baf16138d9a7ed748c60db6c298c298c8bf01",
+    "rust-std-1.96.1-wasm32-wasip1.tar.xz": "e762b64cc79a443e2dab09f5fa7aabb236809246d1e51d5da7d46427adcca15e",
+    "rust-std-1.96.1-x86_64-apple-darwin.tar.xz": "a094fc4d30985f48aff70629d7a6c1f16d314a63f3cb141927095b6d506edd35",
+    "rust-std-1.96.1-x86_64-unknown-linux-gnu.tar.xz": "1bf4fde5048cca33e6ea00c7471281ed96d792f6923141e3db45072743a1afae",
+    "rustc-1.96.1-aarch64-apple-darwin.tar.xz": "9b548f0665f85f3c7fd45165611e3dea79f048c69d163be193986310d204fc2c",
+    "rustc-1.96.1-aarch64-unknown-linux-gnu.tar.xz": "4bc079af433c730af16aa90c96777985b86d40c4670670380160bd61626a577f",
+    "rustc-1.96.1-x86_64-apple-darwin.tar.xz": "814e1ed2d19952cf9771aeff5e0d4e0b77eefa76a689809f2c1bf769187ab051",
+    "rustc-1.96.1-x86_64-unknown-linux-gnu.tar.xz": "3545a0efad2355ecb0a3b9ac02efee96e27f1f9d24b7ce2fc3f279b2efb0d923",
+    "rustfmt-1.96.1-aarch64-apple-darwin.tar.xz": "ed0cc9d72c04e7c3c4b7a82ab7f1ce5e33132017d062d8f9be6adf6472e8f165",
+    "rustfmt-1.96.1-aarch64-unknown-linux-gnu.tar.xz": "e9826e503341e509f47744fc0d33c145955ae832568d906d927d09e4f9b50380",
+    "rustfmt-1.96.1-x86_64-apple-darwin.tar.xz": "9454c897908bf468306bd2f230a5b03dbbaaec0a29e1a0e614a19da73fad5d56",
+    "rustfmt-1.96.1-x86_64-unknown-linux-gnu.tar.xz": "dcee5627f709f387cdca416a1d2ae9e6c2581cd117cdb4fd097c56c196384662",
+}
 
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
@@ -53,6 +89,7 @@ def envoy_dependency_imports(
     gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
+    pip_cve_dependencies()
     pip_dev_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
@@ -64,16 +101,17 @@ def envoy_dependency_imports(
         exec_triple = "s390x-unknown-linux-gnu",
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
         versions = [rust_common.default_version],
     )
     rules_rust_dependencies()
     rust_register_toolchains(
-        versions = ["1.88.0"],
+        sha256s = RUST_SHA256S,
+        versions = [RUST_VERSION],
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
             # Unconditionally specify the target triples for x-compilations.
             # Note that the toolchain won't be fetched/used unless the target triple is actually used in the build.
             "x86_64-unknown-linux-gnu",
@@ -254,4 +292,47 @@ def crates_repositories(cargo_bazel_lockfile):
         cargo_lockfile = "@envoy//:Cargo.lock",
         lockfile = Label(cargo_bazel_lockfile),
         manifests = ["@envoy//:Cargo.toml"],
+    )
+
+    # The crates that the wasmtime C API (`@wasmtime//:wasmtime_lib`) is built against.
+    #
+    # The C API itself is built from the `wasmtime` source archive, so the crate versions are
+    # taken from that pin and cannot drift from it. Everything else is pinned by the `Cargo.lock`,
+    # which is seeded from the one in the source archive.
+    #
+    # After updating `wasmtime`, replace `bazel/external/wasmtime/Cargo.lock` with the one from the
+    # new source archive and run:
+    #
+    #     CARGO_BAZEL_REPIN=1 CARGO_BAZEL_REPIN_ONLY=wasmtime_crates bazel sync --only=wasmtime_crates
+    #
+    wasmtime_version = "={}".format(REPOSITORY_LOCATIONS_SPEC["wasmtime"]["version"])
+    crates_repository(
+        name = "wasmtime_crates",
+        cargo_lockfile = "@envoy//bazel/external/wasmtime:Cargo.lock",
+        lockfile = "@envoy//bazel/external/wasmtime:Cargo.Bazel.lock",
+        packages = {
+            "log": crate.spec(
+                default_features = False,
+                version = "*",
+            ),
+            "tracing": crate.spec(
+                default_features = False,
+                version = "*",
+            ),
+            # The features must match `_C_API_FEATURES` in `bazel/external/wasmtime.BUILD`.
+            "wasmtime": crate.spec(
+                default_features = False,
+                features = [
+                    "cranelift",
+                    "gc",
+                    "gc-drc",
+                    "runtime",
+                    "std",
+                ],
+                version = wasmtime_version,
+            ),
+            "wasmtime-internal-c-api-macros": crate.spec(
+                version = wasmtime_version,
+            ),
+        },
     )

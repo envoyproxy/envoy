@@ -59,6 +59,9 @@ pub(crate) fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
+// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
+// `__darwin_pthread_handler_rec` on macOS.
+#[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -378,7 +381,7 @@ macro_rules! envoy_log {
 macro_rules! set_factory_once {
   ($static:expr, $fn:expr, $name:literal) => {
     if let Err(new_val) = $static.set($fn) {
-      if *$static.get().unwrap() != new_val {
+      if !::std::ptr::fn_addr_eq(*$static.get().unwrap(), new_val) {
         $crate::envoy_log_critical!(
           "Duplicate factory registration for {}. A different module already registered this \
            factory. Check dynamic_module_config for conflicting standalone and consolidated \

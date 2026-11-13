@@ -525,6 +525,24 @@ void ExtProcIntegrationTest::processResponseBodyMessage(
   }
 }
 
+void ExtProcIntegrationTest::processStreamedResponseBodyAs(absl::string_view body) {
+  bool end_stream = false;
+  bool first_chunk = true;
+  while (!end_stream) {
+    processResponseBodyMessage(*grpc_upstreams_[0], false,
+                               [&](const HttpBody& chunk, BodyResponse& body_resp) {
+                                 end_stream = chunk.end_of_stream();
+                                 body_resp.mutable_response()->mutable_body_mutation()->set_body(
+                                     first_chunk ? std::string(body) : "");
+                                 first_chunk = false;
+                                 return true;
+                               });
+    if (testing::Test::HasFatalFailure()) {
+      return;
+    }
+  }
+}
+
 void ExtProcIntegrationTest::processResponseTrailersMessage(
     FakeUpstream& grpc_upstream, bool first_message,
     absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb) {
@@ -727,6 +745,12 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   // Just close the stream without doing anything
   processor_stream_->startGrpcStream();
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  // finishGrpcStream() only posts the response on the fake upstream's dispatcher. In
+  // observability mode, the main stream does not wait for the ext_proc stream, so wait until Envoy
+  // has processed the close before allowing the main response to complete and consume its logging
+  // info.
+  test_server_->waitForCounterGe("http.config_test.ext_proc.server_half_closed", 1);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);

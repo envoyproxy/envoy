@@ -46,10 +46,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.13.post0",
-        sha256 = "0485886f4d2aa3b666540e752d7a2e8eed9b79f6840f8f1cfad3b41f135cdb76",
-        strip_prefix = "toolshed-bazel-v{version}",
-        urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
+        version = "0.4.13.post3",
+        sha256 = "b502cb9a88cba42be907b98c6d8068e348225aaebbf59363ffefd0b505db461d",
+        strip_prefix = "toolshed-bazel-v{version}/bazel",
+        urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
     ),
     rules_fuzzing = dict(
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
@@ -116,8 +116,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/perfetto/releases/download/v{version}/perfetto-cpp-sdk-src.zip"],
     ),
     c_ares = dict(
-        version = "1.34.6",
-        sha256 = "912dd7cc3b3e8a79c52fd7fb9c0f4ecf0aaa73e45efda880266a2d6e26b84ef5",
+        version = "1.34.9",
+        sha256 = "9364b70a12eb59a06830fb488d9357f90100dff0d98b23ea3593a183d43e6f2f",
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/v{version}/c-ares-{version}.tar.gz"],
     ),
@@ -515,8 +515,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
     wasmtime = dict(
-        version = "24.0.10",
-        sha256 = "746e9b629ee944d85a6cc1db099d38865f44688099f7330400b073ed68790fd0",
+        version = "49.0.5",
+        sha256 = "64d42519b616f14336e194b8c3d74b355e01ddff49cee9aa1159a8cdd53b37cf",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
@@ -619,8 +619,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
     ),
     proxy_wasm_cpp_host = dict(
-        version = "beb8a4ece9eede4ab21d89d723359607600296d4",
-        sha256 = "dbd2d449fca10c1cd655efe21eee34fe880f4ff5fe7f01562f7829ca8dd4b2bf",
+        version = "f2db56af443571e92a31c0b877106d9ea96e19ef",
+        sha256 = "34dac5bcebf0b156e435bf8dd9bdac5be60b95f967c420c680578d73af28c604",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
     ),
