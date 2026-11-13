@@ -60,12 +60,12 @@ public:
 
   // Filesystem::Instance
   MOCK_METHOD(FilePtr, createFile, (const FilePathAndType&));
-  MOCK_METHOD(bool, fileExists, (const std::string&));
-  MOCK_METHOD(bool, directoryExists, (const std::string&));
-  MOCK_METHOD(ssize_t, fileSize, (const std::string&));
-  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&));
+  MOCK_METHOD(bool, fileExists, (absl::string_view));
+  MOCK_METHOD(bool, directoryExists, (absl::string_view));
+  MOCK_METHOD(ssize_t, fileSize, (absl::string_view));
+  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (absl::string_view));
   MOCK_METHOD(absl::StatusOr<PathSplitResult>, splitPathFromFilename, (absl::string_view));
-  MOCK_METHOD(bool, illegalPath, (const std::string&));
+  MOCK_METHOD(bool, illegalPath, (absl::string_view));
   MOCK_METHOD(Api::IoCallResult<FileInfo>, stat, (absl::string_view));
   MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view));
 };

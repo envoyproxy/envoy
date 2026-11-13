@@ -18,25 +18,25 @@ public:
 
   FilePtr createFile(const FilePathAndType& file_info) override;
 
-  bool fileExists(const std::string& path) override {
+  bool fileExists(absl::string_view path) override {
     absl::MutexLock m(lock_);
     auto it = files_.find(path);
     return (it != files_.end() || file_system_->fileExists(path));
   }
 
-  bool directoryExists(const std::string& path) override {
+  bool directoryExists(absl::string_view path) override {
     return file_system_->directoryExists(path);
   }
 
-  ssize_t fileSize(const std::string& path) override;
+  ssize_t fileSize(absl::string_view path) override;
 
-  absl::StatusOr<std::string> fileReadToEnd(const std::string& path) override;
+  absl::StatusOr<std::string> fileReadToEnd(absl::string_view path) override;
 
   absl::StatusOr<PathSplitResult> splitPathFromFilename(absl::string_view path) override {
     return file_system_->splitPathFromFilename(path);
   }
 
-  bool illegalPath(const std::string& path) override { return file_system_->illegalPath(path); }
+  bool illegalPath(absl::string_view path) override { return file_system_->illegalPath(path); }
 
   void renameFile(const std::string& old_name, const std::string& new_name);
 

@@ -309,7 +309,7 @@ protected:
         std::move(process_context_));
     server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                         component_factory_);
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(Platform::null_device_path));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -328,7 +328,7 @@ protected:
     server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                         component_factory_);
 
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(Platform::null_device_path));
   }
 
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,

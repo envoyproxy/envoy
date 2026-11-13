@@ -55,12 +55,12 @@ class InstanceImplPosix : public Instance {
 public:
   // Filesystem::Instance
   FilePtr createFile(const FilePathAndType& file_info) override;
-  bool fileExists(const std::string& path) override;
-  bool directoryExists(const std::string& path) override;
-  ssize_t fileSize(const std::string& path) override;
-  absl::StatusOr<std::string> fileReadToEnd(const std::string& path) override;
+  bool fileExists(absl::string_view path) override;
+  bool directoryExists(absl::string_view path) override;
+  ssize_t fileSize(absl::string_view path) override;
+  absl::StatusOr<std::string> fileReadToEnd(absl::string_view path) override;
   absl::StatusOr<PathSplitResult> splitPathFromFilename(absl::string_view path) override;
-  bool illegalPath(const std::string& path) override;
+  bool illegalPath(absl::string_view path) override;
   Api::IoCallResult<FileInfo> stat(absl::string_view path) override;
   Api::IoCallBoolResult createPath(absl::string_view path) override;
 
