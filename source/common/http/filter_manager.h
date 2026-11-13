@@ -366,6 +366,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
+  // True once FilterManager::encodeTrailers() has processed every filter before this one, i.e. the
+  // trailers can be encoded from here without skipping a filter that still holds body or trailers.
+  bool trailersReachedThisFilter() const;
 
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
@@ -1126,7 +1129,12 @@ private:
   // to update stats, do end stream bookkeeping, and send the data to encoder.
   void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
+  // `filter_iteration_start_state` is CanStartFromCurrent when a filter resumes trailer iteration
+  // itself (doTrailers()), and AlwaysStartFromNext when forwarding trailers that `filter` added
+  // during its own encodeData() callback, since that filter has already seen the end of stream.
+  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers,
+                      FilterIterationStartState filter_iteration_start_state =
+                          FilterIterationStartState::CanStartFromCurrent);
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
   bool hasSavedResponseMetadata() const;
   void encodeSavedResponseMetadataToCodec();
