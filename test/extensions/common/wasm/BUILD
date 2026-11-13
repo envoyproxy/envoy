@@ -40,6 +40,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:bad_signature_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
+        "//test/extensions/common/wasm/test_data:test_cpp_source.wasm",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
     rbe_pool = "4core",
@@ -65,6 +66,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
+        "@proxy_wasm_cpp_host//:headers",
     ],
 )
 
@@ -117,6 +119,15 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "wasm_runtime_test",
+    srcs = ["wasm_runtime_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":wasm_runtime",
     ],
 )
 

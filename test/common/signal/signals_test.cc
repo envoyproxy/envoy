@@ -72,6 +72,15 @@ public:
   bool isAsyncSignalSafe() const override { return false; }
 };
 
+TEST(SignalsTest, SignalDescription) {
+  EXPECT_STREQ(SignalAction::signalDescription(SIGSEGV), "Segmentation fault");
+  EXPECT_STREQ(SignalAction::signalDescription(SIGBUS), "Bus error");
+  EXPECT_STREQ(SignalAction::signalDescription(SIGFPE), "Floating point exception");
+  EXPECT_STREQ(SignalAction::signalDescription(SIGILL), "Illegal instruction");
+  EXPECT_STREQ(SignalAction::signalDescription(SIGABRT), "Aborted");
+  EXPECT_STREQ(SignalAction::signalDescription(12345), "Unknown signal");
+}
+
 // Death tests that expect a particular output are disabled under address sanitizer.
 // The sanitizer does its own special signal handling and prints messages that are
 // not ours instead of what this test expects. As of latest Clang this appears

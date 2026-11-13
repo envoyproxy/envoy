@@ -1220,9 +1220,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         envoy_filter.get_received_response_body()
       };
 
-      if optional_vec.is_some() {
-        let received_vec = optional_vec.unwrap();
-
+      if let Some(received_vec) = optional_vec {
         let buffer_bytes = received_vec
           .iter()
           .map(|buf| buf.as_slice().len())
@@ -1241,9 +1239,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         envoy_filter.get_buffered_response_body()
       };
 
-      if optional_vec.is_some() {
-        let buffered_vec = optional_vec.unwrap();
-
+      if let Some(buffered_vec) = optional_vec {
         let buffer_bytes = buffered_vec
           .iter()
           .map(|buf| buf.as_slice().len())
@@ -1300,8 +1296,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading new received request body.
       let body = envoy_filter.get_received_request_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
         self.request_body.extend_from_slice(&buf[..n]);
@@ -1319,8 +1315,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading old buffered request body.
       let body = envoy_filter.get_buffered_request_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
         self.request_body.extend_from_slice(&buf[..n]);
@@ -1347,8 +1343,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading new received response body.
       let body = envoy_filter.get_received_response_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buffer = Vec::new();
         std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
         self.response_body.extend_from_slice(&buffer);
@@ -1366,8 +1362,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading old buffered response body.
       let body = envoy_filter.get_buffered_response_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buffer = Vec::new();
         std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
         self.response_body.extend_from_slice(&buffer);
