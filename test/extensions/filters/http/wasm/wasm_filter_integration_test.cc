@@ -101,15 +101,21 @@ public:
       auto encoder_decoder = codec_client_->startRequest(request_headers);
       request_encoder_ = &encoder_decoder.first;
       response = std::move(encoder_decoder.second);
-      const auto request_body_size = request_body.size();
-      for (size_t n = 0; n < request_body_size; n++) {
-        Buffer::OwnedImpl buffer(request_body[n]);
-        codec_client_->sendData(*request_encoder_, buffer, n == request_body_size - 1);
-      }
     }
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+    // The body is sent once the request headers have reached the upstream. Until the upstream
+    // connection is ready the upstream codec filter holds the headers, and when it resumes it is
+    // given whatever body an earlier filter has buffered so far. If that happens between two
+    // chunks of the body, an upstream filter that is buffering it no longer owns the buffered
+    // data, and fails an assert when it next reads it.
+    const auto request_body_size = request_body.size();
+    for (size_t n = 0; n < request_body_size; n++) {
+      Buffer::OwnedImpl buffer(request_body[n]);
+      codec_client_->sendData(*request_encoder_, buffer, n == request_body_size - 1);
+    }
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
     assertCompareMaps(expected_request_headers, upstream_request_->headers());
