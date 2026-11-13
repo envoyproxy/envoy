@@ -332,6 +332,38 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+
+  testing::StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(true));
+  message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& filtered_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(filtered_config_dump));
 }
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
@@ -1042,19 +1074,19 @@ key:
 // Tests a partially failed push where the valid scopes use dynamic RDS (`route_configuration_name`)
 // and `bad_scope` is missing `route_configuration_name`:
 //
-// - When `envoy.reloadable_features.srds_partial_acceptance` is false, `addOrUpdateScopes()`
-//   creates the RDS subscription for `valid_scope` (processed before `bad_scope`) and inserts it
-//   into `scoped_route_map_`, then aborts on `bad_scope` before reaching `other_scope`. Because
-//   the `srds_initialization_continuation` cleanup still starts `valid_scope`'s RDS subscription
-//   on unwind, an RDS push for `valid_scope_routes` triggers `onRdsConfigUpdate()` and propagates
-//   `valid_scope` to worker threads, while `other_scope` (after `bad_scope`) is completely skipped.
+// - When `envoy.reloadable_features.srds_partial_acceptance` is false (and
+//   `envoy.reloadable_features.srds_fast_config_update` is true), `onConfigUpdate()` rejects the
+//   entire push up front before mutating `scoped_route_map_` or starting any RDS subscriptions.
 // - When `envoy.reloadable_features.srds_partial_acceptance` is true, both `valid_scope` and
 //   `other_scope` have their RDS subscriptions started and both propagate to worker threads once
 //   their RDS configs arrive.
 TEST_P(ScopedRdsPartialAcceptanceTest, PartiallyFailedDynamicRdsPush) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_partial_acceptance",
-                               partialAcceptanceEnabled() ? "true" : "false"}});
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.srds_fast_config_update", "true"},
+      {"envoy.reloadable_features.srds_partial_acceptance",
+       partialAcceptanceEnabled() ? "true" : "false"},
+  });
 
   server_factory_context_.cluster_manager_.initializeClusters({"bluh"}, {});
   setup();
@@ -1134,16 +1166,13 @@ key:
     ASSERT_THAT(worker_route_config("other-key"), Not(IsNull()));
     EXPECT_EQ(worker_route_config("other-key")->name(), "other_scope_routes");
   } else {
-    // When flag is false: valid_scope (processed before bad_scope) had its RDS subscription
-    // created and started on unwind, so onRdsConfigUpdate() propagated it to worker threads even
-    // though the SRDS push was rejected and config_dump is still empty. other_scope (after
-    // bad_scope) was skipped and never received an RDS subscription.
+    // When partial acceptance is false, the up-front validation rejects the entire push before
+    // mutating scoped_route_map_ or creating any RDS subscriptions.
     EXPECT_EQ(0UL, all_scopes_.value());
-    EXPECT_EQ(1UL, active_scopes_.value());
-    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope")));
+    EXPECT_EQ(0UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), testing::IsEmpty());
     EXPECT_THAT(dumped_scope_names(), testing::IsEmpty());
-    ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
-    EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+    EXPECT_THAT(worker_route_config("valid-key"), IsNull());
     EXPECT_THAT(worker_route_config("other-key"), IsNull());
   }
 
@@ -1154,7 +1183,7 @@ key:
     const auto decoded_resources = TestUtility::decodeResources({valid_resource, other_resource});
     EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, removed, "2"));
   }
-  pushRdsConfig({"other_scope_routes"}, "222");
+  pushRdsConfig({"valid_scope_routes", "other_scope_routes"}, "222");
 
   EXPECT_EQ(1UL,
             server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
@@ -2566,6 +2595,531 @@ key:
   // The callback should have been invoked with false (no RDS provider for inline scope).
   EXPECT_TRUE(callback_called);
   EXPECT_FALSE(callback_value);
+}
+
+class ScopedRdsFastConfigUpdateTest : public ScopedRdsTest,
+                                      public testing::WithParamInterface<bool> {
+protected:
+  bool fastConfigUpdateEnabled() const { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(FastConfigUpdate, ScopedRdsFastConfigUpdateTest, testing::Bool());
+
+// Verify that simultaneous scope additions and removals in a single delta
+// onConfigUpdate are applied properly with and without srds_fast_config_update.
+TEST_P(ScopedRdsFastConfigUpdateTest, UnifiedAtomicOnConfigUpdate) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.srds_fast_config_update",
+       fastConfigUpdateEnabled() ? "true" : "false"},
+  });
+
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  const auto resource_1 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto resource_2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+
+  // Step 1: Initial load of foo_scope1 and foo_scope2.
+  const auto decoded_initial = TestUtility::decodeResources({resource_1, resource_2});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(2UL, all_scopes_.value());
+
+  // Step 2: Delta update that simultaneously removes foo_scope1 and adds
+  // foo_scope3.
+  const auto resource_3 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope3
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF");
+  const auto decoded_added = TestUtility::decodeResources({resource_3});
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "foo_scope1";
+
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_added.refvec_, removed, "2"));
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope2"), Key("foo_scope3")));
+
+  // Verify foo_scope1 is gone from ScopedConfigImpl.
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
+              IsNull());
+  // Verify foo_scope2 and foo_scope3 are present and route to foo_routes.
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "foo_routes");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}}))
+                ->name(),
+            "foo_routes");
+
+  // Step 3: State-of-the-world update retaining foo_scope3 and implicitly removing foo_scope2
+  // (exercises removal-only propagation via ScopedConfigImpl::onConfigUpdate).
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_added.refvec_, "3"));
+  EXPECT_EQ(1UL, all_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope3")));
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
+              IsNull());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}}))
+                ->name(),
+            "foo_routes");
+}
+
+// Verify that when an addition fails validation (e.g., empty
+// route_configuration_name), srds_fast_config_update rejects the entire delta
+// update before any scope removals or earlier additions in the same batch are
+// applied, whereas the legacy path fails mid-update in addOrUpdateScopes.
+TEST_P(ScopedRdsFastConfigUpdateTest, TransactionalAbortOnAdditionFailure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
+
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  const auto resource_1 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+
+  const auto decoded_initial = TestUtility::decodeResources({resource_1});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(1UL, all_scopes_.value());
+
+  // Create a batch containing one valid new scope and one invalid scope
+  // (missing both route_configuration and route_configuration_name), while
+  // simultaneously requesting removal of foo_scope1.
+  const auto valid_resource = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: valid_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-valid-key
+)EOF");
+  const auto invalid_resource = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: bad_scope
+key:
+  fragments:
+    - string_key: x-bad-key
+)EOF");
+  const auto decoded_added = TestUtility::decodeResources({valid_resource, invalid_resource});
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "foo_scope1";
+
+  // The update must fail with the exact expected message.
+  auto status = srds_subscription_->onConfigUpdate(decoded_added.refvec_, removed, "2");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "route_configuration_name is empty.");
+
+  if (fastConfigUpdateEnabled()) {
+    // Neither the removal of foo_scope1 nor the addition of valid_scope should
+    // have taken effect.
+    EXPECT_EQ(1UL, all_scopes_.value());
+    EXPECT_EQ(1UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope1")));
+    auto route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}));
+    ASSERT_THAT(route_config, Not(IsNull()));
+    EXPECT_EQ(route_config->name(), "foo_routes");
+  } else {
+    // Without srds_fast_config_update, removeScopes() has already removed
+    // foo_scope1 from both the main thread and worker threads, and
+    // addOrUpdateScopes() inserted valid_scope into scoped_route_map_ before
+    // returning an error prior to worker propagation and gauge update.
+    EXPECT_EQ(1UL, all_scopes_.value());
+    EXPECT_EQ(1UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope")));
+    EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                    scope_key_builder_->computeScopeKey(
+                        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
+                IsNull());
+  }
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-valid-key"}})),
+              IsNull());
+}
+
+// Verify that replacing a scope with a differently named scope that shares the
+// same ScopeKey in a single delta update preserves both worker routing state
+// and main-thread scope_name_by_hash_ (for both small and >10 scope removal
+// batches).
+TEST_P(ScopedRdsFastConfigUpdateTest, AtomicScopeKeyReplacement) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.srds_fast_config_update",
+       fastConfigUpdateEnabled() ? "true" : "false"},
+  });
+
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // Seed 15 scopes so we can test removing >10 scopes while replacing a scope
+  // key in the same delta update.
+  std::vector<envoy::config::route::v3::ScopedRouteConfiguration> initial_resources;
+  initial_resources.reserve(15);
+  for (int i = 0; i < 15; ++i) {
+    initial_resources.push_back(parseScopedRouteConfigurationFromYaml(fmt::format(R"EOF(
+name: scope_{0}
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: key_{0}
+)EOF",
+                                                                                  i)));
+  }
+  const auto decoded_initial = TestUtility::decodeResources(initial_resources);
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(15UL, all_scopes_.value());
+
+  // Now remove all 15 scopes and simultaneously add scope_0_v2 with the same
+  // key as scope_0 ("key_0"). Because removeScopes runs before addOrUpdateScopes,
+  // scope_0_v2's entry in scope_name_by_hash_ and ScopedConfigImpl must remain intact.
+  const auto replacement_resource = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: scope_0_v2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: key_0
+)EOF");
+  const auto decoded_replacement = TestUtility::decodeResources({replacement_resource});
+  Protobuf::RepeatedPtrField<std::string> removed;
+  for (int i = 0; i < 15; ++i) {
+    *removed.Add() = fmt::format("scope_{}", i);
+  }
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_replacement.refvec_, removed, "2"));
+  EXPECT_EQ(1UL, all_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("scope_0_v2")));
+
+  // Worker ScopedConfigImpl must resolve key_0 to foo_routes.
+  auto route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;key_0"}}));
+  ASSERT_THAT(route_config, Not(IsNull()));
+  EXPECT_EQ(route_config->name(), "foo_routes");
+
+  // Main-thread scope_name_by_hash_ must still map key_0's hash to
+  // "scope_0_v2": adding another scope with key_0 without removing scope_0_v2
+  // must be rejected as a key conflict with scope_0_v2.
+  const auto conflicting_resource = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: scope_conflict
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: key_0
+)EOF");
+  const auto decoded_conflict = TestUtility::decodeResources({conflicting_resource});
+  auto conflict_status = srds_subscription_->onConfigUpdate(decoded_conflict.refvec_, {}, "3");
+  EXPECT_FALSE(conflict_status.ok());
+  EXPECT_EQ(conflict_status.message(),
+            "Error adding/updating scoped route(s): scope key conflict found, "
+            "first scope is "
+            "'scope_0_v2', second scope is 'scope_conflict'");
+}
+
+// Verify that when an existing scope is updated in-place to a new
+// route_configuration_name, srds_fast_config_update keeps its old
+// RdsRouteConfigProviderHelper alive until the end of addOrUpdateScopes so
+// another scope in the same batch can reuse the existing RDS subscription,
+// whereas the legacy path overwrites the helper immediately and requires RDS
+// delivery for the new subscription.
+TEST_P(ScopedRdsFastConfigUpdateTest, InPlaceRdsUpdateReusesSubscriptionAcrossBatch) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
+
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  const auto scope1_v1 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto decoded_initial = TestUtility::decodeResources({scope1_v1});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"shared_routes"}, "111");
+
+  // Now update foo_scope1 to use "other_routes" while adding foo_scope2 using
+  // "shared_routes" in the same batch.
+  const auto scope1_v2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: other_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_update = TestUtility::decodeResources({scope1_v2, scope2});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_update.refvec_, {}, "2"));
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(2UL, active_scopes_.value());
+
+  auto scope2_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}));
+  ASSERT_THAT(scope2_route_config, Not(IsNull()));
+  if (fastConfigUpdateEnabled()) {
+    // foo_scope2 immediately has the already-warm "shared_routes" config without
+    // needing a new pushRdsConfig("shared_routes") call.
+    EXPECT_EQ(scope2_route_config->name(), "shared_routes");
+    pushRdsConfig({"other_routes"}, "222");
+  } else {
+    // Without srds_fast_config_update, foo_scope1's old helper was destroyed on
+    // overwrite before foo_scope2 was processed, so foo_scope2 starts with an
+    // uninitialized NullConfigImpl until RDS delivers "shared_routes".
+    EXPECT_EQ(scope2_route_config->name(), "");
+    pushRdsConfig({"other_routes", "shared_routes"}, "222");
+  }
+
+  auto scope1_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}));
+  ASSERT_THAT(scope1_route_config, Not(IsNull()));
+  EXPECT_EQ(scope1_route_config->name(), "other_routes");
+  scope2_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}));
+  ASSERT_THAT(scope2_route_config, Not(IsNull()));
+  EXPECT_EQ(scope2_route_config->name(), "shared_routes");
+}
+
+// Verify that transitioning an existing RDS scope to inline while simultaneously
+// transitioning an existing inline scope to dynamic RDS using the same
+// route_configuration_name reuses the warm RDS subscription via
+// delayed_rds_providers with and without srds_fast_config_update.
+TEST_P(ScopedRdsFastConfigUpdateTest, InlineToRdsAndRdsToInlineTransitionWithSubscriptionReuse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
+
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // Start with foo_scope1 as an RDS scope ("shared_routes") and foo_scope2 as
+  // an inline scope.
+  const auto scope1_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2_inline = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration:
+  name: inline_routes_2
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_initial = TestUtility::decodeResources({scope1_rds, scope2_inline});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"shared_routes"}, "111");
+  EXPECT_EQ(2UL, all_scopes_.value());
+  // Inline RDS does not count as an active RDS scope.
+  EXPECT_EQ(1UL, active_scopes_.value());
+
+  // Now transition foo_scope1 from RDS to inline, and transition foo_scope2
+  // from inline to RDS using "shared_routes" in the same batch. Because
+  // foo_scope1's old RdsRouteConfigProviderHelper is kept alive in
+  // delayed_rds_providers until onConfigUpdate completes, foo_scope2 reuses the
+  // warm "shared_routes" RDS subscription.
+  const auto scope1_inline = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration:
+  name: inline_routes_1
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_update = TestUtility::decodeResources({scope1_inline, scope2_rds});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_update.refvec_, {}, "2"));
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(1UL, active_scopes_.value());
+
+  auto scope1_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}));
+  ASSERT_THAT(scope1_route_config, Not(IsNull()));
+  EXPECT_EQ(scope1_route_config->name(), "inline_routes_1");
+
+  auto scope2_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}));
+  ASSERT_THAT(scope2_route_config, Not(IsNull()));
+  EXPECT_EQ(scope2_route_config->name(), "shared_routes");
+}
+
+// Verify that when srds_partial_acceptance is enabled (with and without
+// srds_fast_config_update), a batch containing scope removals along with both
+// valid and invalid scope additions applies the removals and valid additions
+// while still returning a NACK for the invalid scopes.
+TEST_P(ScopedRdsFastConfigUpdateTest, FastConfigUpdateWithPartialAcceptanceAndRemovals) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.srds_fast_config_update",
+       fastConfigUpdateEnabled() ? "true" : "false"},
+      {"envoy.reloadable_features.srds_partial_acceptance", "true"},
+  });
+
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  const auto initial_scope = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto decoded_initial = TestUtility::decodeResources({initial_scope});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(1UL, all_scopes_.value());
+
+  // Send a delta update that removes foo_scope1 while adding:
+  // 1. bad_rds_scope (empty route_configuration_name)
+  // 2. valid_inline_scope (valid inline route_configuration)
+  // 3. bad_inline_scope (references unknown cluster)
+  // 4. valid_rds_scope (reuses "foo_routes" from removed foo_scope1)
+  const auto bad_rds_scope = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: bad_rds_scope
+key:
+  fragments:
+    - string_key: x-bad-rds-key
+)EOF");
+  const auto valid_inline_scope = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: valid_inline_scope
+route_configuration:
+  name: inline_routes
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-valid-inline-key
+)EOF");
+  const auto bad_inline_scope = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: bad_inline_scope
+route_configuration:
+  name: bad_inline_routes
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: unknown_cluster }
+key:
+  fragments:
+    - string_key: x-bad-inline-key
+)EOF");
+  const auto valid_rds_scope = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: valid_rds_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-valid-rds-key
+)EOF");
+
+  const auto decoded_update = TestUtility::decodeResources(
+      {bad_rds_scope, valid_inline_scope, bad_inline_scope, valid_rds_scope});
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "foo_scope1";
+
+  const absl::Status status =
+      srds_subscription_->onConfigUpdate(decoded_update.refvec_, removed, "2");
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), testing::HasSubstr("route_configuration_name is empty."));
+  EXPECT_THAT(status.message(), testing::HasSubstr("route: unknown cluster 'unknown_cluster'"));
+
+  // foo_scope1 was removed, and both valid_inline_scope and valid_rds_scope were accepted.
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(),
+              UnorderedElementsAre(Key("valid_inline_scope"), Key("valid_rds_scope")));
+
+  auto worker_route_config = [this](absl::string_view key) {
+    return getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", absl::StrCat("x-foo-key;", key)}}));
+  };
+
+  EXPECT_THAT(worker_route_config("x-foo-key"), IsNull());
+  EXPECT_THAT(worker_route_config("x-bad-rds-key"), IsNull());
+  EXPECT_THAT(worker_route_config("x-bad-inline-key"), IsNull());
+  ASSERT_THAT(worker_route_config("x-valid-inline-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-valid-inline-key")->name(), "inline_routes");
+  ASSERT_THAT(worker_route_config("x-valid-rds-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-valid-rds-key")->name(), "foo_routes");
 }
 
 } // namespace
