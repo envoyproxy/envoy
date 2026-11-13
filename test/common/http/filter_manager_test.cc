@@ -2215,6 +2215,185 @@ TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedWithoutStopAreEncodedOnce
   filter_manager_->destroyFilters();
 }
 
+class FilterManagerObservedEndStreamTest : public FilterManagerTest {
+public:
+  using Chunks = std::vector<std::pair<std::string, bool>>;
+
+  void initializeChain(bool per_filter_observed_end_stream) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.filter_manager_per_filter_observed_end_stream",
+          per_filter_observed_end_stream ? "true" : "false"}});
+    initialize();
+
+    for (size_t i = 0; i < filters_.size(); i++) {
+      filters_[i] = std::make_shared<NiceMock<MockStreamFilter>>();
+      ON_CALL(*filters_[i], decodeHeaders(_, _))
+          .WillByDefault(Invoke([this, i](RequestHeaderMap&, bool end_stream) {
+            decoded_headers_[i].push_back(end_stream);
+            return decode_headers_[i];
+          }));
+      ON_CALL(*filters_[i], decodeData(_, _))
+          .WillByDefault(Invoke([this, i](Buffer::Instance& data, bool end_stream) {
+            decoded_data_[i].emplace_back(data.toString(), end_stream);
+            // Filter 0 consumes the body to inject it later; the last filter consumes it, as the
+            // router does.
+            if (i != 1) {
+              data.drain(data.length());
+              return i == 0 ? FilterDataStatus::StopIterationNoBuffer : FilterDataStatus::Continue;
+            }
+            return FilterDataStatus::Continue;
+          }));
+      ON_CALL(*filters_[i], encodeHeaders(_, _))
+          .WillByDefault(
+              Invoke([this, i](ResponseHeaderMap&, bool) { return encode_headers_[i]; }));
+    }
+
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillRepeatedly(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          constexpr std::array<absl::string_view, 3> names{"filter0", "filter1", "filter2"};
+          for (size_t i = 0; i < filters_.size(); i++) {
+            callbacks.setFilterConfigName(names[i]);
+            createStreamFilterFactoryCb(filters_[i])(callbacks);
+          }
+          return true;
+        }));
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers_)));
+    ON_CALL(filter_manager_callbacks_, encodeHeaders(_, _))
+        .WillByDefault(Invoke(
+            [this](ResponseHeaderMap&, bool end_stream) { sent_headers_.push_back(end_stream); }));
+
+    filter_manager_->createDownstreamFilterChain();
+    filter_manager_->requestHeadersInitialized();
+  }
+
+  void decodeData(absl::string_view body, bool end_stream) {
+    Buffer::OwnedImpl data(body);
+    filter_manager_->decodeData(data, end_stream);
+  }
+
+  // The response is originated by the last decoder filter, i.e. the first encoder filter.
+  void encodeHeaders(bool end_stream) {
+    filters_[2]->decoder_callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        end_stream, "details");
+  }
+
+  // Filter 0 consumes the whole request and filter 1 resumes before filter 0 injects the body.
+  void resumeBeforeInjectedBody() {
+    decode_headers_[1] = FilterHeadersStatus::StopIteration;
+    filter_manager_->decodeHeaders(*request_headers_, false);
+    decodeData("aaa", true);
+    filters_[1]->decoder_callbacks_->continueDecoding();
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  std::array<std::shared_ptr<MockStreamFilter>, 3> filters_;
+  std::array<FilterHeadersStatus, 3> decode_headers_{
+      FilterHeadersStatus::Continue, FilterHeadersStatus::Continue, FilterHeadersStatus::Continue};
+  std::array<FilterHeadersStatus, 3> encode_headers_{
+      FilterHeadersStatus::Continue, FilterHeadersStatus::Continue, FilterHeadersStatus::Continue};
+  std::array<std::vector<bool>, 3> decoded_headers_;
+  std::array<Chunks, 3> decoded_data_;
+  RequestHeaderMapPtr request_headers_{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  std::vector<bool> sent_headers_;
+};
+
+TEST_F(FilterManagerObservedEndStreamTest, ResumedFilterDoesNotEndStreamBeforeInjectedBody) {
+  initializeChain(true);
+  resumeBeforeInjectedBody();
+  // The end of stream has not reached filter 1 yet.
+  EXPECT_EQ(std::vector<bool>{false}, decoded_headers_[2]);
+  EXPECT_EQ((Chunks{{"", false}}), decoded_data_[2]);
+
+  Buffer::OwnedImpl body("aaa");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(body, true);
+  EXPECT_EQ((Chunks{{"", false}, {"aaa", true}}), decoded_data_[2]);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, ResumedFilterEndsStreamEarlyWithoutGuard) {
+  initializeChain(false);
+  resumeBeforeInjectedBody();
+  // The stream-level flag ends the stream at filter 2 before filter 0 injects the body.
+  EXPECT_EQ((Chunks{{"", true}}), decoded_data_[2]);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, InjectedDecodedHeadersWithEndStreamSetMarker) {
+  initializeChain(true);
+  decode_headers_[0] = FilterHeadersStatus::StopIteration;
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  auto* filter = dynamic_cast<ActiveStreamDecoderFilter*>(filters_[0]->decoder_callbacks_);
+  ASSERT_NE(nullptr, filter);
+  EXPECT_FALSE(filter->observedEndStream());
+
+  filters_[0]->decoder_callbacks_->injectDecodedHeadersToFilterChain(true);
+  EXPECT_EQ(std::vector<bool>{true}, decoded_headers_[1]);
+  EXPECT_TRUE(filter->observedEndStream());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, InjectedEncodedHeadersWithEndStreamSetMarker) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  encode_headers_[2] = FilterHeadersStatus::StopIteration;
+  encodeHeaders(false);
+  auto* filter = dynamic_cast<ActiveStreamEncoderFilter*>(filters_[2]->encoder_callbacks_);
+  ASSERT_NE(nullptr, filter);
+  EXPECT_FALSE(filter->observedEndStream());
+
+  filters_[2]->encoder_callbacks_->injectEncodedHeadersToFilterChain(true);
+  EXPECT_EQ(std::vector<bool>{true}, sent_headers_);
+  EXPECT_TRUE(filter->observedEndStream());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, InjectedDecodedDataKeepsStreamEndStream) {
+  // The legacy flag would rewrite the stream-level flag; the positional marker ignores it.
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+  Buffer::OwnedImpl chunk2("a2");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+  EXPECT_EQ((Chunks{{"a1", false}, {"a2", true}}), decoded_data_[2]);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, HalfCloseStopsInjectedRequestBodyOnceResponseCompletes) {
+  initializeChain(true);
+  ON_CALL(filter_manager_callbacks_, isHalfCloseEnabled()).WillByDefault(Return(true));
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+
+  // The client already sent end_stream, so a complete response closes the stream even though
+  // filter 0 is still injecting, as with half-close disabled.
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  encodeHeaders(true);
+
+  Buffer::OwnedImpl chunk2("a2");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
+  EXPECT_EQ((Chunks{{"a1", false}}), decoded_data_[2]);
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
