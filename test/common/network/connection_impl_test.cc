@@ -131,11 +131,11 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
   StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
-  EXPECT_ENVOY_BUG(
-      ConnectionImpl(*dispatcher,
-                     std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-                     Network::Test::createRawBufferSocket(), stream_info, false),
-      "Client socket failure");
+  // A socket creation failure (e.g. EMFILE) is not an Envoy bug, so the connection is just closed.
+  ConnectionImpl connection(
+      *dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      Network::Test::createRawBufferSocket(), stream_info, false);
+  EXPECT_EQ(Connection::State::Closed, connection.state());
 }
 
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {
@@ -4676,6 +4676,37 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_THAT(connection->transportFailureReason(), StartsWith("delayed connect error"));
   EXPECT_THAT(connection->transportFailureReason(), EndsWith("custom error"));
+}
+
+// Fails socket(2) with EMFILE, as when the process is out of file descriptors.
+class FailSocketWithEmfile : public Api::OsSysCallsImpl {
+public:
+  Api::SysCallSocketResult socket(int, int, int) override { return {INVALID_SOCKET, EMFILE}; }
+};
+
+// Verify that connect() on a connection whose socket could not be created does not crash and the
+// connection is closed locally.
+TEST_P(TcpClientConnectionImplTest, ConnectAfterSocketCreationFailure) {
+  ClientConnectionPtr connection;
+  {
+    FailSocketWithEmfile os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    connection = dispatcher_->createClientConnection(
+        *Utility::resolveUrl(
+            fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
+        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+        nullptr);
+  }
+  StrictMock<MockConnectionCallbacks> callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->noDelay(true);
+  connection->connect();
+  EXPECT_CALL(callbacks, onEvent(ConnectionEvent::LocalClose)).WillOnce([&](ConnectionEvent) {
+    dispatcher_->exit();
+  });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(connection->state(), Connection::State::Closed);
+  EXPECT_EQ(connection->transportFailureReason(), "socket creation failure");
 }
 
 class PipeClientConnectionImplTest : public testing::Test {

@@ -10,6 +10,10 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
+#if defined(__linux__)
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#endif
 #include "source/common/config/api_version.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
@@ -27,6 +31,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/functional/any_invocable.h"
 #include "absl/strings/ascii.h"
@@ -262,6 +267,69 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectionCreationFailure) {
   // counter, which is only incremented when the failure is handled cleanly.
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
   tcp_client->close();
+}
+
+namespace {
+
+// Whether the calling thread is inside the faked network namespace.
+thread_local bool in_fake_netns = false;
+
+// Entering a network namespace requires CAP_SYS_ADMIN, so setns() is faked. Each
+// execInNetworkNamespace() calls it once to enter the namespace and once to leave it.
+class ToggleFakeNetns : public Api::LinuxOsSysCallsImpl {
+public:
+  Api::SysCallIntResult setns(int, int) const override {
+    in_fake_netns = !in_fake_netns;
+    return {0, 0};
+  }
+};
+
+// Fails socket(2) with EMFILE inside the faked network namespace, as when the process is out of
+// file descriptors.
+class FailSocketInFakeNetns : public Api::OsSysCallsImpl {
+public:
+  Api::SysCallSocketResult socket(int domain, int type, int protocol) override {
+    if (in_fake_netns) {
+      failures_++;
+      return {INVALID_SOCKET, EMFILE};
+    }
+    return Api::OsSysCallsImpl::socket(domain, type, protocol);
+  }
+
+  uint32_t failures() const { return failures_; }
+
+private:
+  std::atomic<uint32_t> failures_{0};
+};
+
+} // namespace
+
+// Regression test: when socket(2) fails with EMFILE inside the configured network namespace, the
+// TCP proxy fails the upstream connection gracefully instead of crashing on connect().
+TEST_P(TcpProxyIntegrationTest, UpstreamSocketExhaustionInNetworkNamespace) {
+  ToggleFakeNetns fake_setns;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&fake_setns};
+  FailSocketInFakeNetns fail_socket;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket};
+  // The namespace file only has to exist since setns() is faked.
+  const std::string netns_path = TestEnvironment::writeStringToFileForTest("netns", "");
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+    source_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    source_address->set_port_value(0);
+    source_address->set_network_namespace_filepath(netns_path);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_fail", 1);
+  tcp_client->close();
+  EXPECT_GE(fail_socket.failures(), 1);
+  // Shut down the server before the injected syscalls go out of scope.
+  test_server_.reset();
 }
 #endif
 
