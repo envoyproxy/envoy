@@ -1,0 +1,10 @@
+path: "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:rawPredict"
+body: "{\"anthropic_version\":\"vertex-2023-10-16\",\"max_tokens\":256,\"system\":\"Migrate Vertex Claude request to canonical Anthropic API.\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello canonical Anthropic!\"}]}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: ANTHROPIC_MESSAGES
+response_binding {
+  uri_pattern: "/v1/messages"
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

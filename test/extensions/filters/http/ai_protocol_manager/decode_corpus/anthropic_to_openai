@@ -1,0 +1,10 @@
+path: "/v1/messages"
+body: "{\"model\":\"claude-sonnet-4-5\",\"max_tokens\":256,\"stream\":true,\"system\":\"You are helpful.\",\"messages\":[{\"role\":\"user\",\"content\":\"Check the weather in NYC.\"}],\"tools\":[{\"name\":\"get_weather\",\"description\":\"Get current weather\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}}],\"tool_choice\":{\"type\":\"tool\",\"name\":\"get_weather\",\"disable_parallel_tool_use\":true},\"temperature\":0.4,\"stop_sequences\":[\"STOP\"]}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: OPENAI_CHAT_COMPLETIONS
+response_binding {
+  uri_pattern: "/v1/chat/completions"
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048
