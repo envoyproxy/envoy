@@ -33,6 +33,7 @@ public:
   MOCK_METHOD(bool, isIdle, (), (const));
   MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
+  MOCK_METHOD(bool, hasReadyConnection, (), (const, override));
   MOCK_METHOD(Cancellable*, newStream,
               (ResponseDecoder & response_decoder, Callbacks& callbacks,
                const Instance::StreamOptions&));

@@ -164,6 +164,18 @@ TEST_F(PriorityConnPoolMapImplTest, TestDrainConnectionsProxiedThrough) {
   test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
+TEST_F(PriorityConnPoolMapImplTest, HasReadyConnection) {
+  TestMapPtr test_map = makeTestMap();
+  EXPECT_FALSE(test_map->hasReadyConnection());
+
+  test_map->getPool(ResourcePriority::Default, 0, getBasicFactory());
+  EXPECT_CALL(*mock_pools_[0], hasReadyConnection()).WillOnce(Return(false));
+  EXPECT_FALSE(test_map->hasReadyConnection());
+
+  EXPECT_CALL(*mock_pools_[0], hasReadyConnection()).WillOnce(Return(true));
+  EXPECT_TRUE(test_map->hasReadyConnection());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
