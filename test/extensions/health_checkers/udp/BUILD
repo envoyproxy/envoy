@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         "//envoy/registry",
         "//source/common/network:io_socket_error_lib",

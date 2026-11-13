@@ -132,8 +132,8 @@ def envoy_cc_fuzz_test(
         deps = [],
         tags = [],
         **kwargs):
-    lib_exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
-    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
+    lib_exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False, link = True)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, link = True)
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus_files"
         native.filegroup(
@@ -226,7 +226,7 @@ def envoy_cc_test(
         exec_properties = {},
         target_compatible_with = []):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
-    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, link = True)
     cc_test(
         name = name,
         srcs = srcs,
@@ -286,7 +286,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False, link = True)
     disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
