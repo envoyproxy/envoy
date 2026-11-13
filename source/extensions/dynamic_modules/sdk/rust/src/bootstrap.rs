@@ -1,3 +1,5 @@
+/// The outcome of an xDS response or a client-initiated unsubscribe.
+pub use crate::abi::envoy_dynamic_module_type_bootstrap_xds_update_status as XdsUpdateStatus;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
@@ -279,6 +281,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
 
+  /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications. Main thread
+  /// only, after server initialization. Calls are idempotent. Enabling fails after shutdown or
+  /// when the module does not implement the xDS hook. No resource payloads cross the ABI.
+  fn set_xds_notifications(&self, enabled: bool) -> bool;
+
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
   /// [`BootstrapExtensionConfig::on_listener_removal`] callbacks when listeners are added, updated,
@@ -532,6 +539,20 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _timer: &dyn EnvoyBootstrapExtensionTimer,
+  ) {
+  }
+
+  /// Called synchronously on the main thread during xDS processing when notifications are enabled.
+  /// The URL and error details are borrowed for this call. Error details describe the rejection
+  /// when the status is `Rejected`, and are empty otherwise. Invalid UTF-8 in error details is
+  /// replaced with the Unicode replacement character. The hook must not block or reenter xDS
+  /// processing.
+  fn on_xds_update(
+    &self,
+    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    _type_url: &str,
+    _status: XdsUpdateStatus,
+    _error_details: &str,
   ) {
   }
 
@@ -1446,6 +1467,14 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn set_xds_notifications(&self, enabled: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+        self.raw, enabled,
+      )
+    }
+  }
+
   fn enable_listener_lifecycle(&self) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
@@ -2063,6 +2092,33 @@ ffi_export! {
 }
 
 ffi_export! {
+  /// Forwards an opted-in xDS outcome without copying resource payloads.
+  ///
+  /// # Safety
+  /// All pointers and the status must satisfy the Envoy dynamic module ABI. The URL and error
+  /// details are valid only during this call; the module config remains live until it returns.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_xds_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    type_url: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: XdsUpdateStatus,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let config = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
+    let bytes = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(type_url.ptr.cast::<u8>(), type_url.length)
+    };
+    if let Ok(type_url) = std::str::from_utf8(bytes) {
+      let error_details = unsafe {
+        crate::ffi_helpers::str_lossy_from_raw(error_details.ptr.cast::<u8>(), error_details.length)
+      };
+      let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+      config.on_xds_update(&mut envoy, type_url, status, error_details.as_ref());
+    }
+  }
+}
+
+ffi_export! {
   /// Event hook called by Envoy when a cluster is removed from the ClusterManager.
   ///
   /// # Safety
@@ -2227,6 +2283,120 @@ ffi_export! {
       listener_name_str.as_ref(),
       status,
       error_details_str.as_ref(),
+    );
+  }
+}
+
+#[cfg(test)]
+mod xds_tests {
+  use super::*;
+  use std::cell::Cell;
+  use std::sync::Arc;
+
+  #[derive(Default)]
+  struct TestHost {
+    enabled: Cell<bool>,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    enabled: bool,
+  ) -> bool {
+    let host = unsafe { &*host.cast::<TestHost>() };
+    host.enabled.set(enabled);
+    true
+  }
+
+  #[test]
+  fn notification_opt_in_crosses_abi() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    assert!(envoy.set_xds_notifications(true));
+    assert!(host.enabled.get());
+    assert!(envoy.set_xds_notifications(false));
+    assert!(!host.enabled.get());
+  }
+
+  #[test]
+  fn xds_hook_forwards_outcomes_and_rejects_invalid_utf8() {
+    struct Observer(Arc<std::sync::Mutex<Vec<(String, XdsUpdateStatus, String)>>>);
+    impl BootstrapExtensionConfig for Observer {
+      fn new_bootstrap_extension(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtension,
+      ) -> Box<dyn BootstrapExtension> {
+        panic!("not used by the xDS hook test")
+      }
+      fn on_xds_update(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtensionConfig,
+        type_url: &str,
+        status: XdsUpdateStatus,
+        error_details: &str,
+      ) {
+        self
+          .0
+          .lock()
+          .unwrap()
+          .push((type_url.to_owned(), status, error_details.to_owned()));
+      }
+    }
+    let observed = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let config: Box<dyn BootstrapExtensionConfig> = Box::new(Observer(Arc::clone(&observed)));
+    let config_ptr = std::ptr::from_ref(&config).cast();
+    for (status, error_details) in [
+      (XdsUpdateStatus::Accepted, b"".as_slice()),
+      (XdsUpdateStatus::Rejected, b"rejected".as_slice()),
+      (XdsUpdateStatus::Rejected, b"".as_slice()),
+      (XdsUpdateStatus::Rejected, b"\xff".as_slice()),
+      (XdsUpdateStatus::Unsubscribed, b"".as_slice()),
+    ] {
+      // the live boxed trait object and URL outlive the synchronous hook
+      unsafe {
+        envoy_dynamic_module_on_bootstrap_extension_xds_update(
+          std::ptr::null_mut(),
+          config_ptr,
+          abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: b"type".as_ptr().cast(),
+            length: 4,
+          },
+          status,
+          abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: if error_details.is_empty() {
+              std::ptr::null()
+            } else {
+              error_details.as_ptr().cast()
+            },
+            length: error_details.len(),
+          },
+        );
+      }
+    }
+    unsafe {
+      envoy_dynamic_module_on_bootstrap_extension_xds_update(
+        std::ptr::null_mut(),
+        config_ptr,
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: b"\xff".as_ptr().cast(),
+          length: 1,
+        },
+        XdsUpdateStatus::Accepted,
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: std::ptr::null(),
+          length: 0,
+        },
+      );
+    }
+    assert_eq!(
+      *observed.lock().unwrap(),
+      [
+        ("type".into(), XdsUpdateStatus::Accepted, "".into()),
+        ("type".into(), XdsUpdateStatus::Rejected, "rejected".into()),
+        ("type".into(), XdsUpdateStatus::Rejected, "".into()),
+        ("type".into(), XdsUpdateStatus::Rejected, "\u{fffd}".into()),
+        ("type".into(), XdsUpdateStatus::Unsubscribed, "".into()),
+      ]
     );
   }
 }

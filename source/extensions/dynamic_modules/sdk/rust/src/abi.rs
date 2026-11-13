@@ -9904,6 +9904,38 @@ pub enum envoy_dynamic_module_type_bootstrap_active_resource_kind {
     TransportSocketMatch = 2,
     Secret = 3,
 }
+#[repr(u32)]
+/// The outcome of an xDS response, or a client-initiated unsubscribe.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_bootstrap_xds_update_status {
+    Accepted = 0,
+    Rejected = 1,
+    Unsubscribed = 2,
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Enables xDS notifications when enabled is true, or unregisters them when false. Main thread
+ only, after server initialization. Enabling returns false before initialization, after shutdown,
+ or when the module does not implement the optional xDS hook. Repeated calls are idempotent.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        enabled: bool,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Optional main-thread hook for xDS processing outcomes. type_url and error_details are borrowed
+ for this call. error_details contains the rejection reason when status is Rejected, and is empty
+ otherwise. No resource payloads are copied. Called only after opting in with
+ set_xds_notifications. Implementations must not block or reenter xDS processing.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_xds_update(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        config_module_ptr: envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+        type_url: envoy_dynamic_module_type_envoy_buffer,
+        status: envoy_dynamic_module_type_bootstrap_xds_update_status,
+        error_details: envoy_dynamic_module_type_envoy_buffer,
+    );
+}
 /** The callback type invoked once per active resource name during enumeration.
 
  @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the

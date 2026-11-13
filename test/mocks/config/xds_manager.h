@@ -14,6 +14,9 @@ public:
   MockXdsManager();
   ~MockXdsManager() override = default;
 
+  MOCK_METHOD(Common::CallbackHandlePtr, addConfigUpdateCallback, (ConfigUpdateCallback callback),
+              (override));
+
   MOCK_METHOD(absl::Status, initialize,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                Upstream::ClusterManager* cm));

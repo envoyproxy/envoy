@@ -1,9 +1,11 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -35,6 +37,21 @@ namespace Config {
 class XdsManager {
 public:
   virtual ~XdsManager() = default;
+
+  /**
+   * Outcomes observed after processing a response, or after a client unsubscribe.
+   */
+  enum class ConfigUpdateStatus { Accepted, Rejected, Unsubscribed };
+  using ConfigUpdateCallback =
+      std::function<void(absl::string_view, ConfigUpdateStatus, absl::string_view)>;
+
+  /**
+   * Observes xDS outcomes on the main thread without transferring resource payloads. Destroying
+   * the returned handle unregisters the callback. The final argument contains rejection details,
+   * and is empty for other outcomes. String views are valid only during the callback. This does
+   * not replace the configured tracker.
+   */
+  virtual Common::CallbackHandlePtr addConfigUpdateCallback(ConfigUpdateCallback callback) PURE;
 
   /**
    * Initializes the xDS-Manager.

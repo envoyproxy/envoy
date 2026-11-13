@@ -9454,6 +9454,36 @@ typedef enum {
 } envoy_dynamic_module_type_bootstrap_active_resource_kind;
 
 /**
+ * The outcome of an xDS response, or a client-initiated unsubscribe.
+ */
+typedef enum {
+  envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted = 0,
+  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected = 1,
+  envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed = 2,
+} envoy_dynamic_module_type_bootstrap_xds_update_status;
+
+/**
+ * Enables xDS notifications when enabled is true, or unregisters them when false. Main thread
+ * only, after server initialization. Enabling returns false before initialization, after shutdown,
+ * or when the module does not implement the optional xDS hook. Repeated calls are idempotent.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, bool enabled);
+
+/**
+ * Optional main-thread hook for xDS processing outcomes. type_url and error_details are borrowed
+ * for this call. error_details contains the rejection reason when status is Rejected, and is empty
+ * otherwise. No resource payloads are copied. Called only after opting in with
+ * set_xds_notifications. Implementations must not block or reenter xDS processing.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_xds_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    envoy_dynamic_module_type_bootstrap_xds_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details);
+
+/**
  * The callback type invoked once per active resource name during enumeration.
  *
  * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the

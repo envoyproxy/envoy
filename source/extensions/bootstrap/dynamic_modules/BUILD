@@ -101,6 +101,7 @@ envoy_cc_library(
         ":cluster_writer_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
+        "//envoy/config:xds_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
         "//envoy/server:factory_context_interface",
