@@ -54,6 +54,24 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "route_config_test",
+    srcs = ["route_config_test.cc"],
+    extension_names = ["envoy.filters.http.ratelimit"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/router:config_lib",
+        "//source/extensions/filters/http/ratelimit:config",
+        "//source/extensions/filters/http/ratelimit:ratelimit_lib",
+        "//test/mocks/ratelimit:ratelimit_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "ratelimit_integration_test",
     size = "large",
     srcs = ["ratelimit_integration_test.cc"],
