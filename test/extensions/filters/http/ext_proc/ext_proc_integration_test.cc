@@ -1230,13 +1230,7 @@ TEST_P(ExtProcIntegrationTest, RemoveResponseContentLength) {
   handleUpstreamRequest(/*add_content_length=*/true);
   processResponseHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
-  processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
+  processStreamedResponseBodyAs("Hello, World!");
 
   verifyDownstreamResponse(*response, 200);
   verifyChunkedEncoding(response->headers());
@@ -1265,13 +1259,7 @@ TEST_P(ExtProcIntegrationTest, RemoveResponseContentLengthAfterBodyProcessing) {
         return true;
       });
 
-  processResponseBodyMessage(
-      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
+  processStreamedResponseBodyAs("Hello, World!");
 
   verifyDownstreamResponse(*response, 200);
   verifyChunkedEncoding(response->headers());
