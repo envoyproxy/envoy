@@ -61,6 +61,7 @@ constexpr const char* CookieTailHttpOnlyFormatString = ";path={};Max-Age={};secu
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr const char* OIDCLogoutUrlBaseFormatString = "{0}?id_token_hint={1}&client_id={2}";
+constexpr const char* OIDCLogoutUrlWithoutIdTokenFormatString = "{0}?client_id={1}";
 constexpr const char* OIDCLogoutUrlPostLogoutRedirectFormatString = "&post_logout_redirect_uri={0}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
@@ -1597,8 +1598,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     const std::string id_token =
         Http::Utility::parseCookieValue(headers, config_->cookieNames().id_token_);
     std::string oidc_logout_url =
-        fmt::format(OIDCLogoutUrlBaseFormatString, config_->endSessionEndpoint(), id_token,
-                    config_->clientId());
+        id_token.empty() ? fmt::format(OIDCLogoutUrlWithoutIdTokenFormatString,
+                                       config_->endSessionEndpoint(), config_->clientId())
+                         : fmt::format(OIDCLogoutUrlBaseFormatString, config_->endSessionEndpoint(),
+                                       id_token, config_->clientId());
 
     if (!config_->disablePostLogoutRedirectUri()) {
       std::string redirect_uri;
