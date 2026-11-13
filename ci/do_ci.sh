@@ -388,16 +388,164 @@ function bazel_envoy_api_go_build() {
     done
 }
 
+# Build the server and tools binaries and run the tests with OpenSSL. `openssl.build` and
+# `openssl.test` do one half each.
 function build_openssl() {
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
-    # shellcheck disable=SC2207
-    # Append OpenSSL compat tests, and exclude quiche tests
-    TEST_TARGETS=("//compat/openssl/test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
     setup_clang_toolchain
-    echo "Bazel fastbuild build with OpenSSL..."
-    bazel_envoy_binary_build fastbuild
-    echo "Testing ${TEST_TARGETS[*]} with OpenSSL..."
-    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+    local -a build_targets=() test_targets=()
+    if [[ "$CI_TARGET" != "openssl.test" ]]; then
+        build_targets=(
+            "${ENVOY_BUILD_TARGET}"
+            //test/tools/schema_validator:schema_validator_tool
+            //test/tools/router_check:router_check_tool
+            //test/tools/config_load_check:config_load_check_tool
+            @su-exec)
+    fi
+    if [[ "$CI_TARGET" != "openssl.build" ]]; then
+        # Append OpenSSL compat tests, and exclude quiche tests
+        # shellcheck disable=SC2207
+        test_targets=("//compat/openssl/test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
+    fi
+    # Nothing built here is published, so the binaries are built in one invocation, with the tests
+    # if there are any, and are not downloaded.
+    if [[ ${#test_targets[@]} -eq 0 ]]; then
+        echo "Building ${build_targets[*]} with OpenSSL..."
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --remote_download_minimal \
+            -- "${build_targets[@]}"
+    else
+        echo "Building ${build_targets[*]} and testing ${test_targets[*]} with OpenSSL..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --remote_download_minimal \
+            -- "${build_targets[@]}" "${test_targets[@]}"
+    fi
+}
+
+# Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
+# code on failure, so a broken query fails the job instead of silently selecting
+# no tests. Results go to stdout as plain labels.
+# Prints the labels matching a cquery expression, one per line, leaving out targets that are
+# incompatible with the target platform (e.g. Windows-only tests): cquery still returns those,
+# and Bazel only skips them for wildcard patterns, not when they are passed as explicit labels.
+function run_bazel_cquery() {
+    local err out rc=0
+    err="$(mktemp)"
+    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" --output=starlark \
+                 --starlark:expr='target.label if "IncompatiblePlatformProvider" not in providers(target) else ""' \
+                 "$1" 2>"$err")" || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "ERROR: bazel cquery failed (exit ${rc}): $1" >&2
+        cat "$err" >&2
+    fi
+    rm -f "$err"
+    printf '%s' "$out" | sed '/^$/d; s|^@@||'
+    return "$rc"
+}
+
+function build_openssl_test_affected() {
+    # Lightweight OpenSSL pre-submit (PRs): run only the tests affected by the PR
+    # (via Bazel rdeps). The binary is built by "openssl.build", and the full
+    # suite still runs on post-submit via "openssl.test".
+    BAZEL_BUILD_OPTIONS+=("--config=openssl")
+    BAZEL_QUERY_OPTIONS+=("--config=openssl")
+    setup_clang_toolchain
+
+    if [[ "$CI_TARGET" == "openssl.presubmit" ]]; then
+        echo "Bazel fastbuild build with OpenSSL..."
+        bazel_envoy_binary_build fastbuild
+    fi
+
+    # Diff against the merge base to see only the PR's own changes; fall back to
+    # the target branch itself when history is too shallow for a merge base.
+    local merge_base
+    if [[ -n "${CI_TARGET_BRANCH}" ]]; then
+        git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
+        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+    else
+        merge_base="HEAD~1"
+    fi
+
+    # A failed diff is fatal: an empty file list would otherwise select no tests
+    # and report a green job that tested nothing.
+    local changed_files
+    if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
+        echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
+        return 1
+    fi
+
+    # Resolve changed files to Bazel labels, so tests are selected from the real
+    # dependency graph rather than by guessing test paths from source paths (the
+    # test tree is not a 1:1 mirror of the source tree).
+    local -a changed_labels=()
+    local global_config_changed=false
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        [[ -e "$file" ]] || continue  # skip deleted files; they have no label
+        case "$file" in
+            # Global/build config: blast radius isn't a per-file query, so defer
+            # to the crypto-surface seed below.
+            .bazelrc|.bazelversion|WORKSPACE|MODULE.bazel|MODULE.bazel.lock|bazel/*)
+                global_config_changed=true
+                ;;
+            # Whole package. A root-level file would yield the invalid pattern
+            # "//./...", and a .bzl in a non-package dir has no targets to match.
+            *BUILD|*BUILD.bazel|*.bzl)
+                local dir
+                dir="$(dirname "$file")"
+                if [[ "$dir" == "." ]]; then
+                    global_config_changed=true
+                elif bazel query "${BAZEL_QUERY_OPTIONS[@]}" "//${dir}/..." >/dev/null 2>&1; then
+                    changed_labels+=("//${dir}/...")
+                fi
+                ;;
+            # Tolerate files Bazel doesn't know about (docs, unwired sources).
+            *)
+                local label
+                label="$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" "$file" 2>/dev/null)" || true
+                [[ -n "$label" ]] && changed_labels+=("$label")
+                ;;
+        esac
+    done < <(printf '%s\n' "$changed_files")
+
+    # rdeps universe; its closure already covers the //source/... deps.
+    local universe="//test/... + //compat/openssl/test/..."
+
+    # Bazel honors "manual" only when expanding wildcard patterns, and the
+    # selection is passed to `bazel test` as explicit labels, so manual tests
+    # must be excluded here or they would be forced to run.
+    local manual="attr(tags, '[\\[ ]manual[,\\]]', ${universe})"
+
+    # Seeds: the PR's own targets, plus -- for global/build-config changes -- the
+    # crypto/TLS surface that differs between OpenSSL and BoringSSL, a full
+    # //test/... run being too costly. One query covers both, since
+    # rdeps(U, A) + rdeps(U, B) is the same set as rdeps(U, A + B).
+    local seed=""
+    [[ ${#changed_labels[@]} -gt 0 ]] && seed="set(${changed_labels[*]})"
+    if [[ "$global_config_changed" == "true" ]]; then
+        echo "Global/build-config change detected; adding OpenSSL crypto-surface tests."
+        seed="${seed:+${seed} + }//source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/..."
+    fi
+
+    # `selected` is assigned after declaring so `set -e` still sees a failing
+    # query; `local x="$(false)"` would return 0. sort -u because cquery can
+    # emit one label under several configurations.
+    local -a test_targets=()
+    local target selected
+    if [[ -n "$seed" ]]; then
+        selected="$(run_bazel_cquery "kind(test, rdeps(${universe}, ${seed})) except ${manual}")"
+        while IFS= read -r target; do
+            [[ -n "$target" ]] && test_targets+=("$target")
+        done < <(printf '%s\n' "$selected" | sort -u)
+    fi
+
+    if [[ ${#test_targets[@]} -eq 0 ]]; then
+        echo "No affected test targets found, skipping tests."
+        return
+    fi
+
+    echo "Testing affected targets with OpenSSL (${#test_targets[@]} targets):"
+    printf '  %s\n' "${test_targets[@]}"
+    # --keep_going so one broken target can't abort the whole run.
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --keep_going "${test_targets[@]}"
 }
 
 shift
@@ -934,8 +1082,27 @@ case $CI_TARGET in
                 -- "${TEST_TARGETS[@]}"
         ;;
 
-    openssl)
+    openssl|openssl.build|openssl.test)
         build_openssl
+        ;;
+
+    # `openssl.presubmit` also builds the binary. It is what a pull request is asked for until the
+    # `check-build-openssl-*` run flags are on its target branch, and can be removed once they are.
+    openssl.presubmit|openssl.test_affected)
+        build_openssl_test_affected
+        ;;
+
+    openssl.asan)
+        setup_clang_toolchain
+        echo "bazel ASAN/UBSAN build of OpenSSL compat layer tests"
+        bazel_with_collection test \
+            --config=asan \
+            --config=openssl \
+            --dynamic_mode=off \
+            --copt=-fno-sanitize=function \
+            --linkopt=-fno-sanitize=function \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            //compat/openssl/test/...
         ;;
 
     publish)

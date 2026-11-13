@@ -44,7 +44,9 @@ checks:
     # - check-build-cto-wasmtime
     - check-build-gcc-build
     - check-build-gcc-test
-    - check-build-openssl
+    - check-build-openssl-build
+    - check-build-openssl-test
+    - check-build-openssl-test-affected
     - check-coverage
     - check-runtime
     - check-san
@@ -373,9 +375,41 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  check-build-openssl:
+  check-build-openssl-build:
+    paths:
+    - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
+    - bazel/**/*
+    - .bazelrc
+    - WORKSPACE
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+  check-build-openssl-test:
     paths:
     - "**/*"
+  check-build-openssl-test-affected:
+    paths:
+    - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
+    - bazel/**/*
+    - .bazelrc
+    - WORKSPACE
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
   check-coverage:
     paths:
     - "**/*"
