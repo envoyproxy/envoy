@@ -173,13 +173,21 @@ public:
      * @param dropped_packets points to a variable to store how many packets are
      * dropped so far. If nullptr, recvmsg() won't try to get this information
      * from transport header.
+     * @param truncated_packets points to a variable to count packets dropped because they exceed
+     * the configured maximum datagram size. If nullptr, truncated packets are not counted
+     * separately.
      */
-    RecvMsgOutput(size_t num_packets_per_call, uint32_t* dropped_packets)
-        : dropped_packets_(dropped_packets), msg_(num_packets_per_call) {}
+    RecvMsgOutput(size_t num_packets_per_call, uint32_t* dropped_packets,
+                  uint32_t* truncated_packets = nullptr)
+        : dropped_packets_(dropped_packets), truncated_packets_(truncated_packets),
+          msg_(num_packets_per_call) {}
 
     // If not nullptr, its value is the total number of packets dropped. recvmsg() will update it
     // when more packets are dropped.
     uint32_t* dropped_packets_;
+
+    // If not nullptr, its value is the number of packets dropped because they were truncated.
+    uint32_t* truncated_packets_;
 
     // Packet headers for each received packet. It's populated according to packet receive order.
     // Only the first entry is used to return per packet information by recvmsg.

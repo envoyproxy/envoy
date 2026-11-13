@@ -570,14 +570,15 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
                                               const Address::Instance& local_address,
                                               UdpPacketProcessor& udp_packet_processor,
                                               TimeSource& time_source, uint32_t* packets_dropped,
-                                              uint32_t* num_packets_read) {
+                                              uint32_t* num_packets_read,
+                                              uint32_t* packets_truncated) {
   ASSERT(Api::OsSysCallsSingleton::get().supportsUdpGro(),
          "cannot use GRO when the platform doesn't support it.");
   if (num_packets_read != nullptr) {
     *num_packets_read = 0;
   }
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
-  IoHandle::RecvMsgOutput output(1, packets_dropped);
+  IoHandle::RecvMsgOutput output(1, packets_dropped, packets_truncated);
 
   // TODO(yugant): Avoid allocating 64k for each read by getting memory from UdpPacketProcessor
   const uint64_t max_rx_datagram_size_with_gro =
@@ -633,7 +634,8 @@ Api::IoCallUint64Result readFromSocketRecvMmsg(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, uint32_t* packets_dropped,
-                                               uint32_t* num_packets_read) {
+                                               uint32_t* num_packets_read,
+                                               uint32_t* packets_truncated) {
   ASSERT(Api::OsSysCallsSingleton::get().supportsMmsg(),
          "cannot use recvmmsg when the platform doesn't support it.");
   const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
@@ -661,7 +663,7 @@ Api::IoCallUint64Result readFromSocketRecvMmsg(IoHandle& handle,
     slices[i][0] = buffers[i].reservation_.slice();
   }
 
-  IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_RECEIVE, packets_dropped);
+  IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_RECEIVE, packets_dropped, packets_truncated);
   ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", NUM_DATAGRAMS_PER_RECEIVE,
                  max_rx_datagram_size);
   Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(),
@@ -700,12 +702,13 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
                                               const Address::Instance& local_address,
                                               UdpPacketProcessor& udp_packet_processor,
                                               TimeSource& time_source, uint32_t* packets_dropped,
-                                              uint32_t* num_packets_read) {
+                                              uint32_t* num_packets_read,
+                                              uint32_t* packets_truncated) {
   if (num_packets_read != nullptr) {
     *num_packets_read = 0;
   }
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
-  IoHandle::RecvMsgOutput output(1, packets_dropped);
+  IoHandle::RecvMsgOutput output(1, packets_dropped, packets_truncated);
 
   ENVOY_LOG_MISC(trace, "starting recvmsg with max={}", udp_packet_processor.maxDatagramSize());
   Api::IoCallUint64Result result =
@@ -734,16 +737,16 @@ Api::IoCallUint64Result
 Utility::readFromSocket(IoHandle& handle, const Address::Instance& local_address,
                         UdpPacketProcessor& udp_packet_processor, TimeSource& time_source,
                         UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped,
-                        uint32_t* num_packets_read) {
+                        uint32_t* num_packets_read, uint32_t* packets_truncated) {
   if (recv_msg_method == UdpRecvMsgMethod::RecvMsgWithGro) {
     return readFromSocketRecvGro(handle, local_address, udp_packet_processor, time_source,
-                                 packets_dropped, num_packets_read);
+                                 packets_dropped, num_packets_read, packets_truncated);
   } else if (recv_msg_method == UdpRecvMsgMethod::RecvMmsg) {
     return readFromSocketRecvMmsg(handle, local_address, udp_packet_processor, time_source,
-                                  packets_dropped, num_packets_read);
+                                  packets_dropped, num_packets_read, packets_truncated);
   }
   return readFromSocketRecvMsg(handle, local_address, udp_packet_processor, time_source,
-                               packets_dropped, num_packets_read);
+                               packets_dropped, num_packets_read, packets_truncated);
 }
 
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
@@ -767,31 +770,32 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
 
   do {
     const uint32_t old_packets_dropped = packets_dropped;
+    uint32_t packets_truncated = 0;
     uint32_t num_packets_processed = 0;
     Api::IoCallUint64Result result =
         Utility::readFromSocket(handle, local_address, udp_packet_processor, time_source,
-                                recv_msg_method, &packets_dropped, &num_packets_processed);
+                                recv_msg_method, &packets_dropped, &num_packets_processed,
+                                &packets_truncated);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
       return std::move(result.err_);
     }
 
-    if (packets_dropped != old_packets_dropped) {
-      // The kernel tracks SO_RXQ_OVFL as a uint32 which can overflow to a smaller
-      // value. So as long as this count differs from previously recorded value,
-      // more packets are dropped by kernel.
-      const uint32_t delta =
-          (packets_dropped > old_packets_dropped)
-              ? (packets_dropped - old_packets_dropped)
-              : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
-                 1);
+    // The kernel tracks SO_RXQ_OVFL as a uint32, so unsigned subtraction naturally handles a
+    // genuine counter wrap. Truncated packets are tracked separately because the kernel counter is
+    // absolute and must not be mixed with Envoy's local truncation count.
+    const uint32_t kernel_delta = packets_dropped - old_packets_dropped;
+    if (kernel_delta != 0) {
       ENVOY_LOG_EVERY_POW_2_MISC(
           warn,
           "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
           "max datagram size.",
-          delta);
-      udp_packet_processor.onDatagramsDropped(delta);
+          kernel_delta);
+    }
+    const uint32_t total_dropped = kernel_delta + packets_truncated;
+    if (total_dropped != 0) {
+      udp_packet_processor.onDatagramsDropped(total_dropped);
     }
     if (num_packets_to_read <= num_packets_processed) {
       return std::move(result.err_);
