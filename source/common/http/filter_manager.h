@@ -142,6 +142,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
   virtual void doData(bool end_stream) PURE;
+  // Continues the trailers of this direction. With held trailers forwarding, they are forwarded
+  // from the filter holding them, if any. See FilterManager::TrailersState.
   virtual void doTrailers() PURE;
   virtual bool hasTrailers() PURE;
   virtual void doMetadata() PURE;
@@ -710,7 +712,10 @@ public:
                 uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
+        proxy_100_continue_(proxy_100_continue),
+        forward_held_trailers_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.filter_manager_forward_held_trailers")),
+        buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -1086,7 +1091,13 @@ private:
   };
 
   // Indicates which filter to start the iteration with.
-  enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+  enum class FilterIterationStartState {
+    AlwaysStartFromNext,
+    // Starts from the current filter if it is resuming from stopping all iteration.
+    CanStartFromCurrent,
+    // Starts from the current filter, e.g. one that trailers are held at but have not reached.
+    AlwaysStartFromCurrent,
+  };
 
   UpgradeResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
                                          FilterChainFactoryCallbacksImpl& callbacks);
@@ -1110,7 +1121,11 @@ private:
   // filter to start the iteration with.
   void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers);
+  void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers,
+                      FilterIterationStartState filter_iteration_start_state =
+                          FilterIterationStartState::CanStartFromCurrent);
+  // Forwards the request trailers from the filter holding them.
+  void forwardRequestTrailers();
   void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
   void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
   ResponseTrailerMap& addEncodedTrailers();
@@ -1126,7 +1141,11 @@ private:
   // to update stats, do end stream bookkeeping, and send the data to encoder.
   void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
+  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers,
+                      FilterIterationStartState filter_iteration_start_state =
+                          FilterIterationStartState::CanStartFromCurrent);
+  // See forwardRequestTrailers().
+  void forwardResponseTrailers();
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
   bool hasSavedResponseMetadata() const;
   void encodeSavedResponseMetadataToCodec();
@@ -1166,10 +1185,27 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  // Runtime flag latched when the filter manager is created, so the trailers handling stays
+  // consistent for the lifetime of the stream.
+  const bool forward_held_trailers_;
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;
   std::vector<StreamFilterBase*> filters_;
+
+  // The single position holding the trailers of a direction. Trailers are held by the filter that
+  // added them, then by each filter they reach while being forwarded, until they leave the chain.
+  // They are forwarded from the holder only while it is iterating, and forwarding updates the
+  // holder before any callback runs, so whichever path forwards them first (the end of a data
+  // pass, or commonContinue()) is the only one.
+  template <class Filter> struct TrailersState {
+    Filter* filter_{};
+    // Whether filter_ added or processed the trailers, so they continue after it. Otherwise they
+    // are parked before filter_, which stopped all iteration, and continue from it.
+    bool processed_{};
+  };
+  TrailersState<ActiveStreamDecoderFilter> request_trailers_state_;
+  TrailersState<ActiveStreamEncoderFilter> response_trailers_state_;
   AccessLog::InstanceSharedPtrVector access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
