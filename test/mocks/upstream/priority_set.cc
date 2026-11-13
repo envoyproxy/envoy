@@ -10,6 +10,7 @@ namespace Envoy {
 namespace Upstream {
 
 using ::testing::_;
+using ::testing::Invoke;
 using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
 
@@ -25,7 +26,21 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
         return priority_update_cb_helper_.add(cb);
       });
-  ON_CALL(*this, crossPriorityHostMap()).WillByDefault(ReturnPointee(&cross_priority_host_map_));
+  ON_CALL(*this, crossPriorityHostMap())
+      .WillByDefault(Invoke([this]() -> HostLookupMapConstSharedPtr {
+        // Derive the cross-priority host map from the current hosts across all priorities,
+        // unless an explicit cross_priority_host_map_ is already set and non-empty.
+        if (cross_priority_host_map_ == nullptr || !cross_priority_host_map_->empty()) {
+          return cross_priority_host_map_;
+        }
+        auto host_map = std::make_shared<HostMap>();
+        for (const auto& host_set : host_sets_) {
+          for (const auto& host : host_set->hosts()) {
+            host_map->emplace(host->address()->asString(), host);
+          }
+        }
+        return std::make_shared<FlatHostLookupMap>(std::move(host_map));
+      }));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;
