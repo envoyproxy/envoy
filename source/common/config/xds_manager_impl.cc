@@ -134,6 +134,52 @@ absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
 }
 } // namespace
 
+void XdsManagerImpl::onConfigAccepted(absl::string_view type_url,
+                                      const std::vector<DecodedResourcePtr>& resources) {
+  if (xds_config_tracker_ != nullptr) {
+    xds_config_tracker_->onConfigAccepted(type_url, resources);
+  }
+  config_update_callbacks_.runCallbacks(type_url, ConfigUpdateStatus::Accepted, {});
+}
+
+void XdsManagerImpl::onConfigAccepted(
+    absl::string_view type_url,
+    absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+  if (xds_config_tracker_ != nullptr) {
+    xds_config_tracker_->onConfigAccepted(type_url, added_resources, removed_resources);
+  }
+  config_update_callbacks_.runCallbacks(type_url, ConfigUpdateStatus::Accepted, {});
+}
+
+void XdsManagerImpl::onConfigRejected(
+    const envoy::service::discovery::v3::DiscoveryResponse& message,
+    absl::string_view error_detail) {
+  if (xds_config_tracker_ != nullptr) {
+    xds_config_tracker_->onConfigRejected(message, error_detail);
+  }
+  config_update_callbacks_.runCallbacks(message.type_url(), ConfigUpdateStatus::Rejected,
+                                        error_detail);
+}
+
+void XdsManagerImpl::onConfigRejected(
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+    absl::string_view error_detail) {
+  if (xds_config_tracker_ != nullptr) {
+    xds_config_tracker_->onConfigRejected(message, error_detail);
+  }
+  config_update_callbacks_.runCallbacks(message.type_url(), ConfigUpdateStatus::Rejected,
+                                        error_detail);
+}
+
+void XdsManagerImpl::onResourceUnsubscribed(absl::string_view type_url,
+                                            absl::string_view resource) {
+  if (xds_config_tracker_ != nullptr) {
+    xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
+  }
+  config_update_callbacks_.runCallbacks(type_url, ConfigUpdateStatus::Unsubscribed, {});
+}
+
 absl::Status XdsManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                         Upstream::ClusterManager* cm) {
   ASSERT(cm != nullptr);
@@ -159,8 +205,7 @@ absl::Status XdsManagerImpl::initialize(const envoy::config::bootstrap::v3::Boot
 
   OptRef<XdsResourcesDelegate> xds_resources_delegate =
       makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
-  OptRef<XdsConfigTracker> xds_config_tracker =
-      makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
+  OptRef<XdsConfigTracker> xds_config_tracker{*this};
 
   subscription_factory_ = std::make_unique<SubscriptionFactoryImpl>(
       local_info_, main_thread_dispatcher_, *cm_, validation_context_.dynamicValidationVisitor(),
@@ -207,8 +252,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
     RETURN_IF_NOT_OK_REF(strategy_or_error.status());
     JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
-    OptRef<XdsConfigTracker> xds_config_tracker =
-        makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
+    OptRef<XdsConfigTracker> xds_config_tracker{*this};
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
@@ -457,8 +501,7 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
   RETURN_IF_NOT_OK_REF(strategy_or_error.status());
   JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
-  OptRef<XdsConfigTracker> xds_config_tracker =
-      makeOptRefFromPtr<XdsConfigTracker>(xds_config_tracker_.get());
+  OptRef<XdsConfigTracker> xds_config_tracker{*this};
 
   GrpcMuxSharedPtr authority_mux = nullptr;
   if (api_config_source.api_type() ==

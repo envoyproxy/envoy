@@ -1932,6 +1932,94 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
 }
 
+TEST_F(BootstrapAbiImplTest, XdsNotificationsRequireOptInAndReleaseOnDisableAndShutdown) {
+  auto config = newOptionalHooksConfig();
+  using Status = Config::XdsManager::ConfigUpdateStatus;
+  ::Envoy::Common::CallbackManager<void, absl::string_view, Status, absl::string_view> callbacks;
+  struct ObservedUpdates {
+    mutable std::vector<envoy_dynamic_module_type_bootstrap_xds_update_status> values;
+  };
+  ObservedUpdates outcomes;
+  config->in_module_config_ = &outcomes;
+  config->on_bootstrap_extension_xds_update_ =
+      [](auto, auto module, envoy_dynamic_module_type_envoy_buffer type_url, auto status,
+         envoy_dynamic_module_type_envoy_buffer error_details) {
+        EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), "test-type");
+        EXPECT_EQ(absl::string_view(error_details.ptr, error_details.length),
+                  status == envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected
+                      ? "rejected"
+                      : "");
+        static_cast<const ObservedUpdates*>(module)->values.push_back(status);
+      };
+  EXPECT_CALL(context_.xds_manager_, addConfigUpdateCallback(_))
+      .Times(2)
+      .WillRepeatedly([&](Config::XdsManager::ConfigUpdateCallback callback) {
+        return callbacks.add(std::move(callback));
+      });
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+      config->thisAsVoidPtr(), true));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  callbacks.runCallbacks("test-type", Status::Accepted, "");
+  EXPECT_TRUE(outcomes.values.empty());
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  for (auto status : {Status::Accepted, Status::Rejected, Status::Unsubscribed}) {
+    callbacks.runCallbacks("test-type", status, status == Status::Rejected ? "rejected" : "");
+  }
+  EXPECT_THAT(
+      outcomes.values,
+      testing::ElementsAre(envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed));
+  EXPECT_TRUE(config->setXdsNotifications(false));
+  callbacks.runCallbacks("test-type", Status::Accepted, "");
+  EXPECT_EQ(outcomes.values.size(), 3);
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  config->onShutdown();
+  callbacks.runCallbacks("test-type", Status::Accepted, "");
+  EXPECT_EQ(outcomes.values.size(), 3);
+  EXPECT_FALSE(config->setXdsNotifications(true));
+}
+
+TEST_F(BootstrapAbiImplTest, XdsNotificationsRefusedWithoutHookOrInInitOnlyMode) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_CALL(context_.xds_manager_, addConfigUpdateCallback(_)).Times(0);
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {};
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::InitOnly));
+  EXPECT_FALSE(config->setXdsNotifications(true));
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::Serve));
+  config->on_bootstrap_extension_xds_update_ = nullptr;
+  EXPECT_FALSE(config->setXdsNotifications(true));
+  EXPECT_TRUE(config->setXdsNotifications(false));
+}
+
+TEST_F(BootstrapAbiImplTest, XdsNotificationsReleaseBeforeModuleConfigDestruction) {
+  using Status = Config::XdsManager::ConfigUpdateStatus;
+  using Callbacks =
+      ::Envoy::Common::CallbackManager<void, absl::string_view, Status, absl::string_view>;
+  Callbacks callbacks;
+  auto config = newOptionalHooksConfig();
+  config->in_module_config_ = &callbacks;
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {
+    ADD_FAILURE() << "xDS callback invoked during module config destruction";
+  };
+  config->on_bootstrap_extension_config_destroy_ = [](auto module) {
+    auto* callbacks = static_cast<Callbacks*>(const_cast<void*>(module));
+    callbacks->runCallbacks("test-type", Status::Accepted, "");
+  };
+  EXPECT_CALL(context_.xds_manager_, addConfigUpdateCallback(_))
+      .WillOnce([&](Config::XdsManager::ConfigUpdateCallback callback) {
+        return callbacks.add(std::move(callback));
+      });
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  config.reset();
+}
+
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.
 TEST_F(BootstrapAbiImplTest, EnableClusterLifecycle) {
   auto dynamic_module =
@@ -2317,6 +2405,11 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        [] {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+             nullptr, true));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {

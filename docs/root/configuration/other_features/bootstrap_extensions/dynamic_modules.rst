@@ -178,6 +178,17 @@ prefix, tagged with ``config_name`` set to the extension name, or ``default`` if
   listeners_owned, Gauge, Listeners that the module owns
   updates_pending, Gauge, Writes that are queued or warming or that wait for the workers to start
 
+xDS Notifications
+-----------------
+
+After server initialization, a module can opt in to accepted, rejected and unsubscribe xDS
+notifications with ``envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications``.
+The optional ``envoy_dynamic_module_on_bootstrap_extension_xds_update`` hook receives a borrowed
+resource type URL, an outcome and rejection error details, without resource payloads. The error
+details are empty for accepted updates and unsubscriptions. It runs on the main thread during
+xDS processing. Notifications stop when disabled or when shutdown begins. A rejected response
+may have applied some resources.
+
 Use Cases
 ---------
 

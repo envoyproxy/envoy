@@ -1,7 +1,9 @@
 #pragma once
 
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_manager.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/xds_resource.h"
@@ -9,7 +11,7 @@
 namespace Envoy {
 namespace Config {
 
-class XdsManagerImpl : public XdsManager {
+class XdsManagerImpl : public XdsManager, public XdsConfigTracker {
 public:
   XdsManagerImpl(Event::Dispatcher& main_thread_dispatcher, Api::Api& api, Stats::Store& stats,
                  const LocalInfo::LocalInfo& local_info,
@@ -19,6 +21,23 @@ public:
         validation_context_(validation_context) {}
 
   // Config::XdsManager
+  Common::CallbackHandlePtr addConfigUpdateCallback(ConfigUpdateCallback callback) override {
+    return config_update_callbacks_.add(std::move(callback));
+  }
+
+  // Config::XdsConfigTracker
+  void onConfigAccepted(absl::string_view type_url,
+                        const std::vector<DecodedResourcePtr>& resources) override;
+  void
+  onConfigAccepted(absl::string_view type_url,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onResourceUnsubscribed(absl::string_view type_url, absl::string_view resource) override;
+
   absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           Upstream::ClusterManager* cm) override;
   absl::Status
@@ -85,6 +104,8 @@ private:
   ProtobufMessage::ValidationContext& validation_context_;
   XdsResourcesDelegatePtr xds_resources_delegate_;
   XdsConfigTrackerPtr xds_config_tracker_;
+  Common::CallbackManager<void, absl::string_view, ConfigUpdateStatus, absl::string_view>
+      config_update_callbacks_;
   std::unique_ptr<SubscriptionFactoryImpl> subscription_factory_;
   // The cm_ will only be valid after the cluster-manager is initialized.
   // Note that this implies that the xDS-manager must be shut down properly

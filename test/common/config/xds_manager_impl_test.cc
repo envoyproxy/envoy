@@ -140,6 +140,88 @@ public:
 INSTANTIATE_TEST_SUITE_P(XdsManagerImplTest, XdsManagerImplTest,
                          ::testing::ValuesIn({false, true}));
 
+class ObservingTrackerFactory : public MockXdsConfigTrackerFactory {
+public:
+  XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
+                                             ProtobufMessage::ValidationVisitor&, Api::Api&,
+                                             Event::Dispatcher&) override {
+    auto tracker = std::make_unique<testing::StrictMock<MockXdsConfigTracker>>();
+    tracker_ = tracker.get();
+    return tracker;
+  }
+  MockXdsConfigTracker* tracker_ = nullptr;
+};
+
+TEST_P(XdsManagerImplTest, ConfigUpdateObserversPreserveNativeTrackerAndUnregister) {
+  ObservingTrackerFactory factory;
+  Registry::InjectFactory<XdsConfigTrackerFactory> registration(factory);
+  auto* tracker_config = server_.bootstrap_.mutable_xds_config_tracker_extension();
+  tracker_config->set_name(factory.name());
+  ASSERT_TRUE(tracker_config->mutable_typed_config()->PackFrom(Protobuf::Empty{}));
+  initialize();
+  ASSERT_NE(factory.tracker_, nullptr);
+  std::vector<XdsManager::ConfigUpdateStatus> statuses;
+  std::vector<std::string> errors;
+  auto handle = xds_manager_impl_.addConfigUpdateCallback(
+      [&statuses, &errors](absl::string_view type_url, XdsManager::ConfigUpdateStatus status,
+                           absl::string_view error_detail) {
+        EXPECT_EQ(type_url, "test-type");
+        statuses.push_back(status);
+        errors.emplace_back(error_detail);
+      });
+
+  EXPECT_CALL(*factory.tracker_, onConfigAccepted("test-type", _));
+  xds_manager_impl_.onConfigAccepted("test-type", std::vector<DecodedResourcePtr>{});
+  EXPECT_CALL(*factory.tracker_, onConfigAccepted("test-type", _, _));
+  xds_manager_impl_.onConfigAccepted("test-type", {}, {});
+
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  EXPECT_CALL(
+      *factory.tracker_,
+      onConfigRejected(testing::An<const envoy::service::discovery::v3::DiscoveryResponse&>(),
+                       "sotw rejected"));
+  xds_manager_impl_.onConfigRejected(sotw, "sotw rejected");
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  EXPECT_CALL(
+      *factory.tracker_,
+      onConfigRejected(testing::An<const envoy::service::discovery::v3::DeltaDiscoveryResponse&>(),
+                       "delta rejected"));
+  xds_manager_impl_.onConfigRejected(delta, "delta rejected");
+  EXPECT_CALL(*factory.tracker_, onResourceUnsubscribed("test-type", "resource"));
+  xds_manager_impl_.onResourceUnsubscribed("test-type", "resource");
+  EXPECT_THAT(statuses, testing::ElementsAre(XdsManager::ConfigUpdateStatus::Accepted,
+                                             XdsManager::ConfigUpdateStatus::Accepted,
+                                             XdsManager::ConfigUpdateStatus::Rejected,
+                                             XdsManager::ConfigUpdateStatus::Rejected,
+                                             XdsManager::ConfigUpdateStatus::Unsubscribed));
+  EXPECT_THAT(errors, testing::ElementsAre("", "", "sotw rejected", "delta rejected", ""));
+
+  handle.reset();
+  EXPECT_CALL(*factory.tracker_, onResourceUnsubscribed("test-type", "resource"));
+  xds_manager_impl_.onResourceUnsubscribed("test-type", "resource");
+  EXPECT_EQ(statuses.size(), 5);
+}
+
+TEST_P(XdsManagerImplTest, ConfigUpdateObserversWorkWithoutNativeTracker) {
+  initialize();
+  unsigned calls = 0;
+  auto handle = xds_manager_impl_.addConfigUpdateCallback(
+      [&calls](absl::string_view, XdsManager::ConfigUpdateStatus status,
+               absl::string_view error_detail) {
+        EXPECT_EQ(error_detail, status == XdsManager::ConfigUpdateStatus::Rejected ? "error" : "");
+        ++calls;
+      });
+  xds_manager_impl_.onConfigAccepted("type", std::vector<DecodedResourcePtr>{});
+  xds_manager_impl_.onConfigAccepted("type", {}, {});
+  xds_manager_impl_.onConfigRejected(envoy::service::discovery::v3::DiscoveryResponse{}, "error");
+  xds_manager_impl_.onConfigRejected(envoy::service::discovery::v3::DeltaDiscoveryResponse{},
+                                     "error");
+  xds_manager_impl_.onResourceUnsubscribed("type", "name");
+  EXPECT_EQ(calls, 5);
+}
+
 // Validates that a call to shutdown succeeds.
 TEST_P(XdsManagerImplTest, ShutdownSuccessful) {
   initialize();

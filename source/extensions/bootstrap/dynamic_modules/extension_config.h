@@ -74,6 +74,8 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionXdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_xds_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -155,6 +157,11 @@ public:
    * @return true if the callbacks were successfully registered, false if already registered.
    */
   bool enableClusterLifecycle();
+
+  /**
+   * Registers or unregisters xDS notifications on the main thread.
+   */
+  bool setXdsNotifications(bool enabled);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -286,6 +293,7 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
       nullptr;
@@ -408,6 +416,8 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  Common::CallbackHandlePtr xds_update_handle_;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

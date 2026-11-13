@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "envoy/config/xds_manager.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
@@ -32,6 +33,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 }
 
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
+  xds_update_handle_.reset();
   // Cancel any pending HTTP callouts before destroying the config.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -89,6 +91,40 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
       Server::ServerLifecycleNotifier::Stage::ShutdownExit,
       [this]() { cluster_update_callbacks_handle_.reset(); });
   return true;
+}
+
+bool DynamicModuleBootstrapExtensionConfig::setXdsNotifications(bool enabled) {
+  if (!enabled) {
+    xds_update_handle_.reset();
+    return true;
+  }
+  if (!server_initialized_ || extension_destroyed_ || !shutdownNotificationExpected() ||
+      on_bootstrap_extension_xds_update_ == nullptr) {
+    return false;
+  }
+  if (xds_update_handle_ != nullptr) {
+    return true;
+  }
+  xds_update_handle_ = context_.xdsManager().addConfigUpdateCallback(
+      [this](absl::string_view type_url, Config::XdsManager::ConfigUpdateStatus status,
+             absl::string_view error_details) {
+        envoy_dynamic_module_type_bootstrap_xds_update_status abi_status;
+        switch (status) {
+        case Config::XdsManager::ConfigUpdateStatus::Accepted:
+          abi_status = envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted;
+          break;
+        case Config::XdsManager::ConfigUpdateStatus::Rejected:
+          abi_status = envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected;
+          break;
+        case Config::XdsManager::ConfigUpdateStatus::Unsubscribed:
+          abi_status = envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed;
+          break;
+        }
+        on_bootstrap_extension_xds_update_(thisAsVoidPtr(), in_module_config_,
+                                           {type_url.data(), type_url.size()}, abi_status,
+                                           {error_details.data(), error_details.size()});
+      });
+  return xds_update_handle_ != nullptr;
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
@@ -323,6 +359,7 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
+  xds_update_handle_.reset();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
@@ -597,6 +634,10 @@ newDynamicModuleBootstrapExtensionConfig(
 
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
+  auto on_xds_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionXdsUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_xds_update");
+  config->on_bootstrap_extension_xds_update_ = on_xds_update.ok() ? on_xds_update.value() : nullptr;
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");
