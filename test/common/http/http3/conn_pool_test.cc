@@ -10,6 +10,8 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -32,7 +34,29 @@ public:
   connectingClients(Http3ConnPoolImpl& pool) {
     return pool.connecting_clients_;
   }
+  static std::list<Envoy::ConnectionPool::ActiveClientPtr>&
+  earlyDataClients(Http3ConnPoolImpl& pool) {
+    return pool.early_data_clients_;
+  }
+  static std::list<Envoy::ConnectionPool::ActiveClientPtr>& busyClients(Http3ConnPoolImpl& pool) {
+    return pool.busy_clients_;
+  }
+  static std::list<Envoy::ConnectionPool::ActiveClientPtr>& readyClients(Http3ConnPoolImpl& pool) {
+    return pool.ready_clients_;
+  }
   static quic::QuicServerId& getServerId(Http3ConnPoolImpl& pool) { return pool.server_id_; }
+};
+
+class CodecClientNoAutoConnect : public Http::CodecClient {
+public:
+  CodecClientNoAutoConnect(Http::CodecType type, Network::ClientConnectionPtr&& connection,
+                           Http::ClientConnection* codec,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           Event::Dispatcher& dispatcher)
+      : CodecClient(type, std::move(connection), host, dispatcher) {
+    codec_.reset(codec);
+  }
+  using Http::CodecClient::onMaxStreamsChanged;
 };
 
 class MockPoolConnectResultCallback : public PoolConnectResultCallback {
@@ -385,6 +409,211 @@ TEST_F(Http3ConnPoolImplTest, ServerIdUsesConfiguredSniWithAutoHostSniAndRuntime
   hostname_ = "upstream.example.com";
   initialize();
   EXPECT_EQ("default_sni.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
+}
+
+// Verifies that when a 0-RTT client consumes all cached stream capacity via early data (entering
+// State::Busy) and then receives higher negotiated stream capacity from transport parameters
+// before the Connected event is raised, onMaxStreamsChanged transitions the client back to
+// State::ReadyForEarlyData (attaching only early-data-safe pending streams) rather than triggering
+// an ENVOY_BUG or prematurely attaching non-early-data streams.
+TEST_F(Http3ConnPoolImplTest, OnMaxStreamsChangedWhileBusyBeforeHandshake) {
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(*factory_));
+  EXPECT_CALL(mockHost().cluster_, connectTimeout())
+      .WillRepeatedly(Return(std::chrono::milliseconds(10000)));
+  // Cap cluster connections at 1 so additional streams queue on this pool rather than opening a
+  // second connection while the 0-RTT client is Busy.
+  mockHost().cluster_.resetResourceManager(/*cx_limit=*/1, /*pending_rq_limit=*/1024,
+                                           /*rq_limit=*/1024, /*retry_limit=*/1,
+                                           /*conn_pool_limit=*/1024);
+
+  auto* mock_connection = new NiceMock<Network::MockClientConnection>();
+  auto* mock_codec = new NiceMock<Http::MockClientConnection>();
+  ON_CALL(*mock_codec, protocol()).WillByDefault(Return(Protocol::Http3));
+  CodecClientNoAutoConnect* codec_client = nullptr;
+
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  pool_ = std::make_unique<Http3ConnPoolImpl>(
+      host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, transport_socket_options_,
+      random_, state_,
+      [&](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        Upstream::Host::CreateConnectionData data{};
+        data.host_description_ = pool->host();
+        data.connection_ = Network::ClientConnectionPtr{mock_connection};
+        return std::make_unique<ActiveClient>(*pool, data);
+      },
+      [&](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
+        auto client = std::make_unique<CodecClientNoAutoConnect>(
+            CodecType::HTTP3, std::move(data.connection_), mock_codec, data.host_description_,
+            pool->dispatcher());
+        codec_client = client.get();
+        return client;
+      },
+      std::vector<Protocol>{Protocol::Http3},
+      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+      OptRef<Quic::EnvoyQuicNetworkObserverRegistry>{observers_}, overload_manager_, false);
+
+  NiceMock<MockRequestEncoder> encoder1;
+  NiceMock<MockRequestEncoder> encoder2;
+  NiceMock<MockRequestEncoder> encoder3;
+  EXPECT_CALL(*mock_codec, newStream(_))
+      .WillOnce(testing::ReturnRef(encoder1))
+      .WillOnce(testing::ReturnRef(encoder2))
+      .WillOnce(testing::ReturnRef(encoder3));
+
+  // Queue the first early-data-safe stream, creating the Connecting client.
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  NiceMock<MockResponseDecoder> decoder1;
+  ConnPoolCallbacks callbacks1;
+  EXPECT_NE(nullptr, pool_->newStream(decoder1, callbacks1,
+                                      {/*can_send_early_data_=*/true, /*can_use_http3_=*/true}));
+  ASSERT_EQ(1u, Http3ConnPoolImplPeer::connectingClients(*pool_).size());
+  auto& client =
+      static_cast<ActiveClient&>(*Http3ConnPoolImplPeer::connectingClients(*pool_).front());
+
+  // Connect and enter 0-RTT with cached initial_max_streams_bidi = 1.
+  async_connect_callback->invokeCallback();
+  mock_connection->raiseEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData, client.state());
+  EXPECT_FALSE(client.hasHandshakeCompleted());
+
+  // Applying cached 0-RTT transport params (1 available stream) attaches stream 1 and drives the
+  // client to Busy before the handshake has completed.
+  EXPECT_CALL(callbacks1.pool_ready_, ready());
+  codec_client->onMaxStreamsChanged(1);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+  EXPECT_EQ(0u, client.currentUnusedCapacity());
+  EXPECT_FALSE(client.hasHandshakeCompleted());
+  EXPECT_EQ(1u, Http3ConnPoolImplPeer::busyClients(*pool_).size());
+  EXPECT_EQ(1u, mockHost().cluster_.trafficStats()->upstream_rq_0rtt_.value());
+
+  // Queue a non-early-data stream (e.g. POST) followed by an early-data-safe stream (e.g. GET).
+  NiceMock<MockResponseDecoder> decoder_non_early;
+  ConnPoolCallbacks callbacks_non_early;
+  EXPECT_NE(nullptr, pool_->newStream(decoder_non_early, callbacks_non_early,
+                                      {/*can_send_early_data_=*/false, /*can_use_http3_=*/true}));
+  NiceMock<MockResponseDecoder> decoder_early2;
+  ConnPoolCallbacks callbacks_early2;
+  EXPECT_NE(nullptr, pool_->newStream(decoder_early2, callbacks_early2,
+                                      {/*can_send_early_data_=*/true, /*can_use_http3_=*/true}));
+
+  // Server's handshake transport parameters advertise 2 additional streams (initial_max_streams=3)
+  // via OnConfigNegotiated before OnTlsHandshakeComplete raises Connected.
+  // Only the early-data-safe stream should be attached now; the non-early-data stream must wait
+  // until Connected.
+  EXPECT_CALL(callbacks_non_early.pool_ready_, ready()).Times(0);
+  EXPECT_CALL(callbacks_early2.pool_ready_, ready());
+  codec_client->onMaxStreamsChanged(2);
+
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData, client.state());
+  EXPECT_FALSE(client.hasHandshakeCompleted());
+  EXPECT_EQ(1u, client.currentUnusedCapacity());
+  EXPECT_EQ(1u, Http3ConnPoolImplPeer::earlyDataClients(*pool_).size());
+  EXPECT_TRUE(Http3ConnPoolImplPeer::readyClients(*pool_).empty());
+  EXPECT_EQ(2u, mockHost().cluster_.trafficStats()->upstream_rq_0rtt_.value());
+
+  // Raising Connected completes the handshake and dispatches the remaining non-early-data stream,
+  // consuming the remaining stream slot and driving the client to Busy.
+  EXPECT_CALL(connect_result_callback_, onHandshakeComplete());
+  EXPECT_CALL(callbacks_non_early.pool_ready_, ready());
+  mock_connection->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_TRUE(client.hasHandshakeCompleted());
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+  EXPECT_EQ(0u, client.currentUnusedCapacity());
+  EXPECT_EQ(2u, mockHost().cluster_.trafficStats()->upstream_rq_0rtt_.value());
+
+  // A subsequent post-handshake MAX_STREAMS update transitions Busy -> Ready.
+  codec_client->onMaxStreamsChanged(1);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Ready, client.state());
+  EXPECT_EQ(1u, Http3ConnPoolImplPeer::readyClients(*pool_).size());
+
+  pool_.reset();
+}
+
+TEST_F(Http3ConnPoolImplTest,
+       OnMaxStreamsChangedWhileBusyBeforeHandshakeWithLegacyEarlyDataTiming) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.fix_http3_early_data_timing", "false"}});
+
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(*factory_));
+  EXPECT_CALL(mockHost().cluster_, connectTimeout())
+      .WillRepeatedly(Return(std::chrono::milliseconds(10000)));
+  mockHost().cluster_.resetResourceManager(/*cx_limit=*/1, /*pending_rq_limit=*/1024,
+                                           /*rq_limit=*/1024, /*retry_limit=*/1,
+                                           /*conn_pool_limit=*/1024);
+
+  auto* mock_connection = new NiceMock<Network::MockClientConnection>();
+  auto* mock_codec = new NiceMock<Http::MockClientConnection>();
+  ON_CALL(*mock_codec, protocol()).WillByDefault(Return(Protocol::Http3));
+  CodecClientNoAutoConnect* codec_client = nullptr;
+
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  pool_ = std::make_unique<Http3ConnPoolImpl>(
+      host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, transport_socket_options_,
+      random_, state_,
+      [&](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        Upstream::Host::CreateConnectionData data{};
+        data.host_description_ = pool->host();
+        data.connection_ = Network::ClientConnectionPtr{mock_connection};
+        return std::make_unique<ActiveClient>(*pool, data);
+      },
+      [&](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
+        auto client = std::make_unique<CodecClientNoAutoConnect>(
+            CodecType::HTTP3, std::move(data.connection_), mock_codec, data.host_description_,
+            pool->dispatcher());
+        codec_client = client.get();
+        return client;
+      },
+      std::vector<Protocol>{Protocol::Http3},
+      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+      OptRef<Quic::EnvoyQuicNetworkObserverRegistry>{observers_}, overload_manager_, false);
+
+  NiceMock<MockRequestEncoder> encoder1;
+  NiceMock<MockRequestEncoder> encoder2;
+  EXPECT_CALL(*mock_codec, newStream(_))
+      .WillOnce(testing::ReturnRef(encoder1))
+      .WillOnce(testing::ReturnRef(encoder2));
+  // With fix_http3_early_data_timing=false, connect() synchronously raises ConnectedZeroRtt and
+  // applies cached transport params (max_streams=1) before async_connect_callback calls
+  // onUpstreamReadyForEarlyData().
+  EXPECT_CALL(*mock_connection, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*mock_connection, connect()).WillOnce([&]() {
+    mock_connection->raiseEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+    codec_client->onMaxStreamsChanged(1);
+  });
+
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  NiceMock<MockResponseDecoder> decoder1;
+  ConnPoolCallbacks callbacks1;
+  EXPECT_NE(nullptr, pool_->newStream(decoder1, callbacks1,
+                                      {/*can_send_early_data_=*/true, /*can_use_http3_=*/true}));
+  auto& client =
+      static_cast<ActiveClient&>(*Http3ConnPoolImplPeer::connectingClients(*pool_).front());
+
+  EXPECT_CALL(callbacks1.pool_ready_, ready());
+  async_connect_callback->invokeCallback();
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+  EXPECT_FALSE(client.hasHandshakeCompleted());
+
+  // Queue another early-data stream while Busy, then deliver higher server max_streams before
+  // Connected.
+  NiceMock<MockResponseDecoder> decoder2;
+  ConnPoolCallbacks callbacks2;
+  EXPECT_NE(nullptr, pool_->newStream(decoder2, callbacks2,
+                                      {/*can_send_early_data_=*/true, /*can_use_http3_=*/true}));
+
+  EXPECT_CALL(callbacks2.pool_ready_, ready());
+  codec_client->onMaxStreamsChanged(1);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+  EXPECT_FALSE(client.hasHandshakeCompleted());
+  EXPECT_EQ(2u, mockHost().cluster_.trafficStats()->upstream_rq_0rtt_.value());
+
+  EXPECT_CALL(connect_result_callback_, onHandshakeComplete());
+  mock_connection->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_TRUE(client.hasHandshakeCompleted());
+
+  pool_.reset();
 }
 
 } // namespace Http3
