@@ -15291,3 +15291,20 @@ fn test_load_shed_point_mock() {
     .unwrap()
     .should_shed_load());
 }
+
+#[test]
+fn noop_scheduler_as_boxed_trait_object() {
+  use crate::http::EnvoyHttpFilterConfigScheduler;
+  use crate::NoopScheduler;
+
+  fn use_scheduler(s: &dyn EnvoyHttpFilterConfigScheduler) {
+    s.commit(42);
+  }
+
+  let scheduler: Box<dyn EnvoyHttpFilterConfigScheduler> = Box::new(NoopScheduler);
+  use_scheduler(&*scheduler);
+
+  bootstrap::EnvoyBootstrapExtensionConfigScheduler::commit(&NoopScheduler, 1);
+  cluster::EnvoyClusterScheduler::commit(&NoopScheduler, 2);
+  stats_sink::EnvoyStatSinkConfigScheduler::commit(&NoopScheduler, 3);
+}
