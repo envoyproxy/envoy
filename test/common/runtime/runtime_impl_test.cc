@@ -28,6 +28,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/flags/declare.h"
+#include "absl/flags/reflection.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -632,6 +633,21 @@ TEST_F(StaticLoaderImplTest, RemovedFlags) {
   EXPECT_ENVOY_BUG(setup(), "envoy.reloadable_features.removed_foo");
 }
 
+TEST_F(StaticLoaderImplTest, FrozenRestartFeaturesRejectAdminChanges) {
+  absl::FlagSaver saver;
+  base_ = TestUtility::parseYaml<Protobuf::Struct>(R"EOF(
+    envoy.restart_features.test_feature: true
+  )EOF");
+  setup();
+  loader_->freezeRestartFeatures();
+
+  EXPECT_THAT(loader_->mergeValues({{"envoy.restart_features.test_feature", "false"}}),
+              StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_THAT(loader_->mergeValues({{"envoy.restart_features.test_feature", ""}}),
+              StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+}
+
 TEST_F(StaticLoaderImplTest, ProtoParsingInvalidField) {
   base_ = TestUtility::parseYaml<Protobuf::Struct>("file0:");
   EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException, "Invalid runtime entry value for file0");
@@ -1097,6 +1113,21 @@ TEST_F(RtdsLoaderImplTest, WrongResourceName) {
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, FrozenRestartFeaturesIgnoreRtds) {
+  setup();
+  loader_->freezeRestartFeatures();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.restart_features.test_feature: true
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  EXPECT_LOG_CONTAINS("error", "ignoring envoy.restart_features.test_feature=true",
+                      doOnConfigUpdateVerifyNoThrow(runtime));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
 }
 
 // Successful update.
