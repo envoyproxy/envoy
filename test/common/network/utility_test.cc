@@ -1056,6 +1056,31 @@ TEST_F(ExecInNetnsTest, SetnsFail) {
   EXPECT_THAT(result, HasStatusMessage(testing::StartsWith("failed to set netns to ns1")));
 }
 
+// 0 is a valid file descriptor (e.g. when stdin is closed), so a namespace file opened as fd 0 must
+// be entered and closed rather than rejected and leaked.
+TEST_F(ExecInNetnsTest, NetnsOpenReturnsFdZero) {
+  // Make the tests use mock syscalls.
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
+
+  testing::InSequence s;
+  EXPECT_CALL(os_syscalls, open(testing::StrEq("/proc/thread-self/ns/net"), O_RDONLY))
+      .WillOnce(Return(Api::SysCallIntResult{1337, 0}));
+  EXPECT_CALL(os_syscalls, open(testing::StrEq("ns1"), O_RDONLY))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(linux_os_syscalls, setns(0, CLONE_NEWNET))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(linux_os_syscalls, setns(1337, CLONE_NEWNET))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_syscalls, close(0)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_syscalls, close(1337)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto result = Utility::execInNetworkNamespace([]() -> int { return 42; }, "ns1");
+  EXPECT_THAT(result, IsOkAndHolds(42));
+}
+
 TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
   EXPECT_DEATH(
       {
