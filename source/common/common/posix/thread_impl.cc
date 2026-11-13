@@ -33,7 +33,7 @@ int64_t getPthreadId(pthread_t thread) {
   pthread_threadid_np(thread, &tid);
   return tid;
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
@@ -47,7 +47,7 @@ int64_t getCurrentThreadIdBase() {
 #elif defined(__EMSCRIPTEN__) || defined(__wasm__)
   return getPthreadId(pthread_self());
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
@@ -73,7 +73,7 @@ void setThreadPriority(const int64_t tid, const int priority) {
   UNREFERENCED_PARAMETER(tid);
   UNREFERENCED_PARAMETER(priority);
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
@@ -252,7 +252,7 @@ int PosixThreadFactory::currentThreadPriority() const {
 #elif defined(__EMSCRIPTEN__) || defined(__wasm__)
   return 0;
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
