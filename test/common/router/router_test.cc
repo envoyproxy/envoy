@@ -9126,5 +9126,79 @@ TEST_F(RouterTest, ProdFilterDelegatesToRetryPolicyCreateRetryState) {
   prod_filter.onDestroy();
 }
 
+TEST_F(RouterTest, RetryBufferOverflowDrainsKeptBodyWithActiveUpstream) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).WillOnce([&](Buffer::Instance& data, bool) {
+    decoding_buffer.move(data);
+  });
+  EXPECT_CALL(callbacks_, modifyDecodingBuffer(_))
+      .WillOnce(
+          [&](std::function<void(Buffer::Instance&)> callback) { callback(decoding_buffer); });
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  // Kept for a retry: within the limit.
+  Buffer::OwnedImpl buf1(std::string(40, 'x'));
+  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
+  router_->decodeData(buf1, false);
+  EXPECT_EQ(40U, decoding_buffer.length());
+
+  // Over the limit with the upstream still active: retries are given up, the kept body is dropped
+  // and the new frame still goes upstream.
+  Buffer::OwnedImpl buf2(std::string(15, 'y'));
+  EXPECT_CALL(encoder1, encodeData(BufferString(std::string(15, 'y')), true));
+  router_->decodeData(buf2, true);
+  EXPECT_EQ(0U, decoding_buffer.length());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+TEST_F(RouterTest, RetryBufferOverflowKeepsDecodingBufferWhenItIsData) {
+  // The frame is the decoding buffer replayed by an earlier filter; it must still go upstream.
+  Buffer::OwnedImpl body_data(std::string(60, 'x'));
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&body_data));
+  EXPECT_CALL(callbacks_, modifyDecodingBuffer(_)).Times(0);
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(encoder1, encodeData(BufferString(std::string(60, 'x')), true));
+  router_->decodeData(body_data, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 } // namespace Router
 } // namespace Envoy
