@@ -145,6 +145,12 @@ protected:
   void processResponseBodyMessage(
       FakeUpstream& grpc_upstream, bool first_message,
       absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
+  // Answers STREAMED response body messages on the open processor stream until one carries
+  // end_of_stream, replacing the first chunk with `body` and emptying any later ones. An HTTP/1
+  // upstream delivers the body and the end of stream as separate frames, which reach the
+  // processor in one message or two depending on whether they arrive before the response
+  // headers reply.
+  void processStreamedResponseBodyAs(absl::string_view body);
   void processResponseTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
       absl::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
