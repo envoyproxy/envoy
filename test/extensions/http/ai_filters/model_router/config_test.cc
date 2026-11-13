@@ -496,32 +496,6 @@ quota_config: {}
        "TypedExtensionConfigValidationError"},
       {R"EOF(
 quota_config:
-  name: redis
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
-    host: ""
-)EOF",
-       "RedisQuotaConfigValidationError\\.Host"},
-      {R"EOF(
-quota_config:
-  name: redis
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
-    host: 127.0.0.1
-    port: 70000
-)EOF",
-       "RedisQuotaConfigValidationError\\.Port"},
-      {R"EOF(
-quota_config:
-  name: redis
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
-    host: 127.0.0.1
-    timeout: 0s
-)EOF",
-       "RedisQuotaConfigValidationError\\.Timeout"},
-      {R"EOF(
-quota_config:
   name: rls
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RlsQuotaConfig
@@ -546,7 +520,7 @@ quota_config:
   }
 }
 
-TEST_F(ModelRouterConfigTest, AcceptsValidQuotasAndRedisConfig) {
+TEST_F(ModelRouterConfigTest, AcceptsValidQuotasAndRlsConfig) {
   for (const char* yaml : {
            R"EOF(
 providers:
@@ -576,15 +550,6 @@ quota_config:
   name: local
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.LocalQuotaConfig
-)EOF",
-           R"EOF(
-quota_config:
-  name: redis
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
-    host: 127.0.0.1
-    port: 6379
-    timeout: 2s
 )EOF",
            R"EOF(
 quota_config:

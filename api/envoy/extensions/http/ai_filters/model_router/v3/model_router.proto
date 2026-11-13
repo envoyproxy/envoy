@@ -154,18 +154,6 @@ message RoutingEntry {
 message LocalQuotaConfig {
 }
 
-// Connection parameters for the Redis backend used to track model usage quotas.
-message RedisQuotaConfig {
-  // IP address or hostname of the Redis server.
-  string host = 1 [(validate.rules).string = {min_len: 1}];
-
-  // TCP port of the Redis server. If unset or ``0``, defaults to ``6379``.
-  uint32 port = 2 [(validate.rules).uint32 = {lte: 65535}];
-
-  // Connection and command timeout for Redis operations. If unset, defaults to 1000ms.
-  google.protobuf.Duration timeout = 3 [(validate.rules).duration = {gt {}}];
-}
-
 // Configuration for tracking model usage quotas via an external gRPC RateLimitService (RLS).
 message RlsQuotaConfig {
   // Specifies the gRPC service that hosts the rate limit service.

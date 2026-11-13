@@ -12,7 +12,6 @@
 #include "source/extensions/http/ai_filters/model_router/filter.h"
 #include "source/extensions/http/ai_filters/model_router/local_quota.h"
 #include "source/extensions/http/ai_filters/model_router/quota_interface.h"
-#include "source/extensions/http/ai_filters/model_router/redis_quota.h"
 #include "source/extensions/http/ai_filters/model_router/rls_quota.h"
 
 #include "absl/status/status.h"
@@ -27,8 +26,6 @@ namespace ModelRouter {
 using LocalQuotaConfigProto =
     envoy::extensions::http::ai_filters::model_router::v3::LocalQuotaConfig;
 using ModelRouterProto = envoy::extensions::http::ai_filters::model_router::v3::ModelRouter;
-using RedisQuotaConfigProto =
-    envoy::extensions::http::ai_filters::model_router::v3::RedisQuotaConfig;
 using RlsQuotaConfigProto = envoy::extensions::http::ai_filters::model_router::v3::RlsQuotaConfig;
 
 absl::StatusOr<HttpFilters::AiProtocolManager::AiFilterFactoryCb>
@@ -57,15 +54,6 @@ ModelRouterFilterConfigFactory::createAiFilterFactory(
       tl_quota->set([base_quota = LocalQuota(proto, context.timeSource())](
                         Event::Dispatcher&) -> std::shared_ptr<QuotaInterface> {
         return std::make_shared<LocalQuota>(base_quota);
-      });
-    } else if (type == RedisQuotaConfigProto::default_instance().GetTypeName()) {
-      RedisQuotaConfigProto redis_config;
-      RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-          typed_config, context.messageValidationVisitor(), redis_config));
-      MessageUtil::validate(redis_config, context.messageValidationVisitor());
-      tl_quota->set([proto, redis_config, &time_source = context.timeSource()](
-                        Event::Dispatcher& dispatcher) -> std::shared_ptr<QuotaInterface> {
-        return std::make_shared<RedisQuota>(proto, redis_config, dispatcher, time_source);
       });
     } else if (type == RlsQuotaConfigProto::default_instance().GetTypeName()) {
       RlsQuotaConfigProto rls_config;
