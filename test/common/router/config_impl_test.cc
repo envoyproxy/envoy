@@ -2635,9 +2635,9 @@ virtual_hosts:
     envoy::config::route::v3::RouteConfiguration route_config =
         parseRouteConfigurationFromYaml(yaml);
 
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl config(route_config, factory_context_, true, creation_status_),
-        EnvoyException, ":-prefixed or host headers may not be modified");
+    creation_status_ = absl::OkStatus();
+    TestConfigImpl config(route_config, factory_context_, true, creation_status_);
+    EXPECT_EQ(creation_status_.message(), ":-prefixed or host headers may not be modified");
   }
 }
 
@@ -2659,9 +2659,9 @@ virtual_hosts:
     envoy::config::route::v3::RouteConfiguration route_config =
         parseRouteConfigurationFromYaml(yaml);
 
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl config(route_config, factory_context_, true, creation_status_),
-        EnvoyException, ":-prefixed or host headers may not be removed");
+    creation_status_ = absl::OkStatus();
+    TestConfigImpl config(route_config, factory_context_, true, creation_status_);
+    EXPECT_EQ(creation_status_.message(), ":-prefixed or host headers may not be removed");
   }
 }
 
@@ -12116,12 +12116,11 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_);
-      , EnvoyException,
-      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
-      "'google.protobuf.BoolValue'");
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+            "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerVirtualHost) {
@@ -12139,12 +12138,11 @@ virtual_hosts:
           seconds: 123
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                            creation_status_);
-      , EnvoyException,
-      "The filter test.default.filter doesn't support virtual host or route specific "
-      "configurations");
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "The filter test.default.filter doesn't support virtual host or route specific "
+            "configurations");
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerRoute) {
@@ -12182,12 +12180,11 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.BoolValue
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_);
-      , EnvoyException,
-      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
-      "'google.protobuf.BoolValue'");
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+            "'google.protobuf.BoolValue'");
 }
 
 TEST_F(PerFilterConfigsTest, PerRouteWithUnknownFilter) {

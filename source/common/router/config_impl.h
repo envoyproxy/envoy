@@ -34,7 +34,9 @@
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/router/config_utility.h"
+#include "source/common/router/deferred_virtual_host.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
@@ -1378,8 +1380,9 @@ public:
   VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
-  const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
-  const VirtualHostImpl* findVirtualHost(absl::string_view host) const;
+  VirtualHostImplConstSharedPtr findVirtualHost(const Http::RequestHeaderMap& headers) const;
+  VirtualHostImplConstSharedPtr findVirtualHost(absl::string_view host) const;
+  const DomainEntry* findDomainEntry(absl::string_view host) const;
 
 private:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1388,39 +1391,46 @@ private:
                ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                bool validate_clusters, absl::Status& creation_status);
 
-  using WildcardVirtualHosts =
-      std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
+  using WildcardDomainEntries =
+      std::map<int64_t, absl::flat_hash_map<std::string, const DomainEntry*>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
-  const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
-                                                 const WildcardVirtualHosts& wildcard_virtual_hosts,
-                                                 SubstringFunction substring_function) const;
+  const DomainEntry* findWildcardDomainEntry(absl::string_view host,
+                                             const WildcardDomainEntries& wildcard_domain_entries,
+                                             SubstringFunction substring_function) const;
   bool hasOnlyDefaultVirtualHost() const {
-    return virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
-           wildcard_virtual_host_prefixes_.empty();
+    return exact_domain_entries_.empty() && wildcard_domain_suffixes_.empty() &&
+           wildcard_domain_prefixes_.empty();
   }
-  const VirtualHostImpl* findVirtualHostInternal(absl::string_view host) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
+  Server::Configuration::ServerFactoryContext& factory_context_;
   // Keeps the shared part of the route config alive and gives access to the route configuration
   // level extensions, which run even when no virtual host matches.
   const CommonConfigSharedPtr global_route_config_;
   // Unprefixed scope that only bounds the lifetime of the virtual cluster stats; see the
   // constructor.
   Stats::ScopeSharedPtr vhost_scope_;
-  absl::flat_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
+  // Backing arena for dormant VirtualHost protos when deferred creation is enabled. Declared
+  // before domain_entries_ so the protos outlive the entries that reference them.
+  Protobuf::Arena deferred_proto_arena_;
+  // Contiguous storage for all virtual host slots in this route configuration, referenced by raw
+  // pointer from the domain lookup maps below.
+  std::unique_ptr<DomainEntry[]> domain_entries_;
+  // Exact lower-case domain name to virtual host slot mapping (excluding wildcard domains).
+  absl::flat_hash_map<std::string, const DomainEntry*> exact_domain_entries_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
-  // A note on using an unordered_map versus a vector of (string, VirtualHostImplSharedPtr) pairs:
+  // A note on using an unordered_map versus a vector of (string, const DomainEntry*) pairs:
   //
   // Based on local benchmarks, each vector entry costs around 20ns for recall and (string)
   // comparison with a fixed cost of about 25ns. For unordered_map, the empty map costs about 65ns
   // and climbs to about 110ns once there are any entries.
   //
   // The break-even is 4 entries.
-  WildcardVirtualHosts wildcard_virtual_host_suffixes_;
-  WildcardVirtualHosts wildcard_virtual_host_prefixes_;
+  WildcardDomainEntries wildcard_domain_suffixes_;
+  WildcardDomainEntries wildcard_domain_prefixes_;
 
-  VirtualHostImplSharedPtr default_virtual_host_;
+  const DomainEntry* default_domain_entry_{nullptr};
   const bool ignore_port_in_host_matching_{false};
   const Http::LowerCaseString vhost_header_;
 };
@@ -1518,7 +1528,7 @@ public:
          bool validate_clusters_default);
 
   bool virtualHostExists(absl::string_view domain) const {
-    return route_matcher_->findVirtualHost(domain) != nullptr;
+    return route_matcher_->findDomainEntry(domain) != nullptr;
   }
 
   // Router::Config

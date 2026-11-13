@@ -33,8 +33,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "config_lib",
-    srcs = ["config_impl.cc"],
-    hdrs = ["config_impl.h"],
+    srcs = [
+        "config_impl.cc",
+        "deferred_virtual_host.cc",
+    ],
+    hdrs = [
+        "config_impl.h",
+        "deferred_virtual_host.h",
+    ],
     deps = [
         ":config_utility_lib",
         ":context_lib",
@@ -56,7 +62,11 @@ envoy_cc_library(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",  # TODO(rodaine): break dependency on server
+        "//envoy/singleton:manager_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
@@ -65,6 +75,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/common:packed_struct_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
@@ -78,7 +89,11 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/common/stream_info:filter_state_lib",
@@ -89,11 +104,14 @@ envoy_cc_library(
         "//source/extensions/early_data:default_early_data_policy_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:config",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
 )

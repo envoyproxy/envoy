@@ -106,7 +106,6 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
 
 BuilderConstPtr createBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config,
                               Protobuf::Arena* arena) {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults.

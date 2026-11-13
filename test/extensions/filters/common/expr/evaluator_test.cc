@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/mocks/stream_info/mocks.h"
@@ -54,6 +56,15 @@ TEST(Evaluator, Activation) {
   const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
   EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
   EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());
+}
+
+TEST(Evaluator, CreateBuilderOnWorkerThread) {
+  std::thread worker([]() {
+    Protobuf::Arena constant_arena;
+    auto builder = createBuilder({}, &constant_arena);
+    EXPECT_NE(builder, nullptr);
+  });
+  worker.join();
 }
 
 } // namespace

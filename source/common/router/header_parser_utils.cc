@@ -30,7 +30,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   std::string new_header_value = header_value;
   absl::string_view matches[3];
   while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 3)) {
-    TRY_ASSERT_MAIN_THREAD {
+    {  // TODO(birenroy): extraneous block to reduce review diffs; remove in a future cleanup
       std::string new_format;
       auto params_or_error = Json::Factory::loadFromString(std::string(matches[2]));
       if (!params_or_error.status().ok()) {
@@ -77,7 +77,6 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       int subs = absl::StrReplaceAll({{matches[0], new_format}}, &new_header_value);
       ASSERT(subs > 0);
     }
-    END_TRY CATCH(..., { return header_value; });
   }
 
   return new_header_value;
