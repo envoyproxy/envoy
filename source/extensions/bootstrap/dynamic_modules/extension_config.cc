@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <vector>
 
+#include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -32,6 +34,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 }
 
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
+  extension_config_subscription_.reset();
   // Cancel any pending HTTP callouts before destroying the config.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -89,6 +92,53 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
       Server::ServerLifecycleNotifier::Stage::ShutdownExit,
       [this]() { cluster_update_callbacks_handle_.reset(); });
   return true;
+}
+
+bool DynamicModuleBootstrapExtensionConfig::subscribeExtensionConfig(
+    absl::string_view name, absl::string_view type_url, absl::string_view config_source_json) {
+  if (!server_initialized_ || extension_destroyed_ || !shutdownNotificationExpected() ||
+      extension_config_subscription_ != nullptr ||
+      on_bootstrap_extension_config_update_ == nullptr) {
+    return false;
+  }
+#ifdef ENVOY_ENABLE_YAML
+  envoy::config::core::v3::ConfigSource source;
+  bool has_unknown_field = false;
+  auto status = MessageUtil::loadFromJsonNoThrow(config_source_json, source, has_unknown_field);
+  if (!status.ok()) {
+    ENVOY_LOG(warn, "bootstrap ECDS config source for {} is invalid: {}", name, status.message());
+    return false;
+  }
+  TRY_ASSERT_MAIN_THREAD {
+    MessageUtil::validate(source, context_.messageValidationContext().dynamicValidationVisitor());
+    auto subscription = ExtensionConfigSubscription::create(
+        name, type_url, source, absl::StrCat("ecds_bootstrap.", extension_name_), context_,
+        [this](std::optional<absl::string_view> config) {
+          return on_bootstrap_extension_config_update_(
+              thisAsVoidPtr(), in_module_config_, config.has_value(),
+              config.has_value()
+                  ? envoy_dynamic_module_type_envoy_buffer{config->data(), config->size()}
+                  : envoy_dynamic_module_type_envoy_buffer{nullptr, 0});
+        });
+    if (!subscription.ok()) {
+      ENVOY_LOG(warn, "cannot subscribe to bootstrap ECDS config {}: {}", name,
+                subscription.status().message());
+      return false;
+    }
+    extension_config_subscription_ = std::move(subscription.value());
+    extension_config_subscription_->start();
+    return true;
+  }
+  END_TRY
+  CATCH(const EnvoyException& exception, {
+    ENVOY_LOG(warn, "cannot subscribe to bootstrap ECDS config {}: {}", name, exception.what());
+    extension_config_subscription_.reset();
+    return false;
+  });
+#else
+  ENVOY_LOG(warn, "bootstrap ECDS subscription requires JSON support");
+  return false;
+#endif
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
@@ -323,6 +373,7 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
+  extension_config_subscription_.reset();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
@@ -597,6 +648,11 @@ newDynamicModuleBootstrapExtensionConfig(
 
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
+  auto on_config_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionConfigUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_config_update");
+  config->on_bootstrap_extension_config_update_ =
+      on_config_update.ok() ? on_config_update.value() : nullptr;
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");
