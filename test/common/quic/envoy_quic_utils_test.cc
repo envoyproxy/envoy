@@ -2,6 +2,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -342,6 +343,39 @@ TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CANCELLED),
             Http::StreamResetReason::RemoteReset);
 }
+
+#if defined(__linux__)
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocketInNetworkNamespace) {
+  testing::StrictMock<Network::MockSocketInterface> socket_interface(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", &socket_interface,
+                                                       "/proc/thread-self/ns/net");
+  const auto bind_addr = local_addr;
+  const auto peer_addr = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321);
+  testing::StrictMock<Api::MockLinuxOsSysCalls> netns_syscalls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> netns_injector{&netns_syscalls};
+  testing::InSequence sequence;
+  EXPECT_CALL(netns_syscalls, setns(_, CLONE_NEWNET)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(socket_interface, socket(Network::Socket::Type::Datagram, local_addr, _))
+      .WillOnce([&](Network::Socket::Type type, Network::Address::InstanceConstSharedPtr address,
+                    const Network::SocketCreationOptions& options) {
+        return socket_interface.SocketInterfaceImpl::socket(type, address, options);
+      });
+  EXPECT_CALL(netns_syscalls, setns(_, CLONE_NEWNET)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_EQ(bind_addr->networkNamespace(), local_addr->networkNamespace());
+  EXPECT_EQ(local_addr, connection_socket->connectionInfoProvider().localAddress());
+
+  local_addr = bind_addr;
+  EXPECT_CALL(netns_syscalls, setns(_, CLONE_NEWNET))
+      .WillOnce(Return(Api::SysCallIntResult{-1, EPERM}));
+  connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_FALSE(connection_socket->isOpen());
+}
+#endif
 
 TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   Network::Address::InstanceConstSharedPtr local_addr =
