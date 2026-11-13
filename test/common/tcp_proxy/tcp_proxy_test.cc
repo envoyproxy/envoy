@@ -2524,7 +2524,43 @@ TEST_P(TcpProxyTest, ImmediateEmptyFinWhileOnDemandClusterPendingIsFlushedUpstre
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
       });
 
-  setup(1, config);
+  // Use connections=0 so setup() does not call onNewConnection(). With ODCDS missing the cluster,
+  // onNewConnection returns StopIteration even though max_early_data_bytes enables
+  // receive_before_connect, so setup(1, ...) cannot reconcile those expectations.
+  setup(0, /*set_redirect_records=*/false, /*receive_before_connect=*/true, config);
+
+  upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
+  upstream_connection_data_.push_back(
+      std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+  ON_CALL(*upstream_connection_data_.back(), connection())
+      .WillByDefault(ReturnRef(*upstream_connections_.back()));
+  upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+  conn_pool_handles_.push_back(
+      std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
+  ON_CALL(*upstream_hosts_.at(0), address())
+      .WillByDefault(Return(*Network::Utility::resolveUrl("tcp://127.0.0.1:80")));
+  EXPECT_CALL(*upstream_connections_.at(0), dispatcher())
+      .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
+
+  {
+    testing::InSequence sequence;
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _, _))
+        .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)))
+        .RetiresOnSaturation();
+    EXPECT_CALL(conn_pool_, newConnection(_))
+        .WillOnce(
+            [=, this](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+              conn_pool_callbacks_.push_back(&cb);
+              return onNewConnection(conn_pool_handles_.at(0).get());
+            })
+        .RetiresOnSaturation();
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _, _))
+        .WillRepeatedly(Return(std::nullopt));
+  }
+
+  // ODCDS is pending, so onNewConnection stops iteration even with receive_before_connect.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // The downstream half-closes while the lookup is still pending. Nothing may close it.
@@ -2535,7 +2571,8 @@ TEST_P(TcpProxyTest, ImmediateEmptyFinWhileOnDemandClusterPendingIsFlushedUpstre
   // Discovery completes. The buffered end_stream must reach the upstream on connect.
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
-  raiseEventUpstreamConnected(0);
+  // Empty FIN with max_early_data_bytes > 0 does not read-disable the downstream.
+  raiseEventUpstreamConnected(0, /*expect_read_enable=*/false);
 }
 
 // Test that upstream transport failure message is reflected in access logs.
