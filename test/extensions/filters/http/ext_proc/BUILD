@@ -557,6 +557,28 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "ext_proc_sidestream_pushback_deadlock_integration_test",
+    size = "large",
+    srcs = ["ext_proc_sidestream_pushback_deadlock_integration_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
+    deps = [
+        ":ext_proc_integration_common_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "ext_proc_observability_integration_test",
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_observability_integration_test.cc"],

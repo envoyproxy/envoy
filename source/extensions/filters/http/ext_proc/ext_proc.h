@@ -652,6 +652,7 @@ public:
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status status);
 
 private:
+  void updateDownstreamWatermarkPushback();
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
