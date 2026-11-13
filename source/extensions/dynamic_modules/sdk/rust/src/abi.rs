@@ -9904,6 +9904,38 @@ pub enum envoy_dynamic_module_type_bootstrap_active_resource_kind {
     TransportSocketMatch = 2,
     Secret = 3,
 }
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Subscribes to one ECDS resource. Call on the main thread after server initialization.
+
+ @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ @param name is the ECDS resource name.
+ @param type_url is the expected payload type URL, or the inner type URL for TypedStruct.
+ @param config_source_json is a JSON-encoded envoy.config.core.v3.ConfigSource.
+ @return true if the subscription started, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        name: envoy_dynamic_module_type_module_buffer,
+        type_url: envoy_dynamic_module_type_module_buffer,
+        config_source_json: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Called on the main thread when an ECDS configuration is updated or removed.
+
+ @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ @param has_config is false when the resource was removed.
+ @param config uses the startup extension_config encoding and is valid only during this call.
+ @return true if accepted, false if rejected without changing the module's current settings.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_config_update(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        config_module_ptr: envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+        has_config: bool,
+        config: envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
 /** The callback type invoked once per active resource name during enumeration.
 
  @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
