@@ -33,6 +33,15 @@
 #include "library/common/types/c_types.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
+#include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator_descriptor.pb.h"
+#include "envoy/extensions/quic/crypto_stream/v3/crypto_stream_descriptor.pb.h"
+#include "envoy/extensions/quic/proof_source/v3/proof_source_descriptor.pb.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory_descriptor.pb.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory_descriptor.pb.h"
+#endif
+
 using testing::_;
 using testing::AnyNumber;
 using testing::Ge;
@@ -86,6 +95,25 @@ public:
         forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
     // For H2 tests.
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+    // Envoy Mobile doesn't embed descriptors for the server-side extensions registered above.
+    std::vector<FileDescriptorInfo> file_descriptors = {
+        protobuf::reflection::
+            envoy_extensions_quic_connection_id_generator_v3_envoy_deterministic_connection_id_generator::
+                kFileDescriptorInfo,
+        protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::
+            kFileDescriptorInfo,
+        protobuf::reflection::envoy_extensions_quic_proof_source_v3_proof_source::
+            kFileDescriptorInfo,
+        protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_default_writer_factory::
+            kFileDescriptorInfo,
+        protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_gso_batch_writer_factory::
+            kFileDescriptorInfo,
+    };
+    for (const FileDescriptorInfo& descriptor : file_descriptors) {
+      loadFileDescriptors(descriptor);
+    }
+#endif
   }
 
   ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(Logger::Levels::info); }
