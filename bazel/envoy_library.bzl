@@ -107,7 +107,7 @@ def envoy_cc_library(
         target_compatible_with = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
-    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False, link = True)
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
