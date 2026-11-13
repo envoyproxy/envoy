@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
@@ -21,6 +23,8 @@
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/common/ratelimit/stat_names.h"
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -83,7 +87,8 @@ public:
                                                  config.failure_mode_deny_percent(), runtime_))
                                        : std::nullopt),
         metadata_namespace_(config.metadata_namespace().empty() ? "envoy.filters.http.ratelimit"
-                                                                : config.metadata_namespace()) {
+                                                                : config.metadata_namespace()),
+        rate_limits_override_option_(config.rate_limits_override_option()) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
@@ -94,6 +99,10 @@ public:
 
   const std::string& domain() const { return domain_; }
   const std::string& metadataNamespace() const { return metadata_namespace_; }
+  envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption
+  rateLimitsOverrideOption() const {
+    return rate_limits_override_option_;
+  }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -181,6 +190,8 @@ private:
   const std::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
   std::unique_ptr<RateLimitConfig> rate_limit_config_;
   const std::string metadata_namespace_;
+  const envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption
+      rate_limits_override_option_{};
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -192,6 +203,7 @@ public:
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config,
       absl::Status& creation_status)
       : local_info_(context.localInfo()), vh_rate_limits_(config.vh_rate_limits()),
+        rate_limits_override_option_(config.rate_limits_override_option()),
         domain_(config.domain()) {
     rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
         config.rate_limits(), context, creation_status, /*no_limit=*/false);
@@ -200,6 +212,11 @@ public:
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
   virtualHostRateLimits() const {
     return vh_rate_limits_;
+  }
+
+  envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption
+  rateLimitsOverrideOption() const {
+    return rate_limits_override_option_;
   }
 
   bool hasRateLimitConfigs() const {
@@ -223,6 +240,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
+  const envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption
+      rate_limits_override_option_{};
   const std::string domain_;
   std::unique_ptr<RateLimitConfig> rate_limit_config_;
 };
@@ -283,6 +302,7 @@ private:
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   double getHitAddend();
   void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
+  void initializeRouteConfigs();
   std::string getDomain();
 
   Http::Context& httpContext() { return config_->httpContext(); }
@@ -296,7 +316,9 @@ private:
   VhRateLimitOptions vh_rate_limits_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::RouteConstSharedPtr route_ = nullptr;
-  const FilterConfigPerRoute* route_config_ = nullptr;
+  // All per-route configs of the current request, from the most specific to the least specific.
+  absl::InlinedVector<std::reference_wrapper<const FilterConfigPerRoute>, 4> route_configs_;
+  envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption override_option_{};
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};

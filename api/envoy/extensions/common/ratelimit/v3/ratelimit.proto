@@ -47,6 +47,22 @@ enum VhRateLimitsOptions {
   IGNORE = 2;
 }
 
+// Determines how the embedded ``rate_limits`` of the filter configs at different levels (from least
+// to most specific: filter level, route configuration, virtual host, route, weighted cluster) are
+// applied.
+enum RateLimitsOverrideOption {
+  // Not specified. The behavior is determined by the filter. See the documentation of the
+  // filter's ``rate_limits_override_option``.
+  RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED = 0;
+
+  // Only the ``rate_limits`` of the most specific filter config are applied.
+  MOST_SPECIFIC_ONLY = 1;
+
+  // The ``rate_limits`` of the filter configs at all levels are applied. How they are applied is
+  // determined by the filter. See the documentation of the filter's ``rate_limits_override_option``.
+  ALL_LEVELS = 2;
+}
+
 // A RateLimitDescriptor is a list of hierarchical entries that are used by the service to
 // determine the final rate limit key and overall allowed limit. Here are some examples of how
 // they might be used for the domain "envoy".
