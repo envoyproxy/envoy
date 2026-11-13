@@ -4,9 +4,11 @@
 #include <memory>
 
 #include "envoy/common/conn_pool.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -85,6 +87,8 @@ public:
     bool can_send_early_data_;
     // True if the request can be sent over HTTP/3.
     bool can_use_http3_;
+    // Optional StreamInfo for the downstream request associated with the stream.
+    OptRef<const StreamInfo::StreamInfo> stream_info_{};
   };
 
   ~Instance() override = default;

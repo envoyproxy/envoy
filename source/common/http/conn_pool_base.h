@@ -18,8 +18,9 @@ namespace Envoy {
 namespace Http {
 
 struct HttpAttachContext : public Envoy::ConnectionPool::AttachContext {
-  HttpAttachContext(Http::ResponseDecoder* d, Http::ConnectionPool::Callbacks* c)
-      : decoder_(d), callbacks_(c) {
+  HttpAttachContext(Http::ResponseDecoder* d, Http::ConnectionPool::Callbacks* c,
+                    OptRef<const StreamInfo::StreamInfo> stream_info = {})
+      : Envoy::ConnectionPool::AttachContext(stream_info), decoder_(d), callbacks_(c) {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
       decoder_handle_ = d->createResponseDecoderHandle();
     }
@@ -36,9 +37,10 @@ public:
   // OnPoolSuccess for HTTP requires both the decoder and callbacks. OnPoolFailure
   // requires only the callbacks, but passes both for consistency.
   HttpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, Http::ResponseDecoder& decoder,
-                    Http::ConnectionPool::Callbacks& callbacks, bool can_send_early_data)
+                    Http::ConnectionPool::Callbacks& callbacks, bool can_send_early_data,
+                    OptRef<const StreamInfo::StreamInfo> stream_info = {})
       : Envoy::ConnectionPool::PendingStream(parent, can_send_early_data),
-        context_(&decoder, &callbacks) {}
+        context_(&decoder, &callbacks, stream_info) {}
 
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
   HttpAttachContext context_;

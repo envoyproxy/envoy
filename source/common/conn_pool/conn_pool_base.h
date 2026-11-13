@@ -26,8 +26,12 @@ class ConnPoolImplBase;
 // A placeholder struct for whatever data a given connection pool needs to
 // successfully attach an upstream connection to a downstream connection.
 struct AttachContext {
+  explicit AttachContext(OptRef<const StreamInfo::StreamInfo> stream_info = {})
+      : stream_info_(stream_info) {}
   // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
   virtual ~AttachContext() = default;
+
+  OptRef<const StreamInfo::StreamInfo> stream_info_;
 };
 
 // ActiveClient provides a base class for connection pool clients that handles connection timings
@@ -342,7 +346,8 @@ protected:
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
     PendingStream& stream = *pending_stream;
     LinkedList::moveIntoListBack(std::move(pending_stream), pending_streams_);
-    pending_stream_queue_->add(stream, {dispatcher_.timeSource().monotonicTime()});
+    pending_stream_queue_->add(
+        stream, {dispatcher_.timeSource().monotonicTime(), stream.context().stream_info_});
     ASSERT(pending_stream_queue_->size() == pending_streams_.size());
     cluster_connectivity_state_.incrPendingStreams(1);
     updateQueueOverloadedGauge();
