@@ -51,17 +51,25 @@ class TestHttpFilterFactory : public TestFilterFactory,
                               public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;
     stat_prefix_ = stat_prefix;
+    const auto* string_config = dynamic_cast<const Protobuf::StringValue*>(&config);
+    if (reject_bad_config_ && string_config != nullptr && string_config->value() == "bad") {
+      return absl::InvalidArgumentError("rejected test filter config");
+    }
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;
     stat_prefix_ = stat_prefix;
+    const auto* string_config = dynamic_cast<const Protobuf::StringValue*>(&config);
+    if (reject_bad_config_ && string_config != nullptr && string_config->value() == "bad") {
+      return absl::InvalidArgumentError("rejected test filter config");
+    }
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -74,6 +82,7 @@ public:
   }
 
   std::string stat_prefix_;
+  bool reject_bad_config_{false};
 };
 
 class TestNetworkFilterFactory
@@ -256,6 +265,20 @@ public:
     return response;
   }
 
+  envoy::service::discovery::v3::DiscoveryResponse createResponseWithValue(
+      std::string version, std::string name, std::string value) {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info(version);
+    envoy::config::core::v3::TypedExtensionConfig extension_config;
+    extension_config.set_name(name);
+    extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" + getTypeUrl());
+    Protobuf::StringValue string_config;
+    string_config.set_value(value);
+    std::ignore = extension_config.mutable_typed_config()->PackFrom(string_config);
+    std::ignore = response.add_resources()->PackFrom(extension_config);
+    return response;
+  }
+
   // Add a filter configuration by send a extension discovery response. Then removes it.
   void incrementalTest() {
     const auto response = createResponse("1", "foo");
@@ -307,6 +330,27 @@ public:
     return "extension_config_discovery.http_filter.foo.config_fail";
   }
 };
+
+TEST_F(HttpFilterConfigDiscoveryImplTest, RejectedConfigDoesNotPoisonSubscription) {
+  InSequence s;
+  setup();
+
+  const auto good_response = createResponseWithValue("1", "foo", "good");
+  const auto good_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(good_response);
+  EXPECT_CALL(init_watcher_, ready());
+  ASSERT_OK(callbacks_->onConfigUpdate(good_resources.refvec_, good_response.version_info()));
+
+  filter_factory_.reject_bad_config_ = true;
+  const auto bad_response = createResponseWithValue("2", "foo", "bad");
+  const auto bad_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(bad_response);
+  EXPECT_FALSE(callbacks_->onConfigUpdate(bad_resources.refvec_, bad_response.version_info()).ok());
+
+  EXPECT_CALL(init_manager_, add(_));
+  const auto provider2 = createProvider("foo", true, false);
+  EXPECT_NE(std::nullopt, provider2->config());
+}
 
 // Upstream HTTP filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
