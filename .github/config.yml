@@ -166,12 +166,16 @@ checks:
           ```
     # yamllint enable rule:line-length
   publish:
-    name: >-
-      Envoy/Publish and verify
+    name: Envoy/Publish
     on-run:
     - release
     - verify
     - docs
+    required: true
+  verify:
+    name: Envoy/Verify
+    on-run:
+    - verify
     required: true
 
 run:

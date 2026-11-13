@@ -30,6 +30,11 @@ on:
       runs-after:
         type: boolean
         default: false
+      # Save the id of the request run in this run, for a workflow triggered by this run
+      # (`runs-after`).
+      save-request:
+        type: boolean
+        default: false
       template-request-summary:
         type: string
         default: |
@@ -83,20 +88,29 @@ jobs:
       trusted: ${{ fromJSON(steps.request-output.outputs.value).request.trusted }}
       skip: ${{ fromJSON(steps.request-output.outputs.value).check.action != 'RUN' }}
     steps:
+    # A workflow that runs after another `workflow_run` workflow is triggered by that run, and
+    # nothing records what triggered it. The triggering run saves the id of its request run
+    # (`save-request`). Anything in that run could have written it: the request is only trusted
+    # once it has been checked below.
+    - uses: envoyproxy/toolshed/actions/github/artifact/download@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      name: Download request id
+      if: ${{ inputs.runs-after == true }}
+      with:
+        name: request-id
+        path: ${{ runner.temp }}
+        run-id: ${{ inputs.run-id }}
     - run: |
-        gh api \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/${GH_REPO}/actions/runs/${RUN_ID}" \
-          | jq '.'
-        RUNID=$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json databaseId | jq -r '.databaseId')
-        echo "value=${RUNID}" >> "$GITHUB_OUTPUT"
+        REQUEST_ID="$(cat "${RUNNER_TEMP}/request-id")"
+        if [[ ! "$REQUEST_ID" =~ ^[0-9]+$ ]]; then
+            echo "Run ${RUN_ID} saved an invalid request id" >&2
+            exit 1
+        fi
+        echo "Request run ${REQUEST_ID}, from run ${RUN_ID}"
+        echo "value=${REQUEST_ID}" >> "$GITHUB_OUTPUT"
       id: run-id
       if: ${{ inputs.runs-after == true }}
       env:
-        GH_TOKEN: ${{ github.token }}
         RUN_ID: ${{ inputs.run-id }}
-        GH_REPO: ${{ github.repository }}
 
     # Load env data
     # Handle any failure in triggering job
@@ -112,6 +126,21 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
 
+    - run: |
+        mkdir -p "${RUNNER_TEMP}/request-id-save"
+        echo "${RUN_ID}" > "${RUNNER_TEMP}/request-id-save/request-id"
+      name: Save request id
+      if: ${{ inputs.save-request == true }}
+      env:
+        RUN_ID: ${{ inputs.run-id }}
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      name: Upload request id
+      if: ${{ inputs.save-request == true }}
+      with:
+        name: request-id
+        path: ${{ runner.temp }}/request-id-save/request-id
+        if-no-files-found: error
+
     #  Update the check
     - uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
       name: Appauth
@@ -119,6 +148,30 @@ jobs:
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
+
+    # The environment comes from a trusted request run (toolshed env/load validates the run). Check
+    # that it is the request of the triggering run: the triggering run updated the request's check
+    # (`external_id`) with the app token, which nothing else in that run has.
+    - run: |
+        CHECK="$(gh api --paginate \
+                    "repos/${GH_REPO}/commits/${SHA}/check-runs?filter=all&per_page=100" \
+                    --jq ".check_runs[] | select(.app.slug != \"github-actions\" and .external_id == \"${RUN_ID}\") | .id")"
+        if [[ -z "$CHECK" ]]; then
+            echo "Request run ${REQUEST_ID} (${SHA}) is not the request of run ${RUN_ID}" >&2
+            exit 1
+        fi
+        echo "Request run ${REQUEST_ID} (${SHA}) is the request of run ${RUN_ID}"
+      name: Check request
+      if: >-
+        inputs.runs-after == true
+        && fromJSON(steps.data.outputs.data).data.check.action == 'RUN'
+      env:
+        GH_TOKEN: ${{ steps.appauth.outputs.token }}
+        GH_REPO: ${{ github.repository }}
+        REQUEST_ID: ${{ steps.run-id.outputs.value }}
+        RUN_ID: ${{ inputs.run-id }}
+        SHA: ${{ fromJSON(steps.data.outputs.data).data.request.sha }}
+
     - uses: envoyproxy/toolshed/actions/github/checks@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}

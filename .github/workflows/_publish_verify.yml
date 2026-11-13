@@ -8,6 +8,10 @@ on:
     secrets:
       dockerhub-token:
     inputs:
+      # The run the verified artifacts are downloaded from, when it is not this one.
+      downloads-run-id:
+        type: string
+        default:
       request:
         type: string
         required: true
@@ -42,6 +46,7 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
+      downloads-run-id: ${{ inputs.downloads-run-id }}
       request: ${{ inputs.request }}
       steps-pre: ${{ matrix.steps-pre }}
       source: ${{ matrix.source }}
@@ -94,6 +99,7 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
+      downloads-run-id: ${{ inputs.downloads-run-id }}
       request: ${{ inputs.request }}
       steps-pre: ${{ matrix.steps-pre }}
       source: ${{ matrix.source }}
@@ -156,6 +162,7 @@ jobs:
       downloads: |
         release.signed: container/release.signed
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
+      downloads-run-id: ${{ inputs.downloads-run-id }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on }}
       source: |
