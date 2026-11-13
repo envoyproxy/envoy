@@ -34,4 +34,7 @@ enum RateLimitUnit {
 
   // The time unit representing a year.
   YEAR = 6;
+
+  // The time unit representing a week.
+  WEEK = 7;
 }
