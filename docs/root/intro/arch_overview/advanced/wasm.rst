@@ -79,7 +79,8 @@ Envoy offers additional functionality over the Proxy-Wasm ABI via `proxy_call_fo
 * ``compress`` applies ``zlib`` compression.
 * ``uncompress`` applies ``zlib`` decompression.
 * ``declare_property`` creates a placeholder filter state object with the type information.
-* ``set_envoy_filter_state`` set a filter state object.
+* ``set_envoy_filter_state`` set a filter state object, optionally shared with the upstream internal
+  connections (see :ref:`internal upstream transport <config_internal_upstream_transport>`).
 * ``clear_route_cache`` updates the selected route.
 * ``expr_create`` compiles a CEL expression for evaluation.
 * ``expr_evalute`` evaluates a compiled CEL expression.
