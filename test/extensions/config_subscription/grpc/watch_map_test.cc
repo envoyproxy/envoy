@@ -949,11 +949,13 @@ TEST(WatchMapTest, AcceptOtherResourcesWildcard) {
 }
 
 // Empty delta updates are still delivered to wildcard-subscribed watches that use accept() prefix
-// filtering (including explicit "*"), while watches with concrete resource names ignore them.
+// filtering (including explicit "*"), while watches with concrete resource names ignore them even
+// if accept("*") is set.
 TEST(WatchMapTest, AcceptOtherResourcesPrefixGlobEmptyDeltaUpdate) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   MockSubscriptionCallbacks callbacks3;
+  MockSubscriptionCallbacks callbacks4;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
@@ -961,43 +963,30 @@ TEST(WatchMapTest, AcceptOtherResourcesPrefixGlobEmptyDeltaUpdate) {
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
+  Watch* watch4 = watch_map.addWatch(callbacks4, resource_decoder);
 
-  // watch1 is implicit wildcard ({}), watch2 has a concrete resource, watch3 is explicit ("*").
+  // watch1 is implicit wildcard ({}), watch2 has a concrete resource, watch3 is explicit ("*"),
+  // and watch4 has a concrete resource with accept("*").
   watch_map.accept(watch1, {"prefix/*"});
   watch_map.updateWatchInterest(watch2, {"alice"});
   watch_map.accept(watch2, {"prefix/*"});
   watch_map.updateWatchInterest(watch3, {"*"});
   watch_map.accept(watch3, {"prefix/*"});
+  watch_map.updateWatchInterest(watch4, {"alice"});
+  watch_map.accept(watch4, {"*"});
 
-  // Repeated empty wire delta updates are delivered to watch1 and watch3, never to watch2.
+  // Repeated empty wire delta updates are delivered to watch1 and watch3, never to watch2 or
+  // watch4.
   for (const auto& version : {"version1", "version2"}) {
     expectDeltaUpdate(callbacks1, {}, {}, version);
     expectNoUpdate(callbacks2, version);
     expectDeltaUpdate(callbacks3, {}, {}, version);
+    expectNoUpdate(callbacks4, version);
     doDeltaUpdate(watch_map, {}, {}, version);
     ::testing::Mock::VerifyAndClearExpectations(&callbacks1);
     ::testing::Mock::VerifyAndClearExpectations(&callbacks2);
     ::testing::Mock::VerifyAndClearExpectations(&callbacks3);
-  }
-}
-
-// accept("*") only affects non-empty resource routing; a watch with concrete wire interest does not
-// become wildcard for empty wire delta updates.
-TEST(WatchMapTest, ConcreteWatchWithAcceptWildcardIgnoresEmptyDeltaUpdate) {
-  MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
-
-  watch_map.updateWatchInterest(watch, {"alice"});
-  watch_map.accept(watch, {"*"});
-
-  for (const auto& version : {"version1", "version2"}) {
-    expectNoUpdate(callbacks, version);
-    doDeltaUpdate(watch_map, {}, {}, version);
-    ::testing::Mock::VerifyAndClearExpectations(&callbacks);
+    ::testing::Mock::VerifyAndClearExpectations(&callbacks4);
   }
 }
 
@@ -1066,66 +1055,11 @@ TEST(WatchMapTest, AcceptOtherResourcesPrefixGlobFilteredInitialDeltaUpdate) {
   }
 }
 
-// A watch added inside another watch's onConfigUpdate() callback must not receive an initial empty
-// update for the already-in-flight delta response, and must receive its initial empty update on
-// the subsequent delta response if all resources on that response are filtered out.
-TEST(WatchMapTest, AddWatchDuringDeltaOnConfigUpdateDoesNotReceiveInFlightEmptyUpdate) {
-  MockSubscriptionCallbacks callbacks1;
-  MockSubscriptionCallbacks callbacks2;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
-  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
-  watch_map.accept(watch1, {"route_a/*"});
-
-  Watch* watch2 = nullptr;
-  {
-    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
-    envoy::config::endpoint::v3::ClusterLoadAssignment vhost0;
-    vhost0.set_cluster_name("route_a/vhost_0");
-    std::ignore = updated_resources.Add()->PackFrom(vhost0);
-
-    EXPECT_CALL(callbacks1, onConfigUpdate(_, _, _))
-        .WillOnce([&](const std::vector<DecodedResourceRef>& gotten_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) {
-          EXPECT_EQ(1, gotten_resources.size());
-          EXPECT_EQ("version1", gotten_resources[0].get().version());
-          EXPECT_TRUE(TestUtility::protoEqual(gotten_resources[0].get().resource(), vhost0));
-          EXPECT_TRUE(removed_resources.empty());
-
-          watch2 = watch_map.addWatch(callbacks2, resource_decoder);
-          watch_map.accept(watch2, {"route_b/*"});
-          return absl::OkStatus();
-        });
-    EXPECT_CALL(callbacks2, onConfigUpdate(_, _, _)).Times(0);
-
-    doDeltaUpdate(watch_map, updated_resources, {}, "version1");
-    ::testing::Mock::VerifyAndClearExpectations(&callbacks1);
-    ::testing::Mock::VerifyAndClearExpectations(&callbacks2);
-  }
-  ASSERT_NE(watch2, nullptr);
-
-  // Subsequent delta update carries only route_a/vhost_1: now pre-existing watch2 receives its
-  // initial empty update because route_a/vhost_1 is filtered out by its route_b/* accept pattern.
-  {
-    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
-    envoy::config::endpoint::v3::ClusterLoadAssignment vhost1;
-    vhost1.set_cluster_name("route_a/vhost_1");
-    std::ignore = updated_resources.Add()->PackFrom(vhost1);
-
-    expectDeltaUpdate(callbacks1, {vhost1}, {}, "version2");
-    expectDeltaUpdate(callbacks2, {}, {}, "version2");
-    doDeltaUpdate(watch_map, updated_resources, {}, "version2");
-    ::testing::Mock::VerifyAndClearExpectations(&callbacks1);
-    ::testing::Mock::VerifyAndClearExpectations(&callbacks2);
-  }
-}
-
-// Adding many watches (triggering watches_ flat_hash_set rehash) inside an empty delta update
-// callback must not invalidate iterators or deliver stale empty updates to the newly added watches.
-TEST(WatchMapTest, AddMultipleWatchesDuringEmptyDeltaOnConfigUpdateDoesNotInvalidateIterators) {
+// Adding watches (including enough to rehash watches_) inside an in-flight delta onConfigUpdate()
+// callback must not invalidate iterators or deliver the in-flight update to the newly added
+// watches; those newly added watches receive their initial empty update on a subsequent response
+// whose resources are all filtered out, and ignore further unrelated incremental updates.
+TEST(WatchMapTest, AddWatchesDuringDeltaOnConfigUpdateDoesNotDeliverInFlightEmptyUpdate) {
   MockSubscriptionCallbacks callbacks0;
   MockSubscriptionCallbacks callbacks1;
   std::vector<std::unique_ptr<MockSubscriptionCallbacks>> extra_callbacks;
@@ -1175,58 +1109,72 @@ TEST(WatchMapTest, AddMultipleWatchesDuringEmptyDeltaOnConfigUpdateDoesNotInvali
 
   doDeltaUpdate(watch_map, {}, {}, "version1");
   EXPECT_TRUE(added_watches);
+  ASSERT_EQ(kExtraWatches, extra_callbacks.size());
+  ::testing::Mock::VerifyAndClearExpectations(&callbacks0);
+  ::testing::Mock::VerifyAndClearExpectations(&callbacks1);
+  for (auto& cb : extra_callbacks) {
+    ::testing::Mock::VerifyAndClearExpectations(cb.get());
+  }
+
+  // Subsequent delta update carries only route_a/vhost_0: pre-existing watch0/watch1 receive it,
+  // while all 16 newly added route_b/* watches receive their initial empty update.
+  {
+    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
+    envoy::config::endpoint::v3::ClusterLoadAssignment vhost0;
+    vhost0.set_cluster_name("route_a/vhost_0");
+    std::ignore = updated_resources.Add()->PackFrom(vhost0);
+
+    expectDeltaUpdate(callbacks0, {vhost0}, {}, "version2");
+    expectDeltaUpdate(callbacks1, {vhost0}, {}, "version2");
+    for (auto& cb : extra_callbacks) {
+      expectDeltaUpdate(*cb, {}, {}, "version2");
+    }
+    doDeltaUpdate(watch_map, updated_resources, {}, "version2");
+    ::testing::Mock::VerifyAndClearExpectations(&callbacks0);
+    ::testing::Mock::VerifyAndClearExpectations(&callbacks1);
+    for (auto& cb : extra_callbacks) {
+      ::testing::Mock::VerifyAndClearExpectations(cb.get());
+    }
+  }
+
+  // Third delta update carries only route_a/vhost_1: none of the 16 route_b/* watches receive a
+  // spurious empty update now that their initial empty update has already been delivered.
+  {
+    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
+    envoy::config::endpoint::v3::ClusterLoadAssignment vhost1;
+    vhost1.set_cluster_name("route_a/vhost_1");
+    std::ignore = updated_resources.Add()->PackFrom(vhost1);
+
+    expectDeltaUpdate(callbacks0, {vhost1}, {}, "version3");
+    expectDeltaUpdate(callbacks1, {vhost1}, {}, "version3");
+    for (auto& cb : extra_callbacks) {
+      expectNoUpdate(*cb, "version3");
+    }
+    doDeltaUpdate(watch_map, updated_resources, {}, "version3");
+  }
 }
 
-// Narrowing a previously wildcard watch to concrete resource interest inside another watch's
-// onConfigUpdate() prevents a spurious empty update for that watch during the same response.
-TEST(WatchMapTest, NarrowingWildcardWatchDuringDeltaOnConfigUpdateSkipsEmptyUpdate) {
-  MockSubscriptionCallbacks callbacks1;
-  MockSubscriptionCallbacks callbacks2;
+// Narrowing or removing a queued wildcard watch inside an earlier onConfigUpdate() callback skips
+// its empty update delivery during the same delta response, both when mutated from per_watch_added
+// and when removed from an earlier iteration of empty_update_watches.
+TEST(WatchMapTest, MutatingQueuedWildcardWatchDuringDeltaOnConfigUpdateSkipsEmptyUpdate) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
-  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
-  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
-  watch_map.accept(watch1, {"route_a/*"});
-  watch_map.accept(watch2, {"route_b/*"});
 
-  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
-  envoy::config::endpoint::v3::ClusterLoadAssignment vhost0;
-  vhost0.set_cluster_name("route_a/vhost_0");
-  std::ignore = updated_resources.Add()->PackFrom(vhost0);
-
-  EXPECT_CALL(callbacks1, onConfigUpdate(_, _, _))
-      .WillOnce([&](const std::vector<DecodedResourceRef>& gotten_resources,
-                    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                    const std::string&) {
-        EXPECT_EQ(1, gotten_resources.size());
-        EXPECT_TRUE(removed_resources.empty());
-        watch_map.updateWatchInterest(watch2, {"alice"});
-        return absl::OkStatus();
-      });
-  EXPECT_CALL(callbacks2, onConfigUpdate(_, _, _)).Times(0);
-
-  doDeltaUpdate(watch_map, updated_resources, {}, "version1");
-}
-
-// Removing a queued wildcard watch inside an earlier onConfigUpdate() callback skips its empty
-// update delivery during the same delta response, both when removed from per_watch_added and when
-// removed from an earlier iteration of empty_update_watches.
-TEST(WatchMapTest, RemovingWildcardWatchDuringDeltaOnConfigUpdateSkipsEmptyUpdate) {
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  NiceMock<MockCustomConfigValidators> config_validators;
-
-  // Case 1: per_watch_added callback drains and removes a watch queued in empty_update_watches.
+  // Case 1: per_watch_added callback narrows watch2 and drains+removes watch3 while both are
+  // queued in empty_update_watches.
   {
     MockSubscriptionCallbacks callbacks1;
     MockSubscriptionCallbacks callbacks2;
+    MockSubscriptionCallbacks callbacks3;
     WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
     Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
     Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+    Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
     watch_map.accept(watch1, {"route_a/*"});
     watch_map.accept(watch2, {"route_b/*"});
+    watch_map.accept(watch3, {"route_c/*"});
 
     Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
     envoy::config::endpoint::v3::ClusterLoadAssignment vhost0;
@@ -1239,11 +1187,13 @@ TEST(WatchMapTest, RemovingWildcardWatchDuringDeltaOnConfigUpdateSkipsEmptyUpdat
                       const std::string&) {
           EXPECT_EQ(1, gotten_resources.size());
           EXPECT_TRUE(removed_resources.empty());
-          watch_map.updateWatchInterest(watch2, {});
-          watch_map.removeWatch(watch2);
+          watch_map.updateWatchInterest(watch2, {"alice"});
+          watch_map.updateWatchInterest(watch3, {});
+          watch_map.removeWatch(watch3);
           return absl::OkStatus();
         });
     EXPECT_CALL(callbacks2, onConfigUpdate(_, _, _)).Times(0);
+    EXPECT_CALL(callbacks3, onConfigUpdate(_, _, _)).Times(0);
 
     doDeltaUpdate(watch_map, updated_resources, {}, "version1");
   }

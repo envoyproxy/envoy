@@ -257,10 +257,7 @@ TEST_P(VhdsIntegrationTest, InitialVhdsResponseWithOnlyOtherRoutePrefixCompletes
 
   // Static virtual host serves traffic normally, while an unmatched domain returns 404.
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
-  cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.example"}});
   ASSERT_TRUE(response->waitForEndStream());
