@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/common:time_interface",
         "//source/common/singleton:manager_impl_lib",

@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/network/ext_proc:config",
         "//test/mocks/server:factory_context_mocks",
@@ -33,7 +36,10 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.network.ext_proc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/common/expr:evaluator_lib",
@@ -49,7 +55,10 @@ envoy_extension_cc_test(
     srcs = ["ext_proc_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -70,7 +79,10 @@ envoy_extension_cc_test(
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

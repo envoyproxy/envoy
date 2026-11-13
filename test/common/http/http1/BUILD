@@ -23,7 +23,10 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -78,7 +81,10 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -107,7 +113,10 @@ envoy_cc_fuzz_test(
     name = "http1_connection_fuzz_test",
     srcs = ["http1_connection_fuzz_test.cc"],
     corpus = "http1_connection_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",

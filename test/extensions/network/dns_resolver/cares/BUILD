@@ -69,7 +69,10 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "dns_impl_integration_test",
     srcs = ["dns_impl_integration_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dns:dns_cluster_lib",

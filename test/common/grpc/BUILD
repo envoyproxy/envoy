@@ -16,7 +16,10 @@ envoy_package()
 envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -32,7 +35,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_client_manager_impl_test",
     srcs = ["async_client_manager_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
@@ -114,7 +120,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "google_async_client_impl_test",
     srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
@@ -185,7 +194,10 @@ envoy_cc_test(
     size = "large",
     srcs = ["grpc_client_integration_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },
@@ -210,7 +222,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "buffered_async_client_test",
     srcs = ["buffered_async_client_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:buffered_async_client_lib",

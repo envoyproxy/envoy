@@ -33,7 +33,10 @@ envoy_extension_cc_test(
         "envoy.filters.http.ai_protocol_manager",
         "envoy.ai_protocol_manager.external_buffer.in_memory",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//source/common/buffer:buffer_lib",
@@ -230,7 +233,10 @@ envoy_extension_cc_test(
     name = "ai_filter_state_test",
     srcs = ["ai_filter_state_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//envoy/router:string_accessor_interface",
@@ -372,7 +378,10 @@ envoy_extension_cc_test(
         "envoy.filters.http.ai_protocol_manager",
         "envoy.ai_protocol_manager.external_buffer.in_memory",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -394,8 +403,14 @@ envoy_extension_cc_test(
     srcs = ["ai_protocol_manager_integration_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_small"},
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     shard_count = 4,

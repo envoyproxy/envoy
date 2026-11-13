@@ -19,7 +19,10 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -66,7 +69,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     tags = [
@@ -91,7 +97,10 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/mocks/server:factory_context_mocks",
@@ -109,7 +118,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -14,7 +14,10 @@ envoy_cc_test_binary(
     name = "test_server",
     srcs = ["test_server.cc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

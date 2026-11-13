@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -37,7 +40,10 @@ envoy_extension_cc_test(
     name = "cluster_update_test",
     srcs = ["cluster_update_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/router:context_lib",
         "//source/common/upstream:cluster_factory_lib",
@@ -65,7 +71,10 @@ envoy_extension_cc_test(
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

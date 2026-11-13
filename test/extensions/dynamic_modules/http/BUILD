@@ -20,7 +20,10 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     extension_names = ["envoy.filters.http.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
@@ -66,7 +69,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.dynamic_modules"],
     # factory_context_mocks needs this.
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -99,7 +105,10 @@ envoy_extension_cc_dyn_module_test(
     extension_names = ["envoy.filters.http.dynamic_modules"],
     # http_mocks needs this.
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -131,7 +140,10 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.dynamic_modules"],
     # http_mocks needs this.
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -182,7 +194,10 @@ envoy_extension_cc_dyn_module_test(
     },
     extension_names = ["envoy.filters.http.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

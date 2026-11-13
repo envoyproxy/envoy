@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["reverse_tunnel_initiator_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -41,7 +44,10 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_initiator_extension_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -84,7 +90,10 @@ envoy_extension_cc_test(
     srcs = ["reverse_connection_io_handle_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -118,7 +127,10 @@ envoy_extension_cc_test(
     size = "medium",
     srcs = ["downstream_reverse_connection_io_handle_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
@@ -177,7 +189,10 @@ envoy_extension_cc_test(
     srcs = ["rc_connection_wrapper_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [

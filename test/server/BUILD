@@ -19,7 +19,10 @@ envoy_package()
 envoy_cc_test(
     name = "api_listener_test",
     srcs = ["api_listener_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":utility_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -53,7 +56,10 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
     },
     deps = [
@@ -85,7 +91,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_handler_test",
     srcs = ["connection_handler_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
@@ -151,7 +160,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "drain_manager_impl_test",
     srcs = ["drain_manager_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/server:drain_manager_lib",
         "//test/mocks/event:event_mocks",
@@ -163,7 +175,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -217,7 +232,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
@@ -381,8 +399,14 @@ envoy_cc_fuzz_test(
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_large",
+        },
     },
     deps = [
         "//source/common/thread_local:thread_local_lib",
@@ -426,7 +450,10 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
     ],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -493,7 +520,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "worker_impl_test",
     srcs = ["worker_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",

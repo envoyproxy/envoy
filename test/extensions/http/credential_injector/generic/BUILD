@@ -17,7 +17,10 @@ envoy_extension_cc_test(
     srcs = ["credential_injector_integration_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -34,7 +37,10 @@ envoy_extension_cc_test(
     srcs = ["credential_injector_upstream_integration_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

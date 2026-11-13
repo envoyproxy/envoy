@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
     extension_names = ["envoy.config_subscription.rest"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":http_subscription_test_harness",
     ],

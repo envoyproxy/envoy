@@ -90,7 +90,10 @@ envoy_cc_fuzz_test(
     srcs = ["network_readfilter_fuzz_test.cc"],
     corpus = "network_readfilter_corpus",
     dictionaries = ["network_readfilter_fuzz_test.dict"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
@@ -135,7 +138,10 @@ envoy_cc_fuzz_test(
     name = "network_writefilter_fuzz_test",
     srcs = ["network_writefilter_fuzz_test.cc"],
     corpus = "network_writefilter_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [

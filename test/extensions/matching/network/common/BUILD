@@ -33,7 +33,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["inputs_integration_test.cc"],
     extension_names = ["envoy.matching.inputs.destination_ip"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network/matching:data_impl_lib",

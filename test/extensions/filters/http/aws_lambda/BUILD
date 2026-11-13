@@ -31,7 +31,10 @@ envoy_extension_cc_test(
     srcs = ["aws_lambda_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.aws_lambda"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -59,7 +62,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.aws_lambda"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/aws_lambda:config",
         "//test/mocks/server:factory_context_mocks",

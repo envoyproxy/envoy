@@ -32,7 +32,10 @@ envoy_extension_cc_test(
     srcs = ["connection_limit_integration_test.cc"],
     extension_names = ["envoy.filters.network.connection_limit"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -27,7 +27,10 @@ envoy_extension_cc_test(
     name = "minimum_clusters_validator_test",
     srcs = ["minimum_clusters_validator_test.cc"],
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/config:decoded_resource_lib",
         "//source/extensions/config/validators/minimum_clusters:minimum_clusters_validator",
@@ -42,7 +45,10 @@ envoy_extension_cc_test(
     srcs = ["minimum_clusters_validator_integration_test.cc"],
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

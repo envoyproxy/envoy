@@ -39,7 +39,10 @@ envoy_extension_cc_test(
     name = "http_inspector_config_test",
     srcs = ["http_inspector_config_test.cc"],
     extension_names = ["envoy.filters.listener.http_inspector"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/listener/http_inspector:config",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
@@ -81,7 +84,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.listener.http_inspector"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

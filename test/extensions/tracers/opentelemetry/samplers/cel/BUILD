@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -30,7 +33,10 @@ envoy_extension_cc_test(
     name = "cel_sampler_test",
     srcs = ["cel_sampler_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/cel:cel_sampler_lib",
@@ -48,7 +54,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     tags = ["skip_on_windows"],

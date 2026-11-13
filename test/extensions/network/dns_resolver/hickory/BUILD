@@ -71,7 +71,10 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["hickory_dns_integration_test.cc"],
     extension_names = ["envoy.network.dns_resolver.hickory"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     tags = [

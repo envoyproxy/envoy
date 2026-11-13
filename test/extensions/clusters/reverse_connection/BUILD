@@ -19,7 +19,10 @@ envoy_extension_cc_test(
         "//conditions:default": [],
     }),
     extension_names = ["envoy.clusters.reverse_connection"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -55,7 +58,10 @@ envoy_extension_cc_test(
         "envoy.transport_sockets.tls",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

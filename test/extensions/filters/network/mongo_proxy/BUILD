@@ -39,7 +39,10 @@ envoy_extension_cc_test(
     name = "proxy_test",
     srcs = ["proxy_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:stats_lib",
@@ -76,7 +79,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/network/mongo_proxy:config",
         "//test/mocks/server:factory_context_mocks",
@@ -92,7 +98,10 @@ envoy_extension_cc_test(
     srcs = ["mongo_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
