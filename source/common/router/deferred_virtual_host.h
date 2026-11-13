@@ -3,9 +3,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
-#include <utility>
 
-#include "envoy/api/api.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
@@ -149,8 +147,8 @@ protected:
  * Also tracks whether any extension accessed main-thread-bound resources (Init::Manager targets,
  * Singleton::Manager, ThreadLocal::Instance, Secret::SecretManager, ClusterManager, XdsManager,
  * mainThreadDispatcher, Admin, AccessLogManager, DrainManager, ServerLifecycleNotifier,
- * SslContextManager, Api::allocateDispatcher, Api::customStatNamespaces, or
- * ServerFactoryContextInstance) so RouteMatcher can fall back to eager main-thread initialization.
+ * SslContextManager, or ServerFactoryContextInstance) so RouteMatcher can fall back to eager
+ * main-thread initialization.
  */
 class IsolatedValidationContext : public DelegatingServerFactoryContext {
 public:
@@ -167,7 +165,6 @@ public:
   Init::Manager& initManager() override { return isolated_init_manager_; }
   Singleton::Manager& singletonManager() override { return tracking_singleton_manager_; }
   ThreadLocal::Instance& threadLocal() override { return tracking_thread_local_; }
-  Api::Api& api() override { return tracking_api_; }
 
   Secret::SecretManager& secretManager() override {
     used_main_thread_resource_ = true;
@@ -260,62 +257,12 @@ private:
     bool& used_main_thread_resource_;
   };
 
-  class TrackingApi : public Api::Api {
-  public:
-    TrackingApi(Server::Configuration::ServerFactoryContext& parent_context,
-                Stats::Scope& isolated_scope, bool& used_main_thread_resource)
-        : parent_context_(parent_context), isolated_scope_(isolated_scope),
-          used_main_thread_resource_(used_main_thread_resource) {}
-
-    Event::DispatcherPtr allocateDispatcher(const std::string& name) override {
-      used_main_thread_resource_ = true;
-      return parent_context_.api().allocateDispatcher(name);
-    }
-    Event::DispatcherPtr
-    allocateDispatcher(const std::string& name,
-                       const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override {
-      used_main_thread_resource_ = true;
-      return parent_context_.api().allocateDispatcher(name, scaled_timer_factory);
-    }
-    Event::DispatcherPtr
-    allocateDispatcher(const std::string& name,
-                       Buffer::WatermarkFactoryPtr&& watermark_factory) override {
-      used_main_thread_resource_ = true;
-      return parent_context_.api().allocateDispatcher(name, std::move(watermark_factory));
-    }
-    Thread::ThreadFactory& threadFactory() override {
-      return parent_context_.api().threadFactory();
-    }
-    Filesystem::Instance& fileSystem() override { return parent_context_.api().fileSystem(); }
-    TimeSource& timeSource() override { return parent_context_.api().timeSource(); }
-    Stats::Scope& rootScope() override { return isolated_scope_; }
-    Random::RandomGenerator& randomGenerator() override {
-      return parent_context_.api().randomGenerator();
-    }
-    ProcessContextOptRef processContext() override {
-      return parent_context_.api().processContext();
-    }
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override {
-      return parent_context_.api().bootstrap();
-    }
-    Stats::CustomStatNamespaces& customStatNamespaces() override {
-      used_main_thread_resource_ = true;
-      return parent_context_.api().customStatNamespaces();
-    }
-
-  private:
-    Server::Configuration::ServerFactoryContext& parent_context_;
-    Stats::Scope& isolated_scope_;
-    bool& used_main_thread_resource_;
-  };
-
   Stats::IsolatedStoreImpl isolated_store_;
   Stats::ScopeSharedPtr isolated_scope_;
   TrackingInitManager isolated_init_manager_;
   bool used_main_thread_resource_{false};
   TrackingSingletonManager tracking_singleton_manager_;
   TrackingThreadLocalInstance tracking_thread_local_;
-  TrackingApi tracking_api_;
 };
 
 /**

@@ -331,8 +331,7 @@ IsolatedValidationContext::IsolatedValidationContext(
       isolated_store_(parent_context.scope().symbolTable()),
       isolated_scope_(isolated_store_.rootScope()),
       tracking_singleton_manager_(parent_context, used_main_thread_resource_),
-      tracking_thread_local_(parent_context, used_main_thread_resource_),
-      tracking_api_(parent_context, *isolated_scope_, used_main_thread_resource_) {}
+      tracking_thread_local_(parent_context, used_main_thread_resource_) {}
 
 Singleton::InstanceSharedPtr IsolatedValidationContext::TrackingSingletonManager::get(
     const std::string& name, Singleton::SingletonFactoryCb cb, bool pin) {
