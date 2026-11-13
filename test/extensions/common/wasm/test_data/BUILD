@@ -51,6 +51,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "test_redis_call_cpp_plugin",
+    srcs = [
+        "test_redis_call_cpp.cc",
+        "test_redis_call_cpp_null_plugin.cc",
+    ],
+    copts = ["-DNULL_PLUGIN=1"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:c_smart_ptr_lib",
+        "//source/extensions/common/wasm:wasm_hdr",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/common/wasm/ext:redis_call_cc_proto",
+        "@abseil-cpp//absl/container:node_hash_map",
+    ],
+)
+
+envoy_cc_test_library(
     name = "test_restriction_cpp_plugin",
     srcs = [
         "test_restriction_cpp.cc",
@@ -85,6 +102,15 @@ envoy_wasm_cc_binary(
     precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "test_redis_call_cpp.wasm",
+    srcs = ["test_redis_call_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = [
+        "//source/extensions/common/wasm/ext:redis_call_cc_proto",
     ],
 )
 
