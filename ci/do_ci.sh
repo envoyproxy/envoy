@@ -975,8 +975,9 @@ case $CI_TARGET in
         ;;
 
     gcc|gcc.build|gcc.test)
-        BAZEL_BUILD_OPTIONS+=("--config=gcc")
-        echo "gcc toolchain configured: gcc"
+        # `gcc-ci`: GCC with `-c opt`, as the release build and tests are, without debug info.
+        BAZEL_BUILD_OPTIONS+=("--config=gcc-ci")
+        echo "gcc toolchain configured: gcc-ci"
         # Nothing built here is published, so the server and tools binaries are built in one
         # invocation, with the tests if there are any, and are not downloaded.
         GCC_BUILD_TARGETS=()
@@ -991,7 +992,6 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" == "gcc.build" ]]; then
             echo "Building ${GCC_BUILD_TARGETS[*]}"
             bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-                -c fastbuild \
                 --remote_download_minimal \
                 -- "${GCC_BUILD_TARGETS[@]}"
             collect_build_profile build
@@ -999,7 +999,6 @@ case $CI_TARGET in
             echo "Building ${GCC_BUILD_TARGETS[*]} and testing ${TEST_TARGETS[*]}"
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
-                -c fastbuild  \
                 --remote_download_minimal \
                 -- "${GCC_BUILD_TARGETS[@]}" "${TEST_TARGETS[@]}"
         fi
