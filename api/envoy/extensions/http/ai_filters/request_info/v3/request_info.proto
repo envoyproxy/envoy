@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.http.ai_filters.request_info.v3;
 
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -32,9 +35,69 @@ message RequestInfo {
     double tokens_per_byte = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
   }
 
+  // Copies a value the client sends in the request body, such as a routing policy, into
+  // untyped dynamic metadata, so filters that never read the body can act on it.
+  message ExtractionRule {
+    // Object keys leading to the value, e.g. ``["settings"]``. Arrays cannot be indexed. The
+    // value is copied whole, arrays and objects included.
+    repeated string path = 1 [(validate.rules).repeated = {
+      min_items: 1
+      max_items: 8
+      items {string {min_len: 1 max_len: 128}}
+    }];
+
+    // Metadata key. Defaults to ``path`` joined with ``.``. When several rules share a key,
+    // the first one that finds a value wins, which allows fallbacks between field spellings.
+    string key = 2 [(validate.rules).string = {max_len: 128}];
+
+    // Written when the path is missing or ``null``. Unset: nothing is written.
+    google.protobuf.Value on_missing = 3;
+  }
+
+  // Caps on what one request may copy. The body is client controlled, and every copied byte is
+  // kept for the stream, sent to external processors, and written to access logs. A value over
+  // any cap is dropped whole rather than truncated, so a consumer never acts on half a policy;
+  // it is counted by ``request_info.extraction_dropped``. The request itself is unaffected.
+  message ExtractionLimits {
+    // Max bytes one rule may copy. Defaults to 4KiB.
+    google.protobuf.UInt32Value max_value_bytes = 1
+        [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
+
+    // Max bytes all rules may copy for one request. Defaults to 16KiB.
+    google.protobuf.UInt32Value max_total_bytes = 2
+        [(validate.rules).uint32 = {lte: 4194304 gte: 64}];
+
+    // Max nesting below the path; an array of objects of scalars is depth 2. Defaults to 8.
+    google.protobuf.UInt32Value max_depth = 3 [(validate.rules).uint32 = {lte: 32 gte: 1}];
+
+    // Max length of any copied string or key. Defaults to 256. Strings the manager offloaded,
+    // over :ref:`inline_string_threshold_bytes
+    // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`,
+    // are not in memory and cannot be copied regardless.
+    google.protobuf.UInt32Value max_string_bytes = 4
+        [(validate.rules).uint32 = {lte: 65536 gte: 1}];
+  }
+
+  // Copies values from the request body into untyped dynamic metadata.
+  message Extraction {
+    // Namespace to write to. Defaults to the filter's ``metadata_namespace``, so consumers find
+    // the typed record and the copied values under one name. Keys already present are left
+    // alone.
+    string metadata_namespace = 1;
+
+    // Rules, applied in order.
+    repeated ExtractionRule rules = 2 [(validate.rules).repeated = {min_items: 1 max_items: 32}];
+
+    // Caps on the copied values. Defaults apply when unset.
+    ExtractionLimits limits = 3;
+  }
+
   // Metadata namespace. Defaults to ``envoy.ai.request_info``.
   string metadata_namespace = 1;
 
   // When unset, no estimate is published.
   TokenEstimation token_estimation = 2;
+
+  // When unset, nothing is extracted.
+  Extraction extraction = 3;
 }

@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
@@ -57,6 +58,38 @@ uint64_t estimateInputTokens(uint64_t payload_bytes, double tokens_per_byte) {
   return static_cast<uint64_t>(std::ceil(static_cast<double>(payload_bytes) * tokens_per_byte));
 }
 
+std::optional<ExtractionConfig>
+compileExtraction(const envoy::extensions::http::ai_filters::request_info::v3::RequestInfo& proto,
+                  const std::string& default_namespace) {
+  if (!proto.has_extraction()) {
+    return std::nullopt;
+  }
+  const auto& extraction = proto.extraction();
+  ExtractionConfig config;
+  config.metadata_namespace =
+      extraction.metadata_namespace().empty() ? default_namespace : extraction.metadata_namespace();
+  config.rules.reserve(extraction.rules().size());
+  for (const auto& rule_proto : extraction.rules()) {
+    ExtractionRule rule;
+    rule.path.assign(rule_proto.path().begin(), rule_proto.path().end());
+    rule.key = rule_proto.key().empty() ? absl::StrJoin(rule.path, ".") : rule_proto.key();
+    if (rule_proto.has_on_missing()) {
+      rule.on_missing = rule_proto.on_missing();
+    }
+    config.rules.push_back(std::move(rule));
+  }
+  const auto& limits = extraction.limits();
+  config.limits.max_value_bytes =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(limits, max_value_bytes, ExtractionLimits{}.max_value_bytes);
+  config.limits.max_total_bytes =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(limits, max_total_bytes, ExtractionLimits{}.max_total_bytes);
+  config.limits.max_depth =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(limits, max_depth, ExtractionLimits{}.max_depth);
+  config.limits.max_string_bytes = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      limits, max_string_bytes, ExtractionLimits{}.max_string_bytes);
+  return config;
+}
+
 } // namespace
 
 RequestInfoFilterConfig::RequestInfoFilterConfig(
@@ -68,7 +101,8 @@ RequestInfoFilterConfig::RequestInfoFilterConfig(
                                                              : proto.metadata_namespace()),
       tokens_per_byte_(proto.has_token_estimation()
                            ? std::make_optional(proto.token_estimation().tokens_per_byte())
-                           : std::nullopt) {}
+                           : std::nullopt),
+      extraction_(compileExtraction(proto, metadata_namespace_)) {}
 
 RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                                      const AiFilterContext& context)
@@ -100,12 +134,45 @@ void RequestInfoFilter::publish(const AiRequest& request) {
   MessageUtil::packFrom(typed_any, record);
   stream_info.setDynamicTypedMetadata(config_->metadataNamespace(), typed_any);
   storeModel(attrs.model);
+  const bool extraction_incomplete = extract(request);
 
   config_->stats().published_.inc();
-  if (attrs.malformed) {
+  if (attrs.malformed || extraction_incomplete) {
     config_->stats().partial_.inc();
   }
   ENVOY_LOG(trace, "request_info: published to namespace {}", config_->metadataNamespace());
+}
+
+bool RequestInfoFilter::extract(const AiRequest& request) {
+  if (!config_->extraction().has_value()) {
+    return false;
+  }
+  const ExtractionConfig& extraction = *config_->extraction();
+  StreamInfo::StreamInfo& stream_info = context_.stream_info;
+  const auto& untyped = stream_info.dynamicMetadata().filter_metadata();
+  const auto existing_it = untyped.find(extraction.metadata_namespace);
+  const Protobuf::Struct* existing = existing_it == untyped.end() ? nullptr : &existing_it->second;
+
+  Protobuf::Struct out;
+  const ExtractionOutcome outcome =
+      extractConfiguredValues(request.json(), extraction.rules, extraction.limits, existing, out);
+  if (!out.fields().empty()) {
+    // Merges into the namespace; `out` holds only keys no earlier writer set.
+    stream_info.setDynamicMetadata(extraction.metadata_namespace, out);
+  }
+  if (outcome.dropped > 0) {
+    config_->stats().extraction_dropped_.add(outcome.dropped);
+    ENVOY_LOG(debug, "request_info: {} extracted value(s) over the configured limits dropped",
+              outcome.dropped);
+  }
+  if (outcome.unusable > 0) {
+    config_->stats().extraction_unusable_.add(outcome.unusable);
+    ENVOY_LOG(debug, "request_info: {} extracted value(s) not representable as metadata dropped",
+              outcome.unusable);
+  }
+  ENVOY_LOG(trace, "request_info: extracted {} value(s) into namespace {}", outcome.written,
+            extraction.metadata_namespace);
+  return outcome.dropped > 0 || outcome.unusable > 0;
 }
 
 void RequestInfoFilter::storeModel(absl::string_view model) {
