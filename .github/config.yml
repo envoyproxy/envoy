@@ -34,6 +34,12 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-cto-asserts
+    - check-build-cto-noadmin
+    - check-build-cto-nolog
+    - check-build-cto-wamr
+    - check-build-cto-wasmtime
+    - check-build-cto-zlib-ng
     - check-coverage
     - check-runtime
     - check-san
@@ -116,6 +122,165 @@ run:
   check-build:
     paths:
     - "**/*"
+  check-build-cto-asserts:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+  check-build-cto-noadmin:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-nolog:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - envoy/**/*
+    - source/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+  check-build-cto-wamr:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-wasmtime:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-zlib-ng:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
   check-coverage:
     paths:
     - "**/*"

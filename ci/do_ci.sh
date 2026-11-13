@@ -42,6 +42,104 @@ setup_clang_toolchain() {
     echo "clang toolchain configured: ${config}"
 }
 
+# Settings for the `cto.*` targets (see `compile_time_options` below). Each can be overridden with
+# a space-separated list.
+
+# The options every `cto.*` target builds with. `compile-time-options` builds with BoringSSL FIPS,
+# so the targets that cannot are left out.
+read -ra CTO_OPTIONS <<< "${CTO_OPTIONS:---config=compile-time-options -c fastbuild --test_tag_filters=-nofips --build_tag_filters=-nofips}"
+
+# The wasm engine is exercised by the wasm extensions, and has to link and run with the rest of
+# Envoy: the server and the tests that link every extension, the other Rust code (dynamic modules),
+# and signal handling.
+CTO_WASM_TARGETS_DEFAULT=(
+    @envoy//test/common/signal/...
+    @envoy//test/config_test/...
+    @envoy//test/exe/...
+    @envoy//test/extensions/access_loggers/wasm/...
+    @envoy//test/extensions/bootstrap/wasm/...
+    @envoy//test/extensions/common/wasm/...
+    @envoy//test/extensions/dynamic_modules/...
+    @envoy//test/extensions/filters/http/wasm/...
+    @envoy//test/extensions/filters/network/wasm/...
+    @envoy//test/extensions/stats_sinks/wasm/...
+    @envoy//test/server/...)
+read -ra CTO_WASM_TARGETS <<< "${CTO_WASM_TARGETS:-${CTO_WASM_TARGETS_DEFAULT[*]}}"
+
+# Run one `cto.*` subtask. See `compile-time-options` in `.bazelrc`: the non-default build switches
+# that can all be set together, which on this branch include gperftools and zlib-ng. Every subtask
+# builds with that config and adds one thing of its own: a wasm engine, the admin code disabled,
+# release-mode asserts, or logging disabled. `cto.wamr` and `cto.noadmin` run the whole tree, as
+# the two whole-tree runs of the previous `compile_time_options` target did; the others run the
+# targets their option can affect. `cto.zlib_ng` checks zlib-ng without the rest of the config.
+function cto_subtask() {
+    local subtask="$1"
+    case "$subtask" in
+        cto.wamr)
+            echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define wasm=wamr \
+                "${TEST_TARGETS[@]}"
+            ;;
+        cto.wasmtime)
+            echo "Testing with wasm=wasmtime: ${CTO_WASM_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define wasm=wasmtime \
+                "${CTO_WASM_TARGETS[@]}"
+            ;;
+        cto.noadmin)
+            echo "Building and testing with wasm=wasmtime and admin_functionality disabled: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define wasm=wasmtime \
+                --define admin_functionality=disabled \
+                "${TEST_TARGETS[@]}"
+            ;;
+        cto.asserts)
+            # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
+            # these tests under "-c opt" (which replaces the "-c" in CTO_OPTIONS) to save time in CI.
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define wasm=wasmtime \
+                -c opt \
+                @envoy//test/common/common:assert_test \
+                @envoy//test/server:server_test
+            # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define wasm=wasmtime \
+                -c opt \
+                @envoy//test/common/common:assert_test \
+                --define log_fast_debug_assert_in_release=enabled \
+                --define log_debug_assert_in_release=disabled
+            ;;
+        cto.nolog)
+            echo "Building binary with wasm=wasmtime and logging disabled..."
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" \
+                --define wasm=wasmtime \
+                --define enable_logging=disabled \
+                @envoy//source/exe:envoy-static
+            collect_build_profile build
+            ;;
+        cto.zlib_ng)
+            # Test zlib-ng explicitly to prevent regressions (Linux only).
+            echo "Testing zlib-ng compression..."
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                --define zlib=ng \
+                -c fastbuild \
+                @envoy//test/extensions/compression/gzip/compressor:compressor_test \
+                @envoy//test/extensions/compression/gzip/decompressor:zlib_decompressor_impl_test
+            ;;
+        *)
+            echo "Unknown compile-time options subtask: ${subtask}" >&2
+            exit 1
+            ;;
+    esac
+}
+
 function collect_build_profile() {
     local output_base
     declare -g build_profile_count=${build_profile_count:-1}
@@ -393,66 +491,25 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options)
-        # See `compile-time-options` in `.bazelrc`
+    compile_time_options|cto|cto.*)
+        # See `compile-time-options` in `.bazelrc`, and `cto_subtask` above. `cto.<option>` runs one
+        # subtask, and `compile_time_options` (also `cto` or `cto.all`) runs them all.
         setup_clang_toolchain
-        # This doesn't go into CI but is available for developer convenience.
-        echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-        echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wamr \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
-            --build_tag_filters=-nofips
-        echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wasmtime \
-            --define admin_functionality=disabled \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
-            --build_tag_filters=-nofips
-        # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
-        # these tests under "-c opt" to save time in CI.
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wasmtime \
-            -c opt \
-            @envoy//test/common/common:assert_test \
-            @envoy//test/server:server_test
-        # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wasmtime \
-            -c opt \
-            @envoy//test/common/common:assert_test \
-            --define log_fast_debug_assert_in_release=enabled \
-            --define log_debug_assert_in_release=disabled
-        echo "Building binary with wasm=wasmtime... and logging disabled"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wasmtime \
-            --define enable_logging=disabled \
-            -c fastbuild \
-            @envoy//source/exe:envoy-static \
-            --build_tag_filters=-nofips
-        # Test zlib-ng explicitly to prevent regressions (Linux only).
-        echo "Testing zlib-ng compression..."
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --define zlib=ng \
-            -c fastbuild \
-            @envoy//test/extensions/compression/gzip/compressor:compressor_test \
-            @envoy//test/extensions/compression/gzip/decompressor:zlib_decompressor_impl_test
-        collect_build_profile build
+        if [[ $# -ge 1 ]]; then
+            # Tests given on the command line replace the list of the subtasks that have one.
+            CTO_WASM_TARGETS=("${TEST_TARGETS[@]}")
+        fi
+        case "$CI_TARGET" in
+            compile_time_options|cto|cto.all)
+                for subtask in cto.asserts cto.noadmin cto.nolog cto.wamr cto.wasmtime cto.zlib_ng; do
+                    cto_subtask "$subtask"
+                done
+                ;;
+            *)
+                cto_subtask "$CI_TARGET"
+                ;;
+        esac
         ;;
 
     # `fuzz_coverage` is the previous name of `coverage.fuzz`, and is what CI still asks for: its
