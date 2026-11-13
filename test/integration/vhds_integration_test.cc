@@ -235,12 +235,25 @@ TEST_P(VhdsIntegrationTest, InitialVhdsResponseWithOnlyOtherRoutePrefixCompletes
     test_server_->waitForCounter("http.config_test.rds.my_route.config_reload", testing::Eq(1));
   }
 
-  auto init_fetch_timeout =
-      test_server_->counter(routeConfigType() == RouteConfigType::Rds
-                                ? "http.config_test.rds.vhds.my_route.init_fetch_timeout"
-                                : "vhds.my_route.init_fetch_timeout");
+  const std::string vhds_stats_prefix = routeConfigType() == RouteConfigType::Rds
+                                            ? "http.config_test.rds.vhds.my_route."
+                                            : "vhds.my_route.";
+  auto init_fetch_timeout = test_server_->counter(vhds_stats_prefix + "init_fetch_timeout");
   ASSERT_NE(nullptr, init_fetch_timeout);
   EXPECT_EQ(0, init_fetch_timeout->value());
+
+  auto update_success = test_server_->counter(vhds_stats_prefix + "update_success");
+  ASSERT_NE(nullptr, update_success);
+  EXPECT_EQ(1, update_success->value());
+
+  // Subsequent incremental pushes for unrelated prefixes must not deliver spurious empty updates.
+  auto second_other_vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+      virtualHostYaml("other_route/vhost_1", "other2.lyft.com"));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {second_other_vhost}, {}, "2", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+  EXPECT_EQ(1, update_success->value());
 
   // Static virtual host serves traffic normally, while an unmatched domain returns 404.
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
@@ -253,6 +266,51 @@ TEST_P(VhdsIntegrationTest, InitialVhdsResponseWithOnlyOtherRoutePrefixCompletes
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
 
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// An initial empty wildcard VHDS DeltaDiscoveryResponse completes initial warming with an empty
+// virtual host set, and subsequent virtual hosts pushed on the stream begin serving.
+TEST_P(VhdsIntegrationTest, InitialEmptyVhdsResponseCompletesWarming) {
+  initializeUpToInitialVhdsRequest();
+
+  EXPECT_FALSE(workersStarted());
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {}, {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForListenerToServe();
+
+  const std::string vhds_stats_prefix = routeConfigType() == RouteConfigType::Rds
+                                            ? "http.config_test.rds.vhds.my_route."
+                                            : "vhds.my_route.";
+  auto update_success = test_server_->counter(vhds_stats_prefix + "update_success");
+  ASSERT_NE(nullptr, update_success);
+  EXPECT_EQ(1, update_success->value());
+
+  auto init_fetch_timeout = test_server_->counter(vhds_stats_prefix + "init_fetch_timeout");
+  ASSERT_NE(nullptr, init_fetch_timeout);
+  EXPECT_EQ(0, init_fetch_timeout->value());
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "2", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+  test_server_->waitForCounter(vhds_stats_prefix + "config_reload", testing::Eq(1));
+  test_server_->waitForWorkerThreads();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }

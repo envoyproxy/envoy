@@ -439,8 +439,7 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(watch) > 0) {
       continue;
     }
-    if (is_wildcard_watch(*watch) &&
-        (wire_update_empty || !watch->delivered_initial_delta_update_)) {
+    if (is_wildcard_watch(*watch)) {
       THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
       watch->delivered_initial_delta_update_ = true;
     }

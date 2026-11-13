@@ -1210,6 +1210,71 @@ TEST(WatchMapTest, NarrowingWildcardWatchDuringDeltaOnConfigUpdateSkipsEmptyUpda
   doDeltaUpdate(watch_map, updated_resources, {}, "version1");
 }
 
+// Removing a queued wildcard watch inside an earlier onConfigUpdate() callback skips its empty
+// update delivery during the same delta response, both when removed from per_watch_added and when
+// removed from an earlier iteration of empty_update_watches.
+TEST(WatchMapTest, RemovingWildcardWatchDuringDeltaOnConfigUpdateSkipsEmptyUpdate) {
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+
+  // Case 1: per_watch_added callback drains and removes a watch queued in empty_update_watches.
+  {
+    MockSubscriptionCallbacks callbacks1;
+    MockSubscriptionCallbacks callbacks2;
+    WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
+    Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+    Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+    watch_map.accept(watch1, {"route_a/*"});
+    watch_map.accept(watch2, {"route_b/*"});
+
+    Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
+    envoy::config::endpoint::v3::ClusterLoadAssignment vhost0;
+    vhost0.set_cluster_name("route_a/vhost_0");
+    std::ignore = updated_resources.Add()->PackFrom(vhost0);
+
+    EXPECT_CALL(callbacks1, onConfigUpdate(_, _, _))
+        .WillOnce([&](const std::vector<DecodedResourceRef>& gotten_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string&) {
+          EXPECT_EQ(1, gotten_resources.size());
+          EXPECT_TRUE(removed_resources.empty());
+          watch_map.updateWatchInterest(watch2, {});
+          watch_map.removeWatch(watch2);
+          return absl::OkStatus();
+        });
+    EXPECT_CALL(callbacks2, onConfigUpdate(_, _, _)).Times(0);
+
+    doDeltaUpdate(watch_map, updated_resources, {}, "version1");
+  }
+
+  // Case 2: an empty_update_watches callback drains and removes both itself and a sibling watch
+  // queued in empty_update_watches; the shared callback must be invoked strictly once.
+  {
+    MockSubscriptionCallbacks shared_callbacks;
+    WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
+    Watch* watch1 = watch_map.addWatch(shared_callbacks, resource_decoder);
+    Watch* watch2 = watch_map.addWatch(shared_callbacks, resource_decoder);
+    watch_map.accept(watch1, {"route_a/*"});
+    watch_map.accept(watch2, {"route_b/*"});
+
+    EXPECT_CALL(shared_callbacks, onConfigUpdate(_, _, _))
+        .WillOnce([&](const std::vector<DecodedResourceRef>& gotten_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string&) {
+          EXPECT_TRUE(gotten_resources.empty());
+          EXPECT_TRUE(removed_resources.empty());
+          watch_map.updateWatchInterest(watch1, {});
+          watch_map.updateWatchInterest(watch2, {});
+          watch_map.removeWatch(watch1);
+          watch_map.removeWatch(watch2);
+          return absl::OkStatus();
+        });
+
+    doDeltaUpdate(watch_map, {}, {}, "version1");
+  }
+}
+
 // TODO(adip): Add tests that use the eds cache.
 // Needs to test the following function onConfigUpdate (sotw&delta) and
 // updateWatchInterest
