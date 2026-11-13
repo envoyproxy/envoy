@@ -16,6 +16,7 @@
 
 #include "absl/strings/str_cat.h"
 
+using Envoy::Extensions::Bootstrap::DynamicModules::ConfigSnapshot;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
@@ -733,6 +734,40 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
 
   const std::string prefix_str(path_prefix.ptr, path_prefix.length);
   return admin->removeHandler(prefix_str);
+}
+
+envoy_dynamic_module_type_config_snapshot_ptr
+envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return nullptr;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  std::vector<absl::string_view> names;
+  names.reserve(providers_count);
+  for (size_t i = 0; i < providers_count; ++i) {
+    names.emplace_back(providers[i].ptr, providers[i].length);
+  }
+  auto snapshot = config->getConfigSnapshot(names);
+  return snapshot.ok() ? snapshot.value().release() : nullptr;
+}
+
+bool envoy_dynamic_module_callback_config_snapshot_serialize(
+    envoy_dynamic_module_type_config_snapshot_ptr snapshot,
+    envoy_dynamic_module_type_config_snapshot_json_fn json_fn, void* user_data) {
+  auto json = static_cast<ConfigSnapshot*>(snapshot)->serialize();
+  if (!json.ok()) {
+    return false;
+  }
+  json_fn({json->data(), json->size()}, user_data);
+  return true;
+}
+
+void envoy_dynamic_module_callback_config_snapshot_delete(
+    envoy_dynamic_module_type_config_snapshot_ptr snapshot) {
+  delete static_cast<ConfigSnapshot*>(snapshot);
 }
 
 // -------------------- Cluster Lifecycle Callbacks --------------------

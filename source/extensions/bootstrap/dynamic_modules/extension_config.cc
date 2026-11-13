@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
@@ -89,6 +90,19 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
       Server::ServerLifecycleNotifier::Stage::ShutdownExit,
       [this]() { cluster_update_callbacks_handle_.reset(); });
   return true;
+}
+
+absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
+    absl::Span<const absl::string_view> providers) {
+  if (!server_initialized_ || shutdown_started_ || extension_destroyed_) {
+    return absl::FailedPreconditionError("config providers are unavailable");
+  }
+  auto server_admin = admin();
+  if (!server_admin.has_value()) {
+    return absl::FailedPreconditionError("admin config tracker is unavailable");
+  }
+  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers);
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
