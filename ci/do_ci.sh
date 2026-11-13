@@ -455,10 +455,13 @@ case $CI_TARGET in
         collect_build_profile build
         ;;
 
-    coverage|fuzz_coverage)
+    # `fuzz_coverage` is the previous name of `coverage.fuzz`, and is what CI still asks for: its
+    # workflows run from main for every branch. CI can switch to `coverage.fuzz` once all the
+    # supported release branches accept it, and `fuzz_coverage` can then be removed here.
+    coverage|coverage.fuzz|fuzz_coverage)
         setup_clang_toolchain
         echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
-        if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
+        if [[ "$CI_TARGET" != "coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
         export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
