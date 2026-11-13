@@ -57,6 +57,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/flags/reflection.h"
 #include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -533,65 +534,68 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 }
 
 // Boots a server backed by a real ThreadLocalStoreImpl (the production store type, unlike the base
-// fixture's TestIsolatedStoreImpl) and verifies the explicit-tags decision made during
-// initialization, observed via ThreadLocalStoreImpl::useExplicitTags(). These live in the
-// ServerInstanceImplTest suite, after WithCustomInlineHeaders, because booting a server finalizes
-// the process-global custom-inline-header registry that the inline-header tests must populate
-// first.
-//
-// With the runtime guard enabled and a default stats config (no custom tags), server initialization
-// turns on the explicit-tags logic on the real stats store, and hands the http context the matching
-// CodeStats implementation. Guards against a regression where an early scope creation would
-// silently cause setUseExplicitTags() to be ignored.
-TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
-  Stats::SymbolTableImpl symbol_table;
-  Stats::AllocatorImpl allocator(symbol_table);
-  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
+// fixture's TestIsolatedStoreImpl) and returns the explicit-tags decision made during
+// initialization, observed via ThreadLocalStoreImpl::useExplicitTags(). The tests using this live
+// in the ServerInstanceImplTest suite, after WithCustomInlineHeaders, because booting a server
+// finalizes the process-global custom-inline-header registry that the inline-header tests must
+// populate first.
+class ServerInstanceImplExplicitTagsTest : public ServerInstanceImplTest {
+protected:
+  bool bootServerAndGetExplicitTags(const std::string& bootstrap_path) {
+    Stats::SymbolTableImpl symbol_table;
+    Stats::AllocatorImpl allocator(symbol_table);
+    auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
 
-  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-      "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
-  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
-  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
-  server_ = std::make_unique<InstanceImpl>(
-      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
-      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
-  server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
-                      component_factory_);
-  EXPECT_TRUE(real_store->useExplicitTags());
-  EXPECT_NE(nullptr, dynamic_cast<Http::TaggedCodeStatsImpl*>(&server_->httpContext().codeStats()));
+    options_.config_path_ = TestEnvironment::temporaryFileSubstitute(bootstrap_path, {}, version_);
+    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+    server_ = std::make_unique<InstanceImpl>(
+        *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
+    const bool explicit_tags = real_store->useExplicitTags();
+    // The http context gets the matching CodeStats implementation.
+    EXPECT_EQ(explicit_tags, dynamic_cast<Http::TaggedCodeStatsImpl*>(
+                                 &server_->httpContext().codeStats()) != nullptr);
 
-  // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
-  // and restore the process-global runtime flag so it does not leak into other tests.
-  server_.reset();
-  real_store.reset();
-  thread_local_.reset();
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+    // Tear down the server (which shuts down threading on real_store) before real_store is
+    // destroyed.
+    server_.reset();
+    real_store.reset();
+    thread_local_.reset();
+    return explicit_tags;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplExplicitTagsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Guards against a regression where an early scope creation would silently cause
+// setUseExplicitTags() to be ignored.
+TEST_P(ServerInstanceImplExplicitTagsTest, EnabledByDefault) {
+  EXPECT_TRUE(bootServerAndGetExplicitTags("test/server/test_data/server/empty_bootstrap.yaml"));
 }
 
-// With the runtime guard at its default (false), the explicit-tags logic stays off after init.
-TEST_P(ServerInstanceImplTest, ExplicitTagsDisabledByDefault) {
+TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByRuntimeGuard) {
+  // The guard is read during initialization, before the runtime loader exists, so it has to be
+  // set directly; the saver restores it when the test ends.
+  absl::FlagSaver saver;
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
-  Stats::SymbolTableImpl symbol_table;
-  Stats::AllocatorImpl allocator(symbol_table);
-  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
+  EXPECT_FALSE(bootServerAndGetExplicitTags("test/server/test_data/server/empty_bootstrap.yaml"));
+}
 
-  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-      "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
-  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
-  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
-  server_ = std::make_unique<InstanceImpl>(
-      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
-      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
-  server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
-                      component_factory_);
-  EXPECT_FALSE(real_store->useExplicitTags());
+// Custom tag extraction rules keep the legacy tag extraction logic.
+TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByCustomStatsTags) {
+  EXPECT_FALSE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_custom_tags_bootstrap.yaml"));
+}
 
-  server_.reset();
-  real_store.reset();
-  thread_local_.reset();
+TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByNoDefaultTags) {
+  EXPECT_FALSE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_no_default_tags_bootstrap.yaml"));
 }
 
 // Validates that server stats are flushed even when server is stuck with initialization.
