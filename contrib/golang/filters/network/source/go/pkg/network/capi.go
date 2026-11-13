@@ -32,6 +32,7 @@ package network
 */
 import "C"
 import (
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"unsafe"
@@ -70,6 +71,12 @@ func (c *cgoApiImpl) DownstreamInfo(f unsafe.Pointer, infoType int) string {
 func (c *cgoApiImpl) GetFilterState(f unsafe.Pointer, key string) string {
 	cb := (*connectionCallback)(f)
 	var value string
+	// On CAPIYield Envoy keeps &value and writes it from the dispatcher thread
+	// after envoyGoFilterGetFilterState has returned, so it must stay pinned
+	// until the sema wait below is over.
+	var pinner runtime.Pinner
+	pinner.Pin(&value)
+	defer pinner.Unpin()
 	cb.mutex.Lock()
 	defer cb.mutex.Unlock()
 	cb.sema.Add(1)

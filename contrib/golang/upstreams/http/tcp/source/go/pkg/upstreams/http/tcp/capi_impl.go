@@ -38,6 +38,7 @@ import (
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 	_ "github.com/envoyproxy/envoy/contrib/golang/common/go/api_impl"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 const (
@@ -102,6 +103,7 @@ func (c *cgoApiImpl) CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map
 	buf := make([]byte, bytes)
 	res := C.envoyGoHttpTcpBridgeCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
+	utils.BuildStringsFromBuffer(strs[:num*2], buf)
 
 	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {

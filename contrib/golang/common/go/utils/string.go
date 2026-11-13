@@ -39,6 +39,26 @@ func BytesToSlice(ptr uint64, len uint64) []byte {
 	return s
 }
 
+// BuildStringsFromBuffer turns strs into strings backed by buf.
+//
+// On entry each strs[i] carries only a length: the C++ side copied the bytes
+// of all entries into buf back to back and stored each entry's length, but
+// left the data pointers nil. Storing a pointer into Go memory from C++ would
+// skip the Go write barrier, so the pointers are installed here, in Go, while
+// walking buf in the same order. Entries with length 0 become "".
+func BuildStringsFromBuffer(strs []string, buf []byte) {
+	off := 0
+	for i := range strs {
+		n := len(strs[i])
+		if n == 0 {
+			strs[i] = ""
+			continue
+		}
+		strs[i] = unsafe.String(unsafe.SliceData(buf[off:off+n]), n)
+		off += n
+	}
+}
+
 // BufferToSlice convert the memory buffer from C to a slice with reserved len.
 func BufferToSlice(ptr uint64, len uint64) []byte {
 	var s []byte
