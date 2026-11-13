@@ -201,6 +201,49 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
   EXPECT_TRUE(log_called);
 }
 
+// A log that the module triggers from its log callback, such as a flush of a network filter whose
+// connection the module closes, leaves the context of the outer log in place.
+TEST_F(DynamicModuleAccessLogTest, NestedEmitLogRestoresOuterContext) {
+  NiceMock<ThreadLocal::MockInstance> tls;
+  auto* slot = new NiceMock<MockSlot>();
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
+  auto access_log = std::make_unique<DynamicModuleAccessLog>(
+      nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
+  tl_logger->logger_ = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
+  ON_CALL(*slot, get()).WillByDefault(testing::Return(tl_logger));
+
+  NiceMock<StreamInfo::MockStreamInfo> outer_stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> inner_stream_info;
+  const Formatter::Context outer_log_context;
+  const Formatter::Context inner_log_context;
+  static DynamicModuleAccessLog* nested_access_log;
+  static const Formatter::Context* nested_log_context;
+  static StreamInfo::StreamInfo* nested_stream_info;
+  static int log_calls;
+  nested_access_log = access_log.get();
+  nested_log_context = &inner_log_context;
+  nested_stream_info = &inner_stream_info;
+  log_calls = 0;
+  config_->on_logger_log_ = [](void* ctx, envoy_dynamic_module_type_access_logger_module_ptr,
+                               envoy_dynamic_module_type_access_log_type) {
+    auto* logger = static_cast<ThreadLocalLogger*>(ctx);
+    if (log_calls++ > 0) {
+      return;
+    }
+    const Formatter::Context* log_context = logger->log_context_;
+    const StreamInfo::StreamInfo* stream_info = logger->stream_info_;
+    nested_access_log->log(*nested_log_context, *nested_stream_info);
+    EXPECT_EQ(log_context, logger->log_context_);
+    EXPECT_EQ(stream_info, logger->stream_info_);
+  };
+
+  access_log->log(outer_log_context, outer_stream_info);
+  EXPECT_EQ(2, log_calls);
+  EXPECT_EQ(nullptr, tl_logger->log_context_);
+  EXPECT_EQ(nullptr, tl_logger->stream_info_);
+}
+
 TEST_F(DynamicModuleAccessLogTest, EmitLogNullLogger) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
