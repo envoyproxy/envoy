@@ -46,9 +46,7 @@ void CommonUpstreamTransportSocketFactory::hashKey(
 
   for (const auto& object : options->downstreamSharedFilterStateObjects()) {
     if (auto hashable = dynamic_cast<const Hashable*>(object.data_.get()); hashable != nullptr) {
-      if (auto hash = hashable->hash(); hash) {
-        pushScalarToByteVector(hash.value(), key);
-      }
+      hashable->hashKey(key);
     }
   }
 }

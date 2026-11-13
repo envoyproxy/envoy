@@ -16,6 +16,7 @@ envoy_cc_test(
         "//envoy/common:hashable_interface",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:uuid_object_lib",
         "//source/extensions/filters/common/set_filter_state:filter_config_lib",
         "//source/server:generic_factory_context_lib",
         "//test/mocks/server:server_factory_context_mocks",

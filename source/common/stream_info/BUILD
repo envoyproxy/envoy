@@ -93,3 +93,16 @@ envoy_cc_library(
         "//envoy/stream_info:bool_accessor_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "uuid_object_lib",
+    hdrs = ["uuid_object_impl.h"],
+    deps = [
+        "//envoy/common:hashable_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:hash_lib",
+        "//source/common/common:random_generator_lib",
+        "//source/common/protobuf",
+        "@abseil-cpp//absl/strings",
+    ],
+)

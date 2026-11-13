@@ -1,5 +1,7 @@
 #include "source/common/common/random_generator.h"
 
+#include <cstring>
+
 #include "source/common/common/assert.h"
 
 #include "openssl/rand.h"
@@ -47,7 +49,7 @@ uint64_t RandomUtility::random() {
   return buffered[buffered_idx++];
 }
 
-std::string RandomUtility::uuid() {
+RandomUtility::UuidBytes RandomUtility::uuidBytes() {
   // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
   // i.e. out-of-range value, so the buffer will be filled with randomness on the first
   // call to this function.
@@ -79,14 +81,21 @@ std::string RandomUtility::uuid() {
 
   // Consume 16 bytes from the buffer.
   ASSERT(buffered_idx + 16 <= sizeof(buffered));
-  uint8_t* rand = &buffered[buffered_idx];
-  buffered_idx += 16;
+  UuidBytes rand;
+  static_assert(sizeof(rand) == 16);
+  memcpy(rand.data(), &buffered[buffered_idx], sizeof(rand));
+  buffered_idx += sizeof(rand);
 
   // Create UUID from Truly Random or Pseudo-Random Numbers.
   // See: https://tools.ietf.org/html/rfc4122#section-4.4
   rand[6] = (rand[6] & 0x0f) | 0x40; // UUID version 4 (random)
   rand[8] = (rand[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
+  return rand;
+}
 
+std::string RandomUtility::uuid() { return uuidToString(uuidBytes()); }
+
+std::string RandomUtility::uuidToString(const UuidBytes& rand) {
   // Convert UUID to a string representation, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
   static const char* const hex = "0123456789abcdef";
   char uuid[CONSTEXPR_UUID_LENGTH];
