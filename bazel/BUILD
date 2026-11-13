@@ -184,6 +184,16 @@ config_setting(
 )
 
 config_setting(
+    name = "compile_time_options_build",
+    values = {"define": "ENVOY_CONFIG_COMPILE_TIME_OPTIONS=1"},
+)
+
+config_setting(
+    name = "fuzz_coverage_build",
+    values = {"define": "ENVOY_CONFIG_FUZZ_COVERAGE=1"},
+)
+
+config_setting(
     name = "clang_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "clang",
@@ -786,10 +796,26 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "engflow_rbe_x86_64_compile_time_options",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":compile_time_options_build",
+    ],
+)
+
+selects.config_setting_group(
     name = "engflow_rbe_x86_64_coverage",
     match_all = [
         ":engflow_rbe_x86_64",
         ":coverage_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_fuzz_coverage",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":fuzz_coverage_build",
     ],
 )
 
