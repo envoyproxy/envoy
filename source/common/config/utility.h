@@ -284,10 +284,10 @@ public:
   }
 
   /**
-   * Get type URL from a typed config.
+   * Get type URL from a typed config without throwing on malformed TypedStruct payloads.
    * @param typed_config for the extension config.
    */
-  static std::string getFactoryType(const Protobuf::Any& typed_config) {
+  static absl::StatusOr<std::string> getFactoryTypeOrStatus(const Protobuf::Any& typed_config) {
     static const std::string typed_struct_type(
         xds::type::v3::TypedStruct::default_instance().GetTypeName());
     static const std::string legacy_typed_struct_type(
@@ -297,16 +297,24 @@ public:
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
     return type;
+  }
+
+  /**
+   * Get type URL from a typed config.
+   * @param typed_config for the extension config.
+   */
+  static std::string getFactoryType(const Protobuf::Any& typed_config) {
+    return THROW_OR_RETURN_VALUE(getFactoryTypeOrStatus(typed_config), std::string);
   }
 
   /**
