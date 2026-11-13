@@ -3,7 +3,9 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "envoy/api/api.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
@@ -79,15 +81,78 @@ private:
 };
 
 /**
+ * Base ServerFactoryContext decorator that forwards all virtual methods to delegate()
+ * (parent_context_ by default), allowing validation, tracking, and worker-safe context wrappers to
+ * override only the methods they customize.
+ */
+class DelegatingServerFactoryContext : public Server::Configuration::ServerFactoryContext {
+public:
+  explicit DelegatingServerFactoryContext(
+      Server::Configuration::ServerFactoryContext& parent_context)
+      : parent_context_(parent_context) {}
+
+  // Server::Configuration::ServerFactoryContext
+  Stats::Scope& scope() override { return delegate().scope(); }
+  Stats::Scope& serverScope() override { return delegate().serverScope(); }
+  Init::Manager& initManager() override { return delegate().initManager(); }
+  Singleton::Manager& singletonManager() override { return delegate().singletonManager(); }
+  ThreadLocal::Instance& threadLocal() override { return delegate().threadLocal(); }
+  Secret::SecretManager& secretManager() override { return delegate().secretManager(); }
+  Upstream::ClusterManager& clusterManager() override { return delegate().clusterManager(); }
+  Envoy::Config::XdsManager& xdsManager() override { return delegate().xdsManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return delegate().httpServerPropertiesCacheManager();
+  }
+  Event::Dispatcher& mainThreadDispatcher() override { return delegate().mainThreadDispatcher(); }
+  const Server::Options& options() override { return delegate().options(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return delegate().localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return delegate().messageValidationContext();
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return delegate().messageValidationVisitor();
+  }
+  Envoy::Runtime::Loader& runtime() override { return delegate().runtime(); }
+  OptRef<Server::Admin> admin() override { return delegate().admin(); }
+  TimeSource& timeSource() override { return delegate().timeSource(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return delegate().accessLogManager(); }
+  Api::Api& api() override { return delegate().api(); }
+  Http::Context& httpContext() override { return delegate().httpContext(); }
+  Grpc::Context& grpcContext() override { return delegate().grpcContext(); }
+  Router::Context& routerContext() override { return delegate().routerContext(); }
+  ProcessContextOptRef processContext() override { return delegate().processContext(); }
+  Envoy::Server::DrainManager& drainManager() override { return delegate().drainManager(); }
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
+    return delegate().lifecycleNotifier();
+  }
+  Regex::Engine& regexEngine() override { return delegate().regexEngine(); }
+  Server::Configuration::StatsConfig& statsConfig() override { return delegate().statsConfig(); }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return delegate().bootstrap(); }
+  Server::OverloadManager& overloadManager() override { return delegate().overloadManager(); }
+  Server::OverloadManager& nullOverloadManager() override {
+    return delegate().nullOverloadManager();
+  }
+  bool healthCheckFailed() const override { return delegate().healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return delegate().sslContextManager(); }
+
+protected:
+  virtual Server::Configuration::ServerFactoryContext& delegate() const { return parent_context_; }
+
+  Server::Configuration::ServerFactoryContext& parent_context_;
+};
+
+/**
  * Isolated validation context used to probe-validate virtual hosts and their route structures on
  * the main thread at configuration ingestion time without polluting server stats/singletons/TLS
  * slots or registering orphaned targets on the RDS warming Init::Manager.
  *
  * Also tracks whether any extension accessed main-thread-bound resources (Init::Manager targets,
- * Singleton::Manager, ThreadLocal::Instance, Secret::SecretManager, or
+ * Singleton::Manager, ThreadLocal::Instance, Secret::SecretManager, ClusterManager, XdsManager,
+ * mainThreadDispatcher, Admin, AccessLogManager, DrainManager, ServerLifecycleNotifier,
+ * SslContextManager, Api::allocateDispatcher, Api::customStatNamespaces, or
  * ServerFactoryContextInstance) so RouteMatcher can fall back to eager main-thread initialization.
  */
-class IsolatedValidationContext : public Server::Configuration::ServerFactoryContext {
+class IsolatedValidationContext : public DelegatingServerFactoryContext {
 public:
   explicit IsolatedValidationContext(Server::Configuration::ServerFactoryContext& parent_context);
 
@@ -102,44 +167,32 @@ public:
   Init::Manager& initManager() override { return isolated_init_manager_; }
   Singleton::Manager& singletonManager() override { return tracking_singleton_manager_; }
   ThreadLocal::Instance& threadLocal() override { return tracking_thread_local_; }
+  Api::Api& api() override { return tracking_api_; }
+
   Secret::SecretManager& secretManager() override {
     used_main_thread_resource_ = true;
     return parent_context_.secretManager();
   }
-
-  Upstream::ClusterManager& clusterManager() override { return parent_context_.clusterManager(); }
+  Upstream::ClusterManager& clusterManager() override {
+    used_main_thread_resource_ = true;
+    return parent_context_.clusterManager();
+  }
   Envoy::Config::XdsManager& xdsManager() override {
     used_main_thread_resource_ = true;
     return parent_context_.xdsManager();
   }
-  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
-    return parent_context_.httpServerPropertiesCacheManager();
-  }
   Event::Dispatcher& mainThreadDispatcher() override {
+    used_main_thread_resource_ = true;
     return parent_context_.mainThreadDispatcher();
   }
-  const Server::Options& options() override { return parent_context_.options(); }
-  const LocalInfo::LocalInfo& localInfo() const override { return parent_context_.localInfo(); }
-  ProtobufMessage::ValidationContext& messageValidationContext() override {
-    return parent_context_.messageValidationContext();
-  }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return parent_context_.messageValidationVisitor();
-  }
-  Envoy::Runtime::Loader& runtime() override { return parent_context_.runtime(); }
   OptRef<Server::Admin> admin() override {
     used_main_thread_resource_ = true;
     return parent_context_.admin();
   }
-  TimeSource& timeSource() override { return parent_context_.timeSource(); }
   AccessLog::AccessLogManager& accessLogManager() override {
+    used_main_thread_resource_ = true;
     return parent_context_.accessLogManager();
   }
-  Api::Api& api() override { return parent_context_.api(); }
-  Http::Context& httpContext() override { return parent_context_.httpContext(); }
-  Grpc::Context& grpcContext() override { return parent_context_.grpcContext(); }
-  Router::Context& routerContext() override { return parent_context_.routerContext(); }
-  ProcessContextOptRef processContext() override { return parent_context_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override {
     used_main_thread_resource_ = true;
     return parent_context_.drainManager();
@@ -148,18 +201,6 @@ public:
     used_main_thread_resource_ = true;
     return parent_context_.lifecycleNotifier();
   }
-  Regex::Engine& regexEngine() override { return parent_context_.regexEngine(); }
-  Server::Configuration::StatsConfig& statsConfig() override {
-    return parent_context_.statsConfig();
-  }
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override {
-    return parent_context_.bootstrap();
-  }
-  Server::OverloadManager& overloadManager() override { return parent_context_.overloadManager(); }
-  Server::OverloadManager& nullOverloadManager() override {
-    return parent_context_.nullOverloadManager();
-  }
-  bool healthCheckFailed() const override { return parent_context_.healthCheckFailed(); }
   Ssl::ContextManager& sslContextManager() override {
     used_main_thread_resource_ = true;
     return parent_context_.sslContextManager();
@@ -184,44 +225,97 @@ private:
 
   class TrackingSingletonManager : public Singleton::Manager {
   public:
-    TrackingSingletonManager(Singleton::Manager& parent, bool& used_main_thread_resource)
-        : parent_(parent), used_main_thread_resource_(used_main_thread_resource) {}
+    TrackingSingletonManager(Server::Configuration::ServerFactoryContext& parent_context,
+                             bool& used_main_thread_resource)
+        : parent_context_(parent_context), used_main_thread_resource_(used_main_thread_resource) {}
 
     Singleton::InstanceSharedPtr get(const std::string& name, Singleton::SingletonFactoryCb cb,
                                      bool pin) override;
 
   private:
-    Singleton::Manager& parent_;
+    Server::Configuration::ServerFactoryContext& parent_context_;
     Singleton::ManagerImpl local_manager_;
     bool& used_main_thread_resource_;
   };
 
   class TrackingThreadLocalInstance : public ThreadLocal::Instance {
   public:
-    TrackingThreadLocalInstance(ThreadLocal::Instance& parent, bool& used_main_thread_resource)
-        : parent_(parent), used_main_thread_resource_(used_main_thread_resource) {}
+    TrackingThreadLocalInstance(Server::Configuration::ServerFactoryContext& parent_context,
+                                bool& used_main_thread_resource)
+        : parent_context_(parent_context), used_main_thread_resource_(used_main_thread_resource) {}
 
     ThreadLocal::SlotSharedPtr allocateSlot() override;
     void registerThread(Event::Dispatcher& dispatcher, bool main_thread) override {
-      parent_.registerThread(dispatcher, main_thread);
+      parent_context_.threadLocal().registerThread(dispatcher, main_thread);
     }
-    void shutdownGlobalThreading() override { parent_.shutdownGlobalThreading(); }
-    void shutdownThread() override { parent_.shutdownThread(); }
-    Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
-    bool isShutdown() const override { return parent_.isShutdown(); }
+    void shutdownGlobalThreading() override {
+      parent_context_.threadLocal().shutdownGlobalThreading();
+    }
+    void shutdownThread() override { parent_context_.threadLocal().shutdownThread(); }
+    Event::Dispatcher& dispatcher() override { return parent_context_.threadLocal().dispatcher(); }
+    bool isShutdown() const override { return parent_context_.threadLocal().isShutdown(); }
 
   private:
-    ThreadLocal::Instance& parent_;
+    Server::Configuration::ServerFactoryContext& parent_context_;
     bool& used_main_thread_resource_;
   };
 
-  Server::Configuration::ServerFactoryContext& parent_context_;
+  class TrackingApi : public Api::Api {
+  public:
+    TrackingApi(Server::Configuration::ServerFactoryContext& parent_context,
+                Stats::Scope& isolated_scope, bool& used_main_thread_resource)
+        : parent_context_(parent_context), isolated_scope_(isolated_scope),
+          used_main_thread_resource_(used_main_thread_resource) {}
+
+    Event::DispatcherPtr allocateDispatcher(const std::string& name) override {
+      used_main_thread_resource_ = true;
+      return parent_context_.api().allocateDispatcher(name);
+    }
+    Event::DispatcherPtr
+    allocateDispatcher(const std::string& name,
+                       const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override {
+      used_main_thread_resource_ = true;
+      return parent_context_.api().allocateDispatcher(name, scaled_timer_factory);
+    }
+    Event::DispatcherPtr
+    allocateDispatcher(const std::string& name,
+                       Buffer::WatermarkFactoryPtr&& watermark_factory) override {
+      used_main_thread_resource_ = true;
+      return parent_context_.api().allocateDispatcher(name, std::move(watermark_factory));
+    }
+    Thread::ThreadFactory& threadFactory() override {
+      return parent_context_.api().threadFactory();
+    }
+    Filesystem::Instance& fileSystem() override { return parent_context_.api().fileSystem(); }
+    TimeSource& timeSource() override { return parent_context_.api().timeSource(); }
+    Stats::Scope& rootScope() override { return isolated_scope_; }
+    Random::RandomGenerator& randomGenerator() override {
+      return parent_context_.api().randomGenerator();
+    }
+    ProcessContextOptRef processContext() override {
+      return parent_context_.api().processContext();
+    }
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override {
+      return parent_context_.api().bootstrap();
+    }
+    Stats::CustomStatNamespaces& customStatNamespaces() override {
+      used_main_thread_resource_ = true;
+      return parent_context_.api().customStatNamespaces();
+    }
+
+  private:
+    Server::Configuration::ServerFactoryContext& parent_context_;
+    Stats::Scope& isolated_scope_;
+    bool& used_main_thread_resource_;
+  };
+
   Stats::IsolatedStoreImpl isolated_store_;
   Stats::ScopeSharedPtr isolated_scope_;
   TrackingInitManager isolated_init_manager_;
   bool used_main_thread_resource_{false};
   TrackingSingletonManager tracking_singleton_manager_;
   TrackingThreadLocalInstance tracking_thread_local_;
+  TrackingApi tracking_api_;
 };
 
 /**
@@ -239,61 +333,18 @@ public:
   ScopedValidationServerContext& operator=(const ScopedValidationServerContext&) = delete;
 
 private:
-  class TrackingServerContextProxy : public Server::Configuration::ServerFactoryContext {
+  class TrackingServerContextProxy : public DelegatingServerFactoryContext {
   public:
-    explicit TrackingServerContextProxy(IsolatedValidationContext& target) : target_(target) {}
+    explicit TrackingServerContextProxy(IsolatedValidationContext& target)
+        : DelegatingServerFactoryContext(target), target_(target) {}
 
-    Stats::Scope& scope() override { return tracked().scope(); }
-    Stats::Scope& serverScope() override { return tracked().serverScope(); }
-    Init::Manager& initManager() override { return tracked().initManager(); }
-    Singleton::Manager& singletonManager() override { return tracked().singletonManager(); }
-    ThreadLocal::Instance& threadLocal() override { return tracked().threadLocal(); }
-    Secret::SecretManager& secretManager() override { return tracked().secretManager(); }
-    Upstream::ClusterManager& clusterManager() override { return tracked().clusterManager(); }
-    Envoy::Config::XdsManager& xdsManager() override { return tracked().xdsManager(); }
-    Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
-      return tracked().httpServerPropertiesCacheManager();
-    }
-    Event::Dispatcher& mainThreadDispatcher() override { return tracked().mainThreadDispatcher(); }
-    const Server::Options& options() override { return tracked().options(); }
-    const LocalInfo::LocalInfo& localInfo() const override { return tracked().localInfo(); }
-    ProtobufMessage::ValidationContext& messageValidationContext() override {
-      return tracked().messageValidationContext();
-    }
-    ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-      return tracked().messageValidationVisitor();
-    }
-    Envoy::Runtime::Loader& runtime() override { return tracked().runtime(); }
-    OptRef<Server::Admin> admin() override { return tracked().admin(); }
-    TimeSource& timeSource() override { return tracked().timeSource(); }
-    AccessLog::AccessLogManager& accessLogManager() override {
-      return tracked().accessLogManager();
-    }
-    Api::Api& api() override { return tracked().api(); }
-    Http::Context& httpContext() override { return tracked().httpContext(); }
-    Grpc::Context& grpcContext() override { return tracked().grpcContext(); }
-    Router::Context& routerContext() override { return tracked().routerContext(); }
-    ProcessContextOptRef processContext() override { return tracked().processContext(); }
-    Envoy::Server::DrainManager& drainManager() override { return tracked().drainManager(); }
-    Server::ServerLifecycleNotifier& lifecycleNotifier() override {
-      return tracked().lifecycleNotifier();
-    }
-    Regex::Engine& regexEngine() override { return tracked().regexEngine(); }
-    Server::Configuration::StatsConfig& statsConfig() override { return tracked().statsConfig(); }
-    envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return tracked().bootstrap(); }
-    Server::OverloadManager& overloadManager() override { return tracked().overloadManager(); }
-    Server::OverloadManager& nullOverloadManager() override {
-      return tracked().nullOverloadManager();
-    }
-    bool healthCheckFailed() const override { return tracked().healthCheckFailed(); }
-    Ssl::ContextManager& sslContextManager() override { return tracked().sslContextManager(); }
-
-  private:
-    IsolatedValidationContext& tracked() const {
+  protected:
+    Server::Configuration::ServerFactoryContext& delegate() const override {
       target_.markMainThreadResourceUsed();
       return target_;
     }
 
+  private:
     IsolatedValidationContext& target_;
   };
 
@@ -302,10 +353,9 @@ private:
 };
 
 /**
- * Shallow protobuf check returning true if the virtual host contains features that inherently
- * require main-thread initialization (route_specifiers, file-watched direct_response.body, custom
- * match tree actions, or dynamic_modules extensions across per-filter configs, matchers, and
- * formatters), allowing RouteMatcher to skip probe validation and initialize eagerly once.
+ * Recursive Protobuf::Reflection check returning true if the virtual host contains features or
+ * extension configurations that require (or are not vetted against) main-thread initialization,
+ * allowing RouteMatcher to skip throwaway probe validation and initialize eagerly once.
  */
 bool requiresMainThreadInit(const envoy::config::route::v3::VirtualHost& vhost_proto);
 

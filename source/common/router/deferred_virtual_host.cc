@@ -2,19 +2,18 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "source/common/config/datasource.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
-#include "absl/algorithm/container.h"
-#include "absl/strings/match.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
-#include "udpa/type/v1/typed_struct.pb.h"
-#include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -45,55 +44,17 @@ public:
   void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps&) override {}
 };
 
-class WorkerSafeFactoryContext : public Server::Configuration::ServerFactoryContext {
+class WorkerSafeFactoryContext : public DelegatingServerFactoryContext {
 public:
   explicit WorkerSafeFactoryContext(Server::Configuration::ServerFactoryContext& parent)
-      : parent_(parent) {}
+      : DelegatingServerFactoryContext(parent) {}
 
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return ProtobufMessage::getNullValidationVisitor();
   }
   Init::Manager& initManager() override { return null_init_manager_; }
 
-  Stats::Scope& scope() override { return parent_.scope(); }
-  Stats::Scope& serverScope() override { return parent_.serverScope(); }
-  Singleton::Manager& singletonManager() override { return parent_.singletonManager(); }
-  ThreadLocal::Instance& threadLocal() override { return parent_.threadLocal(); }
-  Secret::SecretManager& secretManager() override { return parent_.secretManager(); }
-  Upstream::ClusterManager& clusterManager() override { return parent_.clusterManager(); }
-  Envoy::Config::XdsManager& xdsManager() override { return parent_.xdsManager(); }
-  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
-    return parent_.httpServerPropertiesCacheManager();
-  }
-  Event::Dispatcher& mainThreadDispatcher() override { return parent_.mainThreadDispatcher(); }
-  const Server::Options& options() override { return parent_.options(); }
-  const LocalInfo::LocalInfo& localInfo() const override { return parent_.localInfo(); }
-  ProtobufMessage::ValidationContext& messageValidationContext() override {
-    return parent_.messageValidationContext();
-  }
-  Envoy::Runtime::Loader& runtime() override { return parent_.runtime(); }
-  OptRef<Server::Admin> admin() override { return parent_.admin(); }
-  TimeSource& timeSource() override { return parent_.timeSource(); }
-  AccessLog::AccessLogManager& accessLogManager() override { return parent_.accessLogManager(); }
-  Api::Api& api() override { return parent_.api(); }
-  Http::Context& httpContext() override { return parent_.httpContext(); }
-  Grpc::Context& grpcContext() override { return parent_.grpcContext(); }
-  Router::Context& routerContext() override { return parent_.routerContext(); }
-  ProcessContextOptRef processContext() override { return parent_.processContext(); }
-  Envoy::Server::DrainManager& drainManager() override { return parent_.drainManager(); }
-  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
-    return parent_.lifecycleNotifier();
-  }
-  Regex::Engine& regexEngine() override { return parent_.regexEngine(); }
-  Server::Configuration::StatsConfig& statsConfig() override { return parent_.statsConfig(); }
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return parent_.bootstrap(); }
-  Server::OverloadManager& overloadManager() override { return parent_.overloadManager(); }
-  Server::OverloadManager& nullOverloadManager() override { return parent_.nullOverloadManager(); }
-  bool healthCheckFailed() const override { return parent_.healthCheckFailed(); }
-  Ssl::ContextManager& sslContextManager() override { return parent_.sslContextManager(); }
-
 private:
-  Server::Configuration::ServerFactoryContext& parent_;
   NullInitManager null_init_manager_;
 };
 
@@ -122,213 +83,195 @@ bool hasUnrecognizedFields(const Protobuf::Message& message, uint64_t allowed_ma
 #endif
 }
 
-bool isMainThreadOnlyTypeUrl(absl::string_view type_url) {
-  const absl::string_view type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
-  return absl::StrContains(type_name, ".dynamic_modules.") ||
-         absl::StrContains(type_name, ".filters.http.on_demand.") ||
-         absl::StrContains(type_name, ".formatter.file_content.");
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+constexpr int kMaxReflectionDepth = 64;
+
+bool isDeferrableTypeName(absl::string_view type_name) {
+  static const auto* const deferrable_types = new absl::flat_hash_set<absl::string_view>{
+      // Route match tree actions.
+      "envoy.config.route.v3.Route",
+      "envoy.config.route.v3.RouteList",
+      // HTTP and network match inputs.
+      "envoy.type.matcher.v3.HttpRequestHeaderMatchInput",
+      "envoy.type.matcher.v3.HttpRequestTrailerMatchInput",
+      "envoy.type.matcher.v3.HttpResponseHeaderMatchInput",
+      "envoy.type.matcher.v3.HttpResponseTrailerMatchInput",
+      "envoy.type.matcher.v3.HttpRequestQueryParamMatchInput",
+      "envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput",
+      "envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput",
+      "envoy.extensions.matching.common_inputs.network.v3.SourceIPInput",
+      "envoy.extensions.matching.common_inputs.network.v3.SourcePortInput",
+      "envoy.extensions.matching.common_inputs.network.v3.DirectSourceIPInput",
+      "envoy.extensions.matching.common_inputs.network.v3.SourceTypeInput",
+      "envoy.extensions.matching.common_inputs.network.v3.ServerNameInput",
+      "envoy.extensions.matching.common_inputs.network.v3.FilterStateInput",
+      "envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput",
+      // Input matchers.
+      "envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing",
+      "envoy.extensions.matching.input_matchers.ip.v3.Ip",
+      "envoy.extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction",
+      // Path match/rewrite, early-data, internal-redirect, retry, formatter, and cluster-specifier
+      // extensions.
+      "envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig",
+      "envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig",
+      "envoy.extensions.early_data.v3.DefaultEarlyDataPolicy",
+      "envoy.extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig",
+      "envoy.extensions.internal_redirect.filter_state.v3.FilterStateConfig",
+      "envoy.extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig",
+      "envoy.extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig",
+      "envoy.extensions.retry.host.omit_canary_hosts.v3.OmitCanaryHostsPredicate",
+      "envoy.extensions.retry.host.omit_host_metadata.v3.OmitHostMetadataConfig",
+      "envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate",
+      "envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig",
+      "envoy.extensions.formatter.metadata.v3.Metadata",
+      "envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery",
+      "envoy.extensions.http.stateful_session.envelope.v3.EnvelopeSessionState",
+      "envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState",
+      "envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction",
+      "envoy.extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier",
+      "envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier",
+      // Per-route HTTP filter configurations.
+      "envoy.extensions.filters.http.buffer.v3.BufferPerRoute",
+      "envoy.extensions.filters.http.compressor.v3.CompressorPerRoute",
+      "envoy.extensions.filters.http.cors.v3.CorsPolicy",
+      "envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute",
+      "envoy.extensions.filters.http.fault.v3.HTTPFault",
+      "envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute",
+      "envoy.extensions.filters.http.header_mutation.v3.HeaderMutationPerRoute",
+      "envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute",
+      "envoy.extensions.filters.http.set_filter_state.v3.Config",
+      "envoy.extensions.filters.http.set_metadata.v3.Config",
+      "envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute",
+  };
+  return deferrable_types->contains(type_name);
 }
 
-bool isStructWrappedMainThreadOnlyFilterConfig(absl::string_view inner_type_url,
-                                               const Protobuf::Struct& value) {
-  if (isMainThreadOnlyTypeUrl(inner_type_url)) {
+bool messageRequiresMainThreadInit(const Protobuf::Message& message, int depth = 0) {
+  if (depth > kMaxReflectionDepth) {
     return true;
   }
-  if (TypeUtil::typeUrlToDescriptorFullName(inner_type_url) !=
-      "envoy.config.route.v3.FilterConfig") {
-    return false;
-  }
-  const auto& fields = value.fields();
-  if (const auto disabled_it = fields.find("disabled");
-      disabled_it != fields.end() && disabled_it->second.bool_value()) {
-    return false;
-  }
-  const auto config_it = fields.find("config");
-  if (config_it == fields.end() || !config_it->second.has_struct_value()) {
-    return false;
-  }
-  const auto& config_fields = config_it->second.struct_value().fields();
-  const auto type_it = config_fields.find("@type");
-  return type_it != config_fields.end() && isMainThreadOnlyTypeUrl(type_it->second.string_value());
-}
 
-bool isMainThreadOnlyAny(const Protobuf::Any& any) {
-  if (any.type_url().empty()) {
-    return false;
-  }
-  if (isMainThreadOnlyTypeUrl(any.type_url())) {
+  const Protobuf::Descriptor* desc = message.GetDescriptor();
+  const Protobuf::Reflection* refl = message.GetReflection();
+  if (desc == nullptr || refl == nullptr) {
     return true;
   }
-  const absl::string_view type_name = TypeUtil::typeUrlToDescriptorFullName(any.type_url());
-  if (type_name == "xds.type.v3.TypedStruct") {
-    xds::type::v3::TypedStruct typed_struct;
-    return MessageUtil::unpackTo(any, typed_struct).ok() &&
-           isStructWrappedMainThreadOnlyFilterConfig(typed_struct.type_url(), typed_struct.value());
-  }
-  if (type_name == "udpa.type.v1.TypedStruct") {
-    udpa::type::v1::TypedStruct typed_struct;
-    return MessageUtil::unpackTo(any, typed_struct).ok() &&
-           isStructWrappedMainThreadOnlyFilterConfig(typed_struct.type_url(), typed_struct.value());
-  }
-  return false;
-}
 
-template <typename ExtensionConfig> bool isMainThreadOnlyExtension(const ExtensionConfig& ext) {
-  return absl::StrContains(ext.name(), "dynamic_modules") ||
-         ext.name() == "envoy.filters.http.on_demand" ||
-         ext.name() == "envoy.formatter.file_content" ||
-         (ext.has_typed_config() && isMainThreadOnlyAny(ext.typed_config()));
-}
-
-bool hasMainThreadOnlyPerFilterConfig(
-    const Protobuf::Map<std::string, Protobuf::Any>& typed_configs) {
-  for (const auto& [name, any] : typed_configs) {
-    UNREFERENCED_PARAMETER(name);
-    if (TypeUtil::typeUrlToDescriptorFullName(any.type_url()) ==
-        "envoy.config.route.v3.FilterConfig") {
-      envoy::config::route::v3::FilterConfig filter_config;
-      if (MessageUtil::unpackTo(any, filter_config).ok() && !filter_config.disabled() &&
-          filter_config.has_config() && isMainThreadOnlyAny(filter_config.config())) {
-        return true;
-      }
-    } else if (isMainThreadOnlyAny(any)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool routeRequiresMainThreadInit(const envoy::config::route::v3::Route& route) {
-  if (!route.route_specifiers().empty()) {
+  const absl::string_view full_name = desc->full_name();
+  // Short-circuit configurations that open filesystem watches, xDS/SDS subscriptions, or ODCDS
+  // handles so probe validation never triggers side effects on parent_context_.
+  if (full_name == "envoy.config.core.v3.WatchedDirectory" ||
+      full_name == "envoy.config.core.v3.ConfigSource" ||
+      full_name == "envoy.extensions.filters.http.on_demand.v3.OnDemandCds") {
     return true;
   }
-  if (route.has_direct_response()) {
-    if (route.direct_response().has_body() &&
-        Envoy::Config::DataSource::usesFileWatching(route.direct_response().body(), {})) {
-      return true;
-    }
-    if (route.direct_response().has_body_format() &&
-        absl::c_any_of(route.direct_response().body_format().formatters(),
-                       [](const auto& ext) { return isMainThreadOnlyExtension(ext); })) {
-      return true;
-    }
-  }
-  if (hasMainThreadOnlyPerFilterConfig(route.typed_per_filter_config())) {
-    return true;
-  }
-  if (route.has_route()) {
-    if (route.route().has_inline_cluster_specifier_plugin() &&
-        route.route().inline_cluster_specifier_plugin().has_extension() &&
-        isMainThreadOnlyExtension(route.route().inline_cluster_specifier_plugin().extension())) {
-      return true;
-    }
-    if (route.route().has_weighted_clusters()) {
-      for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-        if (hasMainThreadOnlyPerFilterConfig(cluster.typed_per_filter_config())) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
 
-bool predicateRequiresMainThreadInit(
-    const xds::type::matcher::v3::Matcher::MatcherList::Predicate& pred) {
-  switch (pred.match_type_case()) {
-  case xds::type::matcher::v3::Matcher_MatcherList_Predicate::kSinglePredicate: {
-    const auto& sp = pred.single_predicate();
-    if (sp.has_input() && isMainThreadOnlyExtension(sp.input())) {
-      return true;
-    }
-    if (sp.has_custom_match() && isMainThreadOnlyExtension(sp.custom_match())) {
-      return true;
-    }
-    if (sp.has_value_match() && sp.value_match().has_custom() &&
-        isMainThreadOnlyExtension(sp.value_match().custom())) {
-      return true;
-    }
+  // Direct JSON Struct/Value/ListValue fields (e.g., Metadata.filter_metadata,
+  // SubstitutionFormatString.json_format, SetMetadata) only contain JSON primitives/containers and
+  // cannot embed Any, TypedExtensionConfig, WatchedDirectory, or ConfigSource; Any-packed Struct
+  // and TypedStruct configs are already rejected before unpacking in the google.protobuf.Any branch
+  // below.
+  if (full_name == "google.protobuf.Struct" || full_name == "google.protobuf.Value" ||
+      full_name == "google.protobuf.ListValue") {
     return false;
   }
-  case xds::type::matcher::v3::Matcher_MatcherList_Predicate::kOrMatcher:
-    return absl::c_any_of(pred.or_matcher().predicate(), predicateRequiresMainThreadInit);
-  case xds::type::matcher::v3::Matcher_MatcherList_Predicate::kAndMatcher:
-    return absl::c_any_of(pred.and_matcher().predicate(), predicateRequiresMainThreadInit);
-  case xds::type::matcher::v3::Matcher_MatcherList_Predicate::kNotMatcher:
-    return predicateRequiresMainThreadInit(pred.not_matcher());
-  case xds::type::matcher::v3::Matcher_MatcherList_Predicate::MATCH_TYPE_NOT_SET:
-    return false;
-  }
-  return false;
-}
 
-bool matcherRequiresMainThreadInit(const xds::type::matcher::v3::Matcher& matcher);
-
-bool onMatchRequiresMainThreadInit(const xds::type::matcher::v3::Matcher::OnMatch& on_match) {
-  switch (on_match.on_match_case()) {
-  case xds::type::matcher::v3::Matcher_OnMatch::kMatcher:
-    return matcherRequiresMainThreadInit(on_match.matcher());
-  case xds::type::matcher::v3::Matcher_OnMatch::kAction: {
-    if (!on_match.action().has_typed_config()) {
+  if (full_name == "envoy.config.route.v3.FilterConfig") {
+    const auto* disabled_field =
+        desc->FindFieldByNumber(envoy::config::route::v3::FilterConfig::kDisabledFieldNumber);
+    if (disabled_field != nullptr && refl->GetBool(message, disabled_field)) {
       return false;
     }
-    const auto& typed_config = on_match.action().typed_config();
-    const absl::string_view type_name =
-        TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
-    if (type_name == "envoy.config.route.v3.Route") {
-      envoy::config::route::v3::Route route;
-      return MessageUtil::unpackTo(typed_config, route).ok() && routeRequiresMainThreadInit(route);
+    const auto* config_field =
+        desc->FindFieldByNumber(envoy::config::route::v3::FilterConfig::kConfigFieldNumber);
+    if (config_field == nullptr || !refl->HasField(message, config_field)) {
+      return false;
     }
-    if (type_name == "envoy.config.route.v3.RouteList") {
-      envoy::config::route::v3::RouteList route_list;
-      return MessageUtil::unpackTo(typed_config, route_list).ok() &&
-             absl::c_any_of(route_list.routes(), routeRequiresMainThreadInit);
+    const Protobuf::Message& config_any = refl->GetMessage(message, config_field);
+    const auto* any_desc = config_any.GetDescriptor();
+    const auto* any_refl = config_any.GetReflection();
+    const auto* type_url_field =
+        any_desc != nullptr ? any_desc->FindFieldByNumber(Protobuf::Any::kTypeUrlFieldNumber)
+                            : nullptr;
+    std::string scratch;
+    if (type_url_field != nullptr && any_refl != nullptr &&
+        any_refl->GetStringReference(config_any, type_url_field, &scratch).empty()) {
+      return false;
     }
-    // Custom match tree actions or TypedStruct-encoded actions receive RouteActionContext (with
-    // Init::Manager&), so conservatively initialize eagerly on the main thread.
-    return true;
+    return messageRequiresMainThreadInit(config_any, depth + 1);
   }
-  case xds::type::matcher::v3::Matcher_OnMatch::ON_MATCH_NOT_SET:
-    return false;
-  }
-  return false;
-}
 
-bool matcherRequiresMainThreadInit(const xds::type::matcher::v3::Matcher& matcher) {
-  if (matcher.has_matcher_list()) {
-    for (const auto& field_matcher : matcher.matcher_list().matchers()) {
-      if ((field_matcher.has_predicate() &&
-           predicateRequiresMainThreadInit(field_matcher.predicate())) ||
-          (field_matcher.has_on_match() &&
-           onMatchRequiresMainThreadInit(field_matcher.on_match()))) {
+  if (full_name == "envoy.config.core.v3.TypedExtensionConfig" ||
+      full_name == "xds.core.v3.TypedExtensionConfig" ||
+      full_name == "envoy.config.route.v3.RetryPolicy.RetryHostPredicate" ||
+      full_name == "envoy.config.route.v3.RetryPolicy.RetryPriority") {
+    const auto* typed_config_field = desc->FindFieldByName("typed_config");
+    if (typed_config_field == nullptr || !refl->HasField(message, typed_config_field)) {
+      return true;
+    }
+  }
+
+  if (full_name == "google.protobuf.Any") {
+    const auto* type_url_field = desc->FindFieldByNumber(Protobuf::Any::kTypeUrlFieldNumber);
+    const auto* value_field = desc->FindFieldByNumber(Protobuf::Any::kValueFieldNumber);
+    if (type_url_field == nullptr || value_field == nullptr) {
+      return true;
+    }
+    std::string scratch_type_url;
+    const absl::string_view type_url =
+        refl->GetStringReference(message, type_url_field, &scratch_type_url);
+    if (type_url.empty()) {
+      return true;
+    }
+    const absl::string_view inner_type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
+    if (inner_type_name != "envoy.config.route.v3.FilterConfig" &&
+        !isDeferrableTypeName(inner_type_name)) {
+      return true;
+    }
+    const Protobuf::Descriptor* inner_desc =
+        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(inner_type_name);
+    if (inner_desc == nullptr) {
+      return true;
+    }
+    const Protobuf::Message* prototype =
+        Protobuf::MessageFactory::generated_factory()->GetPrototype(inner_desc);
+    if (prototype == nullptr) {
+      return true;
+    }
+    std::unique_ptr<Protobuf::Message> unpacked(prototype->New());
+    std::string scratch_value;
+    const std::string& value_bytes = refl->GetStringReference(message, value_field, &scratch_value);
+    if (!unpacked->ParseFromString(value_bytes)) {
+      return true;
+    }
+    return messageRequiresMainThreadInit(*unpacked, depth + 1);
+  }
+
+  std::vector<const Protobuf::FieldDescriptor*> set_fields;
+  refl->ListFields(message, &set_fields);
+  for (const Protobuf::FieldDescriptor* field : set_fields) {
+    if (field->name() == "route_specifiers") {
+      return true;
+    }
+    if (field->cpp_type() != Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+      continue;
+    }
+    if (field->is_repeated()) {
+      const int count = refl->FieldSize(message, field);
+      for (int i = 0; i < count; ++i) {
+        if (messageRequiresMainThreadInit(refl->GetRepeatedMessage(message, field, i), depth + 1)) {
+          return true;
+        }
+      }
+    } else {
+      if (messageRequiresMainThreadInit(refl->GetMessage(message, field), depth + 1)) {
         return true;
       }
     }
-  } else if (matcher.has_matcher_tree()) {
-    const auto& tree = matcher.matcher_tree();
-    if (tree.has_input() && isMainThreadOnlyExtension(tree.input())) {
-      return true;
-    }
-    if (tree.has_exact_match_map()) {
-      for (const auto& [key, on_match] : tree.exact_match_map().map()) {
-        UNREFERENCED_PARAMETER(key);
-        if (onMatchRequiresMainThreadInit(on_match)) {
-          return true;
-        }
-      }
-    } else if (tree.has_prefix_match_map()) {
-      for (const auto& [key, on_match] : tree.prefix_match_map().map()) {
-        UNREFERENCED_PARAMETER(key);
-        if (onMatchRequiresMainThreadInit(on_match)) {
-          return true;
-        }
-      }
-    } else if (tree.has_custom_match()) {
-      return true;
-    }
   }
-  return matcher.has_on_no_match() && onMatchRequiresMainThreadInit(matcher.on_no_match());
+  return false;
 }
+#endif
 
 } // namespace
 
@@ -384,10 +327,12 @@ DomainEntry::inflateVirtualHost(const CommonConfigSharedPtr& global_route_config
 
 IsolatedValidationContext::IsolatedValidationContext(
     Server::Configuration::ServerFactoryContext& parent_context)
-    : parent_context_(parent_context), isolated_store_(parent_context.scope().symbolTable()),
+    : DelegatingServerFactoryContext(parent_context),
+      isolated_store_(parent_context.scope().symbolTable()),
       isolated_scope_(isolated_store_.rootScope()),
-      tracking_singleton_manager_(parent_context.singletonManager(), used_main_thread_resource_),
-      tracking_thread_local_(parent_context.threadLocal(), used_main_thread_resource_) {}
+      tracking_singleton_manager_(parent_context, used_main_thread_resource_),
+      tracking_thread_local_(parent_context, used_main_thread_resource_),
+      tracking_api_(parent_context, *isolated_scope_, used_main_thread_resource_) {}
 
 Singleton::InstanceSharedPtr IsolatedValidationContext::TrackingSingletonManager::get(
     const std::string& name, Singleton::SingletonFactoryCb cb, bool pin) {
@@ -396,7 +341,8 @@ Singleton::InstanceSharedPtr IsolatedValidationContext::TrackingSingletonManager
   if (instance != nullptr) {
     return instance;
   }
-  return parent_.get(name, []() -> Singleton::InstanceSharedPtr { return nullptr; }, false);
+  return parent_context_.singletonManager().get(
+      name, []() -> Singleton::InstanceSharedPtr { return nullptr; }, false);
 }
 
 ThreadLocal::SlotSharedPtr IsolatedValidationContext::TrackingThreadLocalInstance::allocateSlot() {
@@ -422,21 +368,19 @@ ScopedValidationServerContext::~ScopedValidationServerContext() {
 }
 
 bool requiresMainThreadInit(const envoy::config::route::v3::VirtualHost& vhost_proto) {
-  if (!vhost_proto.route_specifiers().empty() ||
-      hasMainThreadOnlyPerFilterConfig(vhost_proto.typed_per_filter_config())) {
-    return true;
-  }
-  if (vhost_proto.has_matcher() && matcherRequiresMainThreadInit(vhost_proto.matcher())) {
-    return true;
-  }
-  return absl::c_any_of(vhost_proto.routes(), routeRequiresMainThreadInit);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  return messageRequiresMainThreadInit(vhost_proto);
+#else
+  UNREFERENCED_PARAMETER(vhost_proto);
+  return true;
+#endif
 }
 
 bool requiresProbeValidation(const envoy::config::route::v3::VirtualHost& vhost_proto,
                              const CommonConfigSharedPtr& global_route_config,
                              bool validate_clusters,
                              Server::Configuration::ServerFactoryContext& factory_context) {
-  if (global_route_config == nullptr || requiresMainThreadInit(vhost_proto)) {
+  if (global_route_config == nullptr) {
     return true;
   }
 

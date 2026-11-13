@@ -7,9 +7,21 @@
 #include <thread>
 #include <vector>
 
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+#include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
+#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
+#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.h"
+#include "envoy/extensions/filters/http/stateful_session/v3/stateful_session.pb.h"
+#include "envoy/extensions/formatter/req_without_query/v3/req_without_query.pb.h"
+#include "envoy/extensions/http/stateful_session/header/v3/header.pb.h"
+#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
+#include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.h"
+#include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -46,6 +58,11 @@ using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
+void packAny(Protobuf::Any& any, const Protobuf::Message& message) {
+  any.set_type_url(TypeUtil::descriptorFullNameToTypeUrl(message.GetTypeName()));
+  ASSERT_TRUE(message.SerializeToString(any.mutable_value()));
+}
+
 Http::TestRequestHeaderMapImpl genHeaders(absl::string_view host, absl::string_view path,
                                           absl::string_view method = "GET",
                                           absl::string_view scheme = "http") {
@@ -56,6 +73,7 @@ Http::TestRequestHeaderMapImpl genHeaders(absl::string_view host, absl::string_v
                                         {"x-forwarded-proto", std::string(scheme)}};
 }
 
+#if defined(ENVOY_ENABLE_YAML)
 envoy::config::route::v3::RouteConfiguration parseRouteConfig(const std::string& yaml) {
   envoy::config::route::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
@@ -64,6 +82,7 @@ envoy::config::route::v3::RouteConfiguration parseRouteConfig(const std::string&
 
 SINGLETON_MANAGER_REGISTRATION(deferred_vhost_test_singleton);
 SINGLETON_MANAGER_REGISTRATION(deferred_vhost_parent_singleton);
+#endif
 
 class DeferredVirtualHostTest : public testing::Test {
 protected:
@@ -104,6 +123,58 @@ protected:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
+TEST_F(DeferredVirtualHostTest, BasicProtoRoutingAndLiteFallback) {
+  factory_context_.cluster_manager_.initializeClusters({"cluster_1"}, {});
+  envoy::config::route::v3::RouteConfiguration rc;
+  auto* vhost = rc.add_virtual_hosts();
+  vhost->set_name("proto_vhost");
+  vhost->add_domains("proto.example.com");
+  auto* route = vhost->add_routes();
+  route->mutable_match()->set_prefix("/");
+  route->mutable_route()->set_cluster("cluster_1");
+
+  auto global_or_error = CommonConfigImpl::create(
+      rc, factory_context_, ProtobufMessage::getNullValidationVisitor(), init_manager_);
+  ASSERT_OK(global_or_error.status());
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_FALSE(requiresMainThreadInit(*vhost));
+  EXPECT_FALSE(requiresProbeValidation(*vhost, global_or_error.value(), true, factory_context_));
+#else
+  EXPECT_TRUE(requiresMainThreadInit(*vhost));
+  EXPECT_TRUE(requiresProbeValidation(*vhost, global_or_error.value(), true, factory_context_));
+#endif
+
+  auto matcher = createMatcher(rc);
+  ASSERT_NE(matcher, nullptr);
+  const DomainEntry* entry = matcher->findDomainEntry("proto.example.com");
+  ASSERT_NE(entry, nullptr);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_TRUE(entry->isDeferred());
+#else
+  EXPECT_FALSE(entry->isDeferred());
+#endif
+
+  auto config = createConfig(rc);
+  ASSERT_NE(config, nullptr);
+  const auto matched = config->route(genHeaders("proto.example.com", "/"), stream_info_, 0);
+  ASSERT_NE(matched.route, nullptr);
+  EXPECT_EQ("proto_vhost", matched.route->virtualHost().name());
+
+  envoy::config::route::v3::VirtualHost vhost_with_any = *vhost;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute buf;
+  buf.set_disabled(true);
+  envoy::config::route::v3::FilterConfig fc;
+  fc.set_disabled(true);
+  packAny(*fc.mutable_config(), buf);
+  packAny((*vhost_with_any.mutable_typed_per_filter_config())["buf"], fc);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_FALSE(requiresMainThreadInit(vhost_with_any));
+#else
+  EXPECT_TRUE(requiresMainThreadInit(vhost_with_any));
+#endif
+}
+
+#if defined(ENVOY_ENABLE_YAML)
 TEST_F(DeferredVirtualHostTest, DisabledAndEnabledRoutingAndWildcardPrecedence) {
   const std::string yaml = R"EOF(
 ignore_port_in_host_matching: true
@@ -166,8 +237,13 @@ virtual_hosts:
   ASSERT_NE(matcher, nullptr);
   const DomainEntry* exact_entry = matcher->findDomainEntry("SERVICE.SUB.EXAMPLE.COM:8443");
   ASSERT_NE(exact_entry, nullptr);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   EXPECT_TRUE(exact_entry->isDeferred());
   EXPECT_EQ(exact_entry->activeVirtualHost(), nullptr);
+#else
+  EXPECT_FALSE(exact_entry->isDeferred());
+  EXPECT_NE(exact_entry->activeVirtualHost(), nullptr);
+#endif
 
   auto config = createConfig(rc);
   ASSERT_NE(config, nullptr);
@@ -341,7 +417,11 @@ virtual_hosts:
     route: { cluster: "cluster_1" }
 )EOF");
   const auto& base = simple_rc.virtual_hosts(0);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   EXPECT_FALSE(requiresMainThreadInit(base));
+#else
+  EXPECT_TRUE(requiresMainThreadInit(base));
+#endif
 
   // 1. route_specifiers on VirtualHost, Route, and matcher Route / RouteList.
   {
@@ -355,7 +435,9 @@ virtual_hosts:
     EXPECT_TRUE(requiresMainThreadInit(v));
   }
 
-  // 2. File-watched direct_response.body on Route and matcher Route, plus end-to-end watched file.
+  // 2. Watched vs static direct_response.body: watched_directory short-circuits to eager
+  // main-thread init without opening throwaway probe watchers, whereas static inline_string /
+  // filename stays deferred without touching mainThreadDispatcher() or threadLocal().
   {
     auto* watcher = new Filesystem::MockWatcher();
     EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
@@ -387,10 +469,62 @@ virtual_hosts:
     const DomainEntry* entry = matcher->findDomainEntry("dynamic.example.com");
     ASSERT_NE(entry, nullptr);
     EXPECT_FALSE(entry->isDeferred());
+
+    // Static direct_response.body (inline_string and static file) stays deferred and formats
+    // properly on worker threads.
+    EXPECT_CALL(factory_context_, mainThreadDispatcher()).Times(0);
+    EXPECT_CALL(factory_context_, threadLocal()).Times(0);
+    const auto static_rc = parseRouteConfig(fmt::format(R"EOF(
+virtual_hosts:
+- name: static_direct_response_vhost
+  domains: ["static.example.com"]
+  routes:
+  - match: {{ path: "/inline" }}
+    direct_response:
+      status: 200
+      body:
+        inline_string: "inline payload"
+  - match: {{ prefix: "/" }}
+    direct_response:
+      status: 200
+      body:
+        filename: "{}"
+)EOF",
+                                                        file_path));
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(static_rc.virtual_hosts(0)));
+#endif
+    auto static_matcher = createMatcher(static_rc, false);
+    ASSERT_NE(static_matcher, nullptr);
+    const DomainEntry* static_entry = static_matcher->findDomainEntry("static.example.com");
+    ASSERT_NE(static_entry, nullptr);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_TRUE(static_entry->isDeferred());
+#endif
+    auto static_config = createConfig(static_rc, false);
+    ASSERT_NE(static_config, nullptr);
+    std::string body_out;
+    Http::TestResponseHeaderMapImpl resp_headers;
+    const auto inline_route =
+        static_config->route(genHeaders("static.example.com", "/inline"), stream_info_, 0).route;
+    ASSERT_NE(inline_route, nullptr);
+    ASSERT_NE(inline_route->directResponseEntry(), nullptr);
+    EXPECT_EQ("inline payload", inline_route->directResponseEntry()->formatBody(
+                                    genHeaders("static.example.com", "/inline"), resp_headers,
+                                    stream_info_, body_out));
+    const auto file_route =
+        static_config->route(genHeaders("static.example.com", "/other"), stream_info_, 0).route;
+    ASSERT_NE(file_route, nullptr);
+    ASSERT_NE(file_route->directResponseEntry(), nullptr);
+    EXPECT_EQ("dynamic content", file_route->directResponseEntry()->formatBody(
+                                     genHeaders("static.example.com", "/other"), resp_headers,
+                                     stream_info_, body_out));
+    testing::Mock::VerifyAndClearExpectations(&factory_context_);
   }
 
-  // 3. Dynamic modules across per-filter configs (direct, FilterConfig wrapper enabled/disabled,
-  // TypedStruct & legacy TypedStruct), formatters, inline cluster specifier, and matcher trees.
+  // 3. Per-filter configs: unvetted Any types, FilterConfig wrapper (disabled, empty re-enable,
+  // vetted BufferPerRoute, unvetted dynamic_modules), TypedStruct / Struct conservative fallback,
+  // OnDemandCds, and per-route LocalRateLimit.
   const std::string dm_type_url =
       "type.googleapis.com/"
       "envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute";
@@ -405,50 +539,142 @@ virtual_hosts:
     envoy::config::route::v3::FilterConfig fc;
     fc.set_disabled(true);
     fc.mutable_config()->set_type_url(dm_type_url);
-    ASSERT_TRUE((*v.mutable_typed_per_filter_config())["dm"].PackFrom(fc));
+    packAny((*v.mutable_typed_per_filter_config())["dm"], fc);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     EXPECT_FALSE(requiresMainThreadInit(v));
+#endif
+
+    // FilterConfig with empty config Any (explicit filter re-enable) does NOT require main-thread
+    // init.
+    fc.set_disabled(false);
+    fc.mutable_config()->Clear();
+    packAny((*v.mutable_typed_per_filter_config())["dm"], fc);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v));
+#endif
+
+    // Enabled FilterConfig wrapping vetted BufferPerRoute does NOT require main-thread init.
+    envoy::extensions::filters::http::buffer::v3::BufferPerRoute buffer_per_route;
+    buffer_per_route.mutable_buffer()->mutable_max_request_bytes()->set_value(4096);
+    packAny(*fc.mutable_config(), buffer_per_route);
+    packAny((*v.mutable_typed_per_filter_config())["buf"], fc);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v));
+#endif
 
     // Enabled FilterConfig wrapping dynamic_modules DOES require main-thread init.
-    fc.set_disabled(false);
-    ASSERT_TRUE((*v.mutable_typed_per_filter_config())["dm"].PackFrom(fc));
+    fc.mutable_config()->set_type_url(dm_type_url);
+    packAny((*v.mutable_typed_per_filter_config())["dm"], fc);
     EXPECT_TRUE(requiresMainThreadInit(v));
   }
   {
-    // xds.type.v3.TypedStruct and udpa.type.v1.TypedStruct wrapping dynamic_modules or
-    // FilterConfig.
+    // xds.type.v3.TypedStruct and udpa.type.v1.TypedStruct conservatively require main-thread init
+    // regardless of inner type or disabled flag.
     auto v = base;
     xds::type::v3::TypedStruct ts;
-    ts.set_type_url(dm_type_url);
-    ASSERT_TRUE((*v.mutable_routes(0)->mutable_typed_per_filter_config())["dm"].PackFrom(ts));
+    ts.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute");
+    packAny((*v.mutable_routes(0)->mutable_typed_per_filter_config())["buf"], ts);
     EXPECT_TRUE(requiresMainThreadInit(v));
 
     udpa::type::v1::TypedStruct legacy_fc_ts;
     legacy_fc_ts.set_type_url("type.googleapis.com/envoy.config.route.v3.FilterConfig");
-    auto& cfg_struct =
-        *(*legacy_fc_ts.mutable_value()->mutable_fields())["config"].mutable_struct_value();
-    (*cfg_struct.mutable_fields())["@type"].set_string_value(dm_type_url);
+    (*legacy_fc_ts.mutable_value()->mutable_fields())["disabled"].set_bool_value(true);
     auto v2 = base;
     auto* wc = v2.mutable_routes(0)->mutable_route()->mutable_weighted_clusters()->add_clusters();
     wc->set_name("cluster_1");
-    ASSERT_TRUE((*wc->mutable_typed_per_filter_config())["dm"].PackFrom(legacy_fc_ts));
+    packAny((*wc->mutable_typed_per_filter_config())["dm"], legacy_fc_ts);
     EXPECT_TRUE(requiresMainThreadInit(v2));
-
-    (*legacy_fc_ts.mutable_value()->mutable_fields())["disabled"].set_bool_value(true);
-    ASSERT_TRUE((*wc->mutable_typed_per_filter_config())["dm"].PackFrom(legacy_fc_ts));
-    EXPECT_FALSE(requiresMainThreadInit(v2));
   }
   {
-    // Dynamic module / file_content formatter on direct_response.body_format, on_demand per-route
-    // config, and inline cluster specifier.
-    auto v = base;
-    v.mutable_routes(0)->clear_route();
-    v.mutable_routes(0)->mutable_direct_response()->set_status(200);
-    v.mutable_routes(0)
-        ->mutable_direct_response()
-        ->mutable_body_format()
-        ->add_formatters()
-        ->set_name("envoy.formatter.dynamic_modules");
-    EXPECT_TRUE(requiresMainThreadInit(v));
+    // Per-route LocalRateLimit and OnDemandCds short-circuit to eager main-thread init without
+    // creating throwaway probe timers or ODCDS subscriptions.
+    envoy::extensions::filters::http::on_demand::v3::PerRouteConfig od_per_route;
+    od_per_route.mutable_odcds()->mutable_source()->set_path("/tmp/odcds.yaml");
+    auto v_od = base;
+    packAny((*v_od.mutable_routes(0)
+                  ->mutable_typed_per_filter_config())["envoy.filters.http.on_demand"],
+            od_per_route);
+    EXPECT_TRUE(requiresMainThreadInit(v_od));
+
+    envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit local_rl;
+    local_rl.set_stat_prefix("local_rl");
+    local_rl.mutable_token_bucket()->set_max_tokens(10);
+    auto v_local_rl = base;
+    packAny((*v_local_rl.mutable_routes(0)
+                  ->mutable_typed_per_filter_config())["envoy.filters.http.local_ratelimit"],
+            local_rl);
+    EXPECT_TRUE(requiresMainThreadInit(v_local_rl));
+
+    // StatefulSessionPerRoute with HeaderBasedSessionState stays deferred, whereas
+    // CookieBasedSessionState (which accesses mainThreadDispatcher().timeSource()) is eager.
+    envoy::extensions::http::stateful_session::header::v3::HeaderBasedSessionState hdr_session;
+    hdr_session.set_name("x-session");
+    envoy::extensions::filters::http::stateful_session::v3::StatefulSessionPerRoute ss_per_route;
+    auto* session_ext = ss_per_route.mutable_stateful_session()->mutable_session_state();
+    session_ext->set_name("envoy.http.stateful_session.header");
+    packAny(*session_ext->mutable_typed_config(), hdr_session);
+    auto v_ss = base;
+    packAny((*v_ss.mutable_routes(0)->mutable_typed_per_filter_config())["ss"], ss_per_route);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_ss));
+#endif
+
+    session_ext->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState");
+    packAny((*v_ss.mutable_routes(0)->mutable_typed_per_filter_config())["ss"], ss_per_route);
+    EXPECT_TRUE(requiresMainThreadInit(v_ss));
+  }
+
+  // 4. Allowlist keys on Any.type_url rather than TypedExtensionConfig.name user labels, and
+  // catches previously bypassed extension points (generic_secret, StringMatcher.custom,
+  // uri_template input matcher vs path match/rewrite, rate_limits[].actions[].extension,
+  // RetryHostPredicate/RetryPriority without typed_config, and nested filter formatters).
+  {
+    // User label containing "dynamic_modules" paired with vetted ReqWithoutQuery formatter or
+    // HttpRequestHeaderMatchInput -> deferred!
+    envoy::extensions::formatter::req_without_query::v3::ReqWithoutQuery req_wo_query;
+    auto v_vetted_fmt = base;
+    v_vetted_fmt.mutable_routes(0)->clear_route();
+    v_vetted_fmt.mutable_routes(0)->mutable_direct_response()->set_status(200);
+    auto* fmt_ext = v_vetted_fmt.mutable_routes(0)
+                        ->mutable_direct_response()
+                        ->mutable_body_format()
+                        ->add_formatters();
+    fmt_ext->set_name("user_label_with_dynamic_modules_in_name");
+    packAny(*fmt_ext->mutable_typed_config(), req_wo_query);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_vetted_fmt));
+
+    envoy::type::matcher::v3::HttpRequestHeaderMatchInput dm_named_hdr_input;
+    dm_named_hdr_input.set_header_name("x-check");
+    envoy::config::route::v3::RouteConfiguration dm_label_rc;
+    auto* mv = dm_label_rc.add_virtual_hosts();
+    mv->set_name("dm_label_vhost");
+    mv->add_domains("dmlabel.example.com");
+    auto* fm = mv->mutable_matcher()->mutable_matcher_list()->add_matchers();
+    auto* sp = fm->mutable_predicate()->mutable_single_predicate();
+    sp->mutable_input()->set_name("user_label_with_dynamic_modules_and_wasm_and_lua");
+    packAny(*sp->mutable_input()->mutable_typed_config(), dm_named_hdr_input);
+    sp->mutable_value_match()->set_exact("1");
+    packAny(*fm->mutable_on_match()->mutable_action()->mutable_typed_config(), base.routes(0));
+    auto dm_label_matcher = createMatcher(dm_label_rc, false);
+    ASSERT_NE(dm_label_matcher, nullptr);
+    EXPECT_TRUE(dm_label_matcher->findDomainEntry("dmlabel.example.com")->isDeferred());
+#endif
+
+    // Harmless user label paired with generic_secret or file_content formatter -> eager!
+    auto v_secret = base;
+    v_secret.mutable_routes(0)->clear_route();
+    v_secret.mutable_routes(0)->mutable_direct_response()->set_status(200);
+    auto* secret_ext = v_secret.mutable_routes(0)
+                           ->mutable_direct_response()
+                           ->mutable_body_format()
+                           ->add_formatters();
+    secret_ext->set_name("harmless_label");
+    secret_ext->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/envoy.extensions.formatter.generic_secret.v3.GenericSecret");
+    EXPECT_TRUE(requiresMainThreadInit(v_secret));
 
     auto v_file_content = base;
     v_file_content.mutable_routes(0)->clear_route();
@@ -462,57 +688,175 @@ virtual_hosts:
             "type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent");
     EXPECT_TRUE(requiresMainThreadInit(v_file_content));
 
-    auto v_on_demand = base;
-    (*v_on_demand.mutable_routes(0)->mutable_typed_per_filter_config())["envoy.filters.http."
-                                                                        "on_demand"]
-        .set_type_url("type.googleapis.com/envoy.extensions.filters.http.on_demand.v3."
-                      "PerRouteConfig");
-    EXPECT_TRUE(requiresMainThreadInit(v_on_demand));
-
-    auto v_csp = base;
-    v_csp.mutable_routes(0)
+    // TypedExtensionConfig, RetryHostPredicate, and RetryPriority missing typed_config ->
+    // conservatively eager; PreviousHostsPredicate with typed_config -> deferred!
+    auto v_missing_any = base;
+    v_missing_any.mutable_routes(0)
         ->mutable_route()
         ->mutable_inline_cluster_specifier_plugin()
         ->mutable_extension()
-        ->set_name("envoy.router.cluster_specifier_plugin.dynamic_modules");
-    EXPECT_TRUE(requiresMainThreadInit(v_csp));
+        ->set_name("missing_typed_config");
+    EXPECT_TRUE(requiresMainThreadInit(v_missing_any));
+
+    auto v_missing_retry_pred = base;
+    v_missing_retry_pred.mutable_retry_policy()->add_retry_host_predicate()->set_name(
+        "unvetted.retry.host_predicate");
+    EXPECT_TRUE(requiresMainThreadInit(v_missing_retry_pred));
+
+    auto v_missing_retry_prio = base;
+    v_missing_retry_prio.mutable_routes(0)
+        ->mutable_route()
+        ->mutable_retry_policy()
+        ->mutable_retry_priority()
+        ->set_name("unvetted.retry.priority");
+    EXPECT_TRUE(requiresMainThreadInit(v_missing_retry_prio));
+
+    envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate prev_hosts;
+    auto v_prev_hosts = base;
+    auto* rhp = v_prev_hosts.mutable_retry_policy()->add_retry_host_predicate();
+    rhp->set_name("envoy.retry_host_predicates.previous_hosts");
+    packAny(*rhp->mutable_typed_config(), prev_hosts);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_prev_hosts));
+#endif
+
+    // StringMatcher.custom (e.g., Lua string matcher on HeaderMatcher) -> eager!
+    auto v_custom_sm = base;
+    auto* hdr = v_custom_sm.mutable_routes(0)->mutable_match()->add_headers();
+    hdr->set_name("x-lua");
+    hdr->mutable_string_match()->mutable_custom()->set_name("lua_sm");
+    hdr->mutable_string_match()->mutable_custom()->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/envoy.extensions.string_matcher.lua.v3.Lua");
+    EXPECT_TRUE(requiresMainThreadInit(v_custom_sm));
+
+    // uri_template path_match_policy + path_rewrite_policy -> deferred; uri_template input
+    // matcher (which asserts main thread) -> eager!
+    envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig ut_match;
+    ut_match.set_path_template("/api/{version}/items");
+    envoy::extensions::path::rewrite::uri_template::v3::UriTemplateRewriteConfig ut_rewrite;
+    ut_rewrite.set_path_template_rewrite("/v2/{version}/items");
+    auto v_ut_path = base;
+    v_ut_path.mutable_routes(0)->mutable_match()->mutable_path_match_policy()->set_name("ut_match");
+    packAny(*v_ut_path.mutable_routes(0)
+                 ->mutable_match()
+                 ->mutable_path_match_policy()
+                 ->mutable_typed_config(),
+            ut_match);
+    v_ut_path.mutable_routes(0)->mutable_route()->mutable_path_rewrite_policy()->set_name(
+        "ut_rewrite");
+    packAny(*v_ut_path.mutable_routes(0)
+                 ->mutable_route()
+                 ->mutable_path_rewrite_policy()
+                 ->mutable_typed_config(),
+            ut_rewrite);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_ut_path));
+#endif
+
+    // rate_limits[].actions[].extension: vetted HttpRequestHeaderMatchInput -> deferred;
+    // unvetted expr descriptor -> eager!
+    envoy::type::matcher::v3::HttpRequestHeaderMatchInput req_hdr_input;
+    req_hdr_input.set_header_name("x-user");
+    auto v_rl_ok = base;
+    auto* rl_ext = v_rl_ok.add_rate_limits()->add_actions()->mutable_extension();
+    rl_ext->set_name("hdr_input");
+    packAny(*rl_ext->mutable_typed_config(), req_hdr_input);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_rl_ok));
+#endif
+
+    auto v_rl_expr = base;
+    auto* expr_ext = v_rl_expr.add_rate_limits()->add_actions()->mutable_extension();
+    expr_ext->set_name("expr_desc");
+    expr_ext->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor");
+    EXPECT_TRUE(requiresMainThreadInit(v_rl_expr));
+
+    // Nested filter formatters inside allowlisted SetFilterState per-route config:
+    // ReqWithoutQuery -> deferred; GenericSecret -> eager!
+    envoy::extensions::filters::http::set_filter_state::v3::Config sfs_cfg;
+    auto* field_cfg = sfs_cfg.add_on_request_headers();
+    field_cfg->set_object_key("my_key");
+    field_cfg->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+        "%REQ_WITHOUT_QUERY(:path)%");
+    auto* sfs_fmt = field_cfg->mutable_format_string()->add_formatters();
+    sfs_fmt->set_name("req_wo_q");
+    packAny(*sfs_fmt->mutable_typed_config(), req_wo_query);
+    auto v_sfs = base;
+    packAny((*v_sfs.mutable_routes(0)->mutable_typed_per_filter_config())["sfs"], sfs_cfg);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_sfs));
+#endif
+
+    sfs_fmt->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/envoy.extensions.formatter.generic_secret.v3.GenericSecret");
+    packAny((*v_sfs.mutable_routes(0)->mutable_typed_per_filter_config())["sfs"], sfs_cfg);
+    EXPECT_TRUE(requiresMainThreadInit(v_sfs));
+
+    // Deeply nested (>30 levels) JSON Metadata.filter_metadata Struct short-circuits without
+    // hitting kMaxReflectionDepth, whereas Struct packed inside Any still requires main-thread
+    // init.
+    auto v_deep_struct = base;
+    Protobuf::Struct* curr_struct =
+        &(*v_deep_struct.mutable_metadata()->mutable_filter_metadata())["envoy.lb"];
+    for (int i = 0; i < 30; ++i) {
+      curr_struct = (*curr_struct->mutable_fields())["nested"].mutable_struct_value();
+    }
+    (*curr_struct->mutable_fields())["leaf"].set_string_value("val");
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+    EXPECT_FALSE(requiresMainThreadInit(v_deep_struct));
+#endif
+
+    auto v_any_struct = base;
+    Protobuf::Struct raw_struct;
+    (*raw_struct.mutable_fields())["k"].set_string_value("v");
+    packAny((*v_any_struct.mutable_typed_per_filter_config())["raw"], raw_struct);
+    EXPECT_TRUE(requiresMainThreadInit(v_any_struct));
   }
+
+  // 5. Matcher predicates (and/or/not/single input & custom_match), MatcherTree input, RouteList,
+  // uri_template input matcher, custom_match tree, custom match action, and recursion depth guard.
   {
-    // Matcher predicates (and/or/not/single input & custom_match), MatcherTree input, RouteList,
-    // custom_match tree, and custom match action.
+    envoy::type::matcher::v3::HttpRequestHeaderMatchInput req_hdr_input;
+    req_hdr_input.set_header_name("x-match");
+
     envoy::config::route::v3::VirtualHost mv;
     mv.set_name("matcher_vhost");
     mv.add_domains("m.example.com");
     mv.mutable_matcher();
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     EXPECT_FALSE(requiresMainThreadInit(mv));
+#endif
 
     auto* fm = mv.mutable_matcher()->mutable_matcher_list()->add_matchers();
     auto* not_pred =
         fm->mutable_predicate()->mutable_or_matcher()->add_predicate()->mutable_not_matcher();
     auto* sp = not_pred->mutable_and_matcher()->add_predicate()->mutable_single_predicate();
     sp->mutable_input()->set_name("request-headers");
+    packAny(*sp->mutable_input()->mutable_typed_config(), req_hdr_input);
     sp->mutable_value_match()->set_exact("v");
     envoy::config::route::v3::Route inner_route = base.routes(0);
-    ASSERT_TRUE(
-        fm->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(inner_route));
+    packAny(*fm->mutable_on_match()->mutable_action()->mutable_typed_config(), inner_route);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     EXPECT_FALSE(requiresMainThreadInit(mv));
+#endif
 
-    // Dynamic module custom_match in predicate -> true.
-    auto mv_dm_pred = mv;
-    mv_dm_pred.mutable_matcher()
-        ->mutable_matcher_list()
-        ->mutable_matchers(0)
-        ->mutable_predicate()
-        ->mutable_single_predicate()
-        ->mutable_custom_match()
-        ->mutable_typed_config()
-        ->set_type_url("type.googleapis.com/"
-                       "envoy.extensions.matching.input_matchers.dynamic_modules.v3."
-                       "DynamicModuleMatcher");
-    EXPECT_TRUE(requiresMainThreadInit(mv_dm_pred));
+    // uri_template input matcher (asserts main thread) or dynamic_modules custom_match -> true.
+    auto mv_ut_pred = mv;
+    auto* ut_cm = mv_ut_pred.mutable_matcher()
+                      ->mutable_matcher_list()
+                      ->mutable_matchers(0)
+                      ->mutable_predicate()
+                      ->mutable_single_predicate()
+                      ->mutable_custom_match();
+    ut_cm->set_name("ut_input_matcher");
+    ut_cm->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/envoy.extensions.matching.input_matchers.uri_template.v3.UriTemplate");
+    EXPECT_TRUE(requiresMainThreadInit(mv_ut_pred));
 
     // Dynamic module MatcherTree input -> true.
     envoy::config::route::v3::VirtualHost tree_dm;
+    tree_dm.mutable_matcher()->mutable_matcher_tree()->mutable_input()->set_name("dm_input");
     tree_dm.mutable_matcher()
         ->mutable_matcher_tree()
         ->mutable_input()
@@ -525,23 +869,31 @@ virtual_hosts:
     envoy::config::route::v3::RouteList rl;
     *rl.add_routes() = base.routes(0);
     envoy::config::route::v3::VirtualHost tree_map;
-    ASSERT_TRUE((*tree_map.mutable_matcher()
-                      ->mutable_matcher_tree()
-                      ->mutable_prefix_match_map()
-                      ->mutable_map())["p"]
-                    .mutable_action()
-                    ->mutable_typed_config()
-                    ->PackFrom(rl));
+    tree_map.mutable_matcher()->mutable_matcher_tree()->mutable_input()->set_name("hdr");
+    packAny(*tree_map.mutable_matcher()
+                 ->mutable_matcher_tree()
+                 ->mutable_input()
+                 ->mutable_typed_config(),
+            req_hdr_input);
+    packAny(*(*tree_map.mutable_matcher()
+                   ->mutable_matcher_tree()
+                   ->mutable_prefix_match_map()
+                   ->mutable_map())["p"]
+                 .mutable_action()
+                 ->mutable_typed_config(),
+            rl);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     EXPECT_FALSE(requiresMainThreadInit(tree_map));
+#endif
 
     rl.mutable_routes(0)->add_route_specifiers()->set_name("specifier");
-    ASSERT_TRUE((*tree_map.mutable_matcher()
-                      ->mutable_matcher_tree()
-                      ->mutable_prefix_match_map()
-                      ->mutable_map())["p"]
-                    .mutable_action()
-                    ->mutable_typed_config()
-                    ->PackFrom(rl));
+    packAny(*(*tree_map.mutable_matcher()
+                   ->mutable_matcher_tree()
+                   ->mutable_prefix_match_map()
+                   ->mutable_map())["p"]
+                 .mutable_action()
+                 ->mutable_typed_config(),
+            rl);
     EXPECT_TRUE(requiresMainThreadInit(tree_map));
 
     // custom_match tree and custom action -> conservatively true.
@@ -550,12 +902,25 @@ virtual_hosts:
     EXPECT_TRUE(requiresMainThreadInit(custom_tree));
 
     envoy::config::route::v3::VirtualHost custom_action;
+    custom_action.mutable_matcher()->mutable_on_no_match()->mutable_action()->set_name("ca");
     custom_action.mutable_matcher()
         ->mutable_on_no_match()
         ->mutable_action()
         ->mutable_typed_config()
         ->set_type_url("type.googleapis.com/google.protobuf.StringValue");
     EXPECT_TRUE(requiresMainThreadInit(custom_action));
+
+    // Pathologically nested FilterConfig (>64 levels) hits depth guard and conservatively returns
+    // true.
+    envoy::config::route::v3::FilterConfig nested_fc;
+    for (int i = 0; i < 70; ++i) {
+      envoy::config::route::v3::FilterConfig outer_fc;
+      packAny(*outer_fc.mutable_config(), nested_fc);
+      nested_fc = std::move(outer_fc);
+    }
+    auto v_deep = base;
+    packAny((*v_deep.mutable_typed_per_filter_config())["deep"], nested_fc);
+    EXPECT_TRUE(requiresMainThreadInit(v_deep));
   }
 }
 
@@ -781,12 +1146,14 @@ protected:
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-      return std::make_unique<Protobuf::Timestamp>();
+      return std::make_unique<envoy::extensions::filters::http::buffer::v3::BufferPerRoute>();
     }
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Protobuf::Timestamp>();
+      return std::make_unique<envoy::extensions::filters::http::buffer::v3::BufferPerRoute>();
     }
-    std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
+    std::set<std::string> configTypes() override {
+      return {"envoy.extensions.filters.http.buffer.v3.BufferPerRoute"};
+    }
 
     absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfig(
         const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context,
@@ -838,32 +1205,62 @@ protected:
     std::shared_ptr<TestSingletonInstance> observed_parent_singleton_;
   };
 
+  class UnvettedFilterFactory : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+  public:
+    UnvettedFilterFactory() : EmptyHttpFilterConfig("test.unvetted.filter") {}
+
+    absl::StatusOr<Http::FilterFactoryCb>
+    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+      PANIC("not implemented");
+    }
+    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+      return std::make_unique<Protobuf::Timestamp>();
+    }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::Timestamp>();
+    }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
+
+    absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfig(
+        const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context,
+        Server::Configuration::ExtraFactoryContext& extra_context) override {
+      init_managers_.push_back(extra_context.init_manager.ptr());
+      return std::make_shared<ContextCapturingRouteConfig>(context);
+    }
+
+    std::vector<Init::Manager*> init_managers_;
+  };
+
   TestFilterFactory factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_{
       factory_};
+  UnvettedFilterFactory unvetted_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_unvetted_{
+      unvetted_factory_};
 };
 
 TEST_F(ProbingFilterTest, IsolatedValidationContextIsolatesAndDetectsMainThreadResources) {
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
 
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   const auto rc = parseRouteConfig(R"EOF(
 typed_per_filter_config:
   test.deferred.filter:
-    "@type": type.googleapis.com/google.protobuf.Timestamp
-    value: { seconds: 1 }
+    "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute
+    buffer: { max_request_bytes: 1024 }
 virtual_hosts:
 - name: bar
   domains: ["bar.example.com"]
   typed_per_filter_config:
     test.deferred.filter:
-      "@type": type.googleapis.com/google.protobuf.Timestamp
-      value: { seconds: 2 }
+      "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute
+      buffer: { max_request_bytes: 2048 }
   routes:
   - match: { prefix: "/" }
     typed_per_filter_config:
       test.deferred.filter:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
-        value: { seconds: 3 }
+        "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute
+        buffer: { max_request_bytes: 4096 }
     route:
       weighted_clusters:
         clusters:
@@ -871,10 +1268,9 @@ virtual_hosts:
           weight: 100
           typed_per_filter_config:
             test.deferred.filter:
-              "@type": type.googleapis.com/google.protobuf.Timestamp
-              value: { seconds: 4 }
+              "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute
+              buffer: { max_request_bytes: 8192 }
 )EOF");
-
   // 1. Pure worker-safe filter config: isolated probe validation runs once, virtual host stays
   // deferred even after transient RDS Init::Manager is destroyed, and inflates on worker thread
   // with WorkerSafeFactoryContext (null ValidationVisitor & isolated Init::Manager) whose lifetime
@@ -930,8 +1326,8 @@ virtual_hosts:
   - match: { prefix: "/" }
     typed_per_filter_config:
       test.deferred.filter:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
-        value: { seconds: 1 }
+        "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute
+        buffer: { max_request_bytes: 1024 }
     route: { cluster: "baz" }
 )EOF");
 
@@ -993,16 +1389,33 @@ virtual_hosts:
     EXPECT_EQ(factory_.observed_parent_singleton_, parent_singleton);
   }
 
-  // 5. SecretManager, XdsManager, Admin, DrainManager, ServerLifecycleNotifier, and
-  // SslContextManager access during probe all force eager main-thread initialization.
+  // 5. All main-thread-bound primitives on IsolatedValidationContext (including
+  // mainThreadDispatcher, clusterManager, accessLogManager, api().allocateDispatcher(), and
+  // api().customStatNamespaces()) force eager main-thread initialization.
   const std::vector<std::function<void(Server::Configuration::ServerFactoryContext&)>>
       main_thread_hooks = {
           [](auto& ctx) { std::ignore = ctx.secretManager(); },
+          [](auto& ctx) { std::ignore = ctx.clusterManager(); },
           [](auto& ctx) { std::ignore = ctx.xdsManager(); },
+          [](auto& ctx) { std::ignore = ctx.mainThreadDispatcher(); },
           [](auto& ctx) { std::ignore = ctx.admin(); },
+          [](auto& ctx) { std::ignore = ctx.accessLogManager(); },
           [](auto& ctx) { std::ignore = ctx.drainManager(); },
           [](auto& ctx) { std::ignore = ctx.lifecycleNotifier(); },
           [](auto& ctx) { std::ignore = ctx.sslContextManager(); },
+          [](auto& ctx) { std::ignore = ctx.api().allocateDispatcher("probe_disp"); },
+          [](auto& ctx) {
+            std::ignore = ctx.api().allocateDispatcher(
+                "probe_disp_st", Event::ScaledRangeTimerManagerFactory{
+                                     [](Event::Dispatcher&) -> Event::ScaledRangeTimerManagerPtr {
+                                       return nullptr;
+                                     }});
+          },
+          [](auto& ctx) {
+            std::ignore =
+                ctx.api().allocateDispatcher("probe_disp_wm", Buffer::WatermarkFactoryPtr{});
+          },
+          [](auto& ctx) { std::ignore = ctx.api().customStatNamespaces(); },
       };
   for (const auto& hook : main_thread_hooks) {
     factory_.init_managers_.clear();
@@ -1014,6 +1427,68 @@ virtual_hosts:
     ASSERT_EQ(factory_.init_managers_.size(), 2);
     EXPECT_EQ(factory_.init_managers_[1], &init_manager_);
   }
+
+  // 5b. Worker-safe DelegatingServerFactoryContext and TrackingApi accessors keep the virtual host
+  // deferred (and isolate api().rootScope() from parent stats).
+  {
+    factory_.init_managers_.clear();
+    factory_.custom_context_hook_ = [&](Server::Configuration::ServerFactoryContext& ctx) {
+      EXPECT_EQ(&ctx.scope(), &ctx.serverScope());
+      EXPECT_EQ(&ctx.api().rootScope(), &ctx.scope());
+      EXPECT_NE(&ctx.api().rootScope(), &factory_context_.api().rootScope());
+      std::ignore = ctx.httpServerPropertiesCacheManager();
+      std::ignore = ctx.options();
+      std::ignore = ctx.localInfo();
+      std::ignore = ctx.messageValidationContext();
+      std::ignore = ctx.runtime();
+      std::ignore = ctx.timeSource();
+      std::ignore = ctx.httpContext();
+      std::ignore = ctx.grpcContext();
+      std::ignore = ctx.routerContext();
+      std::ignore = ctx.processContext();
+      std::ignore = ctx.regexEngine();
+      std::ignore = ctx.statsConfig();
+      std::ignore = ctx.bootstrap();
+      std::ignore = ctx.overloadManager();
+      std::ignore = ctx.nullOverloadManager();
+      std::ignore = ctx.healthCheckFailed();
+      std::ignore = ctx.api().threadFactory();
+      std::ignore = ctx.api().fileSystem();
+      std::ignore = ctx.api().timeSource();
+      std::ignore = ctx.api().randomGenerator();
+      std::ignore = ctx.api().processContext();
+      std::ignore = ctx.api().bootstrap();
+    };
+    auto matcher = createMatcher(single_filter_rc);
+    factory_.custom_context_hook_ = nullptr;
+    ASSERT_NE(matcher, nullptr);
+    EXPECT_TRUE(matcher->findDomainEntry("bar.example.com")->isDeferred());
+    ASSERT_EQ(factory_.init_managers_.size(), 1);
+  }
+
+  // 5c. Unvetted Any type URLs (not in the allowlist) skip probe_vhost completely and
+  // initialize eagerly once on the main thread.
+  {
+    const auto unvetted_rc = parseRouteConfig(R"EOF(
+virtual_hosts:
+- name: unvetted_bar
+  domains: ["unvetted.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    typed_per_filter_config:
+      test.unvetted.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value: "1970-01-01T00:00:01Z"
+    route: { cluster: "baz" }
+)EOF");
+    unvetted_factory_.init_managers_.clear();
+    auto matcher = createMatcher(unvetted_rc);
+    ASSERT_NE(matcher, nullptr);
+    EXPECT_FALSE(matcher->findDomainEntry("unvetted.example.com")->isDeferred());
+    ASSERT_EQ(unvetted_factory_.init_managers_.size(), 1);
+    EXPECT_EQ(unvetted_factory_.init_managers_[0], &init_manager_);
+  }
+#endif
 
   // 6. Concurrent worker-thread inflation of matcher-based virtual hosts when parent
   // ServerFactoryContext::messageValidationVisitor() is an unsynchronized WarningValidationVisitor
@@ -1050,11 +1525,9 @@ virtual_hosts:
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
       action_route.GetReflection()->MutableUnknownFields(&action_route)->AddVarint(777 + i, 1);
 #endif
-      ASSERT_TRUE(vh->mutable_matcher()
-                      ->mutable_on_no_match()
-                      ->mutable_action()
-                      ->mutable_typed_config()
-                      ->PackFrom(action_route));
+      packAny(
+          *vh->mutable_matcher()->mutable_on_no_match()->mutable_action()->mutable_typed_config(),
+          action_route);
     }
 
     auto config = createConfig(matcher_rc);
@@ -1195,6 +1668,57 @@ virtual_hosts:
   worker.join();
 }
 
+TEST_F(DeferredVirtualHostTest, StaticDirectResponseBodyRemainsDeferredAndFormatsOnWorkerThread) {
+  const auto rc = parseRouteConfig(R"EOF(
+virtual_hosts:
+- name: direct_vhost
+  domains: ["direct.example.com"]
+  routes:
+  - match: { path: "/raw" }
+    direct_response:
+      status: 200
+      body: { inline_string: "static-payload" }
+  - match: { path: "/formatted" }
+    direct_response:
+      status: 200
+      body: { inline_string: "base-body" }
+      body_format:
+        text_format_source: { inline_string: "%LOCAL_REPLY_BODY%:%REQ(x-tag)%" }
+)EOF");
+
+  EXPECT_CALL(factory_context_, mainThreadDispatcher()).Times(0);
+  auto matcher = createMatcher(rc);
+  ASSERT_NE(matcher, nullptr);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_TRUE(matcher->findDomainEntry("direct.example.com")->isDeferred());
+#endif
+
+  auto config = createConfig(rc);
+  ASSERT_NE(config, nullptr);
+
+  std::thread worker([&config]() {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> local_info;
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body_out;
+
+    auto h_raw = genHeaders("direct.example.com", "/raw");
+    auto r_raw = config->route(h_raw, local_info, 0);
+    ASSERT_NE(r_raw.route, nullptr);
+    ASSERT_NE(r_raw.route->directResponseEntry(), nullptr);
+    EXPECT_EQ("static-payload", r_raw.route->directResponseEntry()->formatBody(
+                                    h_raw, response_headers, local_info, body_out));
+
+    auto h_fmt = genHeaders("direct.example.com", "/formatted");
+    h_fmt.addCopy("x-tag", "ok");
+    auto r_fmt = config->route(h_fmt, local_info, 0);
+    ASSERT_NE(r_fmt.route, nullptr);
+    ASSERT_NE(r_fmt.route->directResponseEntry(), nullptr);
+    EXPECT_EQ("base-body:ok", r_fmt.route->directResponseEntry()->formatBody(
+                                  h_fmt, response_headers, local_info, body_out));
+  });
+  worker.join();
+}
+
 TEST_F(DeferredVirtualHostTest, RejectsInvalidConfigurationsAtIngestionTime) {
   factory_context_.cluster_manager_.initializeClusters(
       {"existing_cluster", "some_cluster", "valid_cluster"}, {});
@@ -1273,6 +1797,30 @@ virtual_hosts:
     route: { cluster: "valid_cluster" }
 )EOF",
        "route: unknown shadow cluster 'missing_shadow_cluster'"},
+      {"MissingRouteShadowCluster", R"EOF(
+virtual_hosts:
+- name: vhost_with_route_shadow
+  domains: ["route-shadow.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route:
+      cluster: "valid_cluster"
+      request_mirror_policies:
+      - cluster: "missing_route_shadow_cluster"
+)EOF",
+       "route: unknown shadow cluster 'missing_route_shadow_cluster'"},
+      {"OversizedDirectResponseBody", R"EOF(
+max_direct_response_body_size_bytes: 4
+virtual_hosts:
+- name: vhost_oversized_direct
+  domains: ["oversized.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    direct_response:
+      status: 200
+      body: { inline_string: "too-long-body" }
+)EOF",
+       "response body size is 13 bytes; maximum is 4"},
       {"InvalidVirtualHostHeader", R"EOF(
 virtual_hosts:
 - name: bad_hdr_vhost
@@ -1296,6 +1844,19 @@ virtual_hosts:
     route: { cluster: "valid_cluster" }
 )EOF",
        "Didn't find a registered implementation for 'unknown.non_optional.filter'"},
+      {"UnknownVettedVirtualHostPerFilterConfig", R"EOF(
+virtual_hosts:
+- name: bad_vetted_filter_vhost
+  domains: ["vetted-filter.example.com"]
+  typed_per_filter_config:
+    unknown.non_optional.buffer_filter:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.BufferPerRoute
+      disabled: true
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: "valid_cluster" }
+)EOF",
+       "Didn't find a registered implementation for 'unknown.non_optional.buffer_filter'"},
   };
 
   for (const auto& tc : cases) {
@@ -1313,6 +1874,7 @@ virtual_hosts:
     }
   }
 }
+#endif
 
 } // namespace
 } // namespace Router

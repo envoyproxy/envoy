@@ -523,6 +523,21 @@ public:
                   Server::Configuration::ServerFactoryContext& factory_context,
                   Stats::ScopeSharedPtr scope, ProtobufMessage::ValidationVisitor& validator,
                   Init::Manager& init_manager, bool validate_clusters,
+                  absl::Status& creation_status)
+      : VirtualHostImpl(
+            virtual_host, global_route_config, factory_context, std::move(scope), validator,
+            init_manager,
+            (validate_clusters && !virtual_host.has_matcher() && !virtual_host.routes().empty())
+                ? makeOptRef<const Upstream::ClusterManager>(factory_context.clusterManager())
+                : OptRef<const Upstream::ClusterManager>{},
+            creation_status) {}
+
+  VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
+                  const CommonConfigSharedPtr& global_route_config,
+                  Server::Configuration::ServerFactoryContext& factory_context,
+                  Stats::ScopeSharedPtr scope, ProtobufMessage::ValidationVisitor& validator,
+                  Init::Manager& init_manager,
+                  OptRef<const Upstream::ClusterManager> validation_clusters,
                   absl::Status& creation_status);
 
   VirtualHostMatchResult getRouteFromEntries(const RouteCallback& cb,
@@ -1080,6 +1095,7 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
+  std::string direct_response_body_;
   Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
   std::string direct_response_content_type_;

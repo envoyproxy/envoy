@@ -74,7 +74,7 @@ public:
                          const CommonVirtualHostSharedPtr& vhost,
                          Server::Configuration::ServerFactoryContext& factory_context,
                          ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-                         bool validate_clusters) {
+                         OptRef<const Upstream::ClusterManager> validation_clusters) {
 
     absl::Status creation_status = absl::OkStatus();
     RouteEntryImplBaseConstSharedPtr route;
@@ -111,14 +111,12 @@ public:
     }
     RETURN_IF_NOT_OK(creation_status);
 
-    if (validate_clusters) {
-      const Upstream::ClusterManager& cluster_manager = factory_context.clusterManager();
-      RETURN_IF_NOT_OK(route->validateClusters(cluster_manager));
+    if (validation_clusters.has_value()) {
+      RETURN_IF_NOT_OK(route->validateClusters(*validation_clusters));
       for (const auto& shadow_policy : route->shadowPolicies()) {
         if (!shadow_policy->cluster().empty()) {
           ASSERT(shadow_policy->clusterHeader().get().empty());
-          // if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-          if (!cluster_manager.hasCluster(shadow_policy->cluster())) {
+          if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
             return absl::InvalidArgumentError(
                 fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
           }
@@ -169,8 +167,12 @@ RouteBuilderImpl::build(const envoy::config::route::v3::Route& route, bool valid
   absl::StatusOr<RouteEntryImplBaseConstSharedPtr> route_or_error =
       absl::InvalidArgumentError("unreachable");
   TRY_ASSERT_MAIN_THREAD {
+    const OptRef<const Upstream::ClusterManager> validation_clusters =
+        validate_clusters
+            ? makeOptRef<const Upstream::ClusterManager>(factory_context_.clusterManager())
+            : OptRef<const Upstream::ClusterManager>{};
     route_or_error = RouteCreator::createAndValidateRoute(
-        route, vhost_, factory_context_, validator_, init_manager_, validate_clusters);
+        route, vhost_, factory_context_, validator_, init_manager_, validation_clusters);
   }
   END_TRY
   CATCH(const EnvoyException& e, { route_or_error = absl::InvalidArgumentError(e.what()); });
@@ -589,7 +591,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       }()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)), route_name_(route.name()),
-      time_source_(factory_context.mainThreadDispatcher().timeSource()),
+      time_source_(factory_context.timeSource()),
       request_body_buffer_limit_(getRequestBodyBufferLimit(vhost, route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
@@ -613,13 +615,28 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                                      : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
-    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider<std::string>::create(
-        route.direct_response().body(), factory_context.mainThreadDispatcher(),
-        factory_context.threadLocal(), factory_context.api(), true,
-        [](absl::string_view data) { return std::make_shared<std::string>(data); },
-        vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
-    SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
-    direct_response_body_provider_ = std::move(provider_or_error.value());
+    const auto& body = route.direct_response().body();
+    const uint64_t max_body_size = vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes();
+    if (Envoy::Config::DataSource::usesFileWatching(body, {})) {
+      auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider<std::string>::create(
+          body, factory_context.mainThreadDispatcher(), factory_context.threadLocal(),
+          factory_context.api(), true,
+          [](absl::string_view data) { return std::make_shared<std::string>(data); },
+          max_body_size);
+      SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
+      direct_response_body_provider_ = std::move(provider_or_error.value());
+    } else {
+      auto body_or_error = Envoy::Config::DataSource::read(body, /*allow_empty=*/true,
+                                                           factory_context.api(), max_body_size);
+      SET_AND_RETURN_IF_NOT_OK(body_or_error.status(), creation_status);
+      if (max_body_size > 0 && body_or_error.value().length() > max_body_size) {
+        creation_status =
+            absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
+                                                   body_or_error.value().length(), max_body_size));
+        return;
+      }
+      direct_response_body_ = std::move(body_or_error.value());
+    }
   }
 
   if (route.direct_response().has_body_format()) {
@@ -1200,10 +1217,12 @@ absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& r
                                                  const Http::ResponseHeaderMap& response_headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  std::string& body_out) const {
-  absl::string_view direct_body = (direct_response_body_provider_ != nullptr &&
-                                   direct_response_body_provider_->data() != nullptr)
-                                      ? *direct_response_body_provider_->data()
-                                      : EMPTY_STRING;
+  absl::string_view direct_body =
+      direct_response_body_provider_ != nullptr
+          ? (direct_response_body_provider_->data() != nullptr
+                 ? absl::string_view(*direct_response_body_provider_->data())
+                 : absl::string_view(EMPTY_STRING))
+          : absl::string_view(direct_response_body_);
   if (direct_response_body_formatter_ == nullptr) {
     return direct_body;
   }
@@ -1868,7 +1887,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
                                  Server::Configuration::ServerFactoryContext& factory_context,
                                  Stats::ScopeSharedPtr scope,
                                  ProtobufMessage::ValidationVisitor& validator,
-                                 Init::Manager& init_manager, bool validate_clusters,
+                                 Init::Manager& init_manager,
+                                 OptRef<const Upstream::ClusterManager> validation_clusters,
                                  absl::Status& creation_status) {
 
   auto host_or_error =
@@ -1909,8 +1929,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   } else {
     routes_.reserve(virtual_host.routes().size());
     for (const auto& route : virtual_host.routes()) {
-      auto route_or_error = RouteCreator::createAndValidateRoute(
-          route, shared_virtual_host_, factory_context, validator, init_manager, validate_clusters);
+      auto route_or_error =
+          RouteCreator::createAndValidateRoute(route, shared_virtual_host_, factory_context,
+                                               validator, init_manager, validation_clusters);
       SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
       routes_.emplace_back(route_or_error.value());
     }
@@ -2113,23 +2134,31 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
 
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     DomainEntry& domain_entry = domain_entries_[entry_index++];
-    bool eager_init = !deferred_vhost_enabled || requiresMainThreadInit(virtual_host_config);
+    bool eager_init = !deferred_vhost_enabled;
     if (!eager_init && requiresProbeValidation(virtual_host_config, global_route_config,
                                                validate_clusters, factory_context)) {
-      // Configuration may need validation on the main thread, which would exclude this VirtualHost
-      // from deferred initialization.
-      IsolatedValidationContext validation_context(factory_context);
-      ScopedValidationServerContext scoped_server_context(validation_context);
-      auto isolated_vhost_scope = validation_context.scope().scopeFromStatName(Stats::StatName());
-      absl::Status validation_status = absl::OkStatus();
-      VirtualHostImpl probe_vhost(virtual_host_config, global_route_config, validation_context,
-                                  isolated_vhost_scope, validator, validation_context.initManager(),
-                                  validate_clusters, validation_status);
-      if (!validation_status.ok()) {
-        creation_status = validation_status;
-        return;
+      eager_init = requiresMainThreadInit(virtual_host_config);
+      if (!eager_init) {
+        // Configuration may need validation on the main thread, which would exclude this
+        // VirtualHost from deferred initialization.
+        const OptRef<const Upstream::ClusterManager> validation_clusters =
+            (validate_clusters && !virtual_host_config.has_matcher() &&
+             !virtual_host_config.routes().empty())
+                ? makeOptRef<const Upstream::ClusterManager>(factory_context.clusterManager())
+                : OptRef<const Upstream::ClusterManager>{};
+        IsolatedValidationContext validation_context(factory_context);
+        ScopedValidationServerContext scoped_server_context(validation_context);
+        auto isolated_vhost_scope = validation_context.scope().scopeFromStatName(Stats::StatName());
+        absl::Status validation_status = absl::OkStatus();
+        VirtualHostImpl probe_vhost(
+            virtual_host_config, global_route_config, validation_context, isolated_vhost_scope,
+            validator, validation_context.initManager(), validation_clusters, validation_status);
+        if (!validation_status.ok()) {
+          creation_status = validation_status;
+          return;
+        }
+        eager_init = validation_context.requiresMainThreadInit();
       }
-      eager_init = validation_context.requiresMainThreadInit();
     }
 
     if (eager_init) {
@@ -2487,7 +2516,7 @@ RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActi
                                                                                validation_visitor);
   auto route = THROW_OR_RETURN_VALUE(
       RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
-                                           validation_visitor, context.init_manager, false),
+                                           validation_visitor, context.init_manager, {}),
       RouteEntryImplBaseConstSharedPtr);
   return route;
 }
@@ -2505,7 +2534,7 @@ RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
   for (const auto& route : route_config.routes()) {
     routes.emplace_back(THROW_OR_RETURN_VALUE(
         RouteCreator::createAndValidateRoute(route, context.vhost, context.factory_context,
-                                             validation_visitor, context.init_manager, false),
+                                             validation_visitor, context.init_manager, {}),
         RouteEntryImplBaseConstSharedPtr));
   }
   return std::make_shared<RouteListMatchAction>(std::move(routes));

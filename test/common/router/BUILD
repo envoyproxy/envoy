@@ -86,6 +86,7 @@ envoy_cc_test(
     name = "deferred_virtual_host_test",
     srcs = ["deferred_virtual_host_test.cc"],
     copts = select({
+        "//bazel:disable_full_protos": [],
         "//bazel:windows_x86_64": [],
         "//conditions:default": [
             "-DUSE_CEL_PARSER",
@@ -101,7 +102,6 @@ envoy_cc_test(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
-        "//source/extensions/formatter/cel:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/init:init_mocks",
@@ -112,10 +112,27 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_filter_state/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/stateful_session/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/req_without_query/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/stateful_session/header/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/rewrite/uri_template/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/retry/host/previous_hosts/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
         "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:disable_full_protos": [],
+        "//conditions:default": [
+            "//source/extensions/formatter/cel:config",
+        ],
+    }),
 )
 
 # envoy_cc_test_binary is generating mostly static binary regardless of config
