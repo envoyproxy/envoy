@@ -380,6 +380,7 @@ TEST_F(PostgresFilterTest, SplitStartupDoesNotLeak) {
   // Second segment: the rest of the Startup message.
   data_.add(static_cast<char*>(startup.linearize(total_len)) + 4, total_len - 4);
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(data_.toString(), startup.toString());
 
   ASSERT_THAT(static_cast<DecoderImpl*>(filter_->getDecoder())->state(),
               DecoderImpl::State::InSyncState);
@@ -398,6 +399,10 @@ TEST_F(PostgresFilterTest, SplitSSLRequestDoesNotLeak) {
   // Second segment: the SSL request code.
   data_.writeBEInt<uint32_t>(80877103); // SSL code.
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
+
+  EXPECT_EQ(data_.length(), 8);
+  EXPECT_EQ(data_.peekBEInt<uint32_t>(0), 8);
+  EXPECT_EQ(data_.peekBEInt<uint32_t>(4), 80877103);
 
   ASSERT_THAT(filter_->getStats().messages_frontend_.value(), 1);
 }
@@ -430,6 +435,17 @@ TEST_F(PostgresFilterTest, SplitStartupDelaysUpstreamSSLNegotiation) {
       });
   data_.add(static_cast<char*>(startup.linearize(total_len)) + 4, total_len - 4);
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(data_.length(), 0);
+
+  EXPECT_CALL(read_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false))
+      .WillOnce(Invoke([&startup](Buffer::Instance& data, bool) {
+        EXPECT_EQ(data.toString(), startup.toString());
+        data.drain(data.length());
+      }));
+  data_.add("S");
+  EXPECT_EQ(filter_->onWrite(data_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data_.length(), 0);
 }
 
 // Test verifies that filter reacts to RequestSSL message.
@@ -471,6 +487,26 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
   ASSERT_THAT(filter_->getStats().sessions_terminated_ssl_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 0);
   ASSERT_THAT(filter_->getStats().sessions_unencrypted_.value(), 0);
+}
+
+TEST_F(PostgresFilterTest, TerminateSSLRejectsPipelinedStartup) {
+  filter_->getConfig()->terminate_ssl_ = true;
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_, addBytesSentCallback(_)).Times(0);
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false)).Times(0);
+
+  data_.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE);
+  EXPECT_EQ(filter_->onData(data_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data_.length(), 0);
+
+  data_.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
+  createInitialPostgresRequest(data_);
+
+  EXPECT_EQ(filter_->onData(data_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data_.length(), 0);
+  EXPECT_EQ(filter_->getStats().sessions_terminated_ssl_.value(), 0);
+  EXPECT_FALSE(filter_->isSwitchedToTls());
 }
 
 // Test verifies that filter verifies downstream ssl after ssl negotiation for ssl enabled client

@@ -1,11 +1,14 @@
 #pragma once
 
+#include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/filters/common/rbac/engine_impl.h"
+
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -121,6 +124,11 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
 }
 
 std::string responseDetail(absl::string_view policy_id);
+
+/**
+ * Validate the RBAC rules doesn't include any header or metadata rule.
+ */
+absl::Status validateRbacRules(const envoy::config::rbac::v3::RBAC& rules);
 
 } // namespace RBAC
 } // namespace Common

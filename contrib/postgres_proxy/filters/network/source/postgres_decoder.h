@@ -44,15 +44,20 @@ public:
 
   virtual void processQuery(const std::string&) PURE;
 
+  virtual bool authorizationEnabled() const PURE;
+  virtual bool authorizeStartup() PURE;
+  virtual void rejectStartup(absl::string_view log_policy_id) PURE;
+  virtual bool shouldPassthroughSSL() const PURE;
+  virtual void rejectSSLRequest() PURE;
   virtual bool onSSLRequest() PURE;
   virtual bool shouldEncryptUpstream() const PURE;
   virtual void sendUpstream(Buffer::Instance&) PURE;
   virtual bool encryptUpstream(bool, Buffer::Instance&) PURE;
   /**
    * If downstream SSL is required but client didn't initiate SSL,
-   * close the downstream connection.
+   * close the downstream connection and return false.
    */
-  virtual void verifyDownstreamSSL() PURE;
+  virtual bool verifyDownstreamSSL() PURE;
 };
 
 // Postgres message decoder.
@@ -63,10 +68,11 @@ public:
   // The following values are returned by the decoder, when filter
   // passes bytes of data via onData method:
   enum class Result {
-    ReadyForNext, // Decoder processed previous message and is ready for the next message.
-    NeedMoreData, // Decoder needs more data to reconstruct the message.
-    Stopped       // Don't forward data to the next filter. Used when the filter must perform
-                  // an action (e.g., start TLS) or when accumulating a partial initial message.
+    ReadyForNext,        // Decoder processed previous message and is ready for the next message.
+    NeedMoreData,        // Decoder needs more data to reconstruct the message.
+    NeedMoreStartupData, // Initial message is incomplete; retain its original bytes until complete.
+    Stopped              // Don't forward data to the next filter; the message was consumed locally
+                         // or the filter must perform an action (e.g., start TLS).
   };
   virtual Result onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
@@ -101,7 +107,8 @@ public:
     InSyncState,
     OutOfSyncState,
     EncryptedState,
-    NegotiatingUpstreamSSL
+    NegotiatingUpstreamSSL,
+    RejectedState
   };
   State state() const { return state_; }
   void state(State state) { state_ = state; }

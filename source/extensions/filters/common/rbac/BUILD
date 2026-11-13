@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
     ],
 )
 

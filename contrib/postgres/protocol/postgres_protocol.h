@@ -42,6 +42,9 @@ constexpr uint32_t SSL_REQUEST_MESSAGE_SIZE = 8;        // Length(4) + Code(4).
 constexpr uint32_t CANCEL_REQUEST_MESSAGE_SIZE = 16;    // Length(4) + Code(4) + PID(4) + Key(4).
 constexpr uint32_t GSSAPI_ENC_REQUEST_MESSAGE_SIZE = 8; // Length(4) + Code(4).
 
+// PostgreSQL's default NAMEDATALEN reserves one byte for the terminating null.
+constexpr uint32_t MAX_NAME_LENGTH = 63;
+
 // Base code for encryption requests (most significant 16 bits = 1234).
 // Used to identify messages that negotiate encryption: SSL, GSSAPI, or future variants.
 constexpr uint32_t ENCRYPTION_REQUEST_BASE_CODE = 0x04d20000;
