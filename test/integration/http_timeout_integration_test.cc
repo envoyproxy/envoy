@@ -54,6 +54,49 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
             "envoy; error=http_response_timeout; details=\"response_timeout; UT\"");
 }
 
+// Sends a request whose upstream TLS handshake never completes, and ensures that the global
+// timeout reports the connecting phase in the response code details.
+TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutWhileConnecting) {
+  // Envoy speaks TLS to the upstream while the fake upstream stays plaintext, so the ClientHello
+  // is never answered and the connection pool never hands a connection to the request.
+  config_helper_.configureUpstreamTls();
+  // Keep the connect timeout well above the route timeout so the route timeout fires first.
+  config_helper_.setConnectTimeout(std::chrono::seconds(30));
+  config_helper_.addConfigModifier(configureProxyStatus());
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  // x-forwarded-for marks the request as internal so that x-envoy-upstream-rq-timeout-ms is
+  // honored rather than sanitized away, matching the GlobalTimeout test above.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"}});
+
+  // The TCP connection is accepted but nothing is ever written back, so the handshake hangs.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // The connection can be accepted while the router is still processing the request, before the
+  // route timeout has been armed. Envoy only writes its ClientHello from a later event loop
+  // iteration, so once any bytes have arrived the timer is guaranteed to be running and simulated
+  // time can be advanced safely.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForAtLeastBytes(1)));
+
+  // Trigger global timeout.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=http_response_timeout; details=\"response_timeout{connecting}; UT\"");
+}
+
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress
 // envoy when `respect_expected_rq_timeout` field is enabled. Sends a request with a global timeout
 // specified, sleeps for longer than the timeout, and ensures that a timeout is received.
