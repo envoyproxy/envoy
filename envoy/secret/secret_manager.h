@@ -1,10 +1,10 @@
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -24,6 +24,31 @@ class ServerFactoryContext;
 } // namespace Server
 
 namespace Secret {
+
+/**
+ * Observer of the dynamic TLS certificate secrets held by a SecretManager. Called on the main
+ * thread only.
+ */
+class SecretLifecycleCallbacks {
+public:
+  virtual ~SecretLifecycleCallbacks() = default;
+
+  /**
+   * Called each time a dynamic TLS certificate provider stores a secret, on first delivery and on
+   * every rotation. A name can be held by several providers (one per config source and warming
+   * mode), so this can repeat for the same name. The provider has stored the secret, which does
+   * not mean the TLS contexts that use it have been updated yet.
+   * @param name supplies the secret name. The view is valid only for the duration of the call.
+   */
+  virtual void onSecretAddOrUpdate(absl::string_view name) PURE;
+
+  /**
+   * Called when the last dynamic TLS certificate provider for a name leaves the manager, if any
+   * provider for that name delivered a secret.
+   * @param name supplies the secret name. The view is valid only for the duration of the call.
+   */
+  virtual void onSecretRemoval(absl::string_view name) PURE;
+};
 
 /**
  * A manager for static and dynamic secrets.
@@ -187,22 +212,15 @@ public:
   virtual std::vector<absl::string_view> dynamicActiveSecretNames() const PURE;
 
   /**
-   * Callback invoked on the main thread each time a dynamic TLS certificate secret provider is
-   * created, carrying the secret's config name and the provider. Observers typically subscribe to
-   * the provider's update/remove callbacks to learn when the secret becomes active or is removed.
+   * Registers observer callbacks for the dynamic TLS certificate secrets held by this manager.
+   * Before this returns, SecretLifecycleCallbacks::onSecretAddOrUpdate is invoked inline once for
+   * each name that currently has a delivered secret. Destroying the returned handle unregisters
+   * the callbacks. Main thread only.
+   * @param callbacks supplies the callbacks, which must outlive the returned handle.
+   * @return the handle that keeps the callbacks registered.
    */
-  using DynamicTlsCertificateSecretProviderCreatedCb = std::function<void(
-      const std::string& name, const TlsCertificateConfigProviderSharedPtr& provider)>;
-
-  /**
-   * Registers a callback invoked when a dynamic TLS certificate secret provider is created. On
-   * registration the callback is also invoked once for every provider that already exists, so an
-   * observer sees every provider regardless of whether it predates registration. At most one
-   * callback is held; a later call replaces the earlier one. Default is a no-op so only
-   * implementations that support secret lifecycle observation need override it.
-   */
-  virtual void setDynamicTlsCertificateSecretProviderCreatedCallback(
-      DynamicTlsCertificateSecretProviderCreatedCb) {}
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addSecretLifecycleCallbacks(SecretLifecycleCallbacks& callbacks) PURE;
 };
 
 using SecretManagerPtr = std::unique_ptr<SecretManager>;

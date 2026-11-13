@@ -9247,9 +9247,16 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
     envoy_dynamic_module_type_envoy_buffer listener_name);
 
 /**
- * envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is called when a dynamic secret
- * (SDS) becomes active or is updated in the SecretManager. Unlike clusters and listeners, secrets
- * are independent xDS resources, so this fires even when no cluster or listener is re-pushed.
+ * envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is called each time a dynamic
+ * (SDS) TLS certificate provider stores a secret, on first delivery and on every rotation. Only TLS
+ * certificates fire; certificate validation contexts, session ticket keys and generic secrets do
+ * not, although envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names lists
+ * them. Secrets are independent xDS resources, so this fires even when no cluster or listener is
+ * re-pushed.
+ *
+ * A name can be held by several providers (one per config source and warming mode), so this can
+ * repeat for the same name. The event means the provider stored the secret, not that the TLS
+ * contexts that use it already serve it.
  *
  * This is only called if the module has opted in to receiving secret lifecycle events via
  * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The callback is
@@ -9267,8 +9274,11 @@ void envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
     envoy_dynamic_module_type_envoy_buffer secret_name);
 
 /**
- * envoy_dynamic_module_on_bootstrap_extension_secret_removal is called when a dynamic secret (SDS)
- * is removed from the SecretManager.
+ * envoy_dynamic_module_on_bootstrap_extension_secret_removal is called when the last dynamic (SDS)
+ * TLS certificate provider for a name leaves the SecretManager, which happens when the last
+ * listener or cluster that references it is removed. It fires only for a name that delivered a
+ * secret. A delta xDS removal of the resource does not fire it, since the provider keeps serving
+ * the last secret.
  *
  * This is only called if the module has opted in to receiving secret lifecycle events via
  * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The callback is
@@ -9960,9 +9970,13 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
  * (envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update and
  * envoy_dynamic_module_on_bootstrap_extension_secret_removal).
  *
- * This must be called on the main thread, typically during or after
- * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the SecretManager is
- * not available until that point.
+ * Before this returns, envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is invoked
+ * once for each name that already has a delivered secret. A module must not hold a lock or borrow
+ * across this call that the hook also takes.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls before that return false;
+ * the validation server never reaches that point.
  *
  * This should be called at most once. Subsequent calls are no-ops and return false.
  *

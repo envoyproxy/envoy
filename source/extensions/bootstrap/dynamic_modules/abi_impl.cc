@@ -683,6 +683,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle must be called "
+        "on the main thread");
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableClusterLifecycle();
 }
@@ -691,6 +697,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle must "
+                 "be called "
+                 "on the main thread");
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableListenerLifecycle();
 }
@@ -699,6 +711,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle must be called "
+        "on the main thread");
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableSecretLifecycle();
 }

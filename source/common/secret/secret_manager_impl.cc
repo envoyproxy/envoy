@@ -14,10 +14,15 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Secret {
 
 SecretManagerImpl::SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker) {
+  certificate_providers_.setLifecycleCallback([this](absl::string_view name, bool removed) {
+    secret_lifecycle_callbacks_.runCallbacks(name, removed);
+  });
   if (config_tracker.has_value()) {
     config_tracker_entry_ =
         config_tracker->add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
@@ -183,25 +188,24 @@ std::vector<absl::string_view> SecretManagerImpl::dynamicActiveSecretNames() con
   return names;
 }
 
-void SecretManagerImpl::setDynamicTlsCertificateSecretProviderCreatedCallback(
-    DynamicTlsCertificateSecretProviderCreatedCb callback) {
-  if (!callback) {
-    certificate_providers_.on_provider_created_ = nullptr;
-    return;
-  }
-  certificate_providers_.on_provider_created_ =
-      [callback = std::move(callback)](const std::string& name,
-                                       const std::shared_ptr<TlsCertificateSdsApi>& provider) {
-        callback(name, provider);
-      };
-  // Replay providers that already exist so the observer subscribes to them on the same footing as
-  // providers created later. Without this, a provider created before this call would deliver
-  // neither its update nor its removal events to the observer. allSecretProviders() returns a
-  // snapshot of locked providers, so invoking the callback (which may subscribe) cannot invalidate
-  // the iteration.
+Common::CallbackHandlePtr
+SecretManagerImpl::addSecretLifecycleCallbacks(SecretLifecycleCallbacks& callbacks) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Replay the names that already have a delivered secret, once per name.
+  absl::flat_hash_set<absl::string_view> replayed;
   for (const auto& provider : certificate_providers_.allSecretProviders()) {
-    certificate_providers_.on_provider_created_(provider->secretData().resource_name_, provider);
+    if (provider->secret() != nullptr &&
+        replayed.insert(provider->secretData().resource_name_).second) {
+      callbacks.onSecretAddOrUpdate(provider->secretData().resource_name_);
+    }
   }
+  return secret_lifecycle_callbacks_.add([&callbacks](absl::string_view name, bool removed) {
+    if (removed) {
+      callbacks.onSecretRemoval(name);
+    } else {
+      callbacks.onSecretAddOrUpdate(name);
+    }
+  });
 }
 
 ProtobufTypes::MessagePtr

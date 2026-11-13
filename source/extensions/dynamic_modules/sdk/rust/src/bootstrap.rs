@@ -278,13 +278,15 @@ pub trait EnvoyBootstrapExtensionConfig {
 
   /// Enable secret lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_secret_add_or_update`] and
-  /// [`BootstrapExtensionConfig::on_secret_removal`] callbacks when dynamic TLS certificate secrets
-  /// become active, are rotated, or are removed. SDS secrets are independent xDS resources, so
-  /// these fire even when no cluster or listener is re-pushed. Secrets already active at enable
-  /// time are replayed immediately.
+  /// [`BootstrapExtensionConfig::on_secret_removal`] for the dynamic TLS certificate secrets only.
+  /// SDS secrets are independent xDS resources, so these fire even when no cluster or listener is
+  /// re-pushed.
   ///
-  /// This must be called on the main thread, typically during or after `on_server_initialized`,
-  /// since the SecretManager is not available until that point.
+  /// Before this returns, `on_secret_add_or_update` is called once for each name that already has
+  /// a delivered secret, so do not hold a lock or borrow across this call that the hook also takes.
+  ///
+  /// This must be called on the main thread, during or after `on_server_initialized`. Calls before
+  /// that return `false`.
   ///
   /// This should be called at most once. Subsequent calls are no-ops and return `false`.
   fn enable_secret_lifecycle(&self) -> bool;
@@ -481,7 +483,10 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// This is called when a dynamic TLS certificate secret becomes active or is rotated.
+  /// This is called each time a dynamic TLS certificate provider stores a secret, on first
+  /// delivery and on every rotation. A name can be held by several providers, so this can repeat
+  /// for the same name. The provider has stored the secret, which does not mean the TLS contexts
+  /// that use it already serve it.
   ///
   /// This is only called if the module has opted in via
   /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
@@ -496,7 +501,9 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// This is called when a dynamic TLS certificate secret is removed.
+  /// This is called when the last dynamic TLS certificate provider for a name that delivered a
+  /// secret leaves Envoy, which happens when the last listener or cluster that references it is
+  /// removed. A delta xDS removal of the resource does not trigger it.
   ///
   /// This is only called if the module has opted in via
   /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
@@ -1848,7 +1855,7 @@ ffi_export! {
 }
 
 ffi_export! {
-  /// Event hook called by Envoy when a dynamic TLS certificate secret becomes active or is rotated.
+  /// Event hook called by Envoy when a dynamic TLS certificate provider stores a secret.
   ///
   /// # Safety
   ///
@@ -1874,7 +1881,7 @@ ffi_export! {
 }
 
 ffi_export! {
-  /// Event hook called by Envoy when a dynamic TLS certificate secret is removed.
+  /// Event hook called by Envoy when the last provider for a dynamic TLS certificate secret leaves.
   ///
   /// # Safety
   ///

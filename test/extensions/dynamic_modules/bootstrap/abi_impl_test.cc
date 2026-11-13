@@ -2157,6 +2157,28 @@ TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesOffMainThreadFailsClosed) {
       "on the main thread");
 }
 
+// Calling an enable_*_lifecycle entry off the main thread is an ENVOY_BUG. The guard
+// short-circuits before any pointer dereference, so passing a null config is safe here.
+TEST_F(BootstrapAbiImplTest, EnableLifecycleOffMainThreadFailsClosed) {
+  using EnableFn = bool (*)(envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr);
+  const std::vector<std::pair<EnableFn, std::string>> entries = {
+      {&envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle,
+       "envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle"},
+      {&envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle,
+       "envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle"},
+      {&envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle,
+       "envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle"},
+  };
+  for (const auto& [enable, name] : entries) {
+    EXPECT_ENVOY_BUG(
+        {
+          std::thread t([enable = enable] { EXPECT_FALSE(enable(nullptr)); });
+          t.join();
+        },
+        absl::StrCat(name, " must be called on the main thread"));
+  }
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

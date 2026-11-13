@@ -4,11 +4,10 @@
 #include <vector>
 
 #include "envoy/common/callback.h"
-#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
-#include "envoy/secret/secret_provider.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -80,6 +79,7 @@ class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
       public Upstream::ClusterUpdateCallbacks,
       public Server::ListenerUpdateCallbacks,
+      public Secret::SecretLifecycleCallbacks,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
@@ -179,19 +179,19 @@ public:
   void onListenerRemoval(const std::string& listener_name) override;
 
   /**
-   * Enables secret lifecycle event notifications. When enabled, the module receives
-   * on_bootstrap_extension_secret_add_or_update when a dynamic TLS certificate secret becomes
-   * active or is rotated, and on_bootstrap_extension_secret_removal when one is removed. SDS
-   * secrets are independent xDS resources, so these fire even when no cluster or listener is
-   * re-pushed.
+   * Enables secret lifecycle event notifications for the dynamic TLS certificate secrets. The
+   * secrets that are already delivered are replayed through
+   * on_bootstrap_extension_secret_add_or_update before this returns. Main thread only, after the
+   * server is initialized.
    *
-   * Secrets whose providers already exist and are active at enable time are replayed immediately,
-   * so a module that enables late still observes them. This must be called on the main thread after
-   * the server is initialized, since the SecretManager is not available before that point.
-   *
-   * @return true if the callbacks were successfully registered, false if already registered.
+   * @return true if the callbacks were registered, false if already registered or the server is
+   * not initialized yet.
    */
   bool enableSecretLifecycle();
+
+  // Secret::SecretLifecycleCallbacks
+  void onSecretAddOrUpdate(absl::string_view secret_name) override;
+  void onSecretRemoval(absl::string_view secret_name) override;
 
   /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
@@ -284,15 +284,6 @@ public:
   std::string admin_response_body_;
 
 private:
-  // Subscribes to a dynamic TLS certificate secret provider's update and remove callbacks so the
-  // module is notified when its secret becomes active/rotates or is removed. The subscription
-  // handles are retained for the life of the config. Main thread only.
-  void subscribeSecretProvider(const std::string& secret_name,
-                               const Secret::TlsCertificateConfigProviderSharedPtr& provider);
-  // Notifies the module that a dynamic secret became active/was updated or was removed.
-  void onSecretAddOrUpdate(const std::string& secret_name);
-  void onSecretRemoval(const std::string& secret_name);
-
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
    * callout from the parent bootstrap extension config.
@@ -351,10 +342,10 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
 
-  // Per-provider secret update/remove subscription handles, kept alive for the life of the config
-  // so the module keeps receiving secret lifecycle events. Set when the module enables secret
-  // lifecycle events via enableSecretLifecycle().
-  std::vector<Common::CallbackHandlePtr> secret_callback_handles_;
+  // Handle for the secret lifecycle callbacks registered with the SecretManager.
+  Common::CallbackHandlePtr secret_lifecycle_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up secret_lifecycle_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr secret_lifecycle_shutdown_handle_;
   bool secret_lifecycle_enabled_ = false;
 };
 

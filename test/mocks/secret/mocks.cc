@@ -27,6 +27,10 @@ MockSecretManager::MockSecretManager() {
 
 MockSecretManager::~MockSecretManager() = default;
 
+MockSecretLifecycleCallbacks::MockSecretLifecycleCallbacks() = default;
+
+MockSecretLifecycleCallbacks::~MockSecretLifecycleCallbacks() = default;
+
 MockSecretCallbacks::MockSecretCallbacks() = default;
 
 MockSecretCallbacks::~MockSecretCallbacks() = default;
