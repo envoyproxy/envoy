@@ -40,8 +40,7 @@ checks:
     - check-build-cto-noadmin
     - check-build-cto-nolog
     - check-build-cto-wamr
-    # TODO(phlax): enable once the wasmtime tests are re-enabled on this branch.
-    # - check-build-cto-wasmtime
+    - check-build-cto-wasmtime
     - check-build-gcc-build
     - check-build-gcc-test
     - check-build-openssl-build
@@ -290,35 +289,34 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  # TODO(phlax): enable once the wasmtime tests are re-enabled on this branch.
-  # check-build-cto-wasmtime:
-  #   paths:
-  #   - .bazelrc
-  #   - .bazelversion
-  #   - .github/config.yml
-  #   - API_VERSION.txt
-  #   - BUILD
-  #   - Cargo.Bazel.lock
-  #   - Cargo.lock
-  #   - MODULE.bazel
-  #   - MODULE.bazel.lock
-  #   - VERSION.txt
-  #   - WORKSPACE
-  #   - api/**/*
-  #   - bazel/**/*
-  #   - ci/build_setup.sh
-  #   - ci/do_ci.sh
-  #   - configs/**/*
-  #   - envoy/**/*
-  #   - source/**/*
-  #   - test/**/*
-  #   - third_party/**/*
-  #   - tools/api_versioning/**/*
-  #   - tools/base/requirements.txt
-  #   - tools/dev/requirements.txt
-  #   - tools/h3_request/**/*
-  #   - tools/socket_passing/**/*
-  #   - tools/type_whisperer/**/*
+  check-build-cto-wasmtime:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - WORKSPACE
+    - api/**/*
+    - bazel/**/*
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
   check-build-gcc-build:
     paths:
     - .bazelrc
