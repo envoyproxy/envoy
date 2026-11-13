@@ -361,6 +361,76 @@ TEST_P(ForwardingConnectUdpIntegrationTest, ForwardConnectUdp) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(ForwardingConnectUdpIntegrationTest, ForwardMultipleResponseCapsulesWithEndStream) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_udp_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  Http::TestResponseHeaderMapImpl upgrade_response_headers{{":status", "101"},
+                                                           {"connection", "upgrade"},
+                                                           {"upgrade", "connect-udp"},
+                                                           {"capsule-protocol", "?1"}};
+  upstream_request_->encodeHeaders(upgrade_response_headers, false);
+  response_->waitForHeaders();
+
+  // Send two back-to-back unknown capsules in the final response body chunk (end_stream=true).
+  // Without deferring FIN until capsule fragment ingestion completes, the first capsule buffers FIN
+  // on the QUIC stream, causing the second capsule ("second") to hit QUIC_BUG(quic_bug_10586_7) in
+  // debug builds and be dropped by QuicStream::WriteMemSlices() in release builds. With the fix,
+  // both capsules arrive downstream before FIN.
+  const std::string response_capsules = absl::HexStringToBytes("17056669727374"     // "first"
+                                                               "17067365636f6e64"); // "second"
+  upstream_request_->encodeData(response_capsules, true);
+  response_->waitForBodyData(response_capsules.size());
+  EXPECT_EQ(response_capsules, response_->body());
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ForwardingConnectUdpIntegrationTest, ForwardMultipleRequestCapsulesWithEndStream) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_udp_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  Http::TestResponseHeaderMapImpl upgrade_response_headers{{":status", "101"},
+                                                           {"connection", "upgrade"},
+                                                           {"upgrade", "connect-udp"},
+                                                           {"capsule-protocol", "?1"}};
+  upstream_request_->encodeHeaders(upgrade_response_headers, false);
+  response_->waitForHeaders();
+
+  // Send two back-to-back unknown capsules in the final request body chunk (end_stream=true).
+  // Without deferring FIN until capsule fragment ingestion completes, the second capsule ("world")
+  // hits QUIC_BUG(quic_bug_10586_7) in debug builds and is dropped in release builds; with the fix,
+  // both capsules arrive upstream before FIN.
+  const std::string request_capsules = absl::HexStringToBytes("170568656c6c6f"   // "hello"
+                                                              "1705776f726c64"); // "world"
+  codec_client_->sendData(*request_encoder_, request_capsules, true);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_capsules));
+
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(ForwardingConnectUdpIntegrationTest, DoNotForwardNonConnectUdp) {
   initialize();
 

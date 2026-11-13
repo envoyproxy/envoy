@@ -45,8 +45,9 @@ void HttpDatagramHandler::OnUnknownCapsule(quic::QuicStreamId stream_id,
 bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
   quiche::CapsuleType capsule_type = capsule.capsule_type();
   if (capsule_type != quiche::CapsuleType::DATAGRAM) {
-    // Forward other types of Capsules without modifications.
-    stream_.WriteCapsule(capsule, fin_set_);
+    // Forward other types of Capsules without modifications. Buffer FIN only once after the entire
+    // fragment has been ingested in encodeCapsuleFragment().
+    stream_.WriteCapsule(capsule, /*fin=*/false);
     return true;
   }
   quic::DatagramStatus status =
@@ -75,17 +76,24 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
 
 void HttpDatagramHandler::OnCapsuleParseFailure(absl::string_view error_message) {
   ENVOY_LOG(error, fmt::format("Capsule parsing failed: error_message = {}", error_message));
+  has_parse_error_ = true;
 }
 
 bool HttpDatagramHandler::encodeCapsuleFragment(absl::string_view capsule_fragment,
                                                 bool end_stream) {
-  fin_set_ = end_stream;
   // If a CapsuleParser object fails to parse a capsule fragment, the corresponding stream should
   // be reset. Returning false in this method resets the stream.
   if (!capsule_parser_.IngestCapsuleFragment(capsule_fragment)) {
     ENVOY_LOG(error, fmt::format("Capsule parsing error occurred: capsule_fragment = {}",
                                  capsule_fragment));
     return false;
+  }
+  if (end_stream) {
+    capsule_parser_.ErrorIfThereIsRemainingBufferedData();
+    if (has_parse_error_) {
+      return false;
+    }
+    stream_.WriteOrBufferBody("", /*fin=*/true);
   }
   return true;
 }

@@ -54,7 +54,7 @@ private:
   quiche::CapsuleParser capsule_parser_{this};
   quiche::SimpleBufferAllocator capsule_buffer_allocator_;
   StreamDecoderProvider stream_decoder_provider_;
-  bool fin_set_ = false;
+  bool has_parse_error_ = false;
 };
 
 } // namespace Quic

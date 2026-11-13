@@ -101,6 +101,34 @@ TEST_F(HttpDatagramHandlerTest, SendCapsulesWithUnknownType) {
                                                            /*end_stream=*/false));
 }
 
+TEST_F(HttpDatagramHandlerTest, SendMultipleUnknownCapsulesWithEndStream) {
+  testing::InSequence s;
+  EXPECT_CALL(stream_, WriteOrBufferBody(testing::Eq(unknown_capsule_fragment_), /*fin=*/false))
+      .Times(2);
+  EXPECT_CALL(stream_, WriteOrBufferBody(testing::Eq(""), /*fin=*/true));
+  EXPECT_TRUE(http_datagram_handler_.encodeCapsuleFragment(
+      absl::StrCat(unknown_capsule_fragment_, unknown_capsule_fragment_), /*end_stream=*/true));
+}
+
+TEST_F(HttpDatagramHandlerTest, SendDatagramCapsuleWithEndStream) {
+  testing::InSequence s;
+  EXPECT_CALL(stream_, SendHttp3Datagram(testing::Eq(datagram_payload_)))
+      .WillOnce(testing::Return(quic::DatagramStatus::DATAGRAM_STATUS_SUCCESS));
+  EXPECT_CALL(stream_, WriteOrBufferBody(testing::Eq(""), /*fin=*/true));
+  EXPECT_TRUE(http_datagram_handler_.encodeCapsuleFragment(capsule_fragment_, /*end_stream=*/true));
+}
+
+TEST_F(HttpDatagramHandlerTest, SendEmptyFragmentWithEndStream) {
+  EXPECT_CALL(stream_, WriteOrBufferBody(testing::Eq(""), /*fin=*/true));
+  EXPECT_TRUE(http_datagram_handler_.encodeCapsuleFragment("", /*end_stream=*/true));
+}
+
+TEST_F(HttpDatagramHandlerTest, SendIncompleteCapsuleWithEndStreamFails) {
+  EXPECT_CALL(stream_, WriteOrBufferBody(testing::_, testing::_)).Times(0);
+  EXPECT_FALSE(http_datagram_handler_.encodeCapsuleFragment(
+      absl::string_view(unknown_capsule_fragment_).substr(0, 5), /*end_stream=*/true));
+}
+
 TEST_F(HttpDatagramHandlerTest, SendHttp3DatagramInternalError) {
   EXPECT_CALL(stream_, SendHttp3Datagram(_))
       .WillOnce(testing::Return(quic::DatagramStatus::DATAGRAM_STATUS_INTERNAL_ERROR));
