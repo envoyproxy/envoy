@@ -3336,4 +3336,81 @@ TEST_P(AdsIntegrationTest, NewListenerUsesLocalRouteConfig) {
   cleanupUpstreamAndDownstream();
 }
 
+class AdsSdsReplayIntegrationTest : public AdsIntegrationTest {
+public:
+  // Builds cluster_0 using an ADS-delivered validation context that never times out, so a
+  // provider that misses the secret warms forever.
+  envoy::config::cluster::v3::Cluster buildSdsCluster(bool pin_api_version) {
+    envoy::config::core::v3::TransportSocket sds_transport_socket;
+    // Pinning the API version changes only the sds_config bytes, so the secret manager creates a
+    // new provider for the same secret name.
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          validation_context_sds_secret_config:
+            name: validation_context
+            sds_config:
+              initial_fetch_timeout: 0s
+              {}
+              ads: {{}}
+  )EOF",
+                                          pin_api_version ? "resource_api_version: V3" : ""),
+                              sds_transport_socket);
+    auto cluster = ConfigHelper::buildStaticCluster("cluster_0", 8000, "127.0.0.1");
+    *cluster.mutable_transport_socket() = sds_transport_socket;
+    return cluster;
+  }
+};
+
+// The legacy SotW mux does not use the WatchMap, so it has no replay.
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, AdsSdsReplayIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Grpc::ClientType::EnvoyGrpc),
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedSotw,
+                                     Grpc::SotwOrDelta::UnifiedDelta)),
+    AdsSdsReplayIntegrationTest::protocolTestParamsToString);
+
+// Regression test for #47309.
+TEST_P(AdsSdsReplayIntegrationTest, ClusterSdsConfigChangeReceivesCachedSecret) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto sds_type_url =
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  auto cluster = buildSdsCluster(false);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {cluster}, {},
+                                                             "1");
+  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context"},
+                                      {"validation_context"}, {}));
+  test_server_->waitForGauge("cluster.cluster_0.warming_state", Eq(1));
+
+  envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+    name: validation_context
+    validation_context:
+      trusted_ca:
+        filename: {}
+  )EOF",
+                                        TestEnvironment::runfilesPath(
+                                            "test/config/integration/certs/upstreamcacert.pem")),
+                            validation_context);
+  sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, {validation_context}, {validation_context}, {}, "1");
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(2));
+
+  // The new provider joins a secret name that is already subscribed, so the server is not asked
+  // again; it must leave warming from the cached secret alone.
+  auto updated = buildSdsCluster(true);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {updated}, {updated}, {},
+                                                             "2");
+  // update_success follows the warming gauge update, so the gauge below cannot be read stale.
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(2));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
+}
+
 } // namespace Envoy

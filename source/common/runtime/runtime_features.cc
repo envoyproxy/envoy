@@ -221,6 +221,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_overrides_rds_virtual_hosts_with_same_name);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
+// When a never-notified SDS watch is added for a secret name that another watch on the same mux
+// already subscribes to, replay the last delivered secret to the new watch instead of waiting for
+// the server to resend it.
+RUNTIME_GUARD(envoy_reloadable_features_xds_replay_cached_resources);
 // This is only needed if sharing c-ares query cache across dns clusters.
 // Disabled by default for now to prevent behavior changes.
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
