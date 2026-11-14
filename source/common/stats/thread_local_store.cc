@@ -641,29 +641,34 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     return null_stat;
   } else {
     // Stat creation here. Check limits.
+    RefcountPtr<StatType> stat;
     if constexpr (std::is_same_v<StatType, Counter>) {
       if (limits_.max_counters.has_value() &&
           central_cache_map.size() >= limits_.max_counters.value()) {
         parent_.counters_overflow_->inc();
         return null_stat;
       }
+      stat = parent_.alloc_.findCounter(full_stat_name);
     } else if constexpr (std::is_same_v<StatType, Gauge>) {
       if (limits_.max_gauges.has_value() &&
           central_cache_map.size() >= limits_.max_gauges.value()) {
         parent_.gauges_overflow_->inc();
         return null_stat;
       }
+      stat = parent_.alloc_.findGauge(full_stat_name);
     } else {
       // TextReadouts are currently not limited, but we must ensure they are the only
       // other type being handled. This static_assert will trigger a compilation error
       // if a new StatType is introduced in the future, forcing the developer to
       // explicitly decide how to handle its limits.
       static_assert(std::is_same_v<StatType, TextReadout>, "Unexpected StatType");
+      stat = parent_.alloc_.findTextReadout(full_stat_name);
     }
-    StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
-
-    RefcountPtr<StatType> stat = make_stat(
-        parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(), tag_helper.statNameTags());
+    if (stat == nullptr) {
+      StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
+      stat = make_stat(parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(),
+                       tag_helper.statNameTags());
+    }
     ASSERT(stat != nullptr);
     if (stat_name_tags.has_value() && !stat_name_tags->empty()) {
       // The tags were supplied by the stat's creator rather than derived from the name, so tag

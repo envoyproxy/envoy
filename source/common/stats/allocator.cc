@@ -296,6 +296,24 @@ private:
   std::string value_ ABSL_GUARDED_BY(mutex_);
 };
 
+CounterSharedPtr Allocator::findCounter(StatName name) const {
+  Thread::LockGuard lock(mutex_);
+  auto iter = counters_.find(name);
+  return iter != counters_.end() ? CounterSharedPtr(*iter) : nullptr;
+}
+
+GaugeSharedPtr Allocator::findGauge(StatName name) const {
+  Thread::LockGuard lock(mutex_);
+  auto iter = gauges_.find(name);
+  return iter != gauges_.end() ? GaugeSharedPtr(*iter) : nullptr;
+}
+
+TextReadoutSharedPtr Allocator::findTextReadout(StatName name) const {
+  Thread::LockGuard lock(mutex_);
+  auto iter = text_readouts_.find(name);
+  return iter != text_readouts_.end() ? TextReadoutSharedPtr(*iter) : nullptr;
+}
+
 CounterSharedPtr Allocator::makeCounter(StatName name, StatName tag_extracted_name,
                                         StatNameTagSpan stat_name_tags) {
   Thread::LockGuard lock(mutex_);

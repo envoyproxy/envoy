@@ -24,6 +24,10 @@ public:
   Allocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   virtual ~Allocator();
 
+  CounterSharedPtr findCounter(StatName name) const;
+  GaugeSharedPtr findGauge(StatName name) const;
+  TextReadoutSharedPtr findTextReadout(StatName name) const;
+
   /**
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
