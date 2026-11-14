@@ -40,10 +40,20 @@ public:
     for (const auto& kv : test_output) {
       std::vector<std::string> expected(kv.second);
       std::sort(expected.begin(), expected.end());
-      std::vector<std::string> actual(
-          trie_->getData(Utility::parseInternetAddressNoThrow(kv.first)));
+      const auto address = Utility::parseInternetAddressNoThrow(kv.first);
+      std::vector<std::string> actual(trie_->getData(address));
       std::sort(actual.begin(), actual.end());
       EXPECT_EQ(expected, actual);
+
+      const auto data_set = trie_->getDataSet(address);
+      if (expected.empty()) {
+        EXPECT_FALSE(data_set.has_value());
+      } else {
+        ASSERT_TRUE(data_set.has_value());
+        std::vector<std::string> actual_set(data_set->begin(), data_set->end());
+        std::sort(actual_set.begin(), actual_set.end());
+        EXPECT_EQ(expected, actual_set);
+      }
     }
   }
 

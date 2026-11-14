@@ -35,7 +35,7 @@ namespace FilterChain {
 // Return a fake address for use when either the source or destination is unix domain socket.
 // This address will only match the fallback matcher of 0.0.0.0/0, which is the default
 // when no IP matcher is configured.
-Network::Address::InstanceConstSharedPtr fakeAddress() {
+const Network::Address::InstanceConstSharedPtr& fakeAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
                          Network::Utility::parseInternetAddressNoThrow("255.255.255.255"));
 }
@@ -698,16 +698,16 @@ FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSoc
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.connectionInfoProvider().localAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    address = FilterChain::fakeAddress();
-  }
+  const auto& socket_address = socket.connectionInfoProvider().localAddress();
+  const auto& address = socket_address->type() == Network::Address::Type::Ip
+                            ? socket_address
+                            : FilterChain::fakeAddress();
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
-  const auto& data = destination_ips_trie.getData(address);
-  if (!data.empty()) {
-    ASSERT(data.size() == 1);
-    return findFilterChainForServerName(*data.back(), socket);
+  const auto data = destination_ips_trie.getDataSet(address);
+  if (data.has_value()) {
+    ASSERT(data->size() == 1);
+    return findFilterChainForServerName(**data->begin(), socket);
   }
 
   return nullptr;
@@ -787,15 +787,15 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSourceIP(
     const DirectSourceIPsTrie& direct_source_ips_trie,
     const Network::ConnectionSocket& socket) const {
-  auto address = socket.connectionInfoProvider().directRemoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    address = FilterChain::fakeAddress();
-  }
+  const auto& socket_address = socket.connectionInfoProvider().directRemoteAddress();
+  const auto& address = socket_address->type() == Network::Address::Type::Ip
+                            ? socket_address
+                            : FilterChain::fakeAddress();
 
-  const auto& data = direct_source_ips_trie.getData(address);
-  if (!data.empty()) {
-    ASSERT(data.size() == 1);
-    return findFilterChainForSourceTypes(*data.back(), socket);
+  const auto data = direct_source_ips_trie.getDataSet(address);
+  if (data.has_value()) {
+    ASSERT(data->size() == 1);
+    return findFilterChainForSourceTypes(**data->begin(), socket);
   }
 
   return nullptr;
@@ -837,19 +837,19 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.connectionInfoProvider().remoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    address = FilterChain::fakeAddress();
-  }
+  const auto& socket_address = socket.connectionInfoProvider().remoteAddress();
+  const auto& address = socket_address->type() == Network::Address::Type::Ip
+                            ? socket_address
+                            : FilterChain::fakeAddress();
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
-  const auto& data = source_ips_trie.getData(address);
-  if (data.empty()) {
+  const auto data = source_ips_trie.getDataSet(address);
+  if (!data.has_value()) {
     return nullptr;
   }
 
-  ASSERT(data.size() == 1);
-  const auto& source_ports_map = *data.back();
+  ASSERT(data->size() == 1);
+  const auto& source_ports_map = **data->begin();
   const uint32_t source_port = address->ip()->port();
   const auto port_match = source_ports_map.find(source_port);
 
