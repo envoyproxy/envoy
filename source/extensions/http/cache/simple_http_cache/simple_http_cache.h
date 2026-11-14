@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "absl/base/thread_annotations.h"
@@ -55,7 +54,8 @@ public:
                   const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
 
   absl::Mutex mutex_;
-  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);
+  // Keyed by the deterministic serialization of each cache key.
+  absl::flat_hash_map<std::string, Entry> map_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Cache

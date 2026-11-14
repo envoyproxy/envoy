@@ -70,6 +70,7 @@ envoy_cc_library(
         ":cacheability_utils_lib",
         ":upstream_request_lib",
         "//source/common/common:cancel_wrapper_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

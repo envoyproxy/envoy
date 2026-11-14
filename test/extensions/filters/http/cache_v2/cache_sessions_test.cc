@@ -306,6 +306,30 @@ TEST_F(CacheSessionsTest, CacheSessionsEntriesExpireOnAdjacentLookup) {
   EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(3));
 }
 
+TEST_F(CacheSessionsTest, CacheSessionsEntryExpiresOnLookupsOfOtherResources) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/stale"), _)).Times(2);
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/stale"), _)).Times(2);
+  cache_sessions_->lookup(testLookupRequest("/stale"), [](ActiveLookupResultPtr) {});
+  advanceTime(std::chrono::minutes(4));
+  const std::vector<std::string> paths{"/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h"};
+  for (const std::string& path : paths) {
+    EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath(path), _));
+    EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath(path), _)).Times(2);
+    cache_sessions_->lookup(testLookupRequest(path), [](ActiveLookupResultPtr) {});
+  }
+  advanceTime(std::chrono::minutes(2));
+  // Only /stale is expired now. Each request removes the entry after the one it touches if that
+  // entry is expired, so requests to every other resource remove /stale wherever it is in the
+  // table.
+  for (const std::string& path : paths) {
+    cache_sessions_->lookup(testLookupRequest(path), [](ActiveLookupResultPtr) {});
+  }
+  // The expired entry was removed, so this request has a new lookup.
+  cache_sessions_->lookup(testLookupRequest("/stale"), [](ActiveLookupResultPtr) {});
+  pumpDispatcher();
+  EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(paths.size() + 2));
+}
+
 TEST_F(CacheSessionsTest, CacheDeletionDuringLookupStillCompletesLookup) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));

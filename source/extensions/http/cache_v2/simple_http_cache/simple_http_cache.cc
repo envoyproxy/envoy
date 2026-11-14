@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache_v2/cache_sessions.h"
 
 namespace Envoy {
@@ -167,9 +168,10 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
 
 void SimpleHttpCache::lookup(LookupRequest&& request, LookupCallback&& callback) {
   LookupResult result;
+  const std::string serialized_key = MessageUtil::serializeDeterministically(request.key());
   {
     absl::ReaderMutexLock lock(mu_);
-    auto it = entries_.find(request.key());
+    auto it = entries_.find(serialized_key);
     if (it != entries_.end()) {
       result.cache_reader_ = std::make_unique<SimpleHttpCacheReader>(it->second);
       result.response_headers_ = it->second->copyHeaders();
@@ -182,15 +184,17 @@ void SimpleHttpCache::lookup(LookupRequest&& request, LookupCallback&& callback)
 }
 
 void SimpleHttpCache::evict(Event::Dispatcher&, const Key& key) {
+  const std::string serialized_key = MessageUtil::serializeDeterministically(key);
   absl::WriterMutexLock lock(mu_);
-  entries_.erase(key);
+  entries_.erase(serialized_key);
 }
 
 void SimpleHttpCache::updateHeaders(Event::Dispatcher&, const Key& key,
                                     const Http::ResponseHeaderMap& updated_headers,
                                     const ResponseMetadata& updated_metadata) {
+  const std::string serialized_key = MessageUtil::serializeDeterministically(key);
   absl::WriterMutexLock lock(mu_);
-  auto it = entries_.find(key);
+  auto it = entries_.find(serialized_key);
   if (it == entries_.end()) {
     return;
   }
@@ -203,9 +207,10 @@ void SimpleHttpCache::insert(Event::Dispatcher&, Key key, Http::ResponseHeaderMa
                              std::shared_ptr<CacheProgressReceiver> progress) {
   auto entry = std::make_shared<Entry>(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers),
                                        std::move(metadata));
+  std::string serialized_key = MessageUtil::serializeDeterministically(key);
   {
     absl::WriterMutexLock lock(mu_);
-    entries_.emplace(key, entry);
+    entries_.emplace(std::move(serialized_key), entry);
   }
   if (source) {
     progress->onHeadersInserted(std::make_unique<SimpleHttpCacheReader>(entry), std::move(headers),
