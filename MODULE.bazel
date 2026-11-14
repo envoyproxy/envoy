@@ -167,6 +167,14 @@ single_version_override(
 #     strip_prefix = "bazel",
 # )
 
+# TODO: remove, testing envoyproxy/toolshed#5597 (`oci_base_edit`) on the release.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "d0daea1e08b7734b72337b64d5587369b0fae7bf",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
 ####################################################################################
 # setup: Compilers
 ####################################################################################
