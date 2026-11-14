@@ -1,6 +1,9 @@
 #include "source/common/http/filter_manager.h"
 
 #include <functional>
+#include <limits>
+#include <ranges>
+#include <utility>
 
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -42,6 +45,9 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
   // though filter M > N was the filter that inserted data into the buffer.
   if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
+    // Data has passed the previous latest filter. With per-filter buffer, it buffers into its own
+    // buffer from now on rather than into the shared one held by the new latest filter.
+    latest_filter->passed_by_data_ = true;
     latest_filter = current_filter->get();
   }
 }
@@ -57,6 +63,95 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
 }
 
 } // namespace
+
+// Buffer of the filter manager with per-filter buffer enabled, used for both the shared buffer and
+// the filters' own buffers. It reports its length changes to the PerFilterBufferTracker of its
+// direction instead of applying watermarks to itself. Every mutation of a WatermarkBuffer,
+// including being drained as the source of a move, runs one of the overridden check hooks.
+class PerFilterBuffer : public Buffer::WatermarkBuffer {
+public:
+  explicit PerFilterBuffer(PerFilterBufferTracker& tracker)
+      : Buffer::WatermarkBuffer([] {}, [] {}, [] {}), tracker_(tracker) {}
+  ~PerFilterBuffer() override { tracker_.release(reported_length_); }
+
+  using Buffer::WatermarkBuffer::prepend;
+  void prepend(Instance& data) override {
+    tracker_.deferChecks();
+    Buffer::WatermarkBuffer::prepend(data);
+    tracker_.resumeChecks();
+  }
+  void move(Instance& rhs) override {
+    tracker_.deferChecks();
+    Buffer::WatermarkBuffer::move(rhs);
+    tracker_.resumeChecks();
+  }
+  void move(Instance& rhs, uint64_t length) override {
+    tracker_.deferChecks();
+    Buffer::WatermarkBuffer::move(rhs, length);
+    tracker_.resumeChecks();
+  }
+  void move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) override {
+    tracker_.deferChecks();
+    Buffer::WatermarkBuffer::move(rhs, length, reset_drain_trackers_and_accounting);
+    tracker_.resumeChecks();
+  }
+
+protected:
+  void checkHighAndOverflowWatermarks() override { tracker_.update(*this); }
+  void checkLowWatermark() override { tracker_.update(*this); }
+
+private:
+  friend class PerFilterBufferTracker;
+
+  PerFilterBufferTracker& tracker_;
+  // Length last reported to the tracker.
+  uint64_t reported_length_{};
+};
+
+// Records the filter as active for the scope, restoring the previously active filter on exit
+// so that nested iterations do not clear the record of the outer one.
+class PerFilterBufferTracker::ActiveFilterScope {
+public:
+  ActiveFilterScope(PerFilterBufferTracker& tracker, ActiveStreamFilterBase& filter)
+      : tracker_(tracker), previous_(std::exchange(tracker.active_filter_, &filter)) {}
+  ~ActiveFilterScope() { tracker_.active_filter_ = previous_; }
+
+private:
+  PerFilterBufferTracker& tracker_;
+  ActiveStreamFilterBase* const previous_;
+};
+
+void PerFilterBufferTracker::update(PerFilterBuffer& buffer) {
+  const uint64_t length = buffer.length();
+  // The total always includes the last reported length of every live buffer.
+  ASSERT(total_ >= buffer.reported_length_);
+  total_ -= buffer.reported_length_;
+  ASSERT(total_ <= std::numeric_limits<uint64_t>::max() - length);
+  total_ += length;
+  buffer.reported_length_ = length;
+  check();
+}
+
+void PerFilterBufferTracker::check() {
+  if (defer_depth_ > 0) {
+    return;
+  }
+  if (high_watermark_ != 0 && total_ > high_watermark_) {
+    if (!above_high_watermark_called_) {
+      above_high_watermark_called_ = true;
+      above_high_watermark_();
+    }
+    return;
+  }
+  if (above_high_watermark_called_ && (high_watermark_ == 0 || total_ <= low_watermark_)) {
+    above_high_watermark_called_ = false;
+    below_low_watermark_();
+  }
+}
+
+bool ActiveStreamFilterBase::observedEndStream() const {
+  return parent_.per_filter_observed_end_stream_ ? observed_end_stream_ : streamObservedEndStream();
+}
 
 void ActiveStreamFilterBase::commonContinue() {
   if (!canContinue()) {
@@ -248,15 +343,25 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (observedEndStream() && !hasTrailers() && !bufferedData() &&
-               // If the stream is destroyed, no need to handle the data buffer or trailers.
-               // This can occur if the filter calls sendLocalReply.
-               !parent_.state_.destroyed_) {
-      // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
-      // byte data frame, we need to create an empty buffer to make sure that when commonContinue
-      // is called, the pipeline resumes with an empty data frame with end_stream = true
-      ASSERT(end_stream_);
-      bufferedData() = createBuffer();
+    } else {
+      // StopIterationNoBuffer: the filter has consumed the data. With per-filter buffer, drop
+      // whatever it left, as the codecs do for the data they dispatch. Otherwise data replayed
+      // from an earlier filter's buffer would stay there and be replayed again. A filter replayed
+      // its own buffer (after StopAll) keeps it: e.g. the router keeps the body there for retries.
+      if (parent_.per_filter_buffer_ && &provided_data != bufferedData().get()) {
+        provided_data.drain(provided_data.length());
+      }
+      if (observedEndStream() && !hasTrailers() && !bufferedData() &&
+          // If the stream is destroyed, no need to handle the data buffer or trailers.
+          // This can occur if the filter calls sendLocalReply.
+          !parent_.state_.destroyed_) {
+        // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
+        // byte data frame, we need to create an empty buffer to make sure that when
+        // commonContinue is called, the pipeline resumes with an empty data frame with
+        // end_stream = true
+        ASSERT(end_stream_);
+        bufferedData() = createBuffer();
+      }
     }
 
     return false;
@@ -422,6 +527,9 @@ bool ActiveStreamEncoderFilter::canContinue() {
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
+  if (parent_.per_filter_buffer_) {
+    return std::make_unique<PerFilterBuffer>(parent_.request_buffer_tracker_);
+  }
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { parent_.requestDataDrained(); },
       [this]() -> void { parent_.requestDataTooLarge(this); },
@@ -431,10 +539,13 @@ Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
 }
 
 Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
-  return parent_.buffered_request_data_;
+  return parent_.per_filter_buffer_ && passed_by_data_ ? buffered_data_
+                                                       : parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
+bool ActiveStreamDecoderFilter::streamObservedEndStream() const {
+  return parent_.decoderObservedEndStream();
+}
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -446,6 +557,10 @@ void ActiveStreamDecoderFilter::doData(bool end_stream) {
 }
 
 void ActiveStreamDecoderFilter::doTrailers() {
+  if (parent_.forward_held_trailers_) {
+    parent_.forwardRequestTrailers();
+    return;
+  }
   parent_.decodeTrailers(this, *parent_.filter_manager_callbacks_.requestTrailers());
 }
 bool ActiveStreamDecoderFilter::hasTrailers() {
@@ -480,6 +595,8 @@ void ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
 }
 
 RequestTrailerMap& ActiveStreamDecoderFilter::addDecodedTrailers() {
+  // The added trailers are held at this filter's position.
+  parent_.request_trailers_state_ = {this, true};
   return parent_.addDecodedTrailers();
 }
 
@@ -494,12 +611,15 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
   injectDecodedHeadersToFilterChain(false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+  // The end-of-stream marker originates (or is retracted) at this filter's position.
+  observed_end_stream_ = end_stream;
+  // With per-filter observed end stream, the stream-level flag is left untouched: it records
+  // what the downstream client actually sent and drives lifecycle decisions.
+  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
     parent_.state().observed_decode_end_stream_ = end_stream;
-    ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream updated: {}", parent_,
-                     end_stream);
   }
+  ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream: {}", parent_,
+                   end_stream);
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -507,6 +627,8 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
 void ActiveStreamDecoderFilter::injectDecodedHeadersToFilterChain(bool end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
+    // Headers injected with end of stream carry the marker from this filter's position.
+    observed_end_stream_ |= end_stream;
     doHeaders(end_stream);
   }
 }
@@ -522,6 +644,7 @@ bool ActiveStreamDecoderFilter::shouldLoadShed() const { return parent_.shouldLo
 
 void ActiveStreamDecoderFilter::modifyDecodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
+  PerFilterBufferTracker::ActiveFilterScope buffer_scope(parent_.request_buffer_tracker_, *this);
   ASSERT(parent_.state_.latest_data_decoding_filter_ == this);
   callback(*bufferedData());
 }
@@ -636,6 +759,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
+    // |= as the marker latches: a later non-terminal delivery must not retract it.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
@@ -744,8 +869,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    PerFilterBufferTracker::ActiveFilterScope buffer_scope(request_buffer_tracker_, **entry);
     // If the filter pointed by entry has stopped for all frame types, return now.
-    if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
+    if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_, end_stream)) {
       return;
     }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
@@ -796,6 +922,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
+    // |= as the marker latches: when trailers are parked at this filter, its own buffered data
+    // is replayed to it with end_stream false, and that delivery must not retract the marker.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
@@ -839,9 +968,12 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     }
   }
 
-  // If trailers were adding during decodeData we need to trigger decodeTrailers in order
-  // to allow filters to process the trailers.
-  if (trailers_added_entry != decoder_filters_.end()) {
+  if (forward_held_trailers_) {
+    // Trailers added in this pass follow the data from the filter holding them, if it iterates.
+    forwardRequestTrailers();
+  } else if (trailers_added_entry != decoder_filters_.end()) {
+    // If trailers were adding during decodeData we need to trigger decodeTrailers in order
+    // to allow filters to process the trailers.
     decodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.requestTrailers());
   }
 
@@ -861,6 +993,7 @@ RequestTrailerMap& FilterManager::addDecodedTrailers() {
 
 void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data,
                                    bool streaming) {
+  PerFilterBufferTracker::ActiveFilterScope buffer_scope(request_buffer_tracker_, filter);
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::DecodeHeaders) ||
       (state_.filter_call_state_ & FilterCallState::DecodeData) ||
@@ -888,7 +1021,8 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
 
 MetadataMapVector& FilterManager::addDecodedMetadata() { return *getRequestMetadataMapVector(); }
 
-void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers) {
+void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers,
+                                   FilterIterationStartState filter_iteration_start_state) {
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
   if (stopDecoderFilterChain()) {
@@ -896,13 +1030,16 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
   }
 
   // Filter iteration may start at the current filter.
-  StreamDecoderFilters::Iterator entry =
-      commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
+  StreamDecoderFilters::Iterator entry = commonDecodePrefix(filter, filter_iteration_start_state);
   bool terminal_filter_reached = false;
   ASSERT(!state_.decoder_filter_chain_complete_ || entry == decoder_filters_.end());
 
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    // Trailers carry the end-of-stream marker: it reaches this filter's position whether the
+    // trailers are delivered to it below or parked here because it has stopped.
+    (*entry)->observed_end_stream_ = true;
+    request_trailers_state_ = {entry->get(), false};
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -910,6 +1047,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
+    request_trailers_state_.processed_ = true;
     (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
@@ -931,8 +1069,33 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       return;
     }
   }
+  // The trailers have left the chain.
+  request_trailers_state_ = {};
   disarmRequestTimeout();
   maybeEndDecode(terminal_filter_reached);
+}
+
+void FilterManager::forwardRequestTrailers() {
+  ASSERT(forward_held_trailers_);
+  ActiveStreamDecoderFilter* holder = request_trailers_state_.filter_;
+  // Trailers being delivered to a filter are forwarded by that delivery, not by data the filter
+  // adds from its trailers callback. Nothing is forwarded once the terminal filter has seen the end
+  // of stream, a local reply aborted the chain or the filters were destroyed, e.g. by a 413 that
+  // ended the stream.
+  if (holder == nullptr || (state_.filter_call_state_ & FilterCallState::DecodeTrailers) ||
+      !filter_manager_callbacks_.requestTrailers().has_value() || stopDecoderFilterChain() ||
+      state_.decoder_filter_chain_complete_ || state_.destroyed_) {
+    return;
+  }
+  if (!request_trailers_state_.processed_) {
+    // Parked at a filter that stopped all iteration and has not seen them yet. If it is still
+    // stopped, this parks them there again.
+    decodeTrailers(holder, *filter_manager_callbacks_.requestTrailers(),
+                   FilterIterationStartState::AlwaysStartFromCurrent);
+  } else if (holder->canIterate()) {
+    decodeTrailers(holder, *filter_manager_callbacks_.requestTrailers(),
+                   FilterIterationStartState::AlwaysStartFromNext);
+  }
 }
 
 void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map) {
@@ -1022,8 +1185,9 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
     return encoder_filters_.begin();
   }
 
-  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
-      (*(filter->entry()))->iterate_from_current_filter_) {
+  if (filter_iteration_start_state == FilterIterationStartState::AlwaysStartFromCurrent ||
+      (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
+       (*(filter->entry()))->iterate_from_current_filter_)) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's encoding callback has not be called. Call it now.
     return filter->entry();
@@ -1037,8 +1201,9 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   if (!filter) {
     return decoder_filters_.begin();
   }
-  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
-      (*(filter->entry()))->iterate_from_current_filter_) {
+  if (filter_iteration_start_state == FilterIterationStartState::AlwaysStartFromCurrent ||
+      (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
+       (*(filter->entry()))->iterate_from_current_filter_)) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's callback function has not been called. Call it now.
     return filter->entry();
@@ -1360,6 +1525,8 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
+    // |= as the marker latches: a later non-terminal delivery must not retract it.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
@@ -1531,6 +1698,7 @@ ResponseTrailerMap& FilterManager::addEncodedTrailers() {
 
 void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data,
                                    bool streaming) {
+  PerFilterBufferTracker::ActiveFilterScope buffer_scope(response_buffer_tracker_, filter);
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
       (state_.filter_call_state_ & FilterCallState::EncodeData) ||
@@ -1569,8 +1737,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    PerFilterBufferTracker::ActiveFilterScope buffer_scope(response_buffer_tracker_, **entry);
     // If the filter pointed by entry has stopped for all frame type, return now.
-    if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
+    if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_, end_stream)) {
       return;
     }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
@@ -1593,6 +1762,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
+    // |= as the marker latches: when trailers are parked at this filter, its own buffered data
+    // is replayed to it with end_stream false, and that delivery must not retract the marker.
+    (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace, "encodeData filter iteration aborted due to local reply: filter={}",
@@ -1616,6 +1788,10 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_,
                                                  data_nonempty_before_callback)) {
+      if (forward_held_trailers_) {
+        // Trailers added by an earlier filter in this pass follow the data up to here.
+        forwardResponseTrailers();
+      }
       return;
     }
   }
@@ -1627,22 +1803,29 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   }
   maybeEndEncode(modified_end_stream);
 
-  // If trailers were adding during encodeData we need to trigger decodeTrailers in order
-  // to allow filters to process the trailers.
-  if (trailers_added_entry != encoder_filters_.end()) {
+  if (forward_held_trailers_) {
+    // Trailers added in this pass follow the data from the filter holding them, if it iterates.
+    forwardResponseTrailers();
+  } else if (trailers_added_entry != encoder_filters_.end()) {
+    // If trailers were adding during encodeData we need to trigger decodeTrailers in order
+    // to allow filters to process the trailers.
     encodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.responseTrailers());
   }
 }
 
-void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
-                                   ResponseTrailerMap& trailers) {
+void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers,
+                                   FilterIterationStartState filter_iteration_start_state) {
   filter_manager_callbacks_.resetIdleTimer();
 
   // Filter iteration may start at the current filter.
   StreamEncoderFilters::Iterator entry =
-      commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
+      commonEncodePrefix(filter, true, filter_iteration_start_state);
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    // Trailers carry the end-of-stream marker: it reaches this filter's position whether the
+    // trailers are delivered to it below or parked here because it has stopped.
+    (*entry)->observed_end_stream_ = true;
+    response_trailers_state_ = {entry->get(), false};
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -1650,6 +1833,7 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    response_trailers_state_.processed_ = true;
     (*entry)->handle_->encodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
@@ -1660,11 +1844,34 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     }
   }
 
+  // The trailers have left the chain.
+  response_trailers_state_ = {};
   filter_manager_callbacks_.encodeTrailers(trailers);
   if (state_.saw_downstream_reset_) {
     return;
   }
   maybeEndEncode(true);
+}
+
+void FilterManager::forwardResponseTrailers() {
+  ASSERT(forward_held_trailers_);
+  ActiveStreamEncoderFilter* holder = response_trailers_state_.filter_;
+  // See forwardRequestTrailers(). encodeTrailers() does not check for an aborted chain or a
+  // downstream reset itself, so check them here. A local reply raised outside a filter callback
+  // (e.g. the 500 for a response over the buffer limit) does not abort the chain but completes
+  // it, and may already have destroyed the filters.
+  if (holder == nullptr || (state_.filter_call_state_ & FilterCallState::EncodeTrailers) ||
+      !filter_manager_callbacks_.responseTrailers().has_value() || stopEncoderFilterChain() ||
+      state_.encoder_filter_chain_complete_ || state_.destroyed_ || state_.saw_downstream_reset_) {
+    return;
+  }
+  if (!response_trailers_state_.processed_) {
+    encodeTrailers(holder, *filter_manager_callbacks_.responseTrailers(),
+                   FilterIterationStartState::AlwaysStartFromCurrent);
+  } else if (holder->canIterate()) {
+    encodeTrailers(holder, *filter_manager_callbacks_.responseTrailers(),
+                   FilterIterationStartState::AlwaysStartFromNext);
+  }
 }
 
 void FilterManager::maybeEndEncode(bool end_stream) {
@@ -1749,11 +1956,14 @@ bool FilterManager::processNewlyAddedMetadata() {
 }
 
 bool FilterManager::handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
-                                        bool& filter_streaming) {
+                                        bool& filter_streaming, bool end_stream) {
   if (filter.stoppedAll()) {
     ASSERT(!filter.canIterate());
     filter_streaming =
         filter.iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark;
+    // The data (and the end-of-stream marker, if it carries one) parks at this filter's position
+    // until iteration resumes here.
+    filter.observed_end_stream_ |= end_stream;
     filter.commonHandleBufferData(data);
     return true;
   }
@@ -1803,6 +2013,11 @@ void FilterManager::setBufferLimit(uint64_t new_limit) {
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
   }
+  if (!per_filter_buffer_) {
+    return;
+  }
+  request_buffer_tracker_.setLimit(buffer_limit_);
+  response_buffer_tracker_.setLimit(buffer_limit_);
 }
 
 Buffer::InstancePtr FilterManager::takeBufferedRequestData() {
@@ -1810,6 +2025,21 @@ Buffer::InstancePtr FilterManager::takeBufferedRequestData() {
   if (buffered_request_data_ != nullptr && buffered_request_data_->length() > 0) {
     data = std::make_unique<Buffer::OwnedImpl>();
     data->move(*buffered_request_data_);
+  }
+  if (!per_filter_buffer_) {
+    return data;
+  }
+  // The shared buffer is held by the latest filter data has reached, and own buffers only by
+  // filters data has passed. Data buffered at a later chain position entered the stream earlier,
+  // so take the shared buffer first and walk the chain in reverse to restore the byte order.
+  for (auto& entry : std::views::reverse(decoder_filters_.entries_)) {
+    Buffer::InstancePtr& buffered = entry->buffered_data_;
+    if (buffered != nullptr && buffered->length() > 0) {
+      if (data == nullptr) {
+        data = std::make_unique<Buffer::OwnedImpl>();
+      }
+      data->move(*buffered);
+    }
   }
   return data;
 }
@@ -1949,8 +2179,10 @@ void ActiveStreamDecoderFilter::removeUpstreamWatermarkCallbacks(
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
-  // there was no body from the HCM's point of view.
-  if (!observedEndStream()) {
+  // there was no body from the HCM's point of view. This deliberately checks the stream-level
+  // flag rather than this filter's positional marker: recreation requires the whole request to
+  // have been received, wherever it is currently buffered.
+  if (!parent_.decoderObservedEndStream()) {
     return false;
   }
 
@@ -1994,6 +2226,9 @@ Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOp
 }
 
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
+  if (parent_.per_filter_buffer_) {
+    return std::make_unique<PerFilterBuffer>(parent_.response_buffer_tracker_);
+  }
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { parent_.responseDataDrained(); },
       [this]() -> void { parent_.responseDataTooLarge(nullptr); },
@@ -2002,9 +2237,10 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
   return buffer;
 }
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
-  return parent_.buffered_response_data_;
+  return parent_.per_filter_buffer_ && passed_by_data_ ? buffered_data_
+                                                       : parent_.buffered_response_data_;
 }
-bool ActiveStreamEncoderFilter::observedEndStream() {
+bool ActiveStreamEncoderFilter::streamObservedEndStream() const {
   return parent_.state_.observed_encode_end_stream_;
 }
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
@@ -2056,6 +2292,10 @@ void ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
   iterate_from_current_filter_ = saved_state;
 }
 void ActiveStreamEncoderFilter::doTrailers() {
+  if (parent_.forward_held_trailers_) {
+    parent_.forwardResponseTrailers();
+    return;
+  }
   parent_.encodeTrailers(this, *parent_.filter_manager_callbacks_.responseTrailers());
 }
 bool ActiveStreamEncoderFilter::hasTrailers() {
@@ -2068,12 +2308,15 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
   injectEncodedHeadersToFilterChain(false);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+  // The end-of-stream marker originates (or is retracted) at this filter's position.
+  observed_end_stream_ = end_stream;
+  // With per-filter observed end stream, the stream-level flag is left untouched: it records
+  // what the upstream actually sent and drives lifecycle decisions.
+  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
-    ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream updated: {}", parent_,
-                     end_stream);
   }
+  ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream: {}", parent_,
+                   end_stream);
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -2081,11 +2324,15 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
 void ActiveStreamEncoderFilter::injectEncodedHeadersToFilterChain(bool end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
+    // Headers injected with end of stream carry the marker from this filter's position.
+    observed_end_stream_ |= end_stream;
     doHeaders(end_stream);
   }
 }
 
 ResponseTrailerMap& ActiveStreamEncoderFilter::addEncodedTrailers() {
+  // The added trailers are held at this filter's position.
+  parent_.response_trailers_state_ = {this, true};
   return parent_.addEncodedTrailers();
 }
 
@@ -2109,6 +2356,7 @@ const Buffer::Instance* ActiveStreamEncoderFilter::encodingBuffer() { return buf
 
 void ActiveStreamEncoderFilter::modifyEncodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
+  PerFilterBufferTracker::ActiveFilterScope buffer_scope(parent_.response_buffer_tracker_, *this);
   ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
   callback(*bufferedData());
 }

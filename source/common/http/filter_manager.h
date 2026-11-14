@@ -63,6 +63,68 @@ private:
   const absl::string_view filter_config_name_;
 };
 
+// Per-filter buffer of the filter manager.
+class PerFilterBuffer;
+
+// Applies the stream buffer limit to the total bytes held by all per-filter buffers of one
+// direction, with the same hysteresis as Buffer::WatermarkBuffer: the high callback fires once the
+// total exceeds the limit, and the low callback fires once it drops back to half the limit.
+class PerFilterBufferTracker {
+public:
+  PerFilterBufferTracker(uint64_t limit, absl::AnyInvocable<void()> above_high_watermark,
+                         absl::AnyInvocable<void()> below_low_watermark)
+      : above_high_watermark_(std::move(above_high_watermark)),
+        below_low_watermark_(std::move(below_low_watermark)) {
+    setLimitOnly(limit);
+  }
+
+  // Updates the limit, firing any callback triggered by the change.
+  void setLimit(uint64_t limit) {
+    setLimitOnly(limit);
+    check();
+  }
+
+  // The filter whose processing is changing the buffers, or nullptr if none. Used as the owner of
+  // a local reply sent because the limit was exceeded.
+  ActiveStreamFilterBase* activeFilter() const { return active_filter_; }
+
+  // RAII recorder of the active filter, defined in filter_manager.cc.
+  class ActiveFilterScope;
+
+private:
+  friend class PerFilterBuffer;
+
+  // Accounts for the length change of the buffer since its last report.
+  void update(PerFilterBuffer& buffer);
+  // Removes the bytes of a destroyed buffer without firing callbacks, as a destroyed
+  // WatermarkBuffer does.
+  void release(uint64_t length) {
+    ASSERT(total_ >= length);
+    total_ -= length;
+  }
+  // Hold the threshold checks while bytes move between two buffers of this tracker, so the
+  // source being drained and the destination being filled are seen as one net change.
+  void deferChecks() { defer_depth_++; }
+  void resumeChecks() {
+    defer_depth_--;
+    check();
+  }
+  void setLimitOnly(uint64_t limit) {
+    high_watermark_ = limit;
+    low_watermark_ = limit / 2;
+  }
+  void check();
+
+  absl::AnyInvocable<void()> above_high_watermark_;
+  absl::AnyInvocable<void()> below_low_watermark_;
+  ActiveStreamFilterBase* active_filter_{};
+  uint64_t total_{};
+  uint64_t high_watermark_{};
+  uint64_t low_watermark_{};
+  uint32_t defer_depth_{};
+  bool above_high_watermark_called_{};
+};
+
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
 // construct the filter in place in the vector. This should reduce the heap allocation and
 // memory fragmentation.
@@ -136,12 +198,28 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void commonContinue();
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
+  // Buffer that body data stopped at this filter is buffered into, and that
+  // decodingBuffer()/encodingBuffer(), addDecodedData()/addEncodedData() and
+  // modifyDecodingBuffer()/modifyEncodingBuffer() operate on. This is the stream-level buffer
+  // shared by all filters, owned by the latest filter that data has reached. With per-filter
+  // buffer enabled, a filter that data has already passed (see passed_by_data_) uses its own
+  // buffer instead, so it never sees or changes the bytes held further down the chain.
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  virtual bool observedEndStream() PURE;
+  // Whether the end of the stream has been observed, used for the end_stream flag when resuming
+  // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream
+  // marker has reached this filter's position: an end-stream-carrying frame was either delivered
+  // to this filter or parked at this position while iteration is stopped. Otherwise it is the
+  // stream-level observed_[de|en]code_end_stream_ flag.
+  bool observedEndStream() const;
+  // Whether the filter manager has observed the end of the stream in this direction, no matter
+  // which filter positions the end-of-stream marker has reached.
+  virtual bool streamObservedEndStream() const PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
   virtual void doData(bool end_stream) PURE;
+  // Continues the trailers of this direction. With held trailers forwarding, they are forwarded
+  // from the filter holding them, if any. See FilterManager::TrailersState.
   virtual void doTrailers() PURE;
   virtual bool hasTrailers() PURE;
   virtual void doMetadata() PURE;
@@ -229,6 +307,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   const FilterContext filter_context_;
 
+  // Created on demand and only used with per-filter buffer enabled, once data has passed this
+  // filter. See bufferedData().
+  // TODO(wbpcode): add new filter callback methods that take advantage of the per-filter buffer
+  // (e.g. access to the replayed frame and to the filter's own buffer separately), so filters
+  // do not need to rely on the legacy decodingBuffer()/addDecodedData() semantics.
+  Buffer::InstancePtr buffered_data_;
+
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
@@ -240,6 +325,15 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool end_stream_{};
   // If true, the filter has processed headers.
   bool processed_headers_{};
+  // True once the end-of-stream marker has reached this filter's position. Unlike end_stream_,
+  // which is set only when the terminal frame is actually delivered to the filter's callback,
+  // this is also set when that frame parks at this position without the filter being invoked.
+  // Frame deliveries latch this flag (|=) and never clear it; only the data injection APIs,
+  // which author the marker rather than record its arrival, may retract it.
+  bool observed_end_stream_{};
+  // True once data has passed this filter, i.e. the latest filter that data has reached is
+  // further down the chain. Only used with per-filter buffer enabled. See bufferedData().
+  bool passed_by_data_{};
 };
 
 /**
@@ -257,7 +351,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -349,7 +443,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -706,7 +800,25 @@ public:
                 uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
+        proxy_100_continue_(proxy_100_continue),
+        per_filter_observed_end_stream_(ENVOY_RUNTIME_FEATURE_ENABLED(
+            "envoy.reloadable_features.filter_manager_per_filter_observed_end_stream")),
+        inject_data_with_state_update_(ENVOY_RUNTIME_FEATURE_ENABLED(
+            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
+        per_filter_buffer_(per_filter_observed_end_stream_ &&
+                           ENVOY_RUNTIME_FEATURE_ENABLED(
+                               "envoy.reloadable_features.filter_manager_per_filter_buffer")),
+        request_buffer_tracker_(
+            buffer_limit,
+            [this]() -> void { requestDataTooLarge(request_buffer_tracker_.activeFilter()); },
+            [this]() -> void { requestDataDrained(); }),
+        response_buffer_tracker_(
+            buffer_limit,
+            [this]() -> void { responseDataTooLarge(response_buffer_tracker_.activeFilter()); },
+            [this]() -> void { responseDataDrained(); }),
+        forward_held_trailers_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.filter_manager_forward_held_trailers")),
+        buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -1086,7 +1198,13 @@ private:
   };
 
   // Indicates which filter to start the iteration with.
-  enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+  enum class FilterIterationStartState {
+    AlwaysStartFromNext,
+    // Starts from the current filter if it is resuming from stopping all iteration.
+    CanStartFromCurrent,
+    // Starts from the current filter, e.g. one that trailers are held at but have not reached.
+    AlwaysStartFromCurrent,
+  };
 
   UpgradeResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
                                          FilterChainFactoryCallbacksImpl& callbacks);
@@ -1110,7 +1228,11 @@ private:
   // filter to start the iteration with.
   void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers);
+  void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers,
+                      FilterIterationStartState filter_iteration_start_state =
+                          FilterIterationStartState::CanStartFromCurrent);
+  // Forwards the request trailers from the filter holding them.
+  void forwardRequestTrailers();
   void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
   void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
   ResponseTrailerMap& addEncodedTrailers();
@@ -1126,7 +1248,11 @@ private:
   // to update stats, do end stream bookkeeping, and send the data to encoder.
   void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
+  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers,
+                      FilterIterationStartState filter_iteration_start_state =
+                          FilterIterationStartState::CanStartFromCurrent);
+  // See forwardRequestTrailers().
+  void forwardResponseTrailers();
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
   bool hasSavedResponseMetadata() const;
   void encodeSavedResponseMetadataToCodec();
@@ -1145,7 +1271,7 @@ private:
   // filter_streaming is the variable to indicate if stream is streaming, and its value may be
   // changed by the function.
   bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
-                           bool& filter_streaming);
+                           bool& filter_streaming, bool end_stream);
 
   MetadataMapVector* getRequestMetadataMapVector() {
     if (request_metadata_map_vector_ == nullptr) {
@@ -1173,10 +1299,42 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  // Runtime flags latched when the filter manager is created, so the end_stream handling stays
+  // consistent for the lifetime of the stream.
+  const bool per_filter_observed_end_stream_;
+  const bool inject_data_with_state_update_;
+  // Per-filter buffer relies on the positional end-of-stream markers, so it is only enabled when
+  // per-filter observed end stream is enabled too.
+  const bool per_filter_buffer_;
+  // Apply the buffer limit across the per-filter buffers. Declared before the filters so they
+  // outlive the buffers that report to them. The local reply for a too large body is owned by the
+  // filter whose processing exceeded the limit, if any.
+  // TODO(wbpcode): the streaming flag is stream-level and the limit is latched like a single
+  // WatermarkBuffer, so once a streaming filter raises the watermark, a later buffering filter
+  // growing past the limit is never escalated to a local reply. Same as the shared buffer path.
+  PerFilterBufferTracker request_buffer_tracker_;
+  PerFilterBufferTracker response_buffer_tracker_;
+  // Runtime flag latched when the filter manager is created, so the trailers handling stays
+  // consistent for the lifetime of the stream.
+  const bool forward_held_trailers_;
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;
   std::vector<StreamFilterBase*> filters_;
+
+  // The single position holding the trailers of a direction. Trailers are held by the filter that
+  // added them, then by each filter they reach while being forwarded, until they leave the chain.
+  // They are forwarded from the holder only while it is iterating, and forwarding updates the
+  // holder before any callback runs, so whichever path forwards them first (the end of a data
+  // pass, or commonContinue()) is the only one.
+  template <class Filter> struct TrailersState {
+    Filter* filter_{};
+    // Whether filter_ added or processed the trailers, so they continue after it. Otherwise they
+    // are parked before filter_, which stopped all iteration, and continue from it.
+    bool processed_{};
+  };
+  TrailersState<ActiveStreamDecoderFilter> request_trailers_state_;
+  TrailersState<ActiveStreamEncoderFilter> response_trailers_state_;
   AccessLog::InstanceSharedPtrVector access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before

@@ -81,6 +81,9 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+// Ignore the automated "remove this flag" issue: do not remove this before
+// envoy.reloadable_features.filter_manager_per_filter_observed_end_stream is removed, since it is
+// still used when that flag is disabled.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
@@ -94,6 +97,21 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strat
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not
 // lost. See https://github.com/envoyproxy/envoy/issues/46841
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
+// Forward trailers from the filter holding them (the filter that added them, or a filter that
+// stopped all iteration when they arrived) exactly once, once that filter iterates, so they reach
+// every later filter, instead of dispatching them from the adding filter at the end of the data
+// pass.
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
+// When resuming filter chain iteration, compute end_stream from whether the end of the stream has
+// reached the resuming filter, instead of from the stream-level flag. When enabled,
+// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
+// Buffer body data stopped at a filter that body data has already passed in that filter's own
+// buffer instead of the buffer shared by the whole stream, so it can stop and buffer again
+// without mixing its data into data buffered further down the chain. Only
+// takes effect when envoy.reloadable_features.filter_manager_per_filter_observed_end_stream is
+// also enabled.
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_observed_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -432,7 +450,10 @@ bool isLegacyRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  return runtimeFeatureEnabled(RuntimeFeaturesDefaults::get().getFlag(feature), feature);
+}
+
+bool runtimeFeatureEnabled(absl::CommandLineFlag* flag, absl::string_view feature) {
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;

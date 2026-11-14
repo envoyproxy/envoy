@@ -58,6 +58,11 @@ void ExtProcIntegrationTest::TearDown() {
     ASSERT_TRUE(processor_connection_1_->waitForDisconnect());
   }
 
+  if (processor_connection_2_) {
+    ASSERT_TRUE(processor_connection_2_->close());
+    ASSERT_TRUE(processor_connection_2_->waitForDisconnect());
+  }
+
   cleanupUpstreamAndDownstream();
 }
 
@@ -74,8 +79,6 @@ void ExtProcIntegrationTest::addDownstreamExtProcFilter(
 
 void ExtProcIntegrationTest::initializeConfig(
     ConfigOptions config_option, const std::vector<std::pair<int, int>>& cluster_endpoints) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
   int total_cluster_endpoints = 0;
   std::for_each(
       cluster_endpoints.begin(), cluster_endpoints.end(),
