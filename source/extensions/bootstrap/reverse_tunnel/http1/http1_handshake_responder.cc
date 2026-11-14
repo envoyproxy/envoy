@@ -1,8 +1,10 @@
 #include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_responder.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
@@ -10,6 +12,8 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/strings/match.h"
@@ -71,10 +75,34 @@ Http::RequestDecoder& Http1HandshakeResponder::newStream(Http::ResponseEncoder& 
   return *active_decoder_;
 }
 
+HandshakeRequestSpec makeHandshakeRequestSpec(absl::string_view path,
+                                              envoy::config::core::v3::RequestMethod method,
+                                              bool use_http_upgrade) {
+  if (method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
+    method = envoy::config::core::v3::GET;
+  }
+  return {envoy::config::core::v3::RequestMethod_Name(method),
+          path.empty() ? std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)
+                       : std::string(path),
+          use_http_upgrade};
+}
+
 ResponderHandshakePtr
 Http1HandshakeResponderConfigurator::createHandshake(ResponderHandshakeCallbacks& callbacks) const {
   return std::make_unique<Http1HandshakeResponder>(callbacks, codec_stats_, spec_);
 }
+
+absl::StatusOr<ResponderHandshakeConfiguratorSharedPtr>
+Http1ResponderHandshakeConfiguratorFactory::createConfigurator(
+    const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
+  const auto& http1_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::filters::network::reverse_tunnel::v3::Http1HandshakeConfig&>(
+      config, context.messageValidationVisitor());
+  return std::make_shared<Http1HandshakeResponderConfigurator>(makeHandshakeRequestSpec(
+      http1_config.request_path(), http1_config.request_method(), http1_config.use_http_upgrade()));
+}
+
+REGISTER_FACTORY(Http1ResponderHandshakeConfiguratorFactory, ResponderHandshakeConfiguratorFactory);
 
 // RequestDecoderImpl
 void Http1HandshakeResponder::RequestDecoderImpl::decodeHeaders(

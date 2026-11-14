@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
@@ -104,17 +105,48 @@ private:
  */
 class Http1HandshakeConfigurator : public InitiatorHandshakeConfigurator {
 public:
-  explicit Http1HandshakeConfigurator(Http1InitiatorFraming framing = {})
-      : framing_(std::make_shared<const Http1InitiatorFraming>(std::move(framing))) {}
+  explicit Http1HandshakeConfigurator(
+      Http1InitiatorFraming framing = {},
+      std::chrono::milliseconds handshake_timeout = std::chrono::milliseconds{15000})
+      : framing_(std::make_shared<const Http1InitiatorFraming>(std::move(framing))),
+        handshake_timeout_(handshake_timeout) {}
 
   std::unique_ptr<InitiatorHandshake>
   createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
     return std::make_unique<Http1HandshakeInitiator>(callbacks, framing_);
   }
 
+  std::chrono::milliseconds handshakeTimeout() const override { return handshake_timeout_; }
+
+  const Http1InitiatorFraming& framing() const { return *framing_; }
+
 private:
   const Http1InitiatorFramingConstSharedPtr framing_;
+  std::chrono::milliseconds handshake_timeout_;
 };
+
+/**
+ * Registered under the name ``envoy.reverse_tunnel.initiator_handshake.http1``. Its typed config
+ * is ``HttpHandshakeConfig``: ``request_path``, ``use_http_upgrade``, ``additional_headers`` and
+ * ``handshake_timeout`` apply as on ``http_handshake``. ``formatters`` is rejected; formatted
+ * headers are only available through ``http_handshake``.
+ */
+class Http1InitiatorHandshakeConfiguratorFactory : public InitiatorHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+            DownstreamReverseConnectionSocketInterface::HttpHandshakeConfig>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.initiator_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.initiator_handshake.http1"; }
+
+  InitiatorHandshakeConfiguratorSharedPtr
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::ServerFactoryContext& context) override;
+};
+
+DECLARE_FACTORY(Http1InitiatorHandshakeConfiguratorFactory);
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

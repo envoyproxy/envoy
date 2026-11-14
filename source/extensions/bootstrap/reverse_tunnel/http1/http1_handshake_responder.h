@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
@@ -9,6 +11,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/handshake_responder.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -24,6 +27,12 @@ struct HandshakeRequestSpec {
   std::string path;
   bool use_http_upgrade{false};
 };
+
+// Builds the enforced framing from config values; an empty path and an unspecified method fall
+// back to the defaults.
+HandshakeRequestSpec makeHandshakeRequestSpec(absl::string_view path,
+                                              envoy::config::core::v3::RequestMethod method,
+                                              bool use_http_upgrade);
 
 /**
  * HTTP/1.1 responder handshake. Parses the handshake request with an HTTP/1 server codec, enforces
@@ -94,20 +103,41 @@ private:
 
 /**
  * Factory for the HTTP/1.1 responder handshake. One instance per filter config; the codec
- * stats it holds outlive every per-connection codec.
+ * stats it owns outlive every per-connection codec.
  */
 class Http1HandshakeResponderConfigurator : public ResponderHandshakeConfigurator {
 public:
-  Http1HandshakeResponderConfigurator(Http::Http1::CodecStats::AtomicPtr& codec_stats,
-                                      HandshakeRequestSpec spec)
-      : codec_stats_(codec_stats), spec_(std::move(spec)) {}
+  explicit Http1HandshakeResponderConfigurator(HandshakeRequestSpec spec)
+      : spec_(std::move(spec)) {}
 
   ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks& callbacks) const override;
 
+  const HandshakeRequestSpec& spec() const { return spec_; }
+
 private:
-  Http::Http1::CodecStats::AtomicPtr& codec_stats_;
+  mutable Http::Http1::CodecStats::AtomicPtr codec_stats_;
   const HandshakeRequestSpec spec_;
 };
+
+/**
+ * Registered under the name ``envoy.reverse_tunnel.responder_handshake.http1``. Its typed config
+ * is ``Http1HandshakeConfig``, applied as ``http1_handshake`` on the filter config.
+ */
+class Http1ResponderHandshakeConfiguratorFactory : public ResponderHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::filters::network::reverse_tunnel::v3::Http1HandshakeConfig>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.responder_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.responder_handshake.http1"; }
+
+  absl::StatusOr<ResponderHandshakeConfiguratorSharedPtr>
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& context) override;
+};
+
+DECLARE_FACTORY(Http1ResponderHandshakeConfiguratorFactory);
 
 } // namespace ReverseConnection
 } // namespace Bootstrap
