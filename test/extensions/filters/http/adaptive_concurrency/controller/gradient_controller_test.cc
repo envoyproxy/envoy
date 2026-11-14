@@ -283,6 +283,90 @@ min_rtt_calc_params:
   EXPECT_EQ(config.minRTTCalcConcurrency(), 3);
   EXPECT_EQ(config.minConcurrencyLimit(), 3);
   EXPECT_EQ(config.minRTTBufferPercent(), 0.25);
+  EXPECT_EQ(config.minLatencyDelta(), std::chrono::microseconds::zero());
+  EXPECT_TRUE(config.isMinRTTSamplingEnabled());
+}
+
+TEST_F(GradientControllerTest, NewFeaturesAreDisabledByDefault) {
+  for (const bool fixed : {false, true}) {
+    SCOPED_TRACE(fixed);
+    const std::string yaml = std::string(R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 0.1s
+  min_concurrency_limit: 4
+min_rtt_calc_params:
+  min_concurrency: 8
+)EOF") + (fixed ? "  fixed_value: 0.005s\n"
+                : "  interval: 30s\n  jitter: {value: 0}\n  request_count: 5\n");
+    auto run = [&](const std::string& config) {
+      auto controller = makeController(config);
+      EXPECT_EQ(controller->isMinRTTSamplingEnabled(), !fixed);
+      EXPECT_EQ(controller->concurrencyLimit(), fixed ? 4 : 8);
+      if (!fixed) {
+        advancePastMinRTTStage(controller, config);
+      }
+      std::vector<uint32_t> limits;
+      for (const auto latency : {4, 6, 20, 5, 30, 3}) {
+        driveSampleRTTWindows(controller, std::chrono::milliseconds(latency), 1);
+        limits.push_back(controller->concurrencyLimit());
+      }
+      return limits;
+    };
+    const auto original = run(yaml);
+    // An explicit zero duration must be identical to the old configuration.
+    EXPECT_EQ(original, run(yaml + "  min_latency_delta: 0s\n"));
+  }
+}
+
+TEST_F(GradientControllerTest, MinLatencyDeltaUsesMaximumNotSum) {
+  for (const bool sampled : {false, true}) {
+    for (const std::string delta : {"0s", "0.001s", "0.005s", "0.010s", "9223372035.999999999s"}) {
+      SCOPED_TRACE(sampled);
+      SCOPED_TRACE(delta);
+      const std::string yaml =
+          std::string(R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 0.1s
+  min_concurrency_limit: 20
+min_rtt_calc_params:
+  min_concurrency: 20
+  buffer: {value: 100}
+)EOF") +
+          (sampled ? "  interval: 30s\n  request_count: 5\n  jitter: {value: 0}\n"
+                   : "  fixed_value: 0.005s\n") +
+          "  min_latency_delta: " + delta + "\n";
+      auto controller = makeController(yaml);
+      if (sampled) {
+        advancePastMinRTTStage(controller, yaml);
+      }
+      driveSampleRTTWindows(controller, std::chrono::milliseconds(20), 1);
+      const auto gradient =
+          stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::NeverImport).value();
+      // The relative buffer is 5ms. A 10ms absolute buffer raises the threshold from 10 to 15ms,
+      // not 20ms. Very large legal durations must saturate the gradient without integer overflow.
+      const uint64_t expected = delta == "9223372035.999999999s" ? 2000
+                                : delta == "0.010s"              ? 750
+                                                                 : 500;
+      EXPECT_NEAR(gradient, expected, 30);
+    }
+  }
+}
+
+TEST_F(GradientControllerTest, MinLatencyDeltaMaximumDurationDoesNotOverflow) {
+  auto controller = makeController(R"EOF(
+concurrency_limit_params:
+  concurrency_update_interval: 0.1s
+  min_concurrency_limit: 20
+min_rtt_calc_params:
+  fixed_value: 2s
+  buffer: {value: 100}
+  min_latency_delta: 9223372035.999999999s
+)EOF");
+  driveSampleRTTWindows(controller, std::chrono::seconds(10), 1);
+  // This is Envoy's maximum validated duration. Adding the baseline in integer nanoseconds
+  // would overflow; the absolute buffer must still win over the 2s relative buffer.
+  EXPECT_EQ(2000,
+            stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 TEST_F(GradientControllerConfigTest, MinConcurrencyLimitFallsBackToMinRTTCalcConcurrency) {

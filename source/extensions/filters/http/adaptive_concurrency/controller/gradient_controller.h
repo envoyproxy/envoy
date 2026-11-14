@@ -103,6 +103,8 @@ public:
   // True if minRTT is sampled.
   bool isMinRTTSamplingEnabled() const { return fixedValue() <= std::chrono::milliseconds::zero(); }
 
+  std::chrono::microseconds minLatencyDelta() const { return min_latency_delta_; }
+
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
     const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().MinRTTBufferPercentKey,
@@ -168,6 +170,7 @@ private:
 
   // The amount added to the measured minRTT as a hedge against natural variability in latency.
   const double min_rtt_buffer_pct_;
+  const std::chrono::microseconds min_latency_delta_;
 };
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 

@@ -54,7 +54,7 @@ message GradientControllerConfig {
   }
 
   // Parameters controlling the periodic minRTT recalculation.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message MinimumRTTCalculationParams {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
@@ -88,6 +88,10 @@ message GradientControllerConfig {
     //
     // Defaults to 25%.
     type.v3.Percent buffer = 5;
+
+    // Minimum absolute buffer. The larger of this duration and the relative buffer is used.
+    // Unset or zero preserves the existing percentage-only behavior.
+    google.protobuf.Duration min_latency_delta = 7 [(validate.rules).duration = {gte {}}];
   }
 
   // The percentile to use when summarizing aggregated samples. Defaults to p50.
@@ -97,6 +101,39 @@ message GradientControllerConfig {
       [(validate.rules).message = {required: true}];
 
   MinimumRTTCalculationParams min_rtt_calc_params = 3 [(validate.rules).message = {required: true}];
+}
+
+// A probe-free controller inspired by Netflix Gradient2. Each nonempty sample window contributes
+// one RTT percentile to a long-term exponentially weighted moving average (EWMA).
+// [#next-free-field: 10]
+message EwmaControllerConfig {
+  // Time between limit updates. Defaults to 1s. Empty windows do not update the controller.
+  google.protobuf.Duration concurrency_update_interval = 1
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // Half-life of the baseline over nonempty windows after initialization. Defaults to 300s.
+  google.protobuf.Duration half_life = 2 [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // Number of nonempty window percentiles averaged to initialize the baseline. Defaults to 10.
+  google.protobuf.UInt32Value warmup_windows = 3 [(validate.rules).uint32 = {gt: 0}];
+
+  // Lower bound on the calculated limit. Defaults to 3.
+  google.protobuf.UInt32Value min_concurrency_limit = 4 [(validate.rules).uint32 = {gt: 0}];
+
+  // Upper bound on the calculated limit. Defaults to 1000.
+  google.protobuf.UInt32Value max_concurrency_limit = 5 [(validate.rules).uint32 = {gt: 0}];
+
+  // Starting limit, between the minimum and maximum (inclusive). Defaults to the minimum.
+  google.protobuf.UInt32Value initial_concurrency = 6 [(validate.rules).uint32 = {gt: 0}];
+
+  // Percentile of completed request latencies used for both the sample and baseline. Defaults to p50.
+  type.v3.Percent sample_aggregate_percentile = 7;
+
+  // Relative latency buffer added to the baseline. Defaults to 25%.
+  type.v3.Percent buffer = 8;
+
+  // Minimum absolute buffer. Uses the larger of this duration and the relative buffer. Defaults to zero.
+  google.protobuf.Duration min_latency_delta = 9 [(validate.rules).duration = {gte {}}];
 }
 
 message AdaptiveConcurrency {
@@ -109,6 +146,9 @@ message AdaptiveConcurrency {
     // Gradient concurrency control will be used.
     GradientControllerConfig gradient_controller_config = 1
         [(validate.rules).message = {required: true}];
+
+    // Select the probe-free EWMA controller instead of the gradient controller.
+    EwmaControllerConfig ewma_controller_config = 4;
   }
 
   // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the

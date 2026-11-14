@@ -12,6 +12,20 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "ewma_controller_test",
+    srcs = ["ewma_controller_test.cc"],
+    extension_names = ["envoy.filters.http.adaptive_concurrency"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/adaptive_concurrency/controller:controller_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "gradient_controller_test",
     srcs = ["gradient_controller_test.cc"],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
