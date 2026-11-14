@@ -1443,10 +1443,10 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
 
   // Filter chain manager maintains an optional default filter chain besides the filter chains
   // indexed by message.
-  if (auto eq = MessageUtil();
-      filter_chain_manager_->defaultFilterChainMessage().has_value() &&
+  if (filter_chain_manager_->defaultFilterChainMessage().has_value() &&
       (!another_listener.filter_chain_manager_->defaultFilterChainMessage().has_value() ||
-       !eq(*another_listener.filter_chain_manager_->defaultFilterChainMessage(),
+       !FilterChainManagerImpl::filterChainMessagesEqual(
+           *another_listener.filter_chain_manager_->defaultFilterChainMessage(),
            *filter_chain_manager_->defaultFilterChainMessage()))) {
     callback(*filter_chain_manager_->defaultFilterChain());
   }
