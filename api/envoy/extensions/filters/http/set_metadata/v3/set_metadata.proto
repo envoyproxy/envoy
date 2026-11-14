@@ -48,9 +48,16 @@ message Metadata {
   //
   // The object is converted to a ``google.protobuf.Any`` as follows:
   //
-  // * If the object supports proto serialization (``serializeAsProto()``), the
-  //   resulting message is packed into the ``Any``. If the message is already
-  //   an ``Any`` it is used as is.
+  // * If :ref:`value_is_serialized_any
+  //   <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.FilterStateSource.value_is_serialized_any>`
+  //   is set, the object's string serialization (``serializeAsString()``) is
+  //   parsed as a serialized ``Any``, which is used as is. If the object has no
+  //   string serialization or the string is not a serialized ``Any``, nothing
+  //   is written and the ``filter_state_not_serializable`` counter is
+  //   incremented.
+  // * Otherwise, if the object supports proto serialization
+  //   (``serializeAsProto()``), the resulting message is packed into the
+  //   ``Any``. If the message is already an ``Any`` it is used as is.
   // * Otherwise, if the object supports string serialization
   //   (``serializeAsString()``), the string is packed as a
   //   ``google.protobuf.StringValue``.
@@ -68,6 +75,16 @@ message Metadata {
 message FilterStateSource {
   // The key of the filter state object.
   string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // If true, the filter state object's string serialization is a serialized
+  // ``google.protobuf.Any``, which is stored as is. See :ref:`filter_state
+  // <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.filter_state>`
+  // for how the object is converted and what happens on failure.
+  //
+  // This lets a filter that can only store bytes in filter state, for example
+  // a Wasm filter calling ``set_property``, provide a typed value. Without it,
+  // such bytes are converted to ``Any<google.protobuf.BytesValue>``.
+  bool value_is_serialized_any = 2;
 }
 
 message Config {

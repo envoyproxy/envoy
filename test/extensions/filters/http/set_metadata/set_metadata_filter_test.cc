@@ -68,8 +68,37 @@ private:
   const std::string value_;
 };
 
+// Filter state object that serializes to an Any wrapping a BytesValue and to
+// the raw bytes as a string, like the bytes CelState a Wasm filter writes.
+class TestBytesFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  explicit TestBytesFilterStateObject(absl::string_view value) : value_(value) {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    Protobuf::BytesValue bytes_value;
+    bytes_value.set_value(value_);
+    auto any = std::make_unique<Protobuf::Any>();
+    any->PackFrom(bytes_value);
+    return any;
+  }
+
+  std::optional<std::string> serializeAsString() const override { return value_; }
+
+private:
+  const std::string value_;
+};
+
 // Filter state object that supports no serialization at all.
 class TestOpaqueFilterStateObject : public StreamInfo::FilterState::Object {};
+
+// Returns a serialized Any wrapping a Config with the given metadata namespace.
+std::string SerializedConfigAny(absl::string_view metadata_namespace) {
+  envoy::extensions::filters::http::set_metadata::v3::Config message;
+  message.set_metadata_namespace(metadata_namespace);
+  Protobuf::Any any;
+  any.PackFrom(message);
+  return any.SerializeAsString();
+}
 
 class SetMetadataFilterTest : public testing::Test {
 
@@ -666,6 +695,102 @@ TEST_F(SetMetadataFilterTest, FilterStateNotSerializable) {
 
   EXPECT_TRUE(metadata.typed_filter_metadata().empty());
   EXPECT_EQ(0, config_->stats().filter_state_not_found_.value());
+  EXPECT_EQ(1, config_->stats().filter_state_not_serializable_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateValueIsSerializedAny) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+        value_is_serialized_any: true
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData(
+      "thekey", std::make_shared<TestBytesFilterStateObject>(SerializedConfigAny("from_bytes")));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  const auto& any_val = it_namespace->second;
+  // The serialized Any is used as is, not wrapped in a BytesValue.
+  ASSERT_EQ("type.googleapis.com/"
+            "envoy.extensions.filters.http.set_metadata.v3.Config",
+            any_val.type_url());
+  envoy::extensions::filters::http::set_metadata::v3::Config unpacked;
+  ASSERT_TRUE(any_val.UnpackTo(&unpacked));
+  EXPECT_EQ("from_bytes", unpacked.metadata_namespace());
+  EXPECT_EQ(0, config_->stats().filter_state_not_serializable_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateBytesWithoutValueIsSerializedAny) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData(
+      "thekey", std::make_shared<TestBytesFilterStateObject>(SerializedConfigAny("from_bytes")));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  // Without the option, the bytes stay wrapped in a BytesValue.
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  EXPECT_EQ("type.googleapis.com/google.protobuf.BytesValue", it_namespace->second.type_url());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateValueIsSerializedAnyInvalid) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+        value_is_serialized_any: true
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  // Field number 0 is never valid in the protobuf wire format.
+  filter_state->setData("thekey", std::make_shared<TestBytesFilterStateObject>("\x07"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  EXPECT_TRUE(metadata.typed_filter_metadata().empty());
+  EXPECT_EQ(1, config_->stats().filter_state_not_serializable_.value());
+}
+
+TEST_F(SetMetadataFilterTest, FilterStateValueIsSerializedAnyNoString) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+        value_is_serialized_any: true
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  // Only proto serialization: the option needs a string serialization.
+  filter_state->setData("thekey", std::make_shared<TestAnyFilterStateObject>("from_any"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  EXPECT_TRUE(metadata.typed_filter_metadata().empty());
   EXPECT_EQ(1, config_->stats().filter_state_not_serializable_.value());
 }
 

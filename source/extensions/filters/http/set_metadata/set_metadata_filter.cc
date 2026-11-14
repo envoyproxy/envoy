@@ -29,10 +29,16 @@ void setTypedMetadata(const Config& config, envoy::config::core::v3::Metadata& d
   }
 }
 
-// Serializes a filter state object into an Any for typed metadata. Returns false if the object
-// supports neither proto nor string serialization.
+// Serializes a filter state object into an Any for typed metadata. If `value_is_serialized_any`,
+// the object's string serialization is parsed as an Any. Returns false if the object can't be
+// serialized this way.
 bool serializeFilterStateObject(const StreamInfo::FilterState::Object& object,
-                                Protobuf::Any& out) {
+                                bool value_is_serialized_any, Protobuf::Any& out) {
+  if (value_is_serialized_any) {
+    // The object's string serialization is a serialized Any.
+    std::optional<std::string> str = object.serializeAsString();
+    return str.has_value() && out.ParseFromString(*str);
+  }
   if (ProtobufTypes::MessagePtr proto = object.serializeAsProto(); proto != nullptr) {
     if (proto->GetTypeName() == Protobuf::Any::descriptor()->full_name()) {
       // The object already serializes to an Any; use it directly rather than double-wrapping.
@@ -102,7 +108,7 @@ void applyConfigToMetadata(const Config& config, const StreamInfo::FilterState& 
       continue;
     }
     Protobuf::Any value;
-    if (!serializeFilterStateObject(*object, value)) {
+    if (!serializeFilterStateObject(*object, entry.value_is_serialized_any, value)) {
       config.stats().filter_state_not_serializable_.inc();
       continue;
     }
@@ -133,7 +139,8 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
       typed_.emplace_back(typed_entry);
     } else if (metadata.has_filter_state()) {
       FilterStateMetadataEntry filter_state_entry{
-          metadata.allow_overwrite(), metadata.metadata_namespace(), metadata.filter_state().key()};
+          metadata.allow_overwrite(), metadata.metadata_namespace(), metadata.filter_state().key(),
+          metadata.filter_state().value_is_serialized_any()};
       filter_state_.emplace_back(filter_state_entry);
     } else {
       ENVOY_LOG(warn, "set_metadata filter configuration contains metadata entries without value, "

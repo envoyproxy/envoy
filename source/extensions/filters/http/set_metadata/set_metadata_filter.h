@@ -41,6 +41,7 @@ struct FilterStateMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
   std::string key;
+  bool value_is_serialized_any{};
 };
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
