@@ -811,19 +811,39 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
   const std::string& cluster_name = cluster.name();
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
-  const uint64_t new_hash = MessageUtil::hash(cluster);
+  // A cluster whose serialized config is unchanged blocks the update without MessageUtil::hash(),
+  // which only runs for the configs that change or serialize differently.
+  const uint64_t serialized_hash =
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster));
+  std::optional<uint64_t> new_hash;
+  const auto block_update = [&cluster, serialized_hash, &new_hash](ClusterData& cluster_data) {
+    if (cluster_data.serialized_config_hash_ == serialized_hash) {
+      return true;
+    }
+    if (!new_hash.has_value()) {
+      new_hash = MessageUtil::hash(cluster);
+    }
+    if (!cluster_data.blockUpdate(*new_hash)) {
+      return false;
+    }
+    cluster_data.serialized_config_hash_ = serialized_hash;
+    return true;
+  };
   if (existing_warming_cluster != warming_clusters_.end()) {
     // If the cluster is the same as the warming cluster of the same name, block the update.
-    if (existing_warming_cluster->second->blockUpdate(new_hash)) {
+    if (block_update(*existing_warming_cluster->second)) {
       return false;
     }
     // NB: https://github.com/envoyproxy/envoy/issues/14598
     // Always proceed if the cluster is different from the existing warming cluster.
   } else if (existing_active_cluster != active_clusters_.end() &&
-             existing_active_cluster->second->blockUpdate(new_hash)) {
+             block_update(*existing_active_cluster->second)) {
     // If there's no warming cluster of the same name, and if the cluster is the same as the active
     // cluster of the same name, block the update.
     return false;
+  }
+  if (!new_hash.has_value()) {
+    new_hash = MessageUtil::hash(cluster);
   }
 
   if (existing_active_cluster != active_clusters_.end() ||
@@ -853,7 +873,7 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
   auto status_or_cluster =
-      loadCluster(cluster, new_hash, std::string(version_info), /*added_via_api=*/true,
+      loadCluster(cluster, *new_hash, std::string(version_info), /*added_via_api=*/true,
                   /*required_for_ads=*/false, warming_clusters_, avoid_cds_removal);
   RETURN_IF_NOT_OK_REF(status_or_cluster.status());
   const ClusterDataPtr previous_cluster = std::move(status_or_cluster.value());

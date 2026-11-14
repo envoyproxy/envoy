@@ -11,6 +11,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/rds/common/route_config_provider_manager_impl.h"
@@ -169,6 +170,27 @@ TEST_F(RdsConfigUpdateReceiverTest, EmptyRouteConfig) {
   MessageUtil::packFrom(expected_any, empty_config);
   EXPECT_TRUE(TestUtility::protoEqual(expected_any, config_update_->configInfo().value().config_));
   EXPECT_EQ(time1, config_update_->lastUpdated());
+}
+
+// An update that only serializes an Any payload differently should not change the configuration.
+TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdateWithReserializedAnyIsNoop) {
+  setup();
+
+  envoy::config::route::v3::RouteConfiguration route_config;
+  route_config.set_name("foo_route_config");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*route_config.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  EXPECT_OK(config_update_->onRdsUpdate(route_config, "1"));
+  EXPECT_EQ("1", config_update_->configInfo().value().version_);
+  const uint64_t config_hash = config_update_->configHash();
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_OK(config_update_->onRdsUpdate(route_config, "2"));
+  EXPECT_EQ("1", config_update_->configInfo().value().version_);
+  EXPECT_EQ(config_hash, config_update_->configHash());
 }
 
 class RdsConfigProviderManagerTest : public RdsTestBase {

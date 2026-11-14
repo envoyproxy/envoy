@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["rds_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/init:manager_lib",
         "//source/common/rds:rds_lib",
         "//test/mocks/init:init_mocks",

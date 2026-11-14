@@ -20,6 +20,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/active_raw_udp_listener_config.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
@@ -419,6 +420,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(parent_.factory_->nextListenerTag()), name_(name),
       added_via_api_(added_via_api), workers_started_(workers_started), maybe_stale_hash_(hash),
+      serialized_config_hash_(HashUtil::xxHash64(MessageUtil::serializeDeterministically(config))),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -529,8 +531,10 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), in_place_address_update_(in_place_address_update),
-      maybe_stale_hash_(hash), tcp_backlog_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                   config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      maybe_stale_hash_(hash),
+      serialized_config_hash_(HashUtil::xxHash64(MessageUtil::serializeDeterministically(config))),
+      tcp_backlog_size_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
                                           Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),

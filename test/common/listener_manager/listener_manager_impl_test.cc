@@ -20,7 +20,9 @@
 #ifdef __linux__
 #include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
+#include "source/common/common/base64.h"
 #include "source/common/common/cpu_affinity.h"
+#include "source/common/common/hash.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/address_impl.h"
@@ -30,6 +32,7 @@
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/ssl_socket.h"
 #include "source/extensions/common/matcher/ip_range_matcher.h"
@@ -2476,6 +2479,39 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update2, onDestroy());
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_CALL(*listener_baz_update1, onDestroy());
+}
+
+// An update that only serializes an Any payload differently should be a NOP.
+TEST_P(ListenerManagerImplTest, UpdateWithReserializedAnyIsNoop) {
+  InSequence s;
+
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*listener.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(listener));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_FALSE(addOrUpdateListener(listener));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  // The listener keeps the new bytes, so that the next push of them skips MessageUtil::hash().
+  EXPECT_EQ(
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener)),
+      dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()).serializedConfigHash());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
 }
 
 TEST_P(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {

@@ -101,6 +101,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
         "//source/common/config:dependent_type_urls_lib",

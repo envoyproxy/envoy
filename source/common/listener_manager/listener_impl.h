@@ -335,6 +335,10 @@ public:
   bool blockLdsUpdate(uint64_t new_hash) {
     return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
+  uint64_t serializedConfigHash() const { return serialized_config_hash_; }
+  void setSerializedConfigHash(uint64_t serialized_config_hash) {
+    serialized_config_hash_ = serialized_config_hash;
+  }
   bool blockRemove() { return !added_via_api_; }
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
@@ -573,6 +577,10 @@ private:
   // The hash does not cover the FCDS filter chains. It is only used to skip the LDS updates that
   // do not change the listener config.
   const uint64_t maybe_stale_hash_;
+  // The hash of the deterministic serialization of this config, which finds an unchanged config
+  // without the reflection that maybe_stale_hash_ needs. An update that blockLdsUpdate() blocks
+  // replaces it, so that repeated pushes of the same bytes skip MessageUtil::hash().
+  uint64_t serialized_config_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

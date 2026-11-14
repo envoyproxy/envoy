@@ -30,10 +30,12 @@
 #include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/hash.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
@@ -850,6 +852,8 @@ private:
                 bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
                 TimeSource& time_source, const bool avoid_cds_removal = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
+          serialized_config_hash_(
+              HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster_config))),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
           avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
@@ -874,6 +878,10 @@ private:
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
+    // The hash of the deterministic serialization of this config, which finds an unchanged config
+    // without the reflection that config_hash_ needs. An update that blockUpdate() blocks replaces
+    // it, so that repeated pushes of the same bytes skip MessageUtil::hash().
+    uint64_t serialized_config_hash_;
     const std::string version_info_;
     // Don't change the order of cluster_ and thread_aware_lb_ as the thread_aware_lb_ may
     // keep a reference to the cluster_.

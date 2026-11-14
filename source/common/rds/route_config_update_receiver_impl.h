@@ -110,6 +110,14 @@ private:
   std::string update_id_;
 };
 
+// The hashes that tell whether a route configuration changed. The hash of the deterministic
+// serialization finds an unchanged route configuration without MessageUtil::hash(), which still
+// decides when the bytes differ.
+struct ConfigHashes {
+  uint64_t hash{};
+  uint64_t serialized_hash{};
+};
+
 // The state of one route configuration: the route config Any, route config name,
 // the parsed configuration and the bookkeeping that goes with them.
 struct WarmingConfigState {
@@ -118,7 +126,7 @@ struct WarmingConfigState {
   ConfigConstSharedPtr config_;
   std::string version_info_;
   // This will be nullopt if the state is generated from VHDS updates.
-  std::optional<uint64_t> last_config_hash_;
+  std::optional<ConfigHashes> last_config_hashes_;
   SystemTime last_updated_;
 
   void clear() {
@@ -126,7 +134,7 @@ struct WarmingConfigState {
     route_config_name_.clear();
     config_.reset();
     version_info_.clear();
-    last_config_hash_.reset();
+    last_config_hashes_.reset();
     last_updated_ = SystemTime{};
   }
 };
@@ -141,15 +149,14 @@ public:
     warmer_.abortWarming();
   }
 
-  uint64_t getHash(const Protobuf::Message& rc) const { return MessageUtil::hash(rc); }
-  bool checkHash(uint64_t new_hash) const {
-    uint64_t last_config_hash = warming_state_.last_config_hash_.value_or(last_config_hash_);
-    return new_hash != last_config_hash;
-  }
+  // Returns the hashes of a route configuration that differs from the last update, or
+  // std::nullopt if it is unchanged. Equal route configurations can serialize differently, so an
+  // unchanged one also stores its serialized hash.
+  std::optional<ConfigHashes> changedConfigHashes(const Protobuf::Message& rc);
   // Builds a new route configuration and installs the init manager that its resources warm up
   // with, but doesn't warm anything up or publish anything yet. The caller finishes applying the
   // update and then calls startWarming(), which eventually publishes it.
-  void updateConfig(const Protobuf::Message& route_config_proto, std::optional<uint64_t> hash,
+  void updateConfig(const Protobuf::Message& route_config_proto, std::optional<ConfigHashes> hashes,
                     absl::string_view version_info);
   // Warms up the route configuration built by the last updateConfig() call and publishes it once
   // it's ready. Note that this may happen before this method returns, i.e. synchronously, if there
@@ -167,7 +174,7 @@ public:
   }
   bool configWarming() const override { return warmer_.warming(); }
 
-  uint64_t configHash() const override { return last_config_hash_; }
+  uint64_t configHash() const override { return last_config_hashes_.hash; }
   const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override;
   ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }
@@ -176,7 +183,7 @@ private:
   friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
 
   void updateState(Protobuf::Any route_config_any, std::string route_config_name,
-                   std::optional<uint64_t> hash, absl::string_view version_info,
+                   std::optional<ConfigHashes> hashes, absl::string_view version_info,
                    ConfigConstSharedPtr config,
                    std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id);
 
@@ -188,7 +195,7 @@ private:
   TimeSource& time_source_;
   Protobuf::Any route_config_any_;
   std::string route_config_name_;
-  uint64_t last_config_hash_{0ull};
+  ConfigHashes last_config_hashes_;
   SystemTime last_updated_;
   std::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ConfigConstSharedPtr config_;

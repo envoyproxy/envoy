@@ -1,3 +1,5 @@
+#include "source/common/common/base64.h"
+
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
@@ -681,6 +683,31 @@ TEST_P(ClusterManagerLifecycleTest, ShutdownWithWarming) {
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   cluster_manager_->shutdown();
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+// An update that only serializes an Any payload differently should not change the cluster.
+TEST_P(ClusterManagerLifecycleTest, UpdateWithReserializedAnyIsNoop) {
+  create(defaultConfig());
+
+  auto cluster = defaultStaticCluster("fake_cluster");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*cluster.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version1"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version2"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
