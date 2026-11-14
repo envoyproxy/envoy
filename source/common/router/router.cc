@@ -1192,6 +1192,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     buffering = false;
     request_buffer_overflowed_ = true;
 
+    // Nothing reads the kept body once retries and redirects are given up, so drop it to release
+    // its buffer accounting. Skip it if the current frame is the decoding buffer itself, since the
+    // frame still has to be forwarded upstream.
+    if (decoding_buffer != nullptr && decoding_buffer != &data) {
+      callbacks_->modifyDecodingBuffer(
+          [](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
+    }
+
     // Only send local reply and cleanup if we're in a retry waiting state (no active upstream
     // requests). If there are active upstream requests, let the normal upstream failure handling
     // take precedence.
