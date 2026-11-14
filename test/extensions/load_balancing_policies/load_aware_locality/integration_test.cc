@@ -8,6 +8,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -19,14 +20,29 @@ namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 namespace {
 
-class LoadAwareLocalityIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+// Simulated time: the weight-update timer is driven by advanceWeightTick() rather than by sleeping
+// through each weight_update_period, and the utilization timestamps the tick compares against
+// advance by the same amount.
+class LoadAwareLocalityIntegrationTest : public Event::TestUsingSimulatedTime,
+                                         public testing::TestWithParam<Network::Address::IpVersion>,
                                          public HttpIntegrationTest {
 public:
   LoadAwareLocalityIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
     use_bootstrap_node_metadata_ = true;
   }
 
-  void TearDown() override { HttpIntegrationTest::cleanupUpstreamAndDownstream(); }
+  void TearDown() override {
+    for (auto& connection : upstream_connections_) {
+      if (connection != nullptr) {
+        AssertionResult result = connection->close();
+        RELEASE_ASSERT(result, result.message());
+        result = connection->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+    upstream_connections_.clear();
+    HttpIntegrationTest::cleanupUpstreamAndDownstream();
+  }
 
   void initializeConfig(double variance_threshold = 0.1, double remote_probe_fraction = 0.1,
                         int weight_update_period_seconds = 10,
@@ -36,6 +52,7 @@ public:
     endpoints_per_zone_ = endpoints_per_zone;
     num_upstreams_ = endpoints_per_zone_ * static_cast<uint32_t>(1 + remote_zones.size());
     setUpstreamCount(num_upstreams_);
+    upstream_connections_.resize(num_upstreams_);
 
     const auto ip_version = GetParam();
     config_helper_.addConfigModifier(
@@ -112,22 +129,44 @@ public:
     return response_headers;
   }
 
+  // Waits for the next request to arrive on any upstream and returns that upstream's index.
+  // Connections are kept open on both sides across requests: the tests measure the balancer's
+  // host selection over hundreds of requests, so each one reuses the downstream connection and
+  // Envoy's upstream connection pools instead of paying for a connect/close pair per request.
+  uint64_t waitForNextRequestOnAnyUpstream() {
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    while (bound.withinBound()) {
+      for (uint64_t i = 0; i < num_upstreams_; ++i) {
+        if (upstream_connections_[i] == nullptr &&
+            !fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, upstream_connections_[i],
+                                                       std::chrono::milliseconds(5))) {
+          continue;
+        }
+        if (upstream_connections_[i]->waitForNewStream(*dispatcher_, upstream_request_,
+                                                       std::chrono::milliseconds(5))) {
+          const AssertionResult result = upstream_request_->waitForEndStream(*dispatcher_);
+          RELEASE_ASSERT(result, result.message());
+          return i;
+        }
+      }
+    }
+    RELEASE_ASSERT(false, "Timed out waiting for an upstream request.");
+    return 0;
+  }
+
   uint64_t sendRequestWithOrcaResponse(const std::vector<double>& utilizations) {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
+    if (codec_client_ == nullptr) {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+    }
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    std::vector<uint64_t> upstream_indices(num_upstreams_);
-    std::iota(upstream_indices.begin(), upstream_indices.end(), 0);
-    auto upstream_index = waitForNextUpstreamRequest(upstream_indices);
-    RELEASE_ASSERT(upstream_index.has_value(), "Expected upstream request");
-
+    const uint64_t upstream_index = waitForNextRequestOnAnyUpstream();
     upstream_request_->encodeHeaders(
-        responseHeadersWithOrcaUtilization(utilizations[*upstream_index]), true);
+        responseHeadersWithOrcaUtilization(utilizations[upstream_index]), true);
     RELEASE_ASSERT(response->waitForEndStream(), "Expected response");
-    cleanupUpstreamAndDownstream();
-    return *upstream_index;
+    return upstream_index;
   }
 
   std::vector<uint64_t> sendRequestsAndTrack(uint64_t count,
@@ -196,6 +235,7 @@ public:
 protected:
   uint32_t num_upstreams_{4};
   uint32_t endpoints_per_zone_{2};
+  std::vector<FakeHttpConnectionPtr> upstream_connections_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LoadAwareLocalityIntegrationTest,

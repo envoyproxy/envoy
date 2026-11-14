@@ -80,6 +80,9 @@ private:
 
   // Handle for the shutdown lifecycle callback that notifies the configuration of shutdown.
   Server::ServerLifecycleNotifier::HandlePtr config_shutdown_handle_;
+
+  // Handle for the lifecycle callback that notifies the configuration before the workers start.
+  Server::ServerLifecycleNotifier::HandlePtr post_init_handle_;
 };
 
 } // namespace DynamicModules

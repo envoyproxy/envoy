@@ -1549,6 +1549,20 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
     EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), Not(IsOk()));
   }
   {
+    udpa::type::v1::TypedStruct source;
+    source.set_type_url("type.googleapis.com/example.FilterConfig");
+    (*source.mutable_value()->mutable_fields())["key"].set_string_value("value");
+    Protobuf::Any source_any;
+    std::ignore = source_any.PackFrom(source);
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), IsOkAndHolds(R"({"key":"value"})"));
+  }
+  {
+    Protobuf::Any source_any;
+    source_any.set_type_url("type.googleapis.com/udpa.type.v1.TypedStruct");
+    source_any.set_value("\x0a");
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), Not(IsOk()));
+  }
+  {
     envoy::config::cluster::v3::Filter filter;
     Protobuf::Any source_any;
     std::ignore = source_any.PackFrom(filter);

@@ -76,6 +76,30 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "listener_writer_test",
+    srcs = ["listener_writer_test.cc"],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
+    deps = [
+        "//source/common/common:cleanup_lib",
+        "//source/common/config:dependent_type_urls_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:utility_lib",
+        "//source/extensions/bootstrap/dynamic_modules:listener_writer_lib",
+        "//source/extensions/bootstrap/dynamic_modules:writer_shared_state_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:listener_manager_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_dyn_module_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
@@ -110,6 +134,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -178,6 +203,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_shared_data_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_writer_test",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {

@@ -679,6 +679,14 @@ WEAK_STUB(BootstrapExtensionClusterWriterAddOrUpdate,
 WEAK_STUB(BootstrapExtensionClusterWriterRemove,
           envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(nullptr,
                                                                                   {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionEnableListenerWriter,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterAddOrUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterRemove,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(nullptr,
+                                                                                   {nullptr, 0}))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -1251,6 +1259,42 @@ WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
 WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
           envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
+WEAK_STUB(NetworkFilterSetUpstreamHost,
+          envoy_dynamic_module_callback_network_filter_set_upstream_host(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}, 0))
+WEAK_STUB(NetworkFilterSetUpstreamCluster,
+          envoy_dynamic_module_callback_network_filter_set_upstream_cluster(nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterSetUpstreamLocalAddress,
+          envoy_dynamic_module_callback_network_filter_set_upstream_local_address(nullptr,
+                                                                                  {nullptr, 0}, 0))
+WEAK_STUB(NetworkFilterSetUpstreamTransportFailureReason,
+          envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+              nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterSetUpstreamLocalCloseReason,
+          envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(nullptr,
+                                                                                       {nullptr,
+                                                                                        0}))
+WEAK_STUB(NetworkFilterSetUpstreamDetectedCloseType,
+          envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+              nullptr, envoy_dynamic_module_type_detected_close_type_Normal))
+WEAK_STUB(NetworkFilterSetUpstreamRequestAttemptCount,
+          envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(nullptr,
+                                                                                          0))
+WEAK_STUB(NetworkFilterRecordUpstreamTiming,
+          envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+              nullptr, envoy_dynamic_module_type_upstream_timing_event_ConnectStart))
+WEAK_STUB(NetworkFilterAddUpstreamWireBytes,
+          envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterAddDownstreamWireBytes,
+          envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterSetResponseFlag,
+          envoy_dynamic_module_callback_network_filter_set_response_flag(
+              nullptr, envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure))
+WEAK_STUB(NetworkFilterAddCustomFlag,
+          envoy_dynamic_module_callback_network_filter_add_custom_flag(nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterFlushAccessLog,
+          envoy_dynamic_module_callback_network_filter_flush_access_log(
+              nullptr, envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected))
 WEAK_STUB(NetworkFilterStartDownstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,

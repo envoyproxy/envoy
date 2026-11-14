@@ -5,6 +5,8 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
@@ -934,4 +936,31 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_proc:allowed_override_modes_set_lib",
     ],
+)
+
+envoy_extension_cc_benchmark_binary(
+    name = "filter_speed_test",
+    srcs = ["filter_speed_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
+    deps = [
+        ":mock_server_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_benchmark_test(
+    name = "filter_speed_test_benchmark_test",
+    benchmark_binary = "filter_speed_test",
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
 )

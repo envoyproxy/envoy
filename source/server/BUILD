@@ -17,6 +17,7 @@ envoy_cc_library(
     tags = ["backtrace"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stderr_writer_lib",
         "//source/common/version:version_lib",
         "@abseil-cpp//absl/debugging:stacktrace",
         "@abseil-cpp//absl/debugging:symbolize",
@@ -467,6 +468,7 @@ envoy_cc_library(
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
+        "//source/common/runtime:breaking_changes",
         "//source/common/runtime:runtime_keys_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",
@@ -479,6 +481,7 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "//source/server/admin:admin_lib",
         "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/flags:flag",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

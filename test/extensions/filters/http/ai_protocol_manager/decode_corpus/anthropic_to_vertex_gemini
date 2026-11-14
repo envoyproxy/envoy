@@ -1,0 +1,10 @@
+path: "/v1/messages"
+body: "{\"model\":\"gemini-2.5-pro\",\"max_tokens\":384,\"system\":\"You are an expert distributed systems engineer specializing in Envoy proxy filter chains, streaming JSON parsers, external buffer ring management, and cross-provider LLM protocol transcoding across OpenAI, Anthropic, and Google Gemini endpoints.\",\"messages\":[{\"role\":\"user\",\"content\":\"Explain step-by-step how two-pass zero-copy JSON serialization rehydrates ExternalRef slices while enforcing per-stream decoder buffer watermarks across fragmented HTTP/2 data frames.\"}],\"temperature\":0.1}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: GEMINI_GENERATE_CONTENT
+response_binding {
+  uri_pattern: "/v1/projects/acme/locations/us-central1/publishers/google/models/{model}:{generateContent|streamGenerateContent?alt=sse}"
+}
+inline_string_threshold_bytes: 64
+decoder_buffer_limit: 256

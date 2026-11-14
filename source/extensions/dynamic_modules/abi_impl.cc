@@ -544,6 +544,22 @@ WEAK_STUB(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update,
+          envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer, uint64_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove,
+          envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 // ---------------------- Cluster extension callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the cluster extension abi_impl.cc when the cluster extension is used.
@@ -1377,6 +1393,56 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_has_upstream_host, 
 
 WEAK_STUB(uint64_t, envoy_dynamic_module_callback_network_filter_get_upstream_connection_id, 0,
           envoy_dynamic_module_type_network_filter_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_host, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          uint32_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_cluster, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_local_address, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, uint32_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_detected_close_type)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr, uint32_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_record_upstream_timing, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_upstream_timing_event)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr, uint64_t, uint64_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr, uint64_t, uint64_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_response_flag, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_response_flag)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_add_custom_flag, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_flush_access_log, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_access_log_type)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport,
           false, envoy_dynamic_module_type_network_filter_envoy_ptr)

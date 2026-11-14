@@ -1,6 +1,7 @@
 #include "source/common/router/shadow_writer_impl.h"
 
 #include <chrono>
+#include <memory>
 #include <string>
 
 #include "envoy/router/router.h"
@@ -30,6 +31,18 @@ std::string shadowAppendedHost(absl::string_view host) {
                       host.substr(port_start, host.length()));
 }
 
+std::shared_ptr<ShadowRequestContext>
+attachContext(const Http::AsyncClient::RequestOptions& options,
+              const ShadowPolicyStatsSharedPtr& stats) {
+  auto context = std::make_shared<ShadowRequestContext>(stats);
+  const_cast<Http::AsyncClient::RequestOptions&>(options).setContext(context);
+  return context;
+}
+
+ShadowRequestContext* shadowContext(const Http::AsyncClient::Request& request) {
+  return dynamic_cast<ShadowRequestContext*>(request.context().ptr());
+}
+
 } // namespace
 
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
@@ -50,9 +63,10 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
     return;
   }
   stats->rq_started_.inc();
-  auto* callbacks = new ShadowRequestCallbacks(stats, async_client.dispatcher());
-  if (async_client.send(std::move(request), *callbacks, options) == nullptr) {
-    callbacks->onStartFailed();
+  const auto context = attachContext(options, stats);
+  if (async_client.send(std::move(request), *this, options) == nullptr) {
+    // The request failed inline, or could not be created and the callbacks were not called.
+    context->recordFailure();
   }
 }
 
@@ -73,13 +87,27 @@ ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeade
     return async_client.startRequest(std::move(headers), *this, options);
   }
   stats->rq_started_.inc();
-  auto* callbacks = new ShadowRequestCallbacks(stats, async_client.dispatcher());
+  const auto context = attachContext(options, stats);
   Http::AsyncClient::OngoingRequest* request =
-      async_client.startRequest(std::move(headers), *callbacks, options);
+      async_client.startRequest(std::move(headers), *this, options);
   if (request == nullptr) {
-    callbacks->onStartFailed();
+    context->recordFailure();
   }
   return request;
+}
+
+void ShadowWriterImpl::onSuccess(const Http::AsyncClient::Request& request,
+                                 Http::ResponseMessagePtr&& response) {
+  if (auto* context = shadowContext(request); context != nullptr) {
+    context->recordResponse(*response);
+  }
+}
+
+void ShadowWriterImpl::onFailure(const Http::AsyncClient::Request& request,
+                                 Http::AsyncClient::FailureReason) {
+  if (auto* context = shadowContext(request); context != nullptr) {
+    context->recordFailure();
+  }
 }
 
 Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAndOptions(
@@ -102,17 +130,17 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
   return thread_local_cluster;
 }
 
-ShadowRequestCallbacks::~ShadowRequestCallbacks() {
+ShadowRequestContext::~ShadowRequestContext() {
   if (!outcome_recorded_) {
     stats_->rq_cancelled_.inc();
   }
 }
 
-void ShadowRequestCallbacks::onSuccess(const Http::AsyncClient::Request&,
-                                       Http::ResponseMessagePtr&& response) {
+void ShadowRequestContext::recordResponse(Http::ResponseMessage& response) {
+  ASSERT(!outcome_recorded_);
   outcome_recorded_ = true;
   const std::optional<uint64_t> status =
-      Http::Utility::getResponseStatusOrNullopt(response->headers());
+      Http::Utility::getResponseStatusOrNullopt(response.headers());
   if (status.has_value() && Http::CodeUtility::is2xx(status.value())) {
     stats_->rq_success_.inc();
   } else {
@@ -120,27 +148,12 @@ void ShadowRequestCallbacks::onSuccess(const Http::AsyncClient::Request&,
   }
 }
 
-void ShadowRequestCallbacks::onFailure(const Http::AsyncClient::Request&,
-                                       Http::AsyncClient::FailureReason) {
-  outcome_recorded_ = true;
-  stats_->rq_failure_.inc();
-}
-
-void ShadowRequestCallbacks::onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
-                                                          const Http::ResponseHeaderMap*) {
-  if (!finalized_) {
-    finalized_ = true;
-    dispatcher_.deferredDelete(Event::DeferredDeletablePtr{this});
-  }
-}
-
-void ShadowRequestCallbacks::onStartFailed() {
-  if (finalized_) {
+void ShadowRequestContext::recordFailure() {
+  if (outcome_recorded_) {
     return;
   }
   outcome_recorded_ = true;
   stats_->rq_failure_.inc();
-  delete this;
 }
 
 } // namespace Router

@@ -3,8 +3,6 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/event/deferred_deletable.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -32,8 +30,10 @@ public:
                   const ShadowPolicyStatsSharedPtr& stats) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
-  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request& request,
+                 Http::AsyncClient::FailureReason) override;
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 
@@ -45,38 +45,27 @@ private:
   Upstream::ClusterManager& cm_;
 };
 
-// TODO(wdauchy): the self-deletion relies on the async client calling
-// onBeforeFinalizeUpstreamSpan() exactly once per request, so a change in that behavior could leak
-// this object. Let the async client own the callbacks (e.g. via RequestOptions), or support
-// multiple destructor callbacks on Request, then remove the self-deletion.
 /**
- * Async client callbacks of one mirror request of a policy with stats. They record how the mirror
- * ended. The async client always calls onBeforeFinalizeUpstreamSpan() once when the request ends,
- * before onSuccess() or onFailure() and also when the request is cancelled, so it schedules the
- * deletion of this object. A request deleted without onSuccess() or onFailure() was cancelled.
+ * Context of one mirror request of a policy with stats. It records how the mirror ended. The
+ * request holds it until it is destroyed, so a context destroyed without an outcome was cancelled.
  */
-class ShadowRequestCallbacks : public Http::AsyncClient::Callbacks,
-                               public Event::DeferredDeletable {
+class ShadowRequestContext : public Http::AsyncClient::RequestContext {
 public:
-  ShadowRequestCallbacks(ShadowPolicyStatsSharedPtr stats, Event::Dispatcher& dispatcher)
-      : stats_(std::move(stats)), dispatcher_(dispatcher) {}
-  ~ShadowRequestCallbacks() override;
-
-  // Http::AsyncClient::Callbacks
-  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
-  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
-  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&, const Http::ResponseHeaderMap*) override;
+  explicit ShadowRequestContext(ShadowPolicyStatsSharedPtr stats) : stats_(std::move(stats)) {}
+  ~ShadowRequestContext() override;
 
   /**
-   * Records a failure and deletes the callbacks if the async client did not take ownership of
-   * the request, which happens when the request cannot be created.
+   * Records a 2xx response as a success and any other response as a failure.
    */
-  void onStartFailed();
+  void recordResponse(Http::ResponseMessage& response);
+
+  /**
+   * Records a failure, unless an outcome was already recorded.
+   */
+  void recordFailure();
 
 private:
   const ShadowPolicyStatsSharedPtr stats_;
-  Event::Dispatcher& dispatcher_;
-  bool finalized_{};
   bool outcome_recorded_{};
 };
 

@@ -4,11 +4,13 @@
 #include "source/extensions/filters/network/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -46,6 +48,70 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {
   auto& server_scope = context_.server_factory_context_.serverScope();
   EXPECT_EQ(0U, failureCounter(server_scope, "module_load_error", "test_filter"));
   EXPECT_EQ(0U, failureCounter(server_scope, "config_init_error", "test_filter"));
+}
+
+TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithAccessLogs) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  TestUtility::loadFromYaml(R"EOF(
+dynamic_module_config:
+  name: network_no_op
+filter_name: test_filter
+access_log:
+- name: envoy.access_loggers.stdout
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+    log_format:
+      text_format_source:
+        inline_string: "%ACCESS_LOG_TYPE%\n"
+access_log_options:
+  access_log_flush_interval: 1s
+  flush_access_log_on_start: true
+)EOF",
+                            config);
+
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  ASSERT_OK(result);
+
+  // The filter is the access log handler of its connection.
+  testing::StrictMock<Network::MockFilterManager> filter_manager;
+  Network::FilterSharedPtr filter;
+  AccessLog::InstanceSharedPtr access_log_handler;
+  EXPECT_CALL(filter_manager, addFilter(testing::_)).WillOnce(testing::SaveArg<0>(&filter));
+  EXPECT_CALL(filter_manager, addAccessLogHandler(testing::_))
+      .WillOnce(testing::SaveArg<0>(&access_log_handler));
+  result.value()(filter_manager);
+  ASSERT_NE(nullptr, filter);
+  EXPECT_EQ(dynamic_cast<AccessLog::Instance*>(filter.get()), access_log_handler.get());
+
+  // The filter takes its stream ID from the server's random generator, writes the start record and
+  // arms the flush timer with the configured interval.
+  NiceMock<Event::MockDispatcher> worker_dispatcher{"worker_0"};
+  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
+  ON_CALL(read_callbacks.connection_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_dispatcher));
+  auto* timer = new NiceMock<Event::MockTimer>(&worker_dispatcher);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1000), testing::_));
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, uuid());
+  EXPECT_CALL(read_callbacks.connection_.stream_info_, setStreamIdProvider(testing::_));
+  EXPECT_CALL(*context_.server_factory_context_.access_log_manager_.file_,
+              write(absl::string_view("TcpConnectionStart\n")));
+  filter->initializeReadFilterCallbacks(read_callbacks);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+}
+
+// QUIC connections never flush the access logs of their network filters, so a QUIC listener rejects
+// them.
+TEST_F(DynamicModuleNetworkFilterFactoryTest, AccessLogsRejectedOnQuicListener) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  config.mutable_dynamic_module_config()->set_name("network_no_op");
+  config.set_filter_name("test_filter");
+  config.add_access_log()->set_name("envoy.access_loggers.stdout");
+  ON_CALL(context_, isQuic()).WillByDefault(testing::Return(true));
+
+  EXPECT_THAT(factory_.createFilterFactoryFromProto(config, context_),
+              HasStatusMessage("access_log is not supported on QUIC listeners"));
+  config.clear_access_log();
+  EXPECT_OK(factory_.createFilterFactoryFromProto(config, context_));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
@@ -191,6 +257,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, FilterFactoryCallbackAddsFilter) {
   // Test that the filter factory callback correctly adds a filter.
   NiceMock<Network::MockFilterManager> filter_manager;
   EXPECT_CALL(filter_manager, addFilter(testing::_));
+  EXPECT_CALL(filter_manager, addAccessLogHandler(testing::_)).Times(0);
   result.value()(filter_manager);
 }
 

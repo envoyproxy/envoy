@@ -38,6 +38,7 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
       load_shed_point: envoy_filter_config
         .get_load_shed_point(std::str::from_utf8(config).unwrap()),
     })),
+    "access_log_reporter" => Some(Box::new(AccessLogReporterFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -563,5 +564,96 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for LoadShedPointFilter {
     }
     envoy_filter.close(abi::envoy_dynamic_module_type_network_connection_close_type::NoFlush);
     abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
+  }
+}
+
+// =============================================================================
+// Access Log Reporter Test Filter
+// =============================================================================
+
+// A terminal filter that acts as if it reached an upstream of cluster_0 itself. It reports the
+// cluster and flushes a periodic access log before it connects. Its first attempt fails and its
+// second connects, and the upstream answers each read with the read bytes twice. The filter reports
+// all of this, so that the access logs of the connection show it.
+struct AccessLogReporterFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for AccessLogReporterFilterConfig {
+  fn new_network_filter(&self, envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    // Reports have no effect before the new connection.
+    assert!(!envoy.set_upstream_cluster("cluster_0"));
+    Box::new(AccessLogReporterFilter)
+  }
+}
+
+struct AccessLogReporterFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for AccessLogReporterFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    assert!(envoy_filter.set_upstream_cluster("cluster_0"));
+    assert!(
+      envoy_filter.flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpPeriodic)
+    );
+    assert!(envoy_filter
+      .record_upstream_timing(abi::envoy_dynamic_module_type_upstream_timing_event::ConnectStart));
+    assert!(envoy_filter.set_upstream_host("cluster_0", "10.1.2.2", 5432));
+    assert!(envoy_filter.set_upstream_transport_failure_reason("connection refused"));
+    assert!(envoy_filter.set_upstream_host("cluster_0", "10.1.2.3", 5432));
+    assert!(envoy_filter.set_upstream_request_attempt_count(2));
+    assert!(envoy_filter.set_upstream_local_address("10.1.2.100", 41000));
+    assert!(envoy_filter.record_upstream_timing(
+      abi::envoy_dynamic_module_type_upstream_timing_event::ConnectComplete
+    ));
+    assert!(envoy_filter
+      .flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected));
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+
+  fn on_read(
+    &mut self,
+    envoy_filter: &mut ENF,
+    data_length: usize,
+    _end_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    let (chunks, _) = envoy_filter.get_read_buffer_chunks();
+    let request: Vec<u8> = chunks
+      .iter()
+      .flat_map(|chunk| chunk.as_slice().iter().copied())
+      .collect();
+    envoy_filter.drain_read_buffer(data_length);
+    let response = request.repeat(2);
+    for event in [
+      abi::envoy_dynamic_module_type_upstream_timing_event::FirstByteSent,
+      abi::envoy_dynamic_module_type_upstream_timing_event::LastByteSent,
+      abi::envoy_dynamic_module_type_upstream_timing_event::FirstByteReceived,
+      abi::envoy_dynamic_module_type_upstream_timing_event::LastByteReceived,
+    ] {
+      assert!(envoy_filter.record_upstream_timing(event));
+    }
+    assert!(envoy_filter.add_upstream_wire_bytes(response.len() as u64, request.len() as u64));
+    envoy_filter.write(&response, false);
+    assert!(envoy_filter.add_downstream_wire_bytes(request.len() as u64, response.len() as u64));
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration
+  }
+
+  fn on_event(
+    &mut self,
+    envoy_filter: &mut ENF,
+    event: abi::envoy_dynamic_module_type_network_connection_event,
+  ) {
+    if event != abi::envoy_dynamic_module_type_network_connection_event::RemoteClose {
+      return;
+    }
+    // The upstream is reset when the downstream connection closes.
+    assert!(envoy_filter.set_upstream_local_close_reason("downstream closed"));
+    assert!(envoy_filter.set_upstream_detected_close_type(
+      abi::envoy_dynamic_module_type_detected_close_type::LocalReset
+    ));
+    assert!(envoy_filter.set_response_flag(
+      abi::envoy_dynamic_module_type_response_flag::DownstreamConnectionTermination
+    ));
+    assert!(envoy_filter.add_custom_flag("reporter"));
   }
 }
