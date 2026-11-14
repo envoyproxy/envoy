@@ -12,7 +12,10 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/ssl.h"
+#include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
@@ -32,11 +35,13 @@
 #include "test/common/tls/test_data/san_ip_cert_info.h"
 #include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
@@ -2642,6 +2647,100 @@ common_tls_context:
   ASSERT_EQ(1U, gauge_opt->tags().size());
   EXPECT_EQ("envoy.tls_certificate", gauge_opt->tags()[0].name_);
   EXPECT_EQ(actual_cert_name, gauge_opt->tags()[0].value_);
+}
+
+// The expiration gauge lives in a scope owned by the TLS context, so destroying the context must
+// remove the gauge. A ThreadLocalStoreImpl is used because IsolatedStoreImpl (TestStore) does not
+// remove stats when a scope is destroyed.
+TEST_F(CertificateExpirationMetricsTest,
+       ServerCertificateExpirationMetricRemovedOnContextDestruction) {
+  const std::string yaml = R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+
+  auto tls_certs = server_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  const std::string expected_metric_name = absl::StrCat(
+      "ssl.certificate.", tls_certs[0].get().certificateName(), ".expiration_unix_time_seconds");
+
+  Stats::SymbolTableImpl symbol_table;
+  Stats::Allocator alloc(symbol_table);
+  Stats::ThreadLocalStoreImpl store(alloc);
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  store.initializeThreading(main_thread_dispatcher, tls);
+
+  {
+    absl::Status creation_status = absl::OkStatus();
+    TestContextImpl context(*store.rootScope(), *server_context_config, server_factory_context_,
+                            creation_status);
+    ASSERT_OK(creation_status);
+    EXPECT_NE(nullptr, TestUtility::findGauge(store, expected_metric_name));
+  }
+
+  // Destroying the context tears down the scope holding the expiration gauge, so the gauge is no
+  // longer exported for a certificate that is not served anymore.
+  EXPECT_EQ(nullptr, TestUtility::findGauge(store, expected_metric_name));
+
+  tls.shutdownGlobalThreading();
+  store.shutdownThreading();
+  tls.shutdownThread();
+}
+
+TEST_F(CertificateExpirationMetricsTest,
+       ClientCertificateExpirationMetricRemovedOnContextDestruction) {
+  const std::string yaml = R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  auto tls_certs = client_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  const std::string expected_metric_name = absl::StrCat(
+      "ssl.certificate.", tls_certs[0].get().certificateName(), ".expiration_unix_time_seconds");
+
+  Stats::SymbolTableImpl symbol_table;
+  Stats::Allocator alloc(symbol_table);
+  Stats::ThreadLocalStoreImpl store(alloc);
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  store.initializeThreading(main_thread_dispatcher, tls);
+
+  {
+    absl::Status creation_status = absl::OkStatus();
+    TestContextImpl context(*store.rootScope(), *client_context_config, server_factory_context_,
+                            creation_status);
+    ASSERT_OK(creation_status);
+    EXPECT_NE(nullptr, TestUtility::findGauge(store, expected_metric_name));
+  }
+
+  // Destroying the context tears down the scope holding the expiration gauge, so the gauge is no
+  // longer exported for a certificate that is not served anymore.
+  EXPECT_EQ(nullptr, TestUtility::findGauge(store, expected_metric_name));
+
+  tls.shutdownGlobalThreading();
+  store.shutdownThreading();
+  tls.shutdownThread();
 }
 
 // Certificate-level min > context max produces an effective range that can never negotiate.

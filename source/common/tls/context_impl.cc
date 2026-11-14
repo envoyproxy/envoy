@@ -72,8 +72,8 @@ ContextImpl::ContextImpl(
     const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
     Server::Configuration::CommonFactoryContext& factory_context,
     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
-    : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
-      tls_max_version_(config.maxProtocolVersion()),
+    : scope_(scope), cert_scope_(scope.createScope("")), stats_(generateSslStats(scope)),
+      factory_context_(factory_context), tls_max_version_(config.maxProtocolVersion()),
       builtin_stat_names_(getTlsBuiltinStatNames(factory_context)),
       capabilities_(config.capabilities()), tls_keylog_local_(config.tlsKeyLogLocal()),
       tls_keylog_remote_(config.tlsKeyLogRemote()) {
@@ -89,7 +89,7 @@ ContextImpl::ContextImpl(
   }
 
   auto validator_or_error = cert_validator_factory->createCertValidator(
-      config.certificateValidationContext(), stats_, factory_context_, scope);
+      config.certificateValidationContext(), stats_, factory_context_, certScope());
   SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
   cert_validator_ = std::move(*validator_or_error);
 
@@ -160,7 +160,7 @@ ContextImpl::ContextImpl(
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates, scope);
+      ssl_contexts, config.capabilities().provides_certificates, certScope());
   SET_AND_RETURN_IF_NOT_OK(verify_mode_or_error.status(), creation_status);
   auto verify_mode = verify_mode_or_error.value();
 
@@ -227,7 +227,7 @@ ContextImpl::ContextImpl(
       // Create and set the certificate expiration gauge.
       Stats::Gauge& expiration_gauge =
           Extensions::TransportSockets::Tls::createCertificateExpirationGauge(
-              scope, tls_certificate.certificateName());
+              certScope(), tls_certificate.certificateName());
       expiration_gauge.set(Utility::getExpirationUnixTime(ctx.cert_chain_.get()).count());
 
       // The must staple extension means the certificate promises to carry
