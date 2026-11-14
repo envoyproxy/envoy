@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
@@ -333,6 +335,263 @@ TEST_P(ShadowPolicyIntegrationTest, ClusterMirrorPolicyStats) {
   EXPECT_EQ(1, test_server_->counter("mirror.cluster_mirror.rq_started")->value());
   EXPECT_EQ(0, test_server_->counter("mirror.route_mirror.rq_sampled")->value());
   EXPECT_EQ(0, test_server_->counter("mirror.route_mirror.rq_started")->value());
+}
+
+// Mirror retry policy and timeout tests. The upstreams are driven by the tests, which answer the
+// primary request and each mirror attempt.
+class ShadowPolicyRetryAndTimeoutIntegrationTest : public ShadowPolicyIntegrationTest {
+public:
+  ShadowPolicyRetryAndTimeoutIntegrationTest() { autonomous_upstream_ = false; }
+
+  // Mirrors to cluster_1 with a retry policy allowing one retry on retry_on.
+  void configureMirrorRetryOn(const std::string& retry_on) {
+    mirror_policy_modifier_ =
+        [retry_on](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+          policy.set_stat_prefix("test_mirror");
+          policy.mutable_retry_policy()->set_retry_on(retry_on);
+          policy.mutable_retry_policy()->mutable_num_retries()->set_value(1);
+        };
+    initialConfigSetup("cluster_1", "");
+  }
+
+  // Sends a GET request, or a POST request with a body of body_size bytes if body_size is not 0.
+  void sendRequest(uint64_t body_size = 0) {
+    body_size_ = body_size;
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    if (body_size == 0) {
+      response_ = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+      return;
+    }
+    response_ = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"}},
+        body_size);
+  }
+
+  // Answers the primary request with a 200 and waits for the downstream response.
+  void completePrimaryRequest() {
+    ASSERT_TRUE(
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main_));
+    ASSERT_TRUE(
+        fake_upstream_connection_main_->waitForNewStream(*dispatcher_, upstream_request_main_));
+    ASSERT_TRUE(upstream_request_main_->waitForEndStream(*dispatcher_));
+    EXPECT_EQ(body_size_, upstream_request_main_->bodyLength());
+    upstream_request_main_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_EQ("200", response_->headers().getStatusValue());
+  }
+
+  // Waits for the next attempt of the mirrored request, which is appended to mirror_attempts_.
+  void waitForMirrorAttempt() {
+    if (fake_upstream_connection_shadow_ == nullptr) {
+      ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_,
+                                                            fake_upstream_connection_shadow_));
+    }
+    mirror_attempts_.emplace_back();
+    ASSERT_TRUE(
+        fake_upstream_connection_shadow_->waitForNewStream(*dispatcher_, mirror_attempts_.back()));
+    ASSERT_TRUE(mirror_attempts_.back()->waitForEndStream(*dispatcher_));
+    EXPECT_EQ(std::string(body_size_, 'a'), mirror_attempts_.back()->body().toString());
+  }
+
+  void respondToMirrorAttempt(const std::string& status) {
+    mirror_attempts_.back()->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", status}},
+                                           true);
+  }
+
+  void closeConnectionsAndCleanup() {
+    for (FakeHttpConnectionPtr* connection :
+         {&fake_upstream_connection_main_, &fake_upstream_connection_shadow_}) {
+      if (*connection != nullptr) {
+        ASSERT_TRUE((*connection)->close());
+        ASSERT_TRUE((*connection)->waitForDisconnect());
+      }
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
+  void testMirrorTimeout(bool respect_expected_rq_timeout);
+
+  uint64_t body_size_{0};
+  IntegrationStreamDecoderPtr response_;
+  FakeHttpConnectionPtr fake_upstream_connection_main_;
+  FakeStreamPtr upstream_request_main_;
+  FakeHttpConnectionPtr fake_upstream_connection_shadow_;
+  std::vector<FakeStreamPtr> mirror_attempts_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, ShadowPolicyRetryAndTimeoutIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(true)),
+    [](const ::testing::TestParamInfo<ShadowPolicyIntegrationTest::ParamType>& params) {
+      return std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+    });
+
+// A mirror retried after a 503 counts as a single started and successful mirror.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorRetryPolicy) {
+  configureMirrorRetryOn("5xx");
+  initialize();
+  sendRequest();
+  completePrimaryRequest();
+
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("503");
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("200");
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_success", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_failure")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_retry")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_retry_success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+
+  closeConnectionsAndCleanup();
+}
+
+// A mirror that fails all its attempts counts as a single started and failed mirror.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorRetriesExhausted) {
+  configureMirrorRetryOn("reset,5xx");
+  initialize();
+  sendRequest();
+  completePrimaryRequest();
+
+  waitForMirrorAttempt();
+  mirror_attempts_.back()->encodeResetStream();
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("503");
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_failure", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_retry")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_1.upstream_rq_retry_limit_exceeded")->value());
+
+  closeConnectionsAndCleanup();
+}
+
+// A cluster-level retry policy of the mirror cluster overrides the retry policy of the mirror
+// policy, as it overrides route-level retry policies.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, ClusterRetryPolicyOverridesMirrorRetryPolicy) {
+  configureMirrorRetryOn("5xx");
+  // cluster_1 is added by configureMirrorRetryOn().
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto& clusters = *bootstrap.mutable_static_resources()->mutable_clusters();
+    auto it = std::find_if(clusters.begin(), clusters.end(),
+                           [](const auto& cluster) { return cluster.name() == "cluster_1"; });
+    ASSERT_NE(it, clusters.end());
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_retry_policy()->set_retry_on("reset");
+    ConfigHelper::setProtocolOptions(*it, protocol_options);
+  });
+  initialize();
+  sendRequest();
+  completePrimaryRequest();
+
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("503");
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_failure", Eq(1));
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_retry")->value());
+
+  closeConnectionsAndCleanup();
+}
+
+// A mirrored body larger than the default async client buffer limit (64KiB), but within the route
+// buffer limit, is retried in full.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, BodyWithinBufferLimitIsRetriedInFull) {
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    hcm.mutable_route_config()
+        ->mutable_virtual_hosts(0)
+        ->mutable_request_body_buffer_limit()
+        ->set_value(1024 * 1024);
+  });
+  configureMirrorRetryOn("5xx");
+  initialize();
+  sendRequest(128 * 1024);
+  completePrimaryRequest();
+
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("503");
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("200");
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_success", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_retry")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.retry_or_shadow_abandoned")->value());
+
+  closeConnectionsAndCleanup();
+}
+
+// A mirrored body over the route buffer limit is sent in full once, but is not retried.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, BodyOverBufferLimitIsNotRetried) {
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    hcm.mutable_route_config()
+        ->mutable_virtual_hosts(0)
+        ->mutable_request_body_buffer_limit()
+        ->set_value(64 * 1024);
+  });
+  configureMirrorRetryOn("5xx");
+  initialize();
+  sendRequest(128 * 1024);
+  completePrimaryRequest();
+
+  waitForMirrorAttempt();
+  respondToMirrorAttempt("503");
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_failure", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_retry")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.retry_or_shadow_abandoned")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.retry_or_shadow_abandoned")->value());
+
+  closeConnectionsAndCleanup();
+}
+
+void ShadowPolicyRetryAndTimeoutIntegrationTest::testMirrorTimeout(
+    bool respect_expected_rq_timeout) {
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+    policy.mutable_timeout()->set_nanos(200 * 1000 * 1000);
+  };
+  initialConfigSetup("cluster_1", "");
+  if (respect_expected_rq_timeout) {
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+      envoy::extensions::filters::http::router::v3::Router router_config;
+      router_config.set_respect_expected_rq_timeout(true);
+      std::ignore = hcm.mutable_http_filters(hcm.http_filters_size() - 1)
+                        ->mutable_typed_config()
+                        ->PackFrom(router_config);
+    });
+  }
+  initialize();
+  sendRequest();
+
+  waitForMirrorAttempt();
+  // The timeout of the primary request does not leak into the mirror.
+  EXPECT_EQ("200", mirror_attempts_.back()->headers().getEnvoyExpectedRequestTimeoutMsValue());
+
+  // The mirror times out on its own timeout while the primary request is still pending.
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_timeout", Eq(1));
+  test_server_->waitForCounter("mirror.test_mirror.rq_failure", Eq(1));
+
+  completePrimaryRequest();
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
+
+  closeConnectionsAndCleanup();
+}
+
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorTimeout) { testMirrorTimeout(false); }
+
+// With respect_expected_rq_timeout, the mirror router must not take its timeout from the
+// x-envoy-expected-rq-timeout-ms header set by the primary router before the headers are copied.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorTimeoutWithRespectExpectedRqTimeout) {
+  testMirrorTimeout(true);
 }
 
 TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {

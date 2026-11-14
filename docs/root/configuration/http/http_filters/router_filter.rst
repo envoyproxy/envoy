@@ -515,6 +515,13 @@ filter answered the primary request locally after the policies were evaluated.
 ``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts the mirror requests
 still in flight.
 
+A mirror request retried by the policy :ref:`retry_policy
+<envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.retry_policy>` is counted once in
+``rq_started``, and once in ``rq_success`` or ``rq_failure`` with the outcome of its last attempt.
+Its retries are counted in the ``upstream_rq_retry*`` statistics of the mirror cluster. A mirror
+request whose body exceeds the buffer limit is not retried and increments the
+``retry_or_shadow_abandoned`` statistic of the mirror cluster.
+
 Runtime
 -------
 

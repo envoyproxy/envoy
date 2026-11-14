@@ -6612,6 +6612,134 @@ TEST_P(RouterShadowingTest, ShadowStatsSkippedOnLocalReply) {
   router_->onDestroy();
 }
 
+TEST_P(RouterShadowingTest, ShadowRetryPolicyAndTimeout) {
+  envoy::config::route::v3::RouteAction::RequestMirrorPolicy config;
+  config.set_cluster("foo");
+  config.mutable_runtime_fraction()->set_runtime_key("bar");
+  config.mutable_retry_policy()->set_retry_on("5xx");
+  config.mutable_retry_policy()->mutable_num_retries()->set_value(2);
+  config.mutable_timeout()->set_seconds(3);
+  std::shared_ptr<ShadowPolicyImpl> policy = THROW_OR_RETURN_VALUE(
+      ShadowPolicyImpl::create(config, factory_context_), std::shared_ptr<ShadowPolicyImpl>);
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(makeShadowPolicy("fizz", "", "bar"));
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .Times(2)
+      .WillRepeatedly(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&client);
+  NiceMock<Http::MockAsyncClientOngoingRequest> fizz_request(&client);
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                    const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::chrono::milliseconds(3000), options.timeout);
+        EXPECT_EQ(nullptr, shadow_headers->EnvoyExpectedRequestTimeoutMs());
+        EXPECT_EQ(policy->retryPolicy(), options.parsed_retry_policy);
+        EXPECT_EQ(2U, options.parsed_retry_policy->numRetries());
+        EXPECT_TRUE(options.buffer_body_for_retry);
+        return &foo_request;
+      });
+  // A mirror without its own retry policy and timeout keeps the primary request timeout and is
+  // not retried.
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("fizz", _, _))
+      .WillOnce([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                    const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::chrono::milliseconds(10), options.timeout);
+        EXPECT_EQ("10", shadow_headers->getEnvoyExpectedRequestTimeoutMsValue());
+        EXPECT_EQ(nullptr, options.parsed_retry_policy);
+        EXPECT_FALSE(options.retry_policy.has_value());
+        EXPECT_FALSE(options.buffer_body_for_retry);
+        return &fizz_request;
+      });
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+  EXPECT_CALL(fizz_request, removeWatermarkCallbacks());
+  EXPECT_CALL(fizz_request, cancel());
+  router_->onDestroy();
+}
+
+// With respect_expected_rq_timeout, the router keeps the timeout headers of the primary request,
+// which the mirror router would honor. A mirror with its own timeout does not get them.
+TEST_P(RouterShadowingTest, ShadowTimeoutDropsPrimaryTimeoutHeaders) {
+  shadow_writer_ = new MockShadowWriter();
+  config_ = std::make_shared<FilterConfig>(
+      factory_context_, *stats_store_.rootScope(), pool_.add("test"), *stats_store_.rootScope(),
+      cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true, false, false,
+      true /* respect_expected_rq_timeout */, false, false, false,
+      Protobuf::RepeatedPtrField<std::string>{}, test_time_.timeSystem(), http_context_,
+      router_context_);
+  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+  router_->setDecoderFilterCallbacks(callbacks_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
+
+  envoy::config::route::v3::RouteAction::RequestMirrorPolicy config;
+  config.set_cluster("foo");
+  config.mutable_runtime_fraction()->set_runtime_key("bar");
+  config.mutable_timeout()->set_seconds(3);
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(THROW_OR_RETURN_VALUE(
+      ShadowPolicyImpl::create(config, factory_context_), std::shared_ptr<ShadowPolicyImpl>));
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(makeShadowPolicy("fizz", "", "bar"));
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .Times(2)
+      .WillRepeatedly(Return(true));
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "50"},
+                                         {"x-envoy-upstream-rq-timeout-ms", "60"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&client);
+  NiceMock<Http::MockAsyncClientOngoingRequest> fizz_request(&client);
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                    const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::chrono::milliseconds(3000), options.timeout);
+        EXPECT_EQ(nullptr, shadow_headers->EnvoyExpectedRequestTimeoutMs());
+        EXPECT_EQ(nullptr, shadow_headers->EnvoyUpstreamRequestTimeoutMs());
+        return &foo_request;
+      });
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("fizz", _, _))
+      .WillOnce([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                    const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::chrono::milliseconds(50), options.timeout);
+        EXPECT_EQ("50", shadow_headers->getEnvoyExpectedRequestTimeoutMsValue());
+        EXPECT_EQ("60", shadow_headers->getEnvoyUpstreamRequestTimeoutMsValue());
+        return &fizz_request;
+      });
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+  EXPECT_CALL(fizz_request, removeWatermarkCallbacks());
+  EXPECT_CALL(fizz_request, cancel());
+  router_->onDestroy();
+}
+
 TEST_P(RouterShadowingTest, ShadowWithHeaderManipulation) {
   const std::vector<std::string> mutation_yamls = {
       R"EOF(

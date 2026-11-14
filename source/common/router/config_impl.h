@@ -576,6 +576,8 @@ public:
   const Http::HeaderEvaluator& headerEvaluator() const override;
   absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
   const ShadowPolicyStatsSharedPtr& stats() const override { return stats_; }
+  const RetryPolicyConstSharedPtr& retryPolicy() const override { return retry_policy_; }
+  std::optional<std::chrono::milliseconds> timeout() const override { return timeout_; }
 
 private:
   struct ShadowPolicyStatsHolder {
@@ -598,6 +600,8 @@ private:
   const std::string host_rewrite_literal_;
   HeaderMutationsPtr request_headers_mutations_;
   ShadowPolicyStatsSharedPtr stats_;
+  RetryPolicyConstSharedPtr retry_policy_;
+  const std::optional<std::chrono::milliseconds> timeout_;
 };
 
 /**
