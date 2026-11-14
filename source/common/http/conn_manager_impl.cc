@@ -527,6 +527,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
       *this, response_encoder.getStream().bufferLimit(), std::move(downstream_stream_account));
 
   accumulated_requests_++;
+  idle_since_drain_start_ = false;
   if (config_->maxRequestsPerConnection() > 0 &&
       accumulated_requests_ >= config_->maxRequestsPerConnection()) {
     if (codec_->protocol() < Protocol::Http2) {
@@ -980,7 +981,11 @@ void ConnectionManagerImpl::onDrainTimeout() {
   ASSERT(drain_state_ != DrainState::NotDraining);
   codec_->goAway();
   drain_state_ = DrainState::Closing;
-  checkForDeferredClose(false);
+  // An HTTP/1 connection that carried no request while draining has no response for the client to
+  // read, so delaying the close would only hold the socket open and ignore any request sent on it.
+  checkForDeferredClose(idle_since_drain_start_ && codec_->protocol() < Protocol::Http2 &&
+                        Runtime::runtimeFeatureEnabled(
+                            "envoy.reloadable_features.http1_skip_delayed_close_on_idle_drain"));
   // Only once the end of the drain window is near: a drain sequence started earlier (e.g. by a
   // response) must not cut the tunneling streams short while other traffic on the connection can
   // still complete normally.
@@ -1936,6 +1941,7 @@ void ConnectionManagerImpl::ActiveStream::disarmRequestTimeout() {
 void ConnectionManagerImpl::startDrainSequence() {
   ASSERT(drain_state_ == DrainState::NotDraining);
   drain_state_ = DrainState::Draining;
+  idle_since_drain_start_ = streams_.empty();
   codec_->shutdownNotice();
   drain_timer_ = dispatcher_->createTimer([this]() -> void { onDrainTimeout(); });
   drain_timer_->enableTimer(config_->drainTimeout());
