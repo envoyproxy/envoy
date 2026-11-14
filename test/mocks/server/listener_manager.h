@@ -41,6 +41,9 @@ public:
   }
   MOCK_METHOD(ListenerUpdateCallbacksHandle*, addListenerUpdateCallbacks_,
               (ListenerUpdateCallbacks & callbacks));
+  MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateFilterChain,
+              (const envoy::config::listener::v3::FilterChain& filter_chain));
+  MOCK_METHOD(bool, removeFilterChain, (absl::string_view name));
 };
 } // namespace Server
 } // namespace Envoy

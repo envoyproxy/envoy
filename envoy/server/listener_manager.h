@@ -66,6 +66,15 @@ public:
    * keeps serving.
    */
   virtual void onListenerListenFailure(absl::string_view /*listener_name*/, bool /*removed*/) {}
+
+  /**
+   * onFilterChainAddOrUpdate is called once a filter chain that the listeners with fcds_config
+   * find by name is added or updated, and is posted to the workers. Envoy can call this inside
+   * addOrUpdateFilterChain() for a version that was added earlier. It must not add, update or
+   * remove listeners or filter chains.
+   * @param filter_chain_name is the name of the filter chain.
+   */
+  virtual void onFilterChainAddOrUpdate(absl::string_view /*filter_chain_name*/) {}
 };
 
 /**
@@ -357,6 +366,36 @@ public:
    */
   virtual ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) PURE;
+
+  /**
+   * Add or update a filter chain that the listeners with fcds_config find by name, as FCDS would
+   * deliver it. A listener whose fcds_config has no config_source waits, without a timeout, until
+   * the filter chains that it finds by name are added and finished warming, and removing a filter
+   * chain that still warms ends the wait. The wait can hold server initialization. A filter chain
+   * name is either discovered through FCDS or added here, and Envoy rejects a listener that
+   * requests a name of the other kind. A listener keeps its names until it is removed and has
+   * finished draining. The caller must use names that no other caller writes. This call can warm
+   * listeners and start the workers, and the callbacks that run inside it must not add, update or
+   * remove filter chains.
+   * @param filter_chain supplies the configuration of the filter chain.
+   * @return TRUE if the filter chain was added or updated or FALSE if it equals the version added
+   *         last, which can still warm. This routine will return an error if the filter chain
+   *         cannot be built, and an AlreadyExists error if a listener requests its name through
+   *         FCDS.
+   */
+  virtual absl::StatusOr<bool>
+  addOrUpdateFilterChain(const envoy::config::listener::v3::FilterChain& /*filter_chain*/) {
+    return absl::UnimplementedError("filter chains are not supported");
+  }
+
+  /**
+   * Remove a filter chain that addOrUpdateFilterChain() added. The listeners drain its connections.
+   * Like addOrUpdateFilterChain(), this call can warm listeners and start the workers, and the
+   * callbacks that run inside it must not add, update or remove filter chains.
+   * @param name supplies the name of the filter chain.
+   * @return TRUE if the filter chain was found and removed.
+   */
+  virtual bool removeFilterChain(absl::string_view /*name*/) { return false; }
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

@@ -505,19 +505,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
-SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
-
 std::shared_ptr<FcdsSharedFilterChainManager>
 ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
   if (config.has_fcds_config()) {
-    return parent_.server_.serverFactoryContext()
-        .singletonManager()
-        .getTyped<FcdsSharedFilterChainManager>(
-            SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
-            [this]() -> Singleton::InstanceSharedPtr {
-              return std::make_shared<FcdsSharedFilterChainManager>(
-                  parent_.server_.serverFactoryContext(), *parent_.factory_);
-            });
+    return parent_.fcdsSharedFilterChainManager();
   }
   return nullptr;
 }
