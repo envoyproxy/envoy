@@ -2511,8 +2511,8 @@ TEST_F(FilterManagerTrailersTest, RequestTrailersHeldByEarlierFilterAreNotForwar
   filters_[0]->decoder_callbacks_->continueDecoding();
   EXPECT_EQ(1, records_[1].decoded_trailers);
   EXPECT_EQ(1, records_[2].decoded_trailers);
-  // Filter 0 replays the drained shared buffer as an empty frame before the trailers.
-  EXPECT_EQ((Chunks{{"aaa", false}, {"", false}}), records_[2].decoded_data);
+  // Filter 0 was passed by the data, so it has no buffer to replay before the trailers.
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
 
   filter_manager_->destroyFilters();
 }
@@ -2558,8 +2558,8 @@ TEST_F(FilterManagerTrailersTest, ResponseTrailersHeldByEarlierFilterAreNotForwa
   filters_[2]->encoder_callbacks_->continueEncoding();
   EXPECT_EQ(1, records_[1].encoded_trailers);
   EXPECT_EQ(1, sent_trailers_);
-  // Filter 2 replays the drained shared buffer as an empty frame before the trailers.
-  EXPECT_EQ((Chunks{{"aaa", false}, {"", false}}), sent_data_);
+  // Filter 2 was passed by the data, so it has no buffer to replay before the trailers.
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
 
   filter_manager_->destroyFilters();
 }
