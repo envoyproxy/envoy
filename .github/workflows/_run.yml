@@ -51,6 +51,9 @@ on:
         default: false
       checkout-extra:
         type: string
+      checkout-fetch-depth:
+        type: number
+        description: Fetch this many commits of history (default, a push fetches all of it).
       checkout-pr:
         type: string
         description: Check out this pull request's merge ref instead of the request's sha.
@@ -317,6 +320,7 @@ jobs:
           #  If this is set to run untrusted code, then anything before or after in the job should be regarded as
           #  compromisable.
           ref: ${{ inputs.trusted && fromJSON(inputs.request).request.sha || fromJSON(inputs.request).request.ref }}
+          ${{ inputs.checkout-fetch-depth && format('fetch-depth: {0}', inputs.checkout-fetch-depth) || '' }}
         fetch-merge-commit: false
         pr: ${{ fromJSON(inputs.request).request.pr }}
         ssh-key: ${{ inputs.trusted && secrets.ssh-key || '' }}
