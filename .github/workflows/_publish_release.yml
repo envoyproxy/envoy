@@ -117,7 +117,7 @@ jobs:
         export NO_BUILD_SETUP=1
       trusted: ${{ inputs.trusted }}
       uploads: |
-        release.signed: container/envoy/release.signed.tar.zst
+        release.signed: {path: container/envoy/release.signed.tar.zst, compression-level: 0}
       steps-pre: |
         - run: |
             mkdir -p distribution/custom
