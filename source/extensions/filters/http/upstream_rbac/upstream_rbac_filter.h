@@ -19,7 +19,7 @@ inline constexpr absl::string_view DynamicMetadataKey = "envoy.filters.http.upst
  * An upstream HTTP filter that authorizes the *selected upstream host* using the RBAC engine.
  *
  * It is a thin specialization of the downstream RBAC filter: it reuses the engine, config and the
- * shadow/enforced evaluation logic (RoleBasedAccessControlFilter::evaluate{Shadow,Enforced}Engine),
+ * shadow/enforced evaluation logic (RoleBasedAccessControlFilter::evaluateEngines),
  * but instead of evaluating during decodeHeaders it evaluates from the onHostSelected() callback —
  * after a host has been selected but before the upstream connection is initiated. This lets the
  * `upstream_ip_port` matcher work for every cluster type, including dynamic forward proxy
