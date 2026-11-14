@@ -443,6 +443,8 @@ visibility_excludes:
 - source/extensions/clusters/logical_dns/
 - source/extensions/clusters/dns/
 - source/extensions/dynamic_modules/
+- source/extensions/bootstrap/reverse_tunnel/common/BUILD
+- source/extensions/bootstrap/reverse_tunnel/http1/BUILD
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/http/on_demand/BUILD

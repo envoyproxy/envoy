@@ -18,6 +18,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/server/generic_factory_context.h"
 
@@ -43,13 +44,6 @@ struct AttachedTunnelsRequest {
   absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3> active_tunnels;
 };
 using AttachedTunnelsRequestSharedPtr = std::shared_ptr<AttachedTunnelsRequest>;
-
-struct HandshakeHeader {
-  Http::LowerCaseString key;
-  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
-  Formatter::FormatterPtr value_formatter;
-};
-using HandshakeHeadersConstSharedPtr = std::shared_ptr<const std::vector<HandshakeHeader>>;
 
 /**
  * Bootstrap extension for ReverseTunnelInitiator.
@@ -168,6 +162,14 @@ public:
   const HandshakeHeadersConstSharedPtr& handshakeHeaders() const { return handshake_headers_; }
 
   /**
+   * @return the factory creating per-connection initiator handshakes; null means the built-in
+   * HTTP/1 handshake applies.
+   */
+  const std::shared_ptr<const InitiatorHandshakeConfigurator>& handshakeConfigurator() const {
+    return handshake_configurator_;
+  }
+
+  /**
    * @return reference to the configured access loggers for reverse tunnel lifecycle events.
    */
   const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
@@ -242,6 +244,7 @@ private:
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
   HandshakeHeadersConstSharedPtr handshake_headers_;
+  std::shared_ptr<const InitiatorHandshakeConfigurator> handshake_configurator_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 
   // Makes a histogram with the given name and stats store.
