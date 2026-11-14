@@ -1856,7 +1856,7 @@ TEST_P(FilterIntegrationTest, PerFilterBufferDisabledRequestBodyStillCompletes) 
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(FilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
+TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
   // Encoding order: add-trailers-filter, wait-for-whole-request-and-response-filter.
   prependFilter(R"EOF(
   name: add-trailers-filter
