@@ -23,6 +23,7 @@
 
 #include "source/common/upstream/upstream_impl.h"
 
+#include "absl/base/optimization.h"
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
@@ -50,66 +51,104 @@ struct HostSuccessRatePair {
   double success_rate_;
 };
 
-struct SuccessRateAccumulatorBucket {
-  std::atomic<uint64_t> success_request_counter_;
-  std::atomic<uint64_t> total_request_counter_;
-};
-
 /**
- * The SuccessRateAccumulator uses the SuccessRateAccumulatorBucket to get per host success rate
- * stats. This implementation has a fixed window size of time, and thus only needs a
- * bucket to write to, and a bucket to accumulate/run stats over.
+ * The SuccessRateAccumulator tracks per-host success rate stats across time-windowed intervals.
+ * Response outcomes are recorded into a single packed 64-bit atomic state (bits [62:32] total,
+ * bits [30:0] success, bit 63 saturation latch) via compare_exchange_weak. At interval
+ * boundaries, the active window is atomically exchanged with 0 via exchange(0), guaranteeing that
+ * each response belongs to exactly one accounting window without any cross-window splitting, bucket
+ * recycling races, or metadata leakage.
  */
 class SuccessRateAccumulator {
 public:
-  SuccessRateAccumulator()
-      : current_success_rate_bucket_(new SuccessRateAccumulatorBucket()),
-        backup_success_rate_bucket_(new SuccessRateAccumulatorBucket()) {}
+  // Maximum representable request volume per interval field (2^31 - 1, ~2.14 billion).
+  // Request volume reaching or exceeding this boundary transitions the active interval into
+  // the saturated state. Snapshots reaching total >= CAPACITY_LIMIT are rejected by
+  // getSuccessRateAndVolume(), and subsequent recording attempts atomically latch SATURATED_BIT,
+  // preventing 32-bit integer modular wrap and carry bleed.
+  static constexpr uint32_t CAPACITY_LIMIT = 0x7FFFFFFFU;
+  static constexpr uint64_t SATURATED_BIT = (1ULL << 63);
+
+  SuccessRateAccumulator() = default;
 
   /**
-   * This function updates the bucket to write data to.
-   * @return a pointer to the SuccessRateAccumulatorBucket.
+   * Records a request into the active accounting window with atomic outcome synchronization.
+   * Both total requests and success requests, as well as the saturated state, are represented
+   * within a single 64-bit atomic state.
+   * An interval that reaches CAPACITY_LIMIT increments total to limit (which is rejected by
+   * getSuccessRateAndVolume() as invalid). When a subsequent request arrives while total >=
+   * CAPACITY_LIMIT, it atomically latches SATURATED_BIT via CAS, and subsequent requests within
+   * that interval are discarded as deliberate bounded-accounting policy.
+   * @param success true if the request completed successfully, false otherwise.
    */
-  SuccessRateAccumulatorBucket* updateCurrentWriter();
+  void record(bool success) {
+    uint64_t cur = counters_.load(std::memory_order_relaxed);
+    while (true) {
+      if (ABSL_PREDICT_FALSE((cur & SATURATED_BIT) != 0)) {
+        return;
+      }
+      const uint32_t total = static_cast<uint32_t>((cur >> 32) & 0x7FFFFFFFU);
+      const uint32_t succ = static_cast<uint32_t>(cur & 0x7FFFFFFFU);
+      if (ABSL_PREDICT_FALSE(total >= CAPACITY_LIMIT || succ >= CAPACITY_LIMIT)) {
+        if (counters_.compare_exchange_weak(cur, cur | SATURATED_BIT, std::memory_order_relaxed)) {
+          return;
+        }
+        continue;
+      }
+      const uint64_t next = (static_cast<uint64_t>(total + 1) << 32) |
+                            static_cast<uint64_t>(succ + (success ? 1U : 0U));
+      if (counters_.compare_exchange_weak(cur, next, std::memory_order_relaxed)) {
+        return;
+      }
+    }
+  }
+
   /**
-   * This function returns the success rate of a host over a window of time if the request volume is
-   * high enough. The underlying window of time could be dynamically adjusted. In the current
-   * implementation it is a fixed time window.
-   * @param success_rate_request_volume the threshold of requests an accumulator has to have in
-   *                                    order to be able to return a significant success rate value.
-   * @return a valid std::optional<double> with the success rate. If there were not enough
-   * requests, an invalid std::optional<double> is returned.
+   * Rotates the accounting window: atomically exchanges the active counter with 0 and
+   * snapshots the completed window.
+   */
+  void updateCurrentWriter();
+
+  /**
+   * Returns the success rate and volume of the most recently completed accounting window.
+   * If the window overflowed/saturated, has zero volume, or experienced invariant violations,
+   * returns std::nullopt to prevent corrupted metrics or false ejections.
+   * @return a valid std::optional<std::pair<double, uint64_t>> with the success rate and
+   * request volume, or std::nullopt.
    */
   std::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
 
 private:
-  std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
-  std::unique_ptr<SuccessRateAccumulatorBucket> backup_success_rate_bucket_;
+  friend class SuccessRateAccumulatorTestPeer;
+
+  // Packed atomic counter encoding:
+  // - Bit [63]:     SATURATED_BIT indicating the interval reached or exceeded CAPACITY_LIMIT.
+  // - Bits [62:32]: Total request count (up to CAPACITY_LIMIT requests per interval).
+  // - Bit [31]:     Unused (0).
+  // - Bits [30:0]:  Successful request count (up to CAPACITY_LIMIT requests per interval).
+  // All counts and the saturated state reside in one atomic word, updated via CAS and rotated
+  // via a single atomic exchange(0), eliminating any window attribution races or metadata leakage.
+  std::atomic<uint64_t> counters_{0};
+  uint64_t backup_snapshot_{0};
+  bool has_backup_{false};
 };
 
 class SuccessRateMonitor {
 public:
   SuccessRateMonitor(envoy::data::cluster::v3::OutlierEjectionType ejection_type)
       : ejection_type_(ejection_type) {
-    // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
   }
   double getSuccessRate() const { return success_rate_; }
   SuccessRateAccumulator& successRateAccumulator() { return success_rate_accumulator_; }
   void setSuccessRate(double new_success_rate) { success_rate_ = new_success_rate; }
-  void updateCurrentSuccessRateBucket() {
-    success_rate_accumulator_bucket_.store(success_rate_accumulator_.updateCurrentWriter());
-  }
-  void incTotalReqCounter() { success_rate_accumulator_bucket_.load()->total_request_counter_++; }
-  void incSuccessReqCounter() {
-    success_rate_accumulator_bucket_.load()->success_request_counter_++;
-  }
+  void updateCurrentSuccessRateBucket() { success_rate_accumulator_.updateCurrentWriter(); }
+  void incReqCounters(bool success) { success_rate_accumulator_.record(success); }
 
   envoy::data::cluster::v3::OutlierEjectionType getEjectionType() const { return ejection_type_; }
 
 private:
   SuccessRateAccumulator success_rate_accumulator_;
-  std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
   envoy::data::cluster::v3::OutlierEjectionType ejection_type_;
   double success_rate_{-1};
 };
