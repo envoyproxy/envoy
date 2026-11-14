@@ -1307,11 +1307,11 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                                   std::move(upstream_callbacks_), std::move(idle_timer_),
                                   idle_timeout_, read_callbacks_->upstreamHost());
     }
-    if (event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::RemoteClose) {
-      upstream_.reset();
-      disableIdleTimer();
-    }
+  }
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    upstream_.reset();
+    disableIdleTimer();
   }
 
   if (generic_conn_pool_) {
@@ -1386,7 +1386,6 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_detected_close_type);
       upstream_.reset();
     }
-    disableIdleTimer();
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
@@ -1413,6 +1412,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset) {
           ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
                          read_callbacks_->connection());
+          disableIdleTimer();
           getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset);
           read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
         } else {
