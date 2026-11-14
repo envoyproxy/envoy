@@ -519,6 +519,19 @@ void ConnectionImpl::StreamImpl::grantPeerAdditionalStreamWindow() {
   }
 }
 
+void ConnectionImpl::StreamImpl::dropRequestData() {
+  // The connection manager has finished this stream, so nothing will read the rest of the request.
+  // Release its flow-control window even if the stream was left read-disabled, so that it does not
+  // use up the connection window that other streams share while the response is still being sent.
+  // onData() drops request data that arrives later.
+  stream_manager_.body_buffered_ = false;
+  pending_recv_data_->drain(pending_recv_data_->length());
+  if (unconsumed_bytes_ > 0) {
+    parent_.adapter_->MarkDataConsumedForStream(stream_id_, unconsumed_bytes_);
+    unconsumed_bytes_ = 0;
+  }
+}
+
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   ENVOY_CONN_LOG(debug, "Stream {} {}, unconsumed_bytes {} read_disable_count {}",
                  parent_.connection_, stream_id_, (disable ? "disabled" : "enabled"),
@@ -808,6 +821,10 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   MultiplexedStreamImplBase::onPendingFlushTimer();
   parent_.stats_.tx_flush_timeout_.inc();
   ASSERT(local_end_stream_ && !local_end_stream_sent_);
+  // If the stream's reset was being held until the response was sent, stop waiting. The response
+  // is incomplete, so the reset below is sent with an error code.
+  const bool was_held =
+      hold_deferred_reset_ && parent_.pending_deferred_reset_streams_.erase(stream_id_) > 0;
   // This will emit a reset frame for this stream and close the stream locally.
   // Only the stream adapter's reset callback should run as other higher layers
   // think the stream is already finished.
@@ -815,6 +832,9 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
+  }
+  if (was_held) {
+    parent_.onHeldStreamResetFinished();
   }
 }
 
@@ -852,8 +872,10 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
 }
 
 void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
-  // Clear the downstream on the account since we're resetting the downstream.
-  if (buffer_memory_account_) {
+  // Clear the downstream on the account since we're resetting the downstream. If the reset may be
+  // held until the response is sent, keep it so the overload manager can still reset this stream
+  // to reclaim the buffered response. destroy() clears it once the stream closes.
+  if (buffer_memory_account_ && !shouldHoldReset(reason)) {
     buffer_memory_account_->clearDownstream();
   }
 
@@ -886,13 +908,22 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // end the local stream. However, if we're resetting the stream due to
   // overload, we should reset the stream as soon as possible to free used
   // resources.
+  bool was_held = false;
   if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
       reason != StreamResetReason::OverloadManager) {
     ASSERT(parent_.getStreamUnchecked(stream_id_) != nullptr);
     parent_.pending_deferred_reset_streams_.emplace(stream_id_, this);
     deferred_reset_ = reason;
+    hold_deferred_reset_ = shouldHoldReset(reason);
+    if (hold_deferred_reset_) {
+      dropRequestData();
+    }
     ENVOY_CONN_LOG(trace, "deferred reset stream", parent_.connection_);
   } else {
+    // A held reset (see shouldHoldReset()) is replaced by one that must not wait, such as an
+    // overload manager reset to reclaim the buffered response.
+    was_held =
+        hold_deferred_reset_ && parent_.pending_deferred_reset_streams_.erase(stream_id_) > 0;
     resetStreamWorker(reason);
   }
 
@@ -902,6 +933,9 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
+  }
+  if (was_held) {
+    parent_.onHeldStreamResetFinished();
   }
 }
 
@@ -1163,6 +1197,11 @@ ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
   StreamImpl* stream = getStream(stream_id);
+  if (stream->hold_deferred_reset_) {
+    // See StreamImpl::dropRequestData().
+    adapter_->MarkDataConsumedForStream(stream_id, len);
+    return 0;
+  }
   // If this results in buffering too much data, the watermark buffer will call
   // pendingRecvBufferHighWatermark, resulting in ++read_disable_count_
   stream->pending_recv_data_->add(data, len);
@@ -1787,17 +1826,39 @@ Status ConnectionImpl::sendPendingFrames() {
   //       to short circuit requests. In the best effort case, we complete the stream before
   //       resetting. In other cases, we just do the reset now which will blow away pending data
   //       frames and release any memory associated with the stream.
+  //       The exception is a reset that is held until the response is sent (see
+  //       StreamImpl::shouldHoldReset()). Such a stream stays in the map until its END_STREAM has
+  //       been sent, and is then reset here with NO_ERROR. The stream flush timer limits the wait.
   if (!pending_deferred_reset_streams_.empty()) {
-    while (!pending_deferred_reset_streams_.empty()) {
-      auto it = pending_deferred_reset_streams_.begin();
+    // Collect the streams first, so that resetting one cannot invalidate the iteration.
+    absl::InlinedVector<StreamImpl*, 4> streams_to_reset;
+    for (auto it = pending_deferred_reset_streams_.begin();
+         it != pending_deferred_reset_streams_.end();) {
       auto* stream = it->second;
       // Sanity check: the stream's id matches the map key.
       ASSERT(it->first == stream->stream_id_);
-      pending_deferred_reset_streams_.erase(it);
       ASSERT(stream->deferred_reset_);
-      stream->resetStreamWorker(stream->deferred_reset_.value());
+      if (stream->holdingDeferredReset()) {
+        // The flush timer limits the hold. onLocalEndStream() only armed it if the codec still
+        // had response data, but the adapter may be holding back the end of the response, e.g.
+        // trailers after a body that exactly used up the window.
+        stream->ensurePendingFlushTimer();
+        ++it;
+        continue;
+      }
+      streams_to_reset.push_back(stream);
+      it = pending_deferred_reset_streams_.erase(it);
     }
-    RETURN_IF_ERROR(sendPendingFrames());
+    for (auto* stream : streams_to_reset) {
+      stream->resetStreamWorker(stream->deferred_reset_.value());
+      if (stream->hold_deferred_reset_) {
+        // END_STREAM has been sent, so there is no pending data left to time out.
+        stream->disarmStreamFlushTimer();
+      }
+    }
+    if (!streams_to_reset.empty()) {
+      RETURN_IF_ERROR(sendPendingFrames());
+    }
   }
 
   // After all pending frames have been written into the outbound buffer check if any of
@@ -1816,6 +1877,16 @@ bool ConnectionImpl::sendPendingFramesAndHandleError() {
     return true;
   }
   return false;
+}
+
+void ConnectionImpl::onHeldStreamResetFinished() {
+  // Held resets finish here only when the codec gives up on them without input from the peer: the
+  // flush timer, or an overload manager reset. Every other way a held stream finishes (a
+  // WINDOW_UPDATE letting END_STREAM out, or the peer ending or resetting the stream) happens
+  // during dispatch(), and the caller checks wantsToWrite() after dispatch() returns.
+  if (!dispatching_ && pending_deferred_reset_streams_.empty()) {
+    notifyWantsToWriteCleared();
+  }
 }
 
 void ConnectionImpl::sendSettingsHelper(

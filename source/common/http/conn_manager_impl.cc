@@ -231,7 +231,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
       direction_(direction), server_context_(server_context),
       use_connection_event_drain_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
+      hold_reset_until_response_sent_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_hold_reset_until_response_sent")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -378,6 +380,9 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
   if (stream.response_encoder_ != nullptr &&
       (!stream.filter_manager_.hasLastDownstreamByteReceived() ||
        !stream.state_.codec_saw_local_complete_)) {
+    // endStream() sets this before calling here, so it is only already set when the response is
+    // complete and the reset ends a request that is still open, rather than aborting the stream.
+    const bool response_complete = stream.state_.codec_saw_local_complete_;
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
@@ -398,6 +403,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
               StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else if (response_complete && hold_reset_until_response_sent_ &&
+                 stream.response_encoder_->getStream().responseDetails().empty()) {
+        // The codec may finish sending the response before it sends this reset. If the codec
+        // reported an error, e.g. for an HTTP/1 protocol error reply, keep LocalReset so that
+        // onResetStream() flags it as a downstream protocol error.
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalResetNoError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       }
@@ -940,6 +951,12 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
 void ConnectionManagerImpl::onGoAway(GoAwayErrorCode) {
   // Currently we do nothing with remote go away frames. In the future we can decide to no longer
   // push resources if applicable.
+}
+
+void ConnectionManagerImpl::onWantsToWriteCleared() {
+  // The codec has finished writing, or given up on, data that kept a draining connection open, so
+  // the connection may now be closed.
+  checkForDeferredClose(false);
 }
 
 void ConnectionManagerImpl::onIdleTimeout() {

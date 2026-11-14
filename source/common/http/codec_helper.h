@@ -115,6 +115,15 @@ public:
     }
   }
 
+  // Arms the flush timer unless it is already armed or the flush timeout is disabled. This is for
+  // a stream that is waiting to finish its response when onLocalEndStream() found no pending data,
+  // e.g. because only the end of the response is waiting for flow-control window.
+  void ensurePendingFlushTimer() {
+    if (stream_flush_timer_ == nullptr) {
+      createPendingFlushTimer();
+    }
+  }
+
   CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
     std::swap(codec_callbacks, codec_callbacks_);
     return codec_callbacks;
