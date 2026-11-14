@@ -58,11 +58,16 @@ public:
   bool moreCompletions() const { return more_completions_; }
   void setMoreCompletions(bool more_completions) { more_completions_ = more_completions; }
 
+  // Another positive completion for this request is already in the bounded CQ snapshot.
+  bool moreReadsInBatch() const { return more_reads_in_batch_; }
+  void setMoreReadsInBatch(bool value) { more_reads_in_batch_ = value; }
+
 private:
   RequestType type_;
   IoUringSocket& socket_;
   int32_t buffer_id_{-1};
   bool more_completions_{false};
+  bool more_reads_in_batch_{false};
 };
 
 /**
