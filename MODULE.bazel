@@ -84,6 +84,7 @@ bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.3.1")
 bazel_dep(name = "rules_buf", version = "0.5.4")
 bazel_dep(name = "rules_cc", version = "0.2.27")
+bazel_dep(name = "rules_distroless", version = "0.9.4")
 bazel_dep(name = "rules_foreign_cc", version = "0.17.0")
 bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
@@ -610,7 +611,7 @@ use_repo(envoy_build_config_ext, "envoy_build_config")
 envoy_module_graph_ext = use_extension("//bazel:extensions.bzl", "envoy_module_graph_extension")
 use_repo(envoy_module_graph_ext, "envoy_mod_graph")
 
-# Base image for the distroless container images (`//distribution/docker`).
+# Base images for the container images (`//distribution/docker`).
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "distroless_base_nossl",
@@ -621,9 +622,54 @@ oci.pull(
         "linux/arm64/v8",
     ],
 )
+oci.pull(
+    name = "ubuntu_base",
+    digest = "sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11",
+    image = "mirror.gcr.io/library/ubuntu",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+)
 use_repo(
     oci,
     "distroless_base_nossl",
     "distroless_base_nossl_linux_amd64",
     "distroless_base_nossl_linux_arm64_v8",
+    "ubuntu_base",
+    "ubuntu_base_linux_amd64",
+    "ubuntu_base_linux_arm64_v8",
 )
+
+# Packages for the ubuntu container images (`//distribution/docker`), from an Ubuntu snapshot.
+# Only the listed packages are installed: their dependencies are in the base image.
+apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
+apt.sources_list(
+    architectures = [
+        "amd64",
+        "arm64",
+    ],
+    components = ["main"],
+    suites = [
+        "jammy",
+        "jammy-security",
+        "jammy-updates",
+    ],
+    types = ["deb"],
+    uris = ["https://snapshot.ubuntu.com/ubuntu/20261113T000000Z"],
+)
+apt.install(
+    dependency_set = "ubuntu_jammy",
+    include_transitive = False,
+    packages = [
+        "ca-certificates",
+        "openssl",
+        "tzdata",
+    ],
+    suites = [
+        "jammy",
+        "jammy-security",
+        "jammy-updates",
+    ],
+)
+use_repo(apt, "ubuntu_jammy")

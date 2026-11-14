@@ -54,37 +54,7 @@ jobs:
       trusted: ${{ inputs.trusted }}
       uploads: |
         release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
-
-  docker:
-    secrets:
-      dockerhub-token: ${{ secrets.dockerhub-token }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    name: Docker OCI
-    needs:
-    - binary
-    uses: ./.github/workflows/_run.yml
-    with:
-      arch: ${{ inputs.arch }}
-      target: docker
-      target-suffix: ${{ inputs.arch }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
-      downloads: |
-        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
-      request: ${{ inputs.request }}
-      source: |
-        export NO_BUILD_SETUP=1
-        export ENVOY_DOCKER_IN_DOCKER=1
-        export ENVOY_DOCKER_SAVE_IMAGE=true
-        export ENVOY_OCI_DIR=build_images
-      trusted: ${{ inputs.trusted }}
-      uploads: |
         oci.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/build_images
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
 
   distribution:
     secrets:

@@ -71,10 +71,6 @@ config_env() {
 }
 
 BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-contrib-distroless" "-distroless" "-tools")
-# The distroless images can be built with bazel instead (`//distribution/docker`)
-if [[ -n "$DOCKER_SKIP_DISTROLESS" ]]; then
-    BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-tools")
-fi
 
 # Configure docker-buildx tools
 BUILD_COMMAND=("buildx" "build")
