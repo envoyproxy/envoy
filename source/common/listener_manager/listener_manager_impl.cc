@@ -437,12 +437,29 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     }
   }
 
+  if (bind_type != BindType::NoBind) {
+    // Create the socket here rather than in the listen socket constructor, which cannot report a
+    // failure, so that socket(2) failing (e.g. with EMFILE) fails the listener instead of crashing.
+    Network::IoHandlePtr io_handle =
+        Network::ioHandleForAddr(socket_type, address, creation_options);
+    if (io_handle == nullptr || !io_handle->isOpen()) {
+      return absl::UnavailableError(
+          fmt::format("failed to create listen socket for address {}", address->asString()));
+    }
+    if (socket_type == Network::Socket::Type::Stream) {
+      return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options,
+                                                        std::nullopt, /*bind_to_port=*/true);
+    }
+    return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options,
+                                                      std::nullopt, /*bind_to_port=*/true);
+  }
+
   if (socket_type == Network::Socket::Type::Stream) {
-    return std::make_shared<Network::TcpListenSocket>(
-        address, options, bind_type != BindType::NoBind, creation_options);
+    return std::make_shared<Network::TcpListenSocket>(address, options, /*bind_to_port=*/false,
+                                                      creation_options);
   } else {
-    return std::make_shared<Network::UdpListenSocket>(
-        address, options, bind_type != BindType::NoBind, creation_options);
+    return std::make_shared<Network::UdpListenSocket>(address, options, /*bind_to_port=*/false,
+                                                      creation_options);
   }
 }
 
