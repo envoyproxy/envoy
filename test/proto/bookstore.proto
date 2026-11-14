@@ -117,6 +117,7 @@ service Bookstore {
   rpc EchoAuthor(Author) returns (Author) {
     option (google.api.http) = {
       post: "/echoAuthor"
+      body: "*"
     };
   }
   rpc GetIndex(google.protobuf.Empty) returns (google.api.HttpBody) {

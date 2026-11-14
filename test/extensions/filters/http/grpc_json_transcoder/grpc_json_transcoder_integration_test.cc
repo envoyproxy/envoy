@@ -863,9 +863,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/shelves/100?unknown=1&shelf=9999"},
                                      {":authority", "host"}},
-      "", {"shelf: 9999"}, {}, Status(StatusCode::kNotFound, "Shelf 9999 Not Found"),
+      "", {"shelf: 100"}, {}, Status(StatusCode::kNotFound, "Shelf 100 Not Found"),
       Http::TestResponseHeaderMapImpl{
-          {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+          {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 100 Not Found"}},
       "");
 }
 

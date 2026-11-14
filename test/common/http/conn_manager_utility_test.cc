@@ -1240,6 +1240,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
                                    {"x-envoy-original-path", "/my_path"},
+                                   {"x-envoy-original-method", "GET"},
                                    {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false, Tracing::Reason::NotTraceable}),
@@ -1248,6 +1249,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
   EXPECT_FALSE(headers.has("x-envoy-original-path"));
+  EXPECT_FALSE(headers.has("x-envoy-original-method"));
   EXPECT_FALSE(headers.has("x-envoy-hedge-on-per-try-timeout"));
   EXPECT_FALSE(headers.has("x-envoy-retriable-status-codes"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
@@ -1287,6 +1289,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
                                    {"x-envoy-original-path", "/my_path"},
+                                   {"x-envoy-original-method", "GET"},
                                    {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"60.0.0.1:0", false, Tracing::Reason::NotTraceable}),
@@ -1298,6 +1301,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
   EXPECT_TRUE(headers.has("x-envoy-decorator-operation"));
   EXPECT_TRUE(headers.has("x-envoy-downstream-service-cluster"));
   EXPECT_TRUE(headers.has("x-envoy-original-path"));
+  EXPECT_TRUE(headers.has("x-envoy-original-method"));
   EXPECT_FALSE(headers.has("x-envoy-hedge-on-per-try-timeout"));
   EXPECT_FALSE(headers.has("x-envoy-retriable-status-codes"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
