@@ -99,8 +99,9 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_con
 // When resuming filter chain iteration, compute end_stream from whether the end of the stream has
 // reached the resuming filter, instead of from the stream-level flag. When enabled,
 // envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
-// Buffer body data stopped at a filter in that filter's own buffer instead of a buffer shared by
-// the whole stream, so several filters can buffer concurrently at different chain positions. Only
+// Buffer body data stopped at a filter that body data has already passed in that filter's own
+// buffer instead of the buffer shared by the whole stream, so it can stop and buffer again
+// without mixing its data into data buffered further down the chain. Only
 // takes effect when envoy.reloadable_features.filter_manager_per_filter_observed_end_stream is
 // also enabled.
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);

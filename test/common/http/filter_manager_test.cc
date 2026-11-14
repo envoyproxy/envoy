@@ -1401,7 +1401,7 @@ TEST_F(FilterManagerPerFilterBufferTest,
   initializeChain(true);
   bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
 
-  // Each filter holds only the bytes stopped at its own position.
+  // Filter 1 holds the shared buffer; filter 0, which data has passed, its own buffer.
   EXPECT_EQ("bbb", filters_[0]->decoder_callbacks_->decodingBuffer()->toString());
   EXPECT_EQ("aaa", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
 
@@ -1733,8 +1733,10 @@ TEST_F(FilterManagerPerFilterBufferTest, StopAllBuffersRequestAtStoppedFilter) {
   decodeData("aaa", false);
   decodeData("bbb", true);
   EXPECT_TRUE(records_[1].decoded_data.empty());
-  EXPECT_EQ(nullptr, filters_[0]->decoder_callbacks_->decodingBuffer());
+  // Parked in the shared buffer, as data has not passed filter 0's position yet.
   EXPECT_EQ("aaabbb", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ(filters_[0]->decoder_callbacks_->decodingBuffer(),
+            filters_[1]->decoder_callbacks_->decodingBuffer());
 
   filters_[1]->decoder_callbacks_->continueDecoding();
   EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[1].decoded_data);
@@ -1851,29 +1853,23 @@ TEST_F(FilterManagerPerFilterBufferTest, RequestTotalAboveLimitSendsPayloadTooLa
 TEST_F(FilterManagerPerFilterBufferTest, MovingBytesBetweenFilterBuffersKeepsWatermarkState) {
   initializeChain(true);
   filters_[0]->decoder_callbacks_->setBufferLimit(4);
-  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[0].decode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndWatermark;
-  };
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndWatermark);
   records_[1].decode_data = [](Buffer::Instance&, bool) {
     return FilterDataStatus::StopIterationAndWatermark;
   };
 
-  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaaaa", false);
-
-  // The bytes move from filter 0's buffer into filter 1's without toggling the watermark.
+  // "bbb" moves from filter 0's own buffer into the shared one without toggling the watermark.
   EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(0);
   filters_[0]->decoder_callbacks_->continueDecoding();
   EXPECT_EQ(0, filters_[0]->decoder_callbacks_->decodingBuffer()->length());
-  EXPECT_EQ("aaaaa", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ("aaabbb", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
   testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
 
   // The last filter drains the bytes.
   EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   filters_[1]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaaaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[2].decoded_data);
 
   filter_manager_->destroyFilters();
 }
@@ -2138,7 +2134,10 @@ TEST_F(FilterManagerPerFilterBufferTest, RequestBytesLeftByLaterFilterAreNotRepl
 
   decodeData("raw", false);
   filters_[0]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ(0, filters_[0]->decoder_callbacks_->decodingBuffer()->length());
+  // Left in the shared buffer by filter 1, as without per-filter buffer.
+  EXPECT_EQ("raw", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  // Filter 0 now buffers into its own buffer, so "raw" is not replayed again.
 
   decodeData("more", false);
   filters_[0]->decoder_callbacks_->continueDecoding();
@@ -2162,7 +2161,10 @@ TEST_F(FilterManagerPerFilterBufferTest, ResponseBytesLeftByLaterFilterAreNotRep
 
   encodeData("raw", false);
   filters_[2]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ(0, filters_[2]->encoder_callbacks_->encodingBuffer()->length());
+  // Left in the shared buffer by filter 1, as without per-filter buffer.
+  EXPECT_EQ("raw", filters_[1]->encoder_callbacks_->encodingBuffer()->toString());
+
+  // Filter 2 now buffers into its own buffer, so "raw" is not replayed again.
 
   encodeData("more", false);
   filters_[2]->encoder_callbacks_->continueEncoding();
@@ -2175,22 +2177,25 @@ TEST_F(FilterManagerPerFilterBufferTest, ResponseBytesLeftByLaterFilterAreNotRep
 TEST_F(FilterManagerPerFilterBufferTest, DroppingBytesLeftByLaterFilterReleasesWatermark) {
   initializeChain(true);
   filters_[0]->decoder_callbacks_->setBufferLimit(4);
-  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[0].decode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndWatermark;
+  int calls = 0;
+  // The first frame passes filter 0, so it buffers the second one into its own buffer.
+  records_[0].decode_data = [&calls](Buffer::Instance&, bool) {
+    return calls++ == 0 ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndWatermark;
   };
   records_[1].decode_data = [](Buffer::Instance&, bool) {
     return FilterDataStatus::StopIterationNoBuffer;
   };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("x", false);
 
   EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
-  filter_manager_->decodeHeaders(*request_headers_, false);
   decodeData("aaaaa", false);
   testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
 
   EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   filters_[0]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaaaa", false}}), records_[1].decoded_data);
+  EXPECT_EQ((Chunks{{"x", false}, {"aaaaa", false}}), records_[1].decoded_data);
+  EXPECT_EQ(0, filters_[0]->decoder_callbacks_->decodingBuffer()->length());
 
   filter_manager_->destroyFilters();
 }
@@ -2212,7 +2217,8 @@ TEST_F(FilterManagerPerFilterBufferTest, FilterStoppingAgainOnOwnBufferKeepsIt) 
 
   filters_[1]->decoder_callbacks_->continueDecoding();
   EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(0, filters_[1]->decoder_callbacks_->decodingBuffer()->length());
+  // The shared buffer, now held by filter 2, was drained.
+  EXPECT_EQ(0, filters_[2]->decoder_callbacks_->decodingBuffer()->length());
 
   filter_manager_->destroyFilters();
 }
@@ -2973,6 +2979,112 @@ TEST_F(FilterManagerTest, ResponseBufferDrainedAfterTooLargeReleasesNothing) {
   EXPECT_FALSE(filter_manager_->aboveHighWatermark());
 
   filter->decoder_callbacks_->removeDownstreamWatermarkCallbacks(watermark_callbacks);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersNotForwardedAfterTooLargeReplyEndsStream) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  encodeHeaders(false);
+  // The 500 goes straight to the codec and ends the stream, which destroys the filters as on
+  // HTTP/1.
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream()).WillOnce([this] {
+    filter_manager_->destroyFilters();
+  });
+  encodeData("aaa", true);
+
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+  EXPECT_EQ(0, records_[0].encoded_trailers);
+  EXPECT_EQ(0, sent_trailers_);
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersNotForwardedAfterTooLargeReplyEndsStream) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+  records_[0].decode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  // The 413 ends the stream, which destroys the filters as on HTTP/1.
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream()).WillOnce([this] {
+    filter_manager_->destroyFilters();
+  });
+  decodeData("aaa", true);
+
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+  EXPECT_EQ(0, records_[2].decoded_trailers);
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, InjectedDecodedDataKeepsStreamEndStream) {
+  // The legacy flag would rewrite the stream-level flag; the positional marker ignores it.
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
+  initializeChain(true);
+  records_[1].decode_data = [](Buffer::Instance& data, bool) {
+    data.drain(data.length());
+    return FilterDataStatus::StopIterationNoBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+  Buffer::OwnedImpl chunk2("a2");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+  EXPECT_EQ((Chunks{{"a1", false}, {"a2", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, HalfCloseStopsInjectedRequestBodyOnceResponseCompletes) {
+  initializeChain(true);
+  ON_CALL(filter_manager_callbacks_, isHalfCloseEnabled()).WillByDefault(Return(true));
+  records_[1].decode_data = [](Buffer::Instance& data, bool) {
+    data.drain(data.length());
+    return FilterDataStatus::StopIterationNoBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+
+  // The client already sent end_stream, so a complete response closes the stream even though
+  // filter 1 is still injecting, as with half-close disabled.
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  encodeHeaders(true);
+
+  Buffer::OwnedImpl chunk2("a2");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
+  EXPECT_EQ((Chunks{{"a1", false}}), records_[2].decoded_data);
+
   filter_manager_->destroyFilters();
 }
 

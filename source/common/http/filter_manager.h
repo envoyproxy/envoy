@@ -198,13 +198,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void commonContinue();
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
-  // Buffer holding body data stopped at this filter. With per-filter buffer enabled, this is the
-  // filter's own buffer: every byte in it has been processed by all earlier filters in the chain
-  // and is withheld from the rest of the chain until iteration resumes here, so several filters
-  // can buffer concurrently at different positions without mixing bytes of different provenance.
-  // Otherwise it is the stream-level buffer shared by all filters.
-  Buffer::InstancePtr& bufferedData();
-  virtual Buffer::InstancePtr& streamBufferedData() PURE;
+  // Buffer that body data stopped at this filter is buffered into, and that
+  // decodingBuffer()/encodingBuffer(), addDecodedData()/addEncodedData() and
+  // modifyDecodingBuffer()/modifyEncodingBuffer() operate on. This is the stream-level buffer
+  // shared by all filters, owned by the latest filter that data has reached. With per-filter
+  // buffer enabled, a filter that data has already passed (see passed_by_data_) uses its own
+  // buffer instead, so it never sees or changes the bytes held further down the chain.
+  virtual Buffer::InstancePtr& bufferedData() PURE;
   // Whether the end of the stream has been observed, used for the end_stream flag when resuming
   // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream
   // marker has reached this filter's position: an end-stream-carrying frame was either delivered
@@ -308,7 +308,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   const FilterContext filter_context_;
 
-  // Created on demand and only used with per-filter buffer enabled. See bufferedData().
+  // Created on demand and only used with per-filter buffer enabled, once data has passed this
+  // filter. See bufferedData().
+  // TODO(wbpcode): add new filter callback methods that take advantage of the per-filter buffer
+  // (e.g. access to the replayed frame and to the filter's own buffer separately), so filters
+  // do not need to rely on the legacy decodingBuffer()/addDecodedData() semantics.
   Buffer::InstancePtr buffered_data_;
 
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
@@ -328,6 +332,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Frame deliveries latch this flag (|=) and never clear it; only the data injection APIs,
   // which author the marker rather than record its arrival, may retract it.
   bool observed_end_stream_{};
+  // True once data has passed this filter, i.e. the latest filter that data has reached is
+  // further down the chain. Only used with per-filter buffer enabled. See bufferedData().
+  bool passed_by_data_{};
 };
 
 /**
@@ -344,7 +351,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // ActiveStreamFilterBase
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
-  Buffer::InstancePtr& streamBufferedData() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool streamObservedEndStream() const override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
@@ -437,7 +444,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   // ActiveStreamFilterBase
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
-  Buffer::InstancePtr& streamBufferedData() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool streamObservedEndStream() const override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
@@ -805,11 +812,13 @@ public:
                            ENVOY_RUNTIME_FEATURE_ENABLED(
                                "envoy.reloadable_features.filter_manager_per_filter_buffer")),
         request_buffer_tracker_(
-            buffer_limit, [this]() -> void { onRequestBufferAboveLimit(); },
-            [this]() -> void { onRequestBufferBelowLimit(); }),
+            buffer_limit,
+            [this]() -> void { requestDataTooLarge(request_buffer_tracker_.activeFilter()); },
+            [this]() -> void { requestDataDrained(); }),
         response_buffer_tracker_(
-            buffer_limit, [this]() -> void { onResponseBufferAboveLimit(); },
-            [this]() -> void { onResponseBufferBelowLimit(); }),
+            buffer_limit,
+            [this]() -> void { responseDataTooLarge(response_buffer_tracker_.activeFilter()); },
+            [this]() -> void { responseDataDrained(); }),
         buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
@@ -1262,12 +1271,6 @@ private:
   // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
   // filter_streaming is the variable to indicate if stream is streaming, and its value may be
   // changed by the function.
-  // Called when the total of the per-filter buffers of a direction crosses the buffer limit.
-  void onRequestBufferAboveLimit();
-  void onRequestBufferBelowLimit();
-  void onResponseBufferAboveLimit();
-  void onResponseBufferBelowLimit();
-
   bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
                            bool& filter_streaming, bool end_stream);
 
@@ -1305,7 +1308,11 @@ private:
   // per-filter observed end stream is enabled too.
   const bool per_filter_buffer_;
   // Apply the buffer limit across the per-filter buffers. Declared before the filters so they
-  // outlive the buffers that report to them.
+  // outlive the buffers that report to them. The local reply for a too large body is owned by the
+  // filter whose processing exceeded the limit, if any.
+  // TODO(wbpcode): the streaming flag is stream-level and the limit is latched like a single
+  // WatermarkBuffer, so once a streaming filter raises the watermark, a later buffering filter
+  // growing past the limit is never escalated to a local reply. Same as the shared buffer path.
   PerFilterBufferTracker request_buffer_tracker_;
   PerFilterBufferTracker response_buffer_tracker_;
 
