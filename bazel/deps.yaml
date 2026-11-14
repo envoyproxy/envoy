@@ -1105,6 +1105,16 @@ rules_license:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE"
 
+rules_oci:
+  project_name: "Bazel rules for OCI containers"
+  project_desc: "Bazel rules for building OCI container images"
+  project_url: "https://github.com/bazel-contrib/rules_oci"
+  release_date: "2026-11-13"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/rules_oci/blob/v{version}/LICENSE"
+
 rules_pkg:
   project_name: "Packaging rules for Bazel"
   project_desc: "Bazel rules for the packaging distributions"

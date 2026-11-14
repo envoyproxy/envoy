@@ -861,6 +861,7 @@ case $CI_TARGET in
         ENVOY_OCI_DIR="${ENVOY_BUILD_DIR}/${ENVOY_OCI_DIR}"
         export ENVOY_OCI_DIR
         _PLATFORMS=()
+        _BIN_FOLDERS=()
         PLATFORM_NAMES=(
             x64:linux/amd64
             arm64:linux/arm64)
@@ -873,11 +874,14 @@ case $CI_TARGET in
                 continue
             fi
             _PLATFORMS+=("$platform")
+            _BIN_FOLDERS+=("$bin_folder")
             if [[ -e "$platform" ]]; then
                 rm -rf "$platform"
             fi
             mkdir -p "${platform}"
             cp -a "${bin_folder}"/* "$platform"
+            # The distroless images are built with bazel (`release`), not added to the build context
+            rm -f "${platform}"/*-distroless.tar
         done
         if [[ -z "${_PLATFORMS[*]}" ]]; then
             echo "No tarballs found in ${ENVOY_TARBALL_DIR}, did you run \`release\` first?" >&2
@@ -888,6 +892,17 @@ case $CI_TARGET in
         if [[ -z "$ENVOY_DOCKER_SAVE_IMAGE" ]]; then
             # if you are not saving the images as OCI then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
+        elif [[ "${#_PLATFORMS[@]}" -eq 1 ]]; then
+            # Collect the distroless images built with bazel (`release`) for this platform
+            arch="$(echo "${_PLATFORMS[0]}" | cut -d/ -f2)"
+            bin_folder="${_BIN_FOLDERS[0]}"
+            if [[ -e "${bin_folder}/envoy-distroless.tar" ]]; then
+                mkdir -p "${ENVOY_OCI_DIR}"
+                for image in envoy-distroless envoy-contrib-distroless; do
+                    cp -a "${bin_folder}/${image}.tar" "${ENVOY_OCI_DIR}/${image}.${arch}.tar"
+                done
+                export DOCKER_SKIP_DISTROLESS=1
+            fi
         fi
         echo "BUILDING FOR: ${PLATFORMS}"
         "${ENVOY_SRCDIR}/distribution/docker/build.sh"
@@ -1136,6 +1151,15 @@ case $CI_TARGET in
         cp -a \
            "bazel-bin/distribution/binary/release.tar.zst" \
            "${ENVOY_BINARY_DIR}/release.tar.zst"
+        # Build the distroless container images (OCI tarballs) with the release binaries
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //distribution/docker:envoy-distroless_tar \
+              //distribution/docker:envoy-contrib-distroless_tar
+        cp -a \
+           bazel-bin/distribution/docker/envoy-distroless.tar \
+           bazel-bin/distribution/docker/envoy-contrib-distroless.tar \
+           "${ENVOY_BINARY_DIR}/"
         # Grab the schema_validator_tool
         # TODO(phlax): bundle this with the release when #26390 is resolved
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
