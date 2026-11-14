@@ -62,6 +62,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
  */
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
   COUNTER(downstream_cx_drain_close)                                                               \
+  COUNTER(downstream_cx_closed_without_data)                                                       \
   COUNTER(downstream_cx_no_route)                                                                  \
   COUNTER(downstream_cx_overload_close)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
