@@ -974,6 +974,15 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
 }
 
+TEST_F(EnvoyQuicServerStreamTest, EncodeMultipleUnknownCapsulesWithEndStream) {
+  setUpCapsuleProtocol(false, true);
+  // Two zero-length RFC 9297 GREASE capsules (type=0x17, length=0) in the final chunk must write
+  // both capsules without buffering FIN twice.
+  Buffer::OwnedImpl buffer(std::string("\x17\x00\x17\x00", 4));
+  quic_stream_->encodeData(buffer, /*end_stream=*/true);
+  EXPECT_TRUE(quic_stream_->fin_sent() || quic_stream_->fin_buffered());
+}
+
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferString(capsule_fragment_), _));
