@@ -4,7 +4,9 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -114,6 +116,22 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForConflictingOptions) {
       manager_->getCache(options2_, dispatcher_),
       ::testing::ContainsRegex("(?s)options specified alternate protocols cache 'name1' with "
                                "different settings first '.*name: \"name1\""));
+  EXPECT_ENVOY_BUG(manager_->getCache(options2_, dispatcher_), "different settings");
+}
+
+// Options that serialize differently but are equivalent share the cache without an ENVOY_BUG.
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForEquivalentOptions) {
+  initialize();
+  HttpServerPropertiesCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
+  envoy::config::core::v3::AlternateProtocolsCacheOptions equivalent_options = options1_;
+  equivalent_options.mutable_key_value_store_config();
+  HttpServerPropertiesCacheSharedPtr equivalent_cache;
+  EXPECT_LOG_NOT_CONTAINS("error", "different settings",
+                          equivalent_cache = manager_->getCache(equivalent_options, dispatcher_));
+  EXPECT_EQ(cache, equivalent_cache);
+  // Both encodings keep finding the cache.
+  EXPECT_EQ(cache, manager_->getCache(equivalent_options, dispatcher_));
+  EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
 }
 
 } // namespace

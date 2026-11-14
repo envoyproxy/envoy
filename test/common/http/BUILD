@@ -720,8 +720,27 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "http_server_properties_cache_manager_speed_test",
+    srcs = ["http_server_properties_cache_manager_speed_test.cc"],
+    deps = [
+        "//source/common/http:http_server_properties_cache",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "http_server_properties_cache_manager_speed_test_benchmark_test",
+    benchmark_binary = "http_server_properties_cache_manager_speed_test",
 )
 
 envoy_proto_library(
