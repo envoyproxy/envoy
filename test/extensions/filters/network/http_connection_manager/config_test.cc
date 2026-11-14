@@ -1239,6 +1239,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitter) {
     EXPECT_GE(value, 5000);
     EXPECT_LE(value, 6250);
   }
+  EXPECT_EQ(5000, config.baseDrainTimeout().count());
 }
 
 // Validate that drain_timeout_jitter defaults to unset.
@@ -1260,6 +1261,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
   ASSERT_OK(creation_status_);
   // No jitter configured: drainTimeout() returns its base (default 5s).
   EXPECT_EQ(5000, config.drainTimeout().count());
+  EXPECT_EQ(5000, config.baseDrainTimeout().count());
 }
 
 // Validate that idle_timeout set in common_http_protocol_options is used.

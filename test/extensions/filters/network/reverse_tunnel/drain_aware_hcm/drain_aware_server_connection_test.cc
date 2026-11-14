@@ -1,3 +1,8 @@
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_server_connection.h"
 
 #include "test/mocks/event/mocks.h"
@@ -26,19 +31,44 @@ namespace {
 class DrainAwareServerConnectionTest : public testing::Test {
 protected:
   DrainAwareServerConnectionTest() {
-    // MockTimer(dispatcher) registers itself as the next timer returned by createTimer_. The
-    // wrapper creates its timer from the connection's dispatcher.
-    timer_ = new Event::MockTimer(&connection_.dispatcher_);
     inner_ = std::make_unique<NiceMock<Http::MockServerConnection>>();
     inner_ptr_ = inner_.get();
     ON_CALL(*inner_ptr_, protocol()).WillByDefault(Return(Http::Protocol::Http2));
   }
 
-  // Creates the connection, consuming inner_. Expects the 100ms timer arm from the constructor.
-  std::unique_ptr<DrainAwareServerConnection> makeConnection() {
+  // Creates the connection, consuming inner_. Mock timers are registered in reverse of the
+  // wrapper's createTimer order because gmock matches the most recent expectation first.
+  std::unique_ptr<DrainAwareServerConnection>
+  makeConnection(std::function<void()> on_local_drain = nullptr,
+                 DrainDelayConfig config = defaultConfig()) {
+    goaway_timer_ = new Event::MockTimer(&connection_.dispatcher_);
+    if (config.shutdown_notice_delay.count()) {
+      shutdown_notice_timer_ = new Event::MockTimer(&connection_.dispatcher_);
+    }
+    if (config.metadata_delay.count()) {
+      metadata_timer_ = new Event::MockTimer(&connection_.dispatcher_);
+    }
+    timer_ = new Event::MockTimer(&connection_.dispatcher_);
     EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
     return std::make_unique<DrainAwareServerConnection>(std::move(inner_), connection_,
-                                                        drain_decision_, server_context_);
+                                                        drain_decision_, server_context_, config,
+                                                        std::move(on_local_drain));
+  }
+
+  static DrainDelayConfig defaultConfig() {
+    return DrainDelayConfig{
+        .shutdown_notice_delay = std::chrono::milliseconds(0),
+        .metadata_delay = std::chrono::milliseconds(0),
+        .goaway_delay = std::chrono::milliseconds(5000),
+    };
+  }
+
+  static DrainDelayConfig delayConfig() {
+    return DrainDelayConfig{
+        .shutdown_notice_delay = std::chrono::milliseconds(3000),
+        .metadata_delay = std::chrono::milliseconds(2000),
+        .goaway_delay = std::chrono::milliseconds(5000),
+    };
   }
 
   // Delivers a connection-level drain notification to the wrapper's registered callbacks.
@@ -57,6 +87,9 @@ protected:
   NiceMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Event::MockTimer* timer_{nullptr};
+  Event::MockTimer* metadata_timer_{nullptr};
+  Event::MockTimer* shutdown_notice_timer_{nullptr};
+  Event::MockTimer* goaway_timer_{nullptr};
   std::unique_ptr<NiceMock<Http::MockServerConnection>> inner_;
   NiceMock<Http::MockServerConnection>* inner_ptr_{nullptr};
 };
@@ -136,16 +169,21 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresNoDrain) {
   destroyConnection(conn);
 }
 
-// Timer fires when the listener is draining: sends GOAWAY once, stops re-arming.
-// Legacy path: drain is detected by polling the DrainDecision.
+// Timer fires when the listener is draining: sends the shutdown notice, then the GOAWAY after
+// drain_timeout, and stops re-arming. Legacy path: drain is detected by polling the DrainDecision.
 TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetected) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto conn = makeConnection();
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
-  EXPECT_CALL(*inner_ptr_, goAway());
+  EXPECT_CALL(*inner_ptr_, shutdownNotice());
+  EXPECT_CALL(*inner_ptr_, goAway()).Times(0);
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
   timer_->invokeCallback();
+
+  EXPECT_CALL(*inner_ptr_, goAway());
+  goaway_timer_->invokeCallback();
   destroyConnection(conn);
 }
 
@@ -157,27 +195,40 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetectedViaConnectionDrain
   // DrainDecision must not be consulted on this path.
   EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
   raiseConnectionDrain();
-  EXPECT_CALL(*inner_ptr_, goAway());
+  EXPECT_CALL(*inner_ptr_, shutdownNotice());
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
   timer_->invokeCallback();
+
+  EXPECT_CALL(*inner_ptr_, goAway());
+  goaway_timer_->invokeCallback();
   destroyConnection(conn);
 }
 
-// After GOAWAY is sent, subsequent timer fires are complete no-ops.
-TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterGoAwaySentIsNoop) {
+// Once the drain has started, subsequent timer fires are complete no-ops.
+TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterDrainStartedIsNoop) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto conn = makeConnection();
-  // First fire: drain detected, GOAWAY sent. enabled_ is now false (no re-arm).
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   timer_->invokeCallback();
 
-  // Second fire: drain_goaway_sent_ == true, early return before any calls.
   // MockTimer::invokeCallback() asserts enabled_ == true, so manually call the callback.
-  EXPECT_CALL(*inner_ptr_, goAway()).Times(0);
+  EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
+  EXPECT_CALL(*goaway_timer_, enableTimer(_, _)).Times(0);
   EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
   timer_->callback_();
 
+  destroyConnection(conn);
+}
+
+// The GOAWAY is sent at most once across the HCM and the wrapper's GOAWAY timer.
+TEST_F(DrainAwareServerConnectionTest, GoAwaySentAtMostOnce) {
+  auto conn = makeConnection();
+  EXPECT_CALL(*inner_ptr_, goAway());
+  conn->goAway();
+  conn->goAway();
   destroyConnection(conn);
 }
 
@@ -187,10 +238,7 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterGoAwaySentIsNoop) {
 TEST_F(DrainAwareServerConnectionTest,
        ShutdownNoticeWithLocalDrainFiresCallbackAndSuppressesInner) {
   bool fired = false;
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
-  auto conn =
-      std::make_unique<DrainAwareServerConnection>(std::move(inner_), connection_, drain_decision_,
-                                                   server_context_, [&fired]() { fired = true; });
+  auto conn = makeConnection([&fired]() { fired = true; });
   EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
   conn->shutdownNotice();
   EXPECT_TRUE(fired);
@@ -202,18 +250,111 @@ TEST_F(DrainAwareServerConnectionTest, LocalDrainFiresAtMostOnce) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   int fired = 0;
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
-  auto conn = std::make_unique<DrainAwareServerConnection>(
-      std::move(inner_), connection_, drain_decision_, server_context_, [&fired]() { ++fired; });
+  auto conn = makeConnection([&fired]() { ++fired; });
   conn->shutdownNotice();
   EXPECT_EQ(1, fired);
 
-  // The drain timer also detects drain and emits the final GOAWAY, but the once-guard prevents a
-  // second callback fire.
+  // The HCM already started the drain and owns the final GOAWAY, so the drain timer is a no-op.
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
-  EXPECT_CALL(*inner_ptr_, goAway());
+  EXPECT_CALL(*inner_ptr_, goAway()).Times(0);
+  EXPECT_CALL(*goaway_timer_, enableTimer(_, _)).Times(0);
   timer_->invokeCallback();
   EXPECT_EQ(1, fired);
+  destroyConnection(conn);
+}
+
+// During a listener drain the HCM also drains on its own (on responses and proactively), so it can
+// call shutdownNotice() after the wrapper has already started the drain. That second notice must
+// not redial again, re-arm the drain timers or send the soft GOAWAY early.
+TEST_F(DrainAwareServerConnectionTest, HcmShutdownNoticeAfterListenerDrainIsNoop) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  int redials = 0;
+  auto conn = makeConnection([&redials]() { ++redials; }, delayConfig());
+
+  ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
+  EXPECT_CALL(*metadata_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  EXPECT_CALL(*shutdown_notice_timer_, enableTimer(std::chrono::milliseconds(3000), _));
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  timer_->invokeCallback();
+  EXPECT_EQ(1, redials);
+
+  EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
+  EXPECT_CALL(*metadata_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(*shutdown_notice_timer_, enableTimer(_, _)).Times(0);
+  conn->shutdownNotice();
+  EXPECT_EQ(1, redials) << "a second drain notice must not dial another replacement tunnel";
+  destroyConnection(conn);
+}
+
+// Drain with delays: redial immediately, then the metadata frame, the soft GOAWAY and the final
+// GOAWAY fire in order.
+TEST_F(DrainAwareServerConnectionTest, DrainSendsMetadataThenShutdownNoticeThenGoAway) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  bool redialed = false;
+  auto conn = makeConnection([&redialed]() { redialed = true; }, delayConfig());
+
+  ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
+  EXPECT_CALL(*inner_ptr_, goAway()).Times(0);
+  EXPECT_CALL(*metadata_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  EXPECT_CALL(*shutdown_notice_timer_, enableTimer(std::chrono::milliseconds(3000), _));
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  timer_->invokeCallback();
+  EXPECT_TRUE(redialed);
+
+  // Phase 1: metadata frame (client propagation).
+  EXPECT_CALL(*inner_ptr_, encodeMetadata(_))
+      .WillOnce([](const Http::MetadataMapVector& metadata_map_vector) {
+        ASSERT_EQ(1, metadata_map_vector.size());
+        EXPECT_EQ(Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_VALUE,
+                  (*metadata_map_vector[0])[std::string(
+                      Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY)]);
+      });
+  metadata_timer_->invokeCallback();
+
+  // Phase 2: soft GOAWAY (peer stops new streams).
+  EXPECT_CALL(*inner_ptr_, shutdownNotice());
+  shutdown_notice_timer_->invokeCallback();
+
+  // Phase 3: final GOAWAY (close).
+  EXPECT_CALL(*inner_ptr_, goAway());
+  goaway_timer_->invokeCallback();
+  destroyConnection(conn);
+}
+
+// shutdownNotice with metadata arms the metadata and shutdown-notice timers and still suppresses
+// the inner notice at this point (it is deferred to the shutdown-notice timer).
+TEST_F(DrainAwareServerConnectionTest, ShutdownNoticeWithMetadataArmsTimers) {
+  bool redialed = false;
+  auto conn = makeConnection([&redialed]() { redialed = true; }, delayConfig());
+  EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
+  EXPECT_CALL(*metadata_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  EXPECT_CALL(*shutdown_notice_timer_, enableTimer(std::chrono::milliseconds(3000), _));
+  conn->shutdownNotice();
+  EXPECT_TRUE(redialed);
+
+  EXPECT_CALL(*inner_ptr_, encodeMetadata(_));
+  metadata_timer_->invokeCallback();
+
+  EXPECT_CALL(*inner_ptr_, shutdownNotice());
+  shutdown_notice_timer_->invokeCallback();
+  destroyConnection(conn);
+}
+
+// Only the metadata delay is set: the metadata frame is sent and the soft GOAWAY is skipped.
+TEST_F(DrainAwareServerConnectionTest, MetadataOnlySkipsShutdownNotice) {
+  auto conn = makeConnection([]() {}, DrainDelayConfig{
+                                          .shutdown_notice_delay = std::chrono::milliseconds(0),
+                                          .metadata_delay = std::chrono::milliseconds(2000),
+                                          .goaway_delay = std::chrono::milliseconds(5000),
+                                      });
+  EXPECT_CALL(*inner_ptr_, shutdownNotice()).Times(0);
+  EXPECT_CALL(*metadata_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  conn->shutdownNotice();
+
+  EXPECT_CALL(*inner_ptr_, encodeMetadata(_));
+  metadata_timer_->invokeCallback();
   destroyConnection(conn);
 }
 
