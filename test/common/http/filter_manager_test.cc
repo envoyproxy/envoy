@@ -27,6 +27,7 @@
 using testing::_;
 using testing::InSequence;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
@@ -1196,6 +1197,76 @@ TEST_F(FilterManagerTest, DecodeDataFrameLostAfterContinueWithoutGuard) {
 
 TEST_F(FilterManagerTest, DecodeDataFrameNotLostAfterContinueWithAddDecodedData) {
   runAddDecodedDataOnContinueTest(/*forward_data=*/true);
+}
+
+TEST_F(FilterManagerTest, RequestBufferDrainedAfterPayloadTooLargeReleasesNothing) {
+  initialize();
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        createDecoderFilterFactoryCb(filter)(callbacks);
+        return true;
+      });
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+  filter_manager_->createDownstreamFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->setBufferLimit(5);
+
+  ON_CALL(*filter, decodeData(_, _))
+      .WillByDefault(Return(FilterDataStatus::StopIterationAndBuffer));
+  filter_manager_->decodeHeaders(*headers, false);
+  // The buffering filter goes over the limit: a 413 instead of backpressure.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, onRequestDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  Buffer::OwnedImpl data("aaaaaa");
+  filter_manager_->decodeData(data, false);
+
+  // The buffer drops below the low watermark, but there is no backpressure to release.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(0);
+  filter_manager_->setBufferLimit(100);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ResponseBufferDrainedAfterTooLargeReleasesNothing) {
+  initialize();
+  std::shared_ptr<MockStreamFilter> filter(new NiceMock<MockStreamFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        createStreamFilterFactoryCb(filter)(callbacks);
+        return true;
+      });
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+  filter_manager_->createDownstreamFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*headers, true);
+  filter_manager_->setBufferLimit(5);
+  StrictMock<MockDownstreamWatermarkCallbacks> watermark_callbacks;
+  filter->decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks);
+
+  ON_CALL(*filter, encodeHeaders(_, _)).WillByDefault(Return(FilterHeadersStatus::StopIteration));
+  ON_CALL(*filter, encodeData(_, _))
+      .WillByDefault(Return(FilterDataStatus::StopIterationAndBuffer));
+  filter->decoder_callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
+  // The buffering filter goes over the limit: a 500 instead of backpressure.
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  Buffer::OwnedImpl data("aaaaaa");
+  filter->decoder_callbacks_->encodeData(data, false);
+
+  // The buffer drops below the low watermark, but there is no backpressure to release: the
+  // strict watermark callbacks would fail on a low watermark without a high one.
+  filter_manager_->setBufferLimit(100);
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+
+  filter->decoder_callbacks_->removeDownstreamWatermarkCallbacks(watermark_callbacks);
+  filter_manager_->destroyFilters();
 }
 
 } // namespace

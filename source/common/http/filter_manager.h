@@ -323,8 +323,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
     return status;
   }
 
-  void requestDataTooLarge();
-  void requestDataDrained();
   // Encoding end_stream by a non-terminal filters (i.e. cache filter) always causes the decoding to
   // be stopped even if independent half-close is enabled. For simplicity, independent half-close is
   // enabled only when the terminal filter is encoding the response.
@@ -383,8 +381,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                       const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
 
-  void responseDataTooLarge();
-  void responseDataDrained();
   StreamEncoderFilters::Iterator entry() const { return entry_; }
 
   StreamEncoderFilterSharedPtr handle_;
@@ -999,6 +995,10 @@ protected:
     bool saw_downstream_reset_{};
     // True when the stream was recreated.
     bool recreated_stream_{};
+    // Whether the buffer high watermark of the direction applied backpressure (as opposed to
+    // sending a local reply), so the low watermark only releases backpressure that was applied.
+    bool request_buffer_backpressure_applied_{};
+    bool response_buffer_backpressure_applied_{};
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
@@ -1133,6 +1133,13 @@ private:
 
   // Returns true if new metadata is decoded. Otherwise, returns false.
   bool processNewlyAddedMetadata();
+
+  // Watermark callbacks of the request and response body buffers. The local reply for a too large
+  // body is sent on behalf of the owner filter, or by the filter manager itself if it is null.
+  void requestDataTooLarge(ActiveStreamFilterBase* owner);
+  void requestDataDrained();
+  void responseDataTooLarge(ActiveStreamFilterBase* owner);
+  void responseDataDrained();
 
   // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
   // filter_streaming is the variable to indicate if stream is streaming, and its value may be
