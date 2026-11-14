@@ -11,6 +11,15 @@ application layer:
 * gRPC makes use of trailers to convey request status. Envoy is one of very few HTTP proxies
   that correctly supports trailers and is thus one of the few proxies that can transport
   gRPC requests and responses.
+* Envoy sends gRPC-style local replies (a trailers-only ``200`` response with ``grpc-status`` and,
+  when present, ``grpc-message`` headers) to gRPC requests. By default a request is treated as gRPC
+  for this purpose only if it has a gRPC content type and uses the ``POST`` method, as the `gRPC over
+  HTTP/2 protocol <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_ requires. A
+  request with a gRPC content type and another method gets an ordinary HTTP local reply (for
+  ``HEAD``, its headers without a body). The previous behavior, which treated any request with a
+  gRPC content type as gRPC, can be restored by setting the runtime guard
+  ``envoy.reloadable_features.grpc_local_reply_requires_post`` to ``false``; the value is read when
+  a connection manager is created, so a change applies to new connections.
 * The gRPC runtime for some languages is relatively immature. See :ref:`below <arch_overview_grpc_bridging>`
   for an overview of filters that can help bring gRPC to more languages.
 * gRPC-Web is supported by a :ref:`filter <config_http_filters_grpc_web>` that allows a gRPC-Web

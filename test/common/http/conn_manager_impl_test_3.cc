@@ -2482,7 +2482,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
         {"content-type", "application/grpc"}, // Make Envoy interpret this request as gRPC call
         {":authority", "host"},
         {":path", "/something"},
-        {":method", "GET"}}};
+        {":method", "POST"}}};
     decoder_->decodeHeaders(std::move(headers), true);
     data.drain(4);
     return Http::okStatus();
@@ -2544,7 +2544,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
         {"content-type", "application/grpc"}, // Make Envoy interpret this request as gRPC call
         {":authority", "host"},
         {":path", "/something"},
-        {":method", "GET"}}};
+        {":method", "POST"}}};
     decoder_->decodeHeaders(std::move(headers), true);
     data.drain(4);
     return Http::okStatus();

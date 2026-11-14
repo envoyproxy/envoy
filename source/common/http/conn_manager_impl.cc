@@ -231,7 +231,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
       direction_(direction), server_context_(server_context),
       use_connection_event_drain_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
+      grpc_local_reply_requires_post_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.grpc_local_reply_requires_post")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -1122,7 +1124,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       connection_manager_.config_->localReply(),
                       connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
                       connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
-                      connection_manager_.overload_manager_),
+                      connection_manager_.overload_manager_,
+                      connection_manager_.grpc_local_reply_requires_post_),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       has_explicit_global_flush_timeout_(

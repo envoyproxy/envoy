@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/grpc:status_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3:pkg_cc_proto",
     ],
