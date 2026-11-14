@@ -1482,7 +1482,7 @@
     "@@envoy_toolshed+//coverage/lcov:extensions.bzl%lcov_merge_extension": {
       "general": {
         "bzlTransitiveDigest": "MZZWjIidnDgUiPw2Eu7QCUjoKJcAuTr8h1h4JhZ3qW0=",
-        "usagesDigest": "RdbvAomL8T6maSc6lIikolxNpeuTKGQlD0nPM2Gjghs=",
+        "usagesDigest": "pJAD3rD1N3rZrYuN09hV9euIbyUQkF2PLjifUw5oKjM=",
         "recordedInputs": [
           "REPO_MAPPING:envoy_toolshed+,bazel_tools bazel_tools"
         ],
@@ -1490,7 +1490,7 @@
           "lcov_merge": {
             "repoRuleId": "@@envoy_toolshed+//coverage/lcov:lcov_merge_repository.bzl%_lcov_merge_repo",
             "attributes": {
-              "bins_release_version": "0.2.32"
+              "bins_release_version": "0.2.34"
             }
           }
         }
