@@ -1058,6 +1058,64 @@ TEST(ObjectFactory, DynamicPort) {
   ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
 }
 
+TEST_F(ClusterTest, HostReplacedOnAddressChangeWhenSkipDrainingDisabled) {
+  initialize(R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    skip_draining_on_resolution: false
+    dns_cache_config:
+      name: foo
+      dns_lookup_family: AUTO
+)EOF",
+             false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  const auto original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _))
+      .WillOnce(
+          [&](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
+            ASSERT_EQ(1UL, hosts_added.size());
+            ASSERT_EQ(1UL, hosts_removed.size());
+            EXPECT_EQ(original_host, hosts_removed[0]);
+            EXPECT_NE(original_host, hosts_added[0]);
+            EXPECT_EQ("2.3.4.5:0", hosts_added[0]->address()->asString());
+          });
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+
+  // The old instance kept its original address and only the new instance is in the host set.
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("2.3.4.5:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+}
+
+TEST_F(ClusterTest, AddressChangeUpdatesHostInPlaceByDefault) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  const auto original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+
+  // No onMemberUpdateCb expectation: an unexpected call on the mock would fail the test.
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  EXPECT_EQ(original_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ("2.3.4.5:0", original_host->address()->asString());
+}
+
 } // namespace DynamicForwardProxy
 } // namespace Clusters
 } // namespace Extensions

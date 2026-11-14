@@ -25,6 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 // [#extension: envoy.clusters.dynamic_forward_proxy]
+// [#next-free-field: 6]
 message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig";
@@ -75,6 +76,17 @@ message ClusterConfig {
   //   <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
   //
   bool allow_coalesced_connections = 3;
+
+  // Only takes effect when
+  // :ref:`dns_cache_config <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`
+  // is used. If true, a DNS resolution that changes the address of a host updates the address of
+  // the existing host in place. The host is not replaced, so no cluster membership update is
+  // published and existing connection pools are not drained; new connections use the new
+  // address. If false, the host is replaced by a new host whenever its address changes, which
+  // drains the connection pools of the old host, so that connections to addresses that are no
+  // longer resolved are drained as well.
+  // Defaults to true.
+  google.protobuf.BoolValue skip_draining_on_resolution = 5;
 }
 
 // Configuration for sub clusters. Sub clusters default to the ``STRICT_DNS`` discovery type, or
