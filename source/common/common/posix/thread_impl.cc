@@ -21,6 +21,22 @@ namespace Thread {
 
 namespace {
 
+int64_t getPthreadId(pthread_t thread) {
+#if defined(__LLVM_LIBC__) && !defined(__Fuchsia__)
+  pthread_id_np_t tid = 0;
+  pthread_getunique_np(&thread, &tid);
+  return static_cast<int64_t>(tid);
+#elif defined(__linux__) || defined(__EMSCRIPTEN__) || defined(__wasm__)
+  return static_cast<int64_t>(thread);
+#elif defined(__APPLE__)
+  uint64_t tid;
+  pthread_threadid_np(thread, &tid);
+  return tid;
+#else
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
+#endif
+}
+
 int64_t getCurrentThreadIdBase() {
 #ifdef __linux__
   return static_cast<int64_t>(syscall(SYS_gettid));
@@ -29,9 +45,9 @@ int64_t getCurrentThreadIdBase() {
   pthread_threadid_np(nullptr, &tid);
   return tid;
 #elif defined(__EMSCRIPTEN__) || defined(__wasm__)
-  return static_cast<int64_t>(pthread_self());
+  return getPthreadId(pthread_self());
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
@@ -57,7 +73,7 @@ void setThreadPriority(const int64_t tid, const int priority) {
   UNREFERENCED_PARAMETER(tid);
   UNREFERENCED_PARAMETER(priority);
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
@@ -166,15 +182,7 @@ bool PosixThread::joinable() const { return !joined_; }
 
 ThreadId PosixThread::pthreadId() const {
   ASSERT(!joined_);
-#if defined(__linux__) || defined(__EMSCRIPTEN__) || defined(__wasm__)
-  return ThreadId(static_cast<int64_t>(thread_handle_->handle()));
-#elif defined(__APPLE__)
-  uint64_t tid;
-  pthread_threadid_np(thread_handle_->handle(), &tid);
-  return ThreadId(tid);
-#else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
-#endif
+  return ThreadId(getPthreadId(thread_handle_->handle()));
 }
 
 #if SUPPORTS_PTHREAD_NAMING
@@ -244,20 +252,12 @@ int PosixThreadFactory::currentThreadPriority() const {
 #elif defined(__EMSCRIPTEN__) || defined(__wasm__)
   return 0;
 #else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#error "Enable and test pthread id retrieval code for your arch in pthread/thread_impl.cc"
 #endif
 }
 
 ThreadId PosixThreadFactory::currentPthreadId() const {
-#if defined(__linux__) || defined(__EMSCRIPTEN__) || defined(__wasm__)
-  return static_cast<ThreadId>(static_cast<int64_t>(pthread_self()));
-#elif defined(__APPLE__)
-  uint64_t tid;
-  pthread_threadid_np(pthread_self(), &tid);
-  return ThreadId(tid);
-#else
-#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
-#endif
+  return ThreadId(getPthreadId(pthread_self()));
 }
 
 PosixThreadFactoryPtr PosixThreadFactory::create() {
