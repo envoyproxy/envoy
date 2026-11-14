@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["extractor_test.cc"],
     extension_names = ["envoy.http.ai_filters.request_info"],
     deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",

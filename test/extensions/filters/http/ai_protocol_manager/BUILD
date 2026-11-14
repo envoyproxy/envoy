@@ -206,6 +206,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "api_bindings_test",
+    srcs = ["api_bindings_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "llm_binding_test",
     srcs = ["llm_binding_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],

@@ -63,6 +63,8 @@ envoy_extension_cc_test(
     srcs = ["transcoder_integration_test.cc"],
     extension_names = [
         "envoy.http.ai_filters.transcoder",
+        "envoy.http.ai_filters.schema_validation",
+        "envoy.http.ai_filters.request_info",
         "envoy.filters.http.ai_protocol_manager",
     ],
     rbe_pool = {
@@ -72,6 +74,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/set_filter_state:config",
+        "//source/extensions/http/ai_filters/request_info:config",
+        "//source/extensions/http/ai_filters/schema_validation:config",
         "//source/extensions/http/ai_filters/transcoder:config",
         "//test/integration:http_integration_lib",
         "@abseil-cpp//absl/strings",

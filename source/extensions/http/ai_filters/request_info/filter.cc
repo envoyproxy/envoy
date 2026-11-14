@@ -12,6 +12,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_bindings.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
 
@@ -25,6 +26,7 @@ namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
+using HttpFilters::AiProtocolManager::LlmBindingRead;
 using HttpFilters::AiProtocolManager::LocalReplier;
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 
@@ -89,8 +91,15 @@ void RequestInfoFilter::publish(const AiRequest& request) {
     return;
   }
 
-  const RequestAttributes attrs = extractRequestAttributes(request.protocol(), request.json(),
-                                                           context_.request_headers.getPathValue());
+  // The path names the model, and sometimes the streaming mode, under the binding the request
+  // arrived in: Gemini's own, or Vertex AI's for Gemini and Claude.
+  const std::optional<LlmBindingRead> arrived = HttpFilters::AiProtocolManager::peekClientPath(
+      request.protocol(),
+      HttpFilters::AiProtocolManager::requestBinding(*stream_info.filterState(),
+                                                     context_.request_binding),
+      context_.request_headers.getPathValue(), request.json());
+  const RequestAttributes attrs = extractRequestAttributes(
+      request.protocol(), request.json(), arrived.has_value() ? &*arrived : nullptr);
   envoy::data::ai::v3::RequestInfo record = toProto(attrs);
   if (config_->tokensPerByte().has_value()) {
     record.mutable_estimated_input_tokens()->set_value(

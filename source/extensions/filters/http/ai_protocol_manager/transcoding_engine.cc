@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_bindings.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -1147,12 +1148,6 @@ StreamGrammar anthropicStreamFromIr() {
   };
 }
 
-// A binding Envoy defines. Its pattern is a constant, so it parses.
-LlmBindingConstSharedPtr builtInBinding(absl::string_view pattern,
-                                        std::vector<LlmBinding::Mutation>&& mutations) {
-  return std::make_shared<const LlmBinding>(*UriPattern::parse(pattern), std::move(mutations));
-}
-
 // Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
@@ -1160,27 +1155,9 @@ DialectTranscodePack createAnthropicTranscodePack() {
       .request = {.to_ir = anthropicRequestToIr(), .from_ir = anthropicRequestFromIr()},
       .response = {.to_ir = anthropicResponseToIr(), .from_ir = anthropicResponseFromIr()},
       .stream = {.to_ir = anthropicStreamToIr(), .from_ir = anthropicStreamFromIr()},
-      // The Anthropic API's layout: a fixed path, with the API version in a header rather than in
-      // the body or the path. A request leaves in it unless a binding names another.
-      .binding = builtInBinding("/v1/messages", {{.header = "anthropic-version",
-                                                  .value = nlohmann::json("2023-06-01"),
-                                                  .keep_existing = true}}),
-      // Claude on Vertex AI: the model in the path alone, and the Vertex API version in the body
-      // rather than in the API's header, which is removed so it does not leak to Vertex.
-      .client_bindings = {builtInBinding(
-          "/{version}/projects/{project}/locations/{location}/publishers/anthropic/models/"
-          "{model}:{rawPredict|streamRawPredict}",
-          {{.body_field = "model"},
-           {.body_field = "anthropic_version",
-            .value = nlohmann::json("vertex-2023-10-16"),
-            .keep_existing = true},
-           {.header = "anthropic-version"}})},
+      .binding = apiBindings(LLMProtocol::AnthropicMessages).api,
+      .client_bindings = apiBindings(LLMProtocol::AnthropicMessages).client,
   };
-}
-
-// Gemini names the model and the streaming mode in the path alone.
-std::vector<LlmBinding::Mutation> geminiMutations() {
-  return {{.body_field = "model"}, {.body_field = "stream"}};
 }
 
 // Gemini GenerateContent request -> IR request.
@@ -1525,15 +1502,8 @@ DialectTranscodePack createGeminiTranscodePack() {
       .request = {.to_ir = geminiRequestToIr(), .from_ir = geminiRequestFromIr()},
       .response = {.to_ir = geminiResponseToIr(), .from_ir = geminiResponseFromIr()},
       .stream = {.to_ir = geminiStreamToIr(), .from_ir = geminiStreamFromIr()},
-      // The Gemini API's layout. A request leaves in it unless a binding names another, such as
-      // Vertex AI's, which nests the same methods under a project and a location.
-      .binding =
-          builtInBinding("/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}",
-                         geminiMutations()),
-      .client_bindings = {builtInBinding(
-          "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
-          "{model}:{generateContent|streamGenerateContent?alt=sse}",
-          geminiMutations())},
+      .binding = apiBindings(LLMProtocol::GeminiGenerateContent).api,
+      .client_bindings = apiBindings(LLMProtocol::GeminiGenerateContent).client,
   };
 }
 
@@ -2756,11 +2726,8 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
   ctx.unresolved = false;
   const HeaderLookup header = headerLookup(ctx);
   if (direction == TranscodeDirection::ToIr) {
-    // The rules then see what the path names as if the body had named it.
-    //
-    // TODO(ginama): `readGeminiTarget()` in the request_info AI filter's extractor.cc parses the
-    // same paths for the same reason. Have it read them through the engine rather than keep its own
-    // copy.
+    // The rules then see what the path names as if the body had named it. The filters ahead read
+    // the same bindings through `peekClientPath`, without the edits.
     ctx.read = readClientPath(ctx.request_binding, pack.binding, pack.client_bindings,
                               ctx.request_path, json, header);
     if (!is_ir) {

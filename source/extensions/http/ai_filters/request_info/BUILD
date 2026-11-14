@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
         "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
@@ -37,6 +38,7 @@ envoy_cc_library(
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_request_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_conversion_lib",
         "//source/extensions/http/ai_filters/common:sync_filter_lib",
         "@abseil-cpp//absl/status",

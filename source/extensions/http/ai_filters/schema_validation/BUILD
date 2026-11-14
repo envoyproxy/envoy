@@ -36,6 +36,8 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/common:logger_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_adapters_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_conversion_lib",
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",

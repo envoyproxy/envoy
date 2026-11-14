@@ -148,6 +148,12 @@ private:
 std::optional<absl::string_view> stringFromFilterState(const StreamInfo::FilterState& filter_state,
                                                        absl::string_view key);
 
+// The binding the request arrived in: the `envoy.ai.binding.request` object, else
+// `route_binding`. For the filters ahead of the transcoder, which rejects an object that does not
+// parse; they read the route's instead and leave the error to it.
+LlmBindingConstSharedPtr requestBinding(const StreamInfo::FilterState& filter_state,
+                                        const LlmBindingConstSharedPtr& route_binding);
+
 // A single candidate target for an LLM request.
 struct LlmRoute {
   LLMProtocol llm_protocol{LLMProtocol::Unspecified};

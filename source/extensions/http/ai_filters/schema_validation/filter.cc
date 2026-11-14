@@ -1,8 +1,11 @@
 #include "source/extensions/http/ai_filters/schema_validation/filter.h"
 
+#include <optional>
 #include <string>
 #include <utility>
 
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_bindings.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
@@ -16,10 +19,13 @@ namespace SchemaValidation {
 using HttpFilters::AiProtocolManager::AdapterRegistry;
 using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
+using HttpFilters::AiProtocolManager::LlmBindingRead;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::llmProtocolName;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::PayloadSchema;
+using HttpFilters::AiProtocolManager::peekClientPath;
+using HttpFilters::AiProtocolManager::requestBinding;
 
 SchemaValidationFilterConfig::SchemaValidationFilterConfig(
     const envoy::extensions::http::ai_filters::schema_validation::v3::SchemaValidation& proto,
@@ -42,9 +48,21 @@ absl::Status SchemaValidationFilter::decodeSync(AiRequest& request, LocalReplier
     return absl::OkStatus();
   }
 
+  // A request may arrive in a layout of its API other than the provider's own -- Claude on Vertex
+  // AI names the model in the path, not the body -- which the transcoder normalizes later. The
+  // schema is the API's, so what the path carries counts as present.
+  //
   // TODO(penguingao): validate as the parser streams, rejecting an invalid field before the
   // payload ends.
-  const absl::Status status = schema->validateRequest(request.request_index());
+  constexpr absl::string_view ModelInPath[] = {"model"};
+  const std::optional<LlmBindingRead> arrived =
+      peekClientPath(request.protocol(),
+                     requestBinding(*context_.stream_info.filterState(), context_.request_binding),
+                     context_.request_headers.getPathValue(), request.json());
+  const absl::Status status =
+      schema->validateRequest(request.json(), arrived.has_value() && arrived->model_from_path
+                                                  ? absl::MakeConstSpan(ModelInPath)
+                                                  : absl::Span<const absl::string_view>());
   if (status.ok()) {
     config_->stats().valid_.inc();
     return absl::OkStatus();
