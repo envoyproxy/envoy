@@ -1,0 +1,16 @@
+script: BODY
+request {
+  headers {
+    headers { key: "x-fuzz-mode" value: "always" }
+    headers { key: "x-fuzz-index" value: "2" }
+    headers { key: "x-fuzz-length" value: "3" }
+    headers { key: "x-fuzz-value" value: "replaced" }
+  }
+  http_body { data: "hello" data: " world" }
+}
+response {
+  headers {
+    headers { key: ":status" value: "200" }
+  }
+  http_body { data: "upstream" }
+}

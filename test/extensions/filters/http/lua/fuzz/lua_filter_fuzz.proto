@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package test.extensions.filters.http.lua;
+
+import "test/fuzz/common.proto";
+import "validate/validate.proto";
+
+// One stream through the Lua filter. The scripts are fixed by the fuzzer rather than taken from
+// the input, so that every input is a valid program and the mutator spends its budget on the data
+// the bindings validate. Each script reads its arguments from x-fuzz-* request headers.
+message LuaFilterFuzzTestCase {
+  enum Script {
+    HEADERS = 0;
+    RESPOND = 1;
+    BODY = 2;
+    HTTP_CALL = 3;
+    STREAM_INFO = 4;
+  }
+
+  Script script = 1 [(validate.rules).enum.defined_only = true];
+
+  test.fuzz.HttpData request = 2 [(validate.rules).message = {required: true}];
+
+  test.fuzz.HttpData response = 3;
+
+  // Answers the script's httpCall()s in order. A call past the last one fails with a reset.
+  repeated HttpCallResponse http_call_responses = 4 [(validate.rules).repeated = {max_items: 8}];
+}
+
+message HttpCallResponse {
+  test.fuzz.Headers headers = 1;
+  bytes body = 2 [(validate.rules).bytes = {max_len: 65536}];
+}
