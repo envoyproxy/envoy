@@ -845,7 +845,7 @@ case $CI_TARGET in
         ;;
 
     docker)
-        # This is limited to linux x86/arm64 and expects `release` or `release.server_only` to have
+        # This is limited to linux x86/arm64 and expects `release` or `release.server` to have
         # been run first.
         if ! docker ps &> /dev/null; then
             echo "Unable to build with Docker. If you are running with ci/run_envoy_docker.sh" \
@@ -1079,7 +1079,9 @@ case $CI_TARGET in
         registry_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
-    release|release.server_only|release.test_only)
+    # `release.server`: the release binaries and tools (`release.server_only` is the same).
+    # `release.publish`: as `release.server`, and the container images.
+    release|release.server|release.server_only|release.publish|release.test_only)
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
@@ -1157,6 +1159,27 @@ case $CI_TARGET in
         cp -a \
            bazel-bin/test/tools/config_load_check/config_load_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/config_load_check_tool"
+        if [[ "$CI_TARGET" == "release.publish" ]]; then
+            # Build the container images (OCI tarballs) with the release binaries, named as `docker`
+            # names them.
+            ENVOY_OCI_DIR="${ENVOY_BUILD_DIR}/build_images"
+            if [[ -e "${ENVOY_OCI_DIR}" ]]; then
+                rm -rf "${ENVOY_OCI_DIR}"
+            fi
+            mkdir -p "$ENVOY_OCI_DIR"
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  --remote_download_toplevel \
+                  //distribution/docker:images
+            OCI_ARCH="$(echo "${ENVOY_BUILD_ARCH}" | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+            for image in \
+                    envoy envoy-contrib envoy-contrib-debug envoy-contrib-distroless \
+                    envoy-debug envoy-distroless envoy-tools; do
+                cp -a \
+                   "bazel-bin/distribution/docker/${image}.tar" \
+                   "${ENVOY_OCI_DIR}/${image}.${OCI_ARCH}.tar"
+            done
+            echo "Container images created in ${ENVOY_OCI_DIR}"
+        fi
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 

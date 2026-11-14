@@ -57,6 +57,7 @@
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.14.0/MODULE.bazel": "2b31ffcc9bdc8295b2167e07a757dbbc9ac8906e7028e5170a3708cecaac119f",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.19.3/MODULE.bazel": "253d739ba126f62a5767d832765b12b59e9f8d2bc88cc1572f4a73e46eb298ca",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.20.0/MODULE.bazel": "c5565bac49e1973227225b441fad1c938d498d83df62dc5da95b2fab0f0626a2",
+    "https://bcr.bazel.build/modules/aspect_bazel_lib/2.21.1/MODULE.bazel": "07e3ce3eaaa50dbd0be7fa0094e36890478937adc780ec53e77fd9fe543af8b1",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.21.2/MODULE.bazel": "276347663a25b0d5bd6cad869252bea3e160c4d980e764b15f3bae7f80b30624",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.5/MODULE.bazel": "004ba890363d05372a97248c37205ae64b6fa31047629cd2c0895a9d0c7779e8",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.22.5/source.json": "ac2c3213df8f985785f1d0aeb7f0f73d5324e6e67d593d9b9470fb74a25d4a9b",
@@ -115,6 +116,7 @@
     "https://bcr.bazel.build/modules/bazel_features/1.53.0/source.json": "a6c0a77f0617548f6ce134743f8149207b4427b5f7d5889db8b1fe29128b1ca3",
     "https://bcr.bazel.build/modules/bazel_features/1.9.0/MODULE.bazel": "885151d58d90d8d9c811eb75e3288c11f850e1d6b481a8c9f766adee4712358b",
     "https://bcr.bazel.build/modules/bazel_features/1.9.1/MODULE.bazel": "8f679097876a9b609ad1f60249c49d68bfab783dd9be012faf9d82547b14815a",
+    "https://bcr.bazel.build/modules/bazel_lib/3.0.0-beta.1/MODULE.bazel": "407729e232f611c3270005b016b437005daa7b1505826798ea584169a476e878",
     "https://bcr.bazel.build/modules/bazel_lib/3.0.0-rc.0/MODULE.bazel": "d6e00979a98ac14ada5e31c8794708b41434d461e7e7ca39b59b765e6d233b18",
     "https://bcr.bazel.build/modules/bazel_lib/3.0.0/MODULE.bazel": "22b70b80ac89ad3f3772526cd9feee2fa412c2b01933fea7ed13238a448d370d",
     "https://bcr.bazel.build/modules/bazel_lib/3.1.0/MODULE.bazel": "6809765c14e3c766a9b9286c7b0ec56ed87a73326e48fe01749f0c0fdcfe3287",
@@ -226,7 +228,8 @@
     "https://bcr.bazel.build/modules/fuzztest/20241028.0/MODULE.bazel": "55ccf828e88fb6ef6aa7fc477f7d0d442c5e740f8c7581294862645069b4a88d",
     "https://bcr.bazel.build/modules/fuzztest/20241028.0/source.json": "dc9bc5801d78274b062ee1dc1a27a0e1e63f8bd505cd46cc1e914a62c0f5c274",
     "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.1/MODULE.bazel": "cdf8cbe5ee750db04b78878c9633cc76e80dcf4416cbe982ac3a9222f80713c8",
-    "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.1/source.json": "fa7b512dfcb5eafd90ce3959cf42a2a6fe96144ebbb4b3b3928054895f2afac2",
+    "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.3/MODULE.bazel": "f1b7bb2dd53e8f2ef984b39485ec8a44e9076dda5c4b8efd2fb4c6a6e856a31d",
+    "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.3/source.json": "ebe931bfe362e4b41e59ee00a528db6074157ff2ced92eb9e970acab2e1089c9",
     "https://bcr.bazel.build/modules/gazelle/0.27.0/MODULE.bazel": "3446abd608295de6d90b4a8a118ed64a9ce11dcb3dda2dc3290a22056bd20996",
     "https://bcr.bazel.build/modules/gazelle/0.30.0/MODULE.bazel": "f888a1effe338491f35f0e0e85003b47bb9d8295ccba73c37e07702d8d31c65b",
     "https://bcr.bazel.build/modules/gazelle/0.32.0/MODULE.bazel": "b499f58a5d0d3537f3cf5b76d8ada18242f64ec474d8391247438bf04f58c7b8",
@@ -398,6 +401,7 @@
     "https://bcr.bazel.build/modules/package_metadata/0.0.2/MODULE.bazel": "fb8d25550742674d63d7b250063d4580ca530499f045d70748b1b142081ebb92",
     "https://bcr.bazel.build/modules/package_metadata/0.0.3/MODULE.bazel": "77890552ecea9e284b5424c9de827a58099348763a4359e975c359a83d4faa83",
     "https://bcr.bazel.build/modules/package_metadata/0.0.5/MODULE.bazel": "ef4f9439e3270fdd6b9fd4dbc3d2f29d13888e44c529a1b243f7a31dfbc2e8e4",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.6/MODULE.bazel": "341dab6f417197494517d54c8e557c0baee1de7aec83543a4fbefe57900acb7e",
     "https://bcr.bazel.build/modules/package_metadata/0.0.7/MODULE.bazel": "7adb03933fc8401f495800cf4eafcff0edc6da0ff55c7db223ef69d19f689486",
     "https://bcr.bazel.build/modules/perfetto/57.2.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/pkgconf/3.0.10/MODULE.bazel": "ddf39e6e5fb2cc326b302395d9dd31f4b35eb866046a2459a8a55571b4dec142",
@@ -547,6 +551,8 @@
     "https://bcr.bazel.build/modules/rules_cc_autoconf/0.26.0/MODULE.bazel": "bbde86042066b179c51ff1e2bfb4e3de0690cd17dba8642c705a07a283dd0e28",
     "https://bcr.bazel.build/modules/rules_cc_autoconf/0.32.0/MODULE.bazel": "c1dc853a311d7bce7479c00041dd888c0e83f4435123ffec076bae7fd399e342",
     "https://bcr.bazel.build/modules/rules_cc_autoconf/0.32.0/source.json": "f19f5c42f952aba8fcacd8518f5305689f122740549454a5239f9fa998aa143b",
+    "https://bcr.bazel.build/modules/rules_distroless/0.9.4/MODULE.bazel": "e098aab7f99a64d254bd4f425db6d7fb0818e2362f028d1672964ee130615567",
+    "https://bcr.bazel.build/modules/rules_distroless/0.9.4/source.json": "f4cc35c677da04b354d652a4b5835a7ad1dbd3d53043fbce163a050ae2af85d1",
     "https://bcr.bazel.build/modules/rules_foreign_cc/0.10.1/MODULE.bazel": "b9527010e5fef060af92b6724edb3691970a5b1f76f74b21d39f7d433641be60",
     "https://bcr.bazel.build/modules/rules_foreign_cc/0.15.1/MODULE.bazel": "c2c60d26c79fda484acb95cdbec46e89d6b28b4845cb277160ce1e0c8622bb88",
     "https://bcr.bazel.build/modules/rules_foreign_cc/0.17.0/MODULE.bazel": "9aac24f07a642f38ccc15131f580a62e2972a649f206d6ce333eef89878558dd",
@@ -594,6 +600,7 @@
     "https://bcr.bazel.build/modules/rules_java/8.5.1/MODULE.bazel": "d8a9e38cc5228881f7055a6079f6f7821a073df3744d441978e7a43e20226939",
     "https://bcr.bazel.build/modules/rules_java/8.6.0/MODULE.bazel": "9c064c434606d75a086f15ade5edb514308cccd1544c2b2a89bbac4310e41c71",
     "https://bcr.bazel.build/modules/rules_java/8.6.1/MODULE.bazel": "f4808e2ab5b0197f094cabce9f4b006a27766beb6a9975931da07099560ca9c2",
+    "https://bcr.bazel.build/modules/rules_java/8.8.0/MODULE.bazel": "de589d0880911ac007abd521b9f0ddcd8b0dbd05c8553e6f8124a050b83acf7d",
     "https://bcr.bazel.build/modules/rules_java/8.9.0/MODULE.bazel": "e17c876cb53dcd817b7b7f0d2985b710610169729e8c371b2221cacdcd3dce4a",
     "https://bcr.bazel.build/modules/rules_java/9.1.0/MODULE.bazel": "ee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d",
     "https://bcr.bazel.build/modules/rules_java/9.3.0/MODULE.bazel": "f657c72d65ac449caae9abf2e68e66c0d36f9416848c4c4903d0b3234229e7f2",
@@ -632,6 +639,8 @@
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.3/MODULE.bazel": "b66eadebd10f1f1b25f52f95ab5213a57e82c37c3f656fcd9a57ad04d2264ce7",
     "https://bcr.bazel.build/modules/rules_nodejs/6.7.6/MODULE.bazel": "45f203b9c0d721bcb1a5932815f218091fa2169cede2af3d88a8a17a4fb7676a",
     "https://bcr.bazel.build/modules/rules_nodejs/6.7.6/source.json": "ad9987b7979be1ce93d10ffee9b6af4f84f8835cbc7def27937d632da2e4750e",
+    "https://bcr.bazel.build/modules/rules_oci/2.3.5/MODULE.bazel": "3aa52163d51d1c18aceb90cff6a2222dd1413a894138af57acc5a6ac6ddc5bbd",
+    "https://bcr.bazel.build/modules/rules_oci/2.3.5/source.json": "24e6bc9d7b335b8f3edf3410396424a675e7f9ef269ed90b72d0eef1fe5cfed1",
     "https://bcr.bazel.build/modules/rules_perl/0.2.4/MODULE.bazel": "5f5af7be4bf5fb88d91af7469518f0fd2161718aefc606188f7cd51f436ca938",
     "https://bcr.bazel.build/modules/rules_perl/1.1.2/MODULE.bazel": "7ccaaa5c42fa272d6e7d391a756b3d378fed645f0481baa55cfac0b97d6298af",
     "https://bcr.bazel.build/modules/rules_perl/2.0.0/MODULE.bazel": "e1273ee3f1cab7b808359374f558adc145e8bc62adb070acde35180ccc14360d",
@@ -733,7 +742,8 @@
     "https://bcr.bazel.build/modules/tar.bzl/0.2.1/MODULE.bazel": "52d1c00a80a8cc67acbd01649e83d8dd6a9dc426a6c0b754a04fe8c219c76468",
     "https://bcr.bazel.build/modules/tar.bzl/0.5.1/MODULE.bazel": "7c2eb3dcfc53b0f3d6f9acdfd911ca803eaf92aadf54f8ca6e4c1f3aee288351",
     "https://bcr.bazel.build/modules/tar.bzl/0.6.0/MODULE.bazel": "a3584b4edcfafcabd9b0ef9819808f05b372957bbdff41601429d5fd0aac2e7c",
-    "https://bcr.bazel.build/modules/tar.bzl/0.6.0/source.json": "4a620381df075a16cb3a7ed57bd1d05f7480222394c64a20fa51bdb636fda658",
+    "https://bcr.bazel.build/modules/tar.bzl/0.7.0/MODULE.bazel": "cc1acd85da33c80e430b65219a620d54d114628df24a618c3a5fa0b65e988da9",
+    "https://bcr.bazel.build/modules/tar.bzl/0.7.0/source.json": "9becb80306f42d4810bfa16379fb48aad0b01ce5342bc12fe47dcd6af3ac4d7a",
     "https://bcr.bazel.build/modules/tclap/1.2.5.bcr.1/MODULE.bazel": "e79bb0e5f39d04e0b69bf36be65419e4fc595787a4344b1177efa5c149f11313",
     "https://bcr.bazel.build/modules/tclap/1.2.5.bcr.1/source.json": "3f51d07ad439a4d8986ecb69699d768397c34050eb8489673fa3e68317e909c8",
     "https://bcr.bazel.build/modules/tcmalloc/0.0.0-20250927-12f2552/MODULE.bazel": "b702a6b6806b1041d84918c5098b765b204261647f8cb3e75e0f439106b65ddd",
@@ -770,6 +780,7 @@
     "https://bcr.bazel.build/modules/yaml-cpp/0.9.0.bcr.1/source.json": "1e4c3e1716a29c4e6074d95ffafbb579ad7c762fcb9735788b819e7be98fff6a",
     "https://bcr.bazel.build/modules/yaml-cpp/0.9.0/MODULE.bazel": "d0841e12e92973d7e4c97557198335788890dafa9487d6dc0f9b852053a6c5c0",
     "https://bcr.bazel.build/modules/yq.bzl/0.1.1/MODULE.bazel": "9039681f9bcb8958ee2c87ffc74bdafba9f4369096a2b5634b88abc0eaefa072",
+    "https://bcr.bazel.build/modules/yq.bzl/0.3.1/MODULE.bazel": "9bcb7151b3cd4681b89d350530eaf7b45e32a44dda94843b8932b0cb1cd4594a",
     "https://bcr.bazel.build/modules/yq.bzl/0.4.0/MODULE.bazel": "1e4b142e391b62c95eb637fc0e944c17f3ed5276cdc9d7033df72a2f96a2a457",
     "https://bcr.bazel.build/modules/yq.bzl/0.4.0/source.json": "e5a3b94fe7ab720818ac2d8150cb19b009daf48c69a72eaab9a4852efb75331d",
     "https://bcr.bazel.build/modules/zipkin-api/1.0.0.bcr.1/MODULE.bazel": "70616960ecd07fb708362e80bc9b2800da523f75487e2a7b256d25ebeaf9daf3",
@@ -944,7 +955,7 @@
   "moduleExtensions": {
     "@@aspect_rules_esbuild+//esbuild:extensions.bzl%esbuild": {
       "general": {
-        "bzlTransitiveDigest": "XctEhDgveQ2gz7rAI7OoYtMd4Lteqej0CuvkA1gLDe4=",
+        "bzlTransitiveDigest": "A8TSfXllG+oGQ3emmEiO4pb8IgqMJV04C43LBDzUMas=",
         "usagesDigest": "2aGKRniWdOhtlYOL0710cE1WHQSZgVJOOQnU6OcEH6M=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_bazel_lib+,bazel_lib bazel_lib+",
@@ -961,7 +972,7 @@
           "REPO_MAPPING:bazel_lib+,bazel_lib bazel_lib+",
           "REPO_MAPPING:bazel_lib+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:bazel_lib+,bazel_tools bazel_tools",
-          "REPO_MAPPING:tar.bzl+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:tar.bzl+,bazel_lib bazel_lib+",
           "REPO_MAPPING:tar.bzl+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:tar.bzl+,tar.bzl tar.bzl+"
         ],
@@ -1062,7 +1073,7 @@
     },
     "@@aspect_rules_js+//npm:extensions.bzl%pnpm": {
       "general": {
-        "bzlTransitiveDigest": "PNe3/0HY1epelZv6BUsg9Rt8mY98XgMoBaB7BYPIkh8=",
+        "bzlTransitiveDigest": "ZTwMpVDbBXhcVZ7X79stQVn9XyD3hOzQTmMufH8tmXk=",
         "usagesDigest": "kbjSw2REjlSC0HtTZDf2p+l/dmiMt3NHLoiWEXYAoQI=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_bazel_lib+,bazel_lib bazel_lib+",
@@ -1079,7 +1090,7 @@
           "REPO_MAPPING:bazel_lib+,bazel_lib bazel_lib+",
           "REPO_MAPPING:bazel_lib+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:bazel_lib+,bazel_tools bazel_tools",
-          "REPO_MAPPING:tar.bzl+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:tar.bzl+,bazel_lib bazel_lib+",
           "REPO_MAPPING:tar.bzl+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:tar.bzl+,tar.bzl tar.bzl+"
         ],
@@ -2070,6 +2081,1449 @@
         }
       }
     },
+    "@@rules_distroless+//apt:extensions.bzl%apt": {
+      "general": {
+        "bzlTransitiveDigest": "pAfSlLirXAHo2maWESOQNX5HZU63EyZvoTv9P2iB6nw=",
+        "usagesDigest": "b8EWI7g46KVIBDgJ3Y17sUA1BaZBsmPVo/drFh36FkE=",
+        "recordedInputs": [
+          "REPO_MAPPING:rules_distroless+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:rules_distroless+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "ubuntu_jammy": {
+            "repoRuleId": "@@rules_distroless+//apt/private:translate_dependency_set.bzl%translate_dependency_set",
+            "attributes": {
+              "depset_name": "ubuntu_jammy",
+              "lock_content": "{\n\t\"dependency_sets\": {\n\t\t\"ubuntu_jammy\": {\n\t\t\t\"sets\": {\n\t\t\t\t\"amd64\": {\n\t\t\t\t\t\"/jammy-updates/ca-certificates:amd64\": \"20260816ubuntu0.22.04.2\",\n\t\t\t\t\t\"/jammy-updates/openssl:amd64\": \"3.0.2-0ubuntu1.30\",\n\t\t\t\t\t\"/jammy-updates/tzdata:amd64\": \"2026e-0ubuntu0.22.04.1\"\n\t\t\t\t},\n\t\t\t\t\"arm64\": {\n\t\t\t\t\t\"/jammy-updates/ca-certificates:arm64\": \"20260816ubuntu0.22.04.2\",\n\t\t\t\t\t\"/jammy-updates/openssl:arm64\": \"3.0.2-0ubuntu1.30\",\n\t\t\t\t\t\"/jammy-updates/tzdata:arm64\": \"2026e-0ubuntu0.22.04.1\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t},\n\t\"facts\": {\n\t\t\"jammy-security/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\": \"sha256-A6v3LMjtpRfcm1XusIsBQnDGG90CpDVanIXX0zvf7A4=\",\n\t\t\"jammy-security/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\": \"sha256-jDAwyvJlmtHyciPnL6c5Wd95ZYfWbduUWu9QMI0QSCw=\",\n\t\t\"jammy-updates/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\": \"sha256-JfSoGHp+winZV8A0qgVHzO8jDKQpLmPpoG84BHNKF8o=\",\n\t\t\"jammy-updates/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\": \"sha256-ytv4bUuPvbvFHzXnN+3eq0KVVcPDvqRhUu2cK+1Z13g=\",\n\t\t\"jammy/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\": \"sha256-N8tX8VVMv6ccWinun/7hipqMF4K7BWjgh0t/9M6PnBE=\",\n\t\t\"jammy/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\": \"sha256-uA0fCXGY9KLYD4TbAlImPZAgUaaVBArLwIXwMwSLybs=\"\n\t},\n\t\"packages\": {\n\t\t\"/jammy-updates/ca-certificates:amd64=20260816ubuntu0.22.04.2\": {\n\t\t\t\"architecture\": \"all\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/debconf:amd64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\",\n\t\t\t\t\"/jammy-updates/openssl:amd64=3.0.2-0ubuntu1.30\",\n\t\t\t\t\"/jammy-updates/libssl3:amd64=3.0.2-0ubuntu1.30\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.22.04.2_all.deb\",\n\t\t\t\"name\": \"ca-certificates\",\n\t\t\t\"section\": \"misc\",\n\t\t\t\"sha256\": \"f99e8375d35bdde4800d4842df777be3dafe38bca4d178429fa929de200bf821\",\n\t\t\t\"size\": 139772,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"20260816ubuntu0.22.04.2\"\n\t\t},\n\t\t\"/jammy-updates/ca-certificates:arm64=20260816ubuntu0.22.04.2\": {\n\t\t\t\"architecture\": \"all\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/debconf:arm64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\",\n\t\t\t\t\"/jammy-updates/openssl:arm64=3.0.2-0ubuntu1.30\",\n\t\t\t\t\"/jammy-updates/libssl3:arm64=3.0.2-0ubuntu1.30\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.22.04.2_all.deb\",\n\t\t\t\"name\": \"ca-certificates\",\n\t\t\t\"section\": \"misc\",\n\t\t\t\"sha256\": \"f99e8375d35bdde4800d4842df777be3dafe38bca4d178429fa929de200bf821\",\n\t\t\t\"size\": 139772,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"20260816ubuntu0.22.04.2\"\n\t\t},\n\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/d/dpkg/dpkg_1.21.1ubuntu2.6_amd64.deb\",\n\t\t\t\"name\": \"dpkg\",\n\t\t\t\"section\": \"admin\",\n\t\t\t\"sha256\": \"8759f60fc173cb4ab85599dd66a633dce9473b9c7655128863a214325f52a7bd\",\n\t\t\t\"size\": 1238552,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1.21.1ubuntu2.6\"\n\t\t},\n\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/d/dpkg/dpkg_1.21.1ubuntu2.6_arm64.deb\",\n\t\t\t\"name\": \"dpkg\",\n\t\t\t\"section\": \"admin\",\n\t\t\t\"sha256\": \"5ddd0d969425aa8876e13aa5262894125a619e049194eeefaee17acaee5188a5\",\n\t\t\t\"size\": 1218220,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1.21.1ubuntu2.6\"\n\t\t},\n\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [],\n\t\t\t\"filename\": \"pool/main/g/gcc-12/gcc-12-base_12.3.0-1ubuntu1~22.04.3_amd64.deb\",\n\t\t\t\"name\": \"gcc-12-base\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"7f9253b7e0976f0526fc21346c73ee006e185a7b2f2f865048ea78a2af55bc8d\",\n\t\t\t\"size\": 215782,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"12.3.0-1ubuntu1~22.04.3\"\n\t\t},\n\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [],\n\t\t\t\"filename\": \"pool/main/g/gcc-12/gcc-12-base_12.3.0-1ubuntu1~22.04.3_arm64.deb\",\n\t\t\t\"name\": \"gcc-12-base\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"b2bc566681989941dd059d6391b01c41854857f26d83c53358287d620dfb0fd4\",\n\t\t\t\"size\": 215822,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"12.3.0-1ubuntu1~22.04.3\"\n\t\t},\n\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/b/bzip2/libbz2-1.0_1.0.8-5ubuntu0.1_amd64.deb\",\n\t\t\t\"name\": \"libbz2-1.0\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"2fd35bb1ac601fa1bf35da2fa08dba3541766ca791927342b5efcb18ef17aecb\",\n\t\t\t\"size\": 34524,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1.0.8-5ubuntu0.1\"\n\t\t},\n\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/b/bzip2/libbz2-1.0_1.0.8-5ubuntu0.1_arm64.deb\",\n\t\t\t\"name\": \"libbz2-1.0\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"facd10a2446b6c75a95fcbaedf2303126ac2f669413f423dabda41047539f8a9\",\n\t\t\t\"size\": 36102,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1.0.8-5ubuntu0.1\"\n\t\t},\n\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/g/glibc/libc6_2.35-0ubuntu3.18_amd64.deb\",\n\t\t\t\"name\": \"libc6\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"cbed4dfa159019c759edae73ece1af67817e163686ad8925a26c90849ba1660a\",\n\t\t\t\"size\": 3235596,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"2.35-0ubuntu3.18\"\n\t\t},\n\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/g/glibc/libc6_2.35-0ubuntu3.18_arm64.deb\",\n\t\t\t\"name\": \"libc6\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"552390697756c005f8eff39b03392b2d8c6e148420c3e237d779fb44e54b5e72\",\n\t\t\t\"size\": 2709712,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"2.35-0ubuntu3.18\"\n\t\t},\n\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/g/gcc-12/libgcc-s1_12.3.0-1ubuntu1~22.04.3_amd64.deb\",\n\t\t\t\"name\": \"libgcc-s1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"d383e642d83263147f7b4b69fb92cf1036e5246c6be3accf10b77f986684589a\",\n\t\t\t\"size\": 53896,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"12.3.0-1ubuntu1~22.04.3\"\n\t\t},\n\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/g/gcc-12/libgcc-s1_12.3.0-1ubuntu1~22.04.3_arm64.deb\",\n\t\t\t\"name\": \"libgcc-s1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"46626e1af6b159061e055f843654ee1f0f1e65fa280331ed47ee76ba1b1f6045\",\n\t\t\t\"size\": 39702,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"12.3.0-1ubuntu1~22.04.3\"\n\t\t},\n\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/x/xz-utils/liblzma5_5.2.5-2ubuntu1.2_amd64.deb\",\n\t\t\t\"name\": \"liblzma5\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"a88fca7506963c443c42a578db6c35424336ae28abcdaa60c89f06d30aeb625b\",\n\t\t\t\"size\": 99802,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"5.2.5-2ubuntu1.2\"\n\t\t},\n\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/x/xz-utils/liblzma5_5.2.5-2ubuntu1.2_arm64.deb\",\n\t\t\t\"name\": \"liblzma5\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"e98ef4ff8c23c34fd2fd13a341d69fd1240a0af790682c3afb93dac6c87d995a\",\n\t\t\t\"size\": 98546,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"5.2.5-2ubuntu1.2\"\n\t\t},\n\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/p/pcre2/libpcre2-8-0_10.39-3ubuntu0.2_amd64.deb\",\n\t\t\t\"name\": \"libpcre2-8-0\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"30dff428411080f04c17d3146cecff946bed94f019f912ea3aa1d2630dee610f\",\n\t\t\t\"size\": 222238,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"10.39-3ubuntu0.2\"\n\t\t},\n\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/p/pcre2/libpcre2-8-0_10.39-3ubuntu0.2_arm64.deb\",\n\t\t\t\"name\": \"libpcre2-8-0\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"fe4e89a79c959dc7df5f84133490c39230ada2f2949aa20638cfecbb1a0c52c4\",\n\t\t\t\"size\": 203734,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"10.39-3ubuntu0.2\"\n\t\t},\n\t\t\"/jammy-updates/libssl3:amd64=3.0.2-0ubuntu1.30\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/debconf:amd64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/o/openssl/libssl3_3.0.2-0ubuntu1.30_amd64.deb\",\n\t\t\t\"name\": \"libssl3\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"d1b4636e32ac6d3b95d583ac05ac548b1aa248414bae1c51b14f54be0f8fd7bc\",\n\t\t\t\"size\": 1907006,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"3.0.2-0ubuntu1.30\"\n\t\t},\n\t\t\"/jammy-updates/libssl3:arm64=3.0.2-0ubuntu1.30\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/debconf:arm64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/o/openssl/libssl3_3.0.2-0ubuntu1.30_arm64.deb\",\n\t\t\t\"name\": \"libssl3\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"1c4b8cc736eed8a0caafc385f854fa6852382221d84be4795f1d19a52b9fec53\",\n\t\t\t\"size\": 1813678,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"3.0.2-0ubuntu1.30\"\n\t\t},\n\t\t\"/jammy-updates/openssl:amd64=3.0.2-0ubuntu1.30\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libssl3:amd64=3.0.2-0ubuntu1.30\",\n\t\t\t\t\"/jammy/debconf:amd64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/o/openssl/openssl_3.0.2-0ubuntu1.30_amd64.deb\",\n\t\t\t\"name\": \"openssl\",\n\t\t\t\"section\": \"utils\",\n\t\t\t\"sha256\": \"a5b9484a287aba47096fa9ea9821c5c98cf95b8dd726786e7c3a3311fb8eb3b4\",\n\t\t\t\"size\": 1185522,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"3.0.2-0ubuntu1.30\"\n\t\t},\n\t\t\"/jammy-updates/openssl:arm64=3.0.2-0ubuntu1.30\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libssl3:arm64=3.0.2-0ubuntu1.30\",\n\t\t\t\t\"/jammy/debconf:arm64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/o/openssl/openssl_3.0.2-0ubuntu1.30_arm64.deb\",\n\t\t\t\"name\": \"openssl\",\n\t\t\t\"section\": \"utils\",\n\t\t\t\"sha256\": \"6a4d2300bc6a40d8948a1cdc31a45fc1b4ff4d526bca606be4f40c5162b4a2ca\",\n\t\t\t\"size\": 1159974,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"3.0.2-0ubuntu1.30\"\n\t\t},\n\t\t\"/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/p/perl/perl-base_5.34.0-3ubuntu1.10_amd64.deb\",\n\t\t\t\"name\": \"perl-base\",\n\t\t\t\"section\": \"perl\",\n\t\t\t\"sha256\": \"a6465f2f76c78b088a5f328fd423a7dd5d83e36f2e34e3bfcf7994ee9bbe34d6\",\n\t\t\t\"size\": 1762892,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"5.34.0-3ubuntu1.10\"\n\t\t},\n\t\t\"/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/p/perl/perl-base_5.34.0-3ubuntu1.10_arm64.deb\",\n\t\t\t\"name\": \"perl-base\",\n\t\t\t\"section\": \"perl\",\n\t\t\t\"sha256\": \"9c42de330a68179b425274432bde3cfa7c213262a7f5285071901b6eaece5a3b\",\n\t\t\t\"size\": 1713346,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"5.34.0-3ubuntu1.10\"\n\t\t},\n\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/t/tar/tar_1.34+dfsg-1ubuntu0.1.22.04.6_amd64.deb\",\n\t\t\t\"name\": \"tar\",\n\t\t\t\"section\": \"utils\",\n\t\t\t\"sha256\": \"9e7a93d96b2c3ed82aa5959933bec3e5082c264b0ae45e86ab450f83886faace\",\n\t\t\t\"size\": 298302,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1.34+dfsg-1ubuntu0.1.22.04.6\"\n\t\t},\n\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/t/tar/tar_1.34+dfsg-1ubuntu0.1.22.04.6_arm64.deb\",\n\t\t\t\"name\": \"tar\",\n\t\t\t\"section\": \"utils\",\n\t\t\t\"sha256\": \"a6e8a42c2be5fdabf51578cc416714cca62f099cde841c3143178919150bda0f\",\n\t\t\t\"size\": 290852,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1.34+dfsg-1ubuntu0.1.22.04.6\"\n\t\t},\n\t\t\"/jammy-updates/tzdata:amd64=2026e-0ubuntu0.22.04.1\": {\n\t\t\t\"architecture\": \"all\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/debconf:amd64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/t/tzdata/tzdata_2026e-0ubuntu0.22.04.1_all.deb\",\n\t\t\t\"name\": \"tzdata\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"9d57d34f323fdb52cdf458b80f5705026ae599497f59bde8e9d7ca514ec73540\",\n\t\t\t\"size\": 346330,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"2026e-0ubuntu0.22.04.1\"\n\t\t},\n\t\t\"/jammy-updates/tzdata:arm64=2026e-0ubuntu0.22.04.1\": {\n\t\t\t\"architecture\": \"all\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy/debconf:arm64=1.5.79ubuntu1\",\n\t\t\t\t\"/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/t/tzdata/tzdata_2026e-0ubuntu0.22.04.1_all.deb\",\n\t\t\t\"name\": \"tzdata\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"9d57d34f323fdb52cdf458b80f5705026ae599497f59bde8e9d7ca514ec73540\",\n\t\t\t\"size\": 346330,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"2026e-0ubuntu0.22.04.1\"\n\t\t},\n\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/z/zlib/zlib1g_1.2.11.dfsg-2ubuntu9.2_amd64.deb\",\n\t\t\t\"name\": \"zlib1g\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"9dc17e51a1be2d9ed63b7b84ef0e4e29c5abe6f1bc62cb03e7181483cce8a2f2\",\n\t\t\t\"size\": 58406,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1:1.2.11.dfsg-2ubuntu9.2\"\n\t\t},\n\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/z/zlib/zlib1g_1.2.11.dfsg-2ubuntu9.2_arm64.deb\",\n\t\t\t\"name\": \"zlib1g\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"cfd99d1ca41e710fdd3f68bfdc4d36dd24e14377656764f00b215b89cf6976e8\",\n\t\t\t\"size\": 57006,\n\t\t\t\"suite\": \"jammy-updates\",\n\t\t\t\"version\": \"1:1.2.11.dfsg-2ubuntu9.2\"\n\t\t},\n\t\t\"/jammy/debconf:amd64=1.5.79ubuntu1\": {\n\t\t\t\"architecture\": \"all\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:amd64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:amd64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/d/debconf/debconf_1.5.79ubuntu1_all.deb\",\n\t\t\t\"name\": \"debconf\",\n\t\t\t\"section\": \"admin\",\n\t\t\t\"sha256\": \"395a65b3a9539304391456d4d0e5531f4249f297b6e67eb0fcaf2ff77ddc3dc3\",\n\t\t\t\"size\": 126202,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"1.5.79ubuntu1\"\n\t\t},\n\t\t\"/jammy/debconf:arm64=1.5.79ubuntu1\": {\n\t\t\t\"architecture\": \"all\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10\",\n\t\t\t\t\"/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6\",\n\t\t\t\t\"/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6\",\n\t\t\t\t\"/jammy/libselinux1:arm64=3.3-1build2\",\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy/libacl1:arm64=2.3.1-1\",\n\t\t\t\t\"/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2\",\n\t\t\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\",\n\t\t\t\t\"/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2\",\n\t\t\t\t\"/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/d/debconf/debconf_1.5.79ubuntu1_all.deb\",\n\t\t\t\"name\": \"debconf\",\n\t\t\t\"section\": \"admin\",\n\t\t\t\"sha256\": \"395a65b3a9539304391456d4d0e5531f4249f297b6e67eb0fcaf2ff77ddc3dc3\",\n\t\t\t\"size\": 126202,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"1.5.79ubuntu1\"\n\t\t},\n\t\t\"/jammy/libacl1:amd64=2.3.1-1\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/a/acl/libacl1_2.3.1-1_amd64.deb\",\n\t\t\t\"name\": \"libacl1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"4db2c64ec74f673ed022e92cce7b83d0cbe0b779e02ca60a56ba59ae07754e05\",\n\t\t\t\"size\": 16218,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"2.3.1-1\"\n\t\t},\n\t\t\"/jammy/libacl1:arm64=2.3.1-1\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/a/acl/libacl1_2.3.1-1_arm64.deb\",\n\t\t\t\"name\": \"libacl1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"328e91b2d6e8ee44ad669fc7276b74f208bc781baf1ecdd7dbf5f092f8b41712\",\n\t\t\t\"size\": 16088,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"2.3.1-1\"\n\t\t},\n\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/libx/libxcrypt/libcrypt1_4.4.27-1_amd64.deb\",\n\t\t\t\"name\": \"libcrypt1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"3fa566e9f861a08736cbc5a97562d9d6e4f0c00450fbeafcb6d7583423b04a98\",\n\t\t\t\"size\": 82004,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"1:4.4.27-1\"\n\t\t},\n\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/libx/libxcrypt/libcrypt1_4.4.27-1_arm64.deb\",\n\t\t\t\"name\": \"libcrypt1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"fb5f8d59de95bbb118a635e83e2a92077e13c6d297980dae3119df057bf88111\",\n\t\t\t\"size\": 86850,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"1:4.4.27-1\"\n\t\t},\n\t\t\"/jammy/libselinux1:amd64=3.3-1build2\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/libs/libselinux/libselinux1_3.3-1build2_amd64.deb\",\n\t\t\t\"name\": \"libselinux1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"b96c6b40ee2388bd51341cb11c0f1d5bcca29b9180b6e3a77a06b881f2913f7e\",\n\t\t\t\"size\": 74578,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"3.3-1build2\"\n\t\t},\n\t\t\"/jammy/libselinux1:arm64=3.3-1build2\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2\",\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/libs/libselinux/libselinux1_3.3-1build2_arm64.deb\",\n\t\t\t\"name\": \"libselinux1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"3a0726b2174a40fa28e74712867aa6e40d3d725543e8f668af9e9e59a28c817c\",\n\t\t\t\"size\": 74408,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"3.3-1build2\"\n\t\t},\n\t\t\"/jammy/libzstd1:amd64=1.4.8+dfsg-3build1\": {\n\t\t\t\"architecture\": \"amd64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:amd64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:amd64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/libz/libzstd/libzstd1_1.4.8+dfsg-3build1_amd64.deb\",\n\t\t\t\"name\": \"libzstd1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"ae7db00ce8b093e50c994518b90203544e063b4bc574836a048bb142b950b2c9\",\n\t\t\t\"size\": 324024,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"1.4.8+dfsg-3build1\"\n\t\t},\n\t\t\"/jammy/libzstd1:arm64=1.4.8+dfsg-3build1\": {\n\t\t\t\"architecture\": \"arm64\",\n\t\t\t\"depends_on\": [\n\t\t\t\t\"/jammy-updates/libc6:arm64=2.35-0ubuntu3.18\",\n\t\t\t\t\"/jammy/libcrypt1:arm64=1:4.4.27-1\",\n\t\t\t\t\"/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3\",\n\t\t\t\t\"/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3\"\n\t\t\t],\n\t\t\t\"filename\": \"pool/main/libz/libzstd/libzstd1_1.4.8+dfsg-3build1_arm64.deb\",\n\t\t\t\"name\": \"libzstd1\",\n\t\t\t\"section\": \"libs\",\n\t\t\t\"sha256\": \"0102eb80384c2432c4be819663341a1c4e511d05f13ec1467643696531ec6491\",\n\t\t\t\"size\": 311026,\n\t\t\t\"suite\": \"jammy\",\n\t\t\t\"version\": \"1.4.8+dfsg-3build1\"\n\t\t}\n\t},\n\t\"sources\": {\n\t\t\"jammy\": {\n\t\t\t\"architectures\": [\n\t\t\t\t\"amd64\",\n\t\t\t\t\"arm64\"\n\t\t\t],\n\t\t\t\"components\": [\n\t\t\t\t\"main\"\n\t\t\t],\n\t\t\t\"types\": [\n\t\t\t\t\"deb\"\n\t\t\t],\n\t\t\t\"uris\": [\n\t\t\t\t\"https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\"\n\t\t\t]\n\t\t},\n\t\t\"jammy-security\": {\n\t\t\t\"architectures\": [\n\t\t\t\t\"amd64\",\n\t\t\t\t\"arm64\"\n\t\t\t],\n\t\t\t\"components\": [\n\t\t\t\t\"main\"\n\t\t\t],\n\t\t\t\"types\": [\n\t\t\t\t\"deb\"\n\t\t\t],\n\t\t\t\"uris\": [\n\t\t\t\t\"https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\"\n\t\t\t]\n\t\t},\n\t\t\"jammy-updates\": {\n\t\t\t\"architectures\": [\n\t\t\t\t\"amd64\",\n\t\t\t\t\"arm64\"\n\t\t\t],\n\t\t\t\"components\": [\n\t\t\t\t\"main\"\n\t\t\t],\n\t\t\t\"types\": [\n\t\t\t\t\"deb\"\n\t\t\t],\n\t\t\t\"uris\": [\n\t\t\t\t\"https://snapshot.ubuntu.com/ubuntu/20261113T000000Z\"\n\t\t\t]\n\t\t}\n\t},\n\t\"version\": 2\n}"
+            }
+          },
+          "jammy-updates_tzdata-arm64_2026e-0ubuntu0.22.04.1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_tzdata-arm64_2026e-0ubuntu0.22.04.1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_tzdata-arm64_2026e-0ubuntu0.22.04.1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/t/tzdata/tzdata_2026e-0ubuntu0.22.04.1_all.deb"
+              ],
+              "sha256": "9d57d34f323fdb52cdf458b80f5705026ae599497f59bde8e9d7ca514ec73540",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/debconf:arm64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_debconf-arm64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "tzdata"
+            }
+          },
+          "jammy_debconf-arm64_1.5.79ubuntu1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_debconf-arm64_1.5.79ubuntu1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_debconf-arm64_1.5.79ubuntu1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/d/debconf/debconf_1.5.79ubuntu1_all.deb"
+              ],
+              "sha256": "395a65b3a9539304391456d4d0e5531f4249f297b6e67eb0fcaf2ff77ddc3dc3",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "debconf"
+            }
+          },
+          "jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/p/perl/perl-base_5.34.0-3ubuntu1.10_arm64.deb"
+              ],
+              "sha256": "9c42de330a68179b425274432bde3cfa7c213262a7f5285071901b6eaece5a3b",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "perl-base"
+            }
+          },
+          "jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_dpkg-arm64_1.21.1ubuntu2.6": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_dpkg-arm64_1.21.1ubuntu2.6",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/d/dpkg/dpkg_1.21.1ubuntu2.6_arm64.deb"
+              ],
+              "sha256": "5ddd0d969425aa8876e13aa5262894125a619e049194eeefaee17acaee5188a5",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "dpkg"
+            }
+          },
+          "jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/t/tar/tar_1.34+dfsg-1ubuntu0.1.22.04.6_arm64.deb"
+              ],
+              "sha256": "a6e8a42c2be5fdabf51578cc416714cca62f099cde841c3143178919150bda0f",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json"
+              ],
+              "package_name": "tar"
+            }
+          },
+          "jammy_libselinux1-arm64_3.3-1build2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libselinux1-arm64_3.3-1build2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libselinux1-arm64_3.3-1build2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/libs/libselinux/libselinux1_3.3-1build2_arm64.deb"
+              ],
+              "sha256": "3a0726b2174a40fa28e74712867aa6e40d3d725543e8f668af9e9e59a28c817c",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libselinux1"
+            }
+          },
+          "jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/p/pcre2/libpcre2-8-0_10.39-3ubuntu0.2_arm64.deb"
+              ],
+              "sha256": "fe4e89a79c959dc7df5f84133490c39230ada2f2949aa20638cfecbb1a0c52c4",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libpcre2-8-0"
+            }
+          },
+          "jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libc6-arm64_2.35-0ubuntu3.18": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libc6-arm64_2.35-0ubuntu3.18",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/g/glibc/libc6_2.35-0ubuntu3.18_arm64.deb"
+              ],
+              "sha256": "552390697756c005f8eff39b03392b2d8c6e148420c3e237d779fb44e54b5e72",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libc6"
+            }
+          },
+          "jammy_libcrypt1-arm64_1-4.4.27-1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libcrypt1-arm64_1-4.4.27-1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libcrypt1-arm64_1-4.4.27-1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/libx/libxcrypt/libcrypt1_4.4.27-1_arm64.deb"
+              ],
+              "sha256": "fb5f8d59de95bbb118a635e83e2a92077e13c6d297980dae3119df057bf88111",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libcrypt1"
+            }
+          },
+          "jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/g/gcc-12/libgcc-s1_12.3.0-1ubuntu1~22.04.3_arm64.deb"
+              ],
+              "sha256": "46626e1af6b159061e055f843654ee1f0f1e65fa280331ed47ee76ba1b1f6045",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libgcc-s1"
+            }
+          },
+          "jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/g/gcc-12/gcc-12-base_12.3.0-1ubuntu1~22.04.3_arm64.deb"
+              ],
+              "sha256": "b2bc566681989941dd059d6391b01c41854857f26d83c53358287d620dfb0fd4",
+              "mergedusr": false,
+              "depends_on": [],
+              "dep_filemaps": [],
+              "package_name": "gcc-12-base"
+            }
+          },
+          "jammy_libacl1-arm64_2.3.1-1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libacl1-arm64_2.3.1-1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libacl1-arm64_2.3.1-1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/a/acl/libacl1_2.3.1-1_arm64.deb"
+              ],
+              "sha256": "328e91b2d6e8ee44ad669fc7276b74f208bc781baf1ecdd7dbf5f092f8b41712",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libacl1"
+            }
+          },
+          "jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/z/zlib/zlib1g_1.2.11.dfsg-2ubuntu9.2_arm64.deb"
+              ],
+              "sha256": "cfd99d1ca41e710fdd3f68bfdc4d36dd24e14377656764f00b215b89cf6976e8",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "zlib1g"
+            }
+          },
+          "jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libzstd1-arm64_1.4.8-dfsg-3build1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libzstd1-arm64_1.4.8-dfsg-3build1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/libz/libzstd/libzstd1_1.4.8+dfsg-3build1_arm64.deb"
+              ],
+              "sha256": "0102eb80384c2432c4be819663341a1c4e511d05f13ec1467643696531ec6491",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libzstd1"
+            }
+          },
+          "jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/x/xz-utils/liblzma5_5.2.5-2ubuntu1.2_arm64.deb"
+              ],
+              "sha256": "e98ef4ff8c23c34fd2fd13a341d69fd1240a0af790682c3afb93dac6c87d995a",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "liblzma5"
+            }
+          },
+          "jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/b/bzip2/libbz2-1.0_1.0.8-5ubuntu0.1_arm64.deb"
+              ],
+              "sha256": "facd10a2446b6c75a95fcbaedf2303126ac2f669413f423dabda41047539f8a9",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libbz2-1.0"
+            }
+          },
+          "jammy-updates_tzdata-amd64_2026e-0ubuntu0.22.04.1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_tzdata-amd64_2026e-0ubuntu0.22.04.1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_tzdata-amd64_2026e-0ubuntu0.22.04.1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/t/tzdata/tzdata_2026e-0ubuntu0.22.04.1_all.deb"
+              ],
+              "sha256": "9d57d34f323fdb52cdf458b80f5705026ae599497f59bde8e9d7ca514ec73540",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/debconf:amd64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_debconf-amd64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "tzdata"
+            }
+          },
+          "jammy_debconf-amd64_1.5.79ubuntu1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_debconf-amd64_1.5.79ubuntu1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_debconf-amd64_1.5.79ubuntu1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/d/debconf/debconf_1.5.79ubuntu1_all.deb"
+              ],
+              "sha256": "395a65b3a9539304391456d4d0e5531f4249f297b6e67eb0fcaf2ff77ddc3dc3",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "debconf"
+            }
+          },
+          "jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/p/perl/perl-base_5.34.0-3ubuntu1.10_amd64.deb"
+              ],
+              "sha256": "a6465f2f76c78b088a5f328fd423a7dd5d83e36f2e34e3bfcf7994ee9bbe34d6",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "perl-base"
+            }
+          },
+          "jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_dpkg-amd64_1.21.1ubuntu2.6": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_dpkg-amd64_1.21.1ubuntu2.6",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/d/dpkg/dpkg_1.21.1ubuntu2.6_amd64.deb"
+              ],
+              "sha256": "8759f60fc173cb4ab85599dd66a633dce9473b9c7655128863a214325f52a7bd",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "dpkg"
+            }
+          },
+          "jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/t/tar/tar_1.34+dfsg-1ubuntu0.1.22.04.6_amd64.deb"
+              ],
+              "sha256": "9e7a93d96b2c3ed82aa5959933bec3e5082c264b0ae45e86ab450f83886faace",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json"
+              ],
+              "package_name": "tar"
+            }
+          },
+          "jammy_libselinux1-amd64_3.3-1build2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libselinux1-amd64_3.3-1build2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libselinux1-amd64_3.3-1build2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/libs/libselinux/libselinux1_3.3-1build2_amd64.deb"
+              ],
+              "sha256": "b96c6b40ee2388bd51341cb11c0f1d5bcca29b9180b6e3a77a06b881f2913f7e",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libselinux1"
+            }
+          },
+          "jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/p/pcre2/libpcre2-8-0_10.39-3ubuntu0.2_amd64.deb"
+              ],
+              "sha256": "30dff428411080f04c17d3146cecff946bed94f019f912ea3aa1d2630dee610f",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libpcre2-8-0"
+            }
+          },
+          "jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libc6-amd64_2.35-0ubuntu3.18": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libc6-amd64_2.35-0ubuntu3.18",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/g/glibc/libc6_2.35-0ubuntu3.18_amd64.deb"
+              ],
+              "sha256": "cbed4dfa159019c759edae73ece1af67817e163686ad8925a26c90849ba1660a",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libc6"
+            }
+          },
+          "jammy_libcrypt1-amd64_1-4.4.27-1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libcrypt1-amd64_1-4.4.27-1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libcrypt1-amd64_1-4.4.27-1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/libx/libxcrypt/libcrypt1_4.4.27-1_amd64.deb"
+              ],
+              "sha256": "3fa566e9f861a08736cbc5a97562d9d6e4f0c00450fbeafcb6d7583423b04a98",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libcrypt1"
+            }
+          },
+          "jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/g/gcc-12/libgcc-s1_12.3.0-1ubuntu1~22.04.3_amd64.deb"
+              ],
+              "sha256": "d383e642d83263147f7b4b69fb92cf1036e5246c6be3accf10b77f986684589a",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libgcc-s1"
+            }
+          },
+          "jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/g/gcc-12/gcc-12-base_12.3.0-1ubuntu1~22.04.3_amd64.deb"
+              ],
+              "sha256": "7f9253b7e0976f0526fc21346c73ee006e185a7b2f2f865048ea78a2af55bc8d",
+              "mergedusr": false,
+              "depends_on": [],
+              "dep_filemaps": [],
+              "package_name": "gcc-12-base"
+            }
+          },
+          "jammy_libacl1-amd64_2.3.1-1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libacl1-amd64_2.3.1-1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libacl1-amd64_2.3.1-1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/a/acl/libacl1_2.3.1-1_amd64.deb"
+              ],
+              "sha256": "4db2c64ec74f673ed022e92cce7b83d0cbe0b779e02ca60a56ba59ae07754e05",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libacl1"
+            }
+          },
+          "jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/z/zlib/zlib1g_1.2.11.dfsg-2ubuntu9.2_amd64.deb"
+              ],
+              "sha256": "9dc17e51a1be2d9ed63b7b84ef0e4e29c5abe6f1bc62cb03e7181483cce8a2f2",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "zlib1g"
+            }
+          },
+          "jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy_libzstd1-amd64_1.4.8-dfsg-3build1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy_libzstd1-amd64_1.4.8-dfsg-3build1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/libz/libzstd/libzstd1_1.4.8+dfsg-3build1_amd64.deb"
+              ],
+              "sha256": "ae7db00ce8b093e50c994518b90203544e063b4bc574836a048bb142b950b2c9",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libzstd1"
+            }
+          },
+          "jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/x/xz-utils/liblzma5_5.2.5-2ubuntu1.2_amd64.deb"
+              ],
+              "sha256": "a88fca7506963c443c42a578db6c35424336ae28abcdaa60c89f06d30aeb625b",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "liblzma5"
+            }
+          },
+          "jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/b/bzip2/libbz2-1.0_1.0.8-5ubuntu0.1_amd64.deb"
+              ],
+              "sha256": "2fd35bb1ac601fa1bf35da2fa08dba3541766ca791927342b5efcb18ef17aecb",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json"
+              ],
+              "package_name": "libbz2-1.0"
+            }
+          },
+          "jammy-updates_openssl-arm64_3.0.2-0ubuntu1.30_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_openssl-arm64_3.0.2-0ubuntu1.30": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_openssl-arm64_3.0.2-0ubuntu1.30",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/o/openssl/openssl_3.0.2-0ubuntu1.30_arm64.deb"
+              ],
+              "sha256": "6a4d2300bc6a40d8948a1cdc31a45fc1b4ff4d526bca606be4f40c5162b4a2ca",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libssl3:arm64=3.0.2-0ubuntu1.30",
+                "/jammy/debconf:arm64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libssl3-arm64_3.0.2-0ubuntu1.30_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_debconf-arm64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "openssl"
+            }
+          },
+          "jammy-updates_libssl3-arm64_3.0.2-0ubuntu1.30_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libssl3-arm64_3.0.2-0ubuntu1.30": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libssl3-arm64_3.0.2-0ubuntu1.30",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/o/openssl/libssl3_3.0.2-0ubuntu1.30_arm64.deb"
+              ],
+              "sha256": "1c4b8cc736eed8a0caafc385f854fa6852382221d84be4795f1d19a52b9fec53",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/debconf:arm64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_debconf-arm64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "libssl3"
+            }
+          },
+          "jammy-updates_openssl-amd64_3.0.2-0ubuntu1.30_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_openssl-amd64_3.0.2-0ubuntu1.30": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_openssl-amd64_3.0.2-0ubuntu1.30",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/o/openssl/openssl_3.0.2-0ubuntu1.30_amd64.deb"
+              ],
+              "sha256": "a5b9484a287aba47096fa9ea9821c5c98cf95b8dd726786e7c3a3311fb8eb3b4",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy-updates/libssl3:amd64=3.0.2-0ubuntu1.30",
+                "/jammy/debconf:amd64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy-updates_libssl3-amd64_3.0.2-0ubuntu1.30_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_debconf-amd64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "openssl"
+            }
+          },
+          "jammy-updates_libssl3-amd64_3.0.2-0ubuntu1.30_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_libssl3-amd64_3.0.2-0ubuntu1.30": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_libssl3-amd64_3.0.2-0ubuntu1.30",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/o/openssl/libssl3_3.0.2-0ubuntu1.30_amd64.deb"
+              ],
+              "sha256": "d1b4636e32ac6d3b95d583ac05ac548b1aa248414bae1c51b14f54be0f8fd7bc",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/debconf:amd64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_debconf-amd64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json"
+              ],
+              "package_name": "libssl3"
+            }
+          },
+          "jammy-updates_ca-certificates-arm64_20260816ubuntu0.22.04.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_ca-certificates-arm64_20260816ubuntu0.22.04.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_ca-certificates-arm64_20260816ubuntu0.22.04.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.22.04.2_all.deb"
+              ],
+              "sha256": "f99e8375d35bdde4800d4842df777be3dafe38bca4d178429fa929de200bf821",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/debconf:arm64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:arm64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:arm64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:arm64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:arm64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:arm64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:arm64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:arm64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:arm64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:arm64=2.3.1-1",
+                "/jammy-updates/zlib1g:arm64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:arm64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:arm64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:arm64=1.0.8-5ubuntu0.1",
+                "/jammy-updates/openssl:arm64=3.0.2-0ubuntu1.30",
+                "/jammy-updates/libssl3:arm64=3.0.2-0ubuntu1.30"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_debconf-arm64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-arm64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-arm64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-arm64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-arm64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-arm64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-arm64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-arm64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-arm64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-arm64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-arm64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-arm64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-arm64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-arm64_1.0.8-5ubuntu0.1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_openssl-arm64_3.0.2-0ubuntu1.30_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libssl3-arm64_3.0.2-0ubuntu1.30_filemap//:filemap.json"
+              ],
+              "package_name": "ca-certificates"
+            }
+          },
+          "jammy-updates_ca-certificates-amd64_20260816ubuntu0.22.04.2_filemap": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_filemap.bzl%deb_filemap",
+            "attributes": {
+              "files": "[]"
+            }
+          },
+          "jammy-updates_ca-certificates-amd64_20260816ubuntu0.22.04.2": {
+            "repoRuleId": "@@rules_distroless+//apt/private:deb_import.bzl%deb_import",
+            "attributes": {
+              "target_name": "jammy-updates_ca-certificates-amd64_20260816ubuntu0.22.04.2",
+              "urls": [
+                "https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.22.04.2_all.deb"
+              ],
+              "sha256": "f99e8375d35bdde4800d4842df777be3dafe38bca4d178429fa929de200bf821",
+              "mergedusr": false,
+              "depends_on": [
+                "/jammy/debconf:amd64=1.5.79ubuntu1",
+                "/jammy-updates/perl-base:amd64=5.34.0-3ubuntu1.10",
+                "/jammy-updates/dpkg:amd64=1.21.1ubuntu2.6",
+                "/jammy-updates/tar:amd64=1.34+dfsg-1ubuntu0.1.22.04.6",
+                "/jammy/libselinux1:amd64=3.3-1build2",
+                "/jammy-updates/libpcre2-8-0:amd64=10.39-3ubuntu0.2",
+                "/jammy-updates/libc6:amd64=2.35-0ubuntu3.18",
+                "/jammy/libcrypt1:amd64=1:4.4.27-1",
+                "/jammy-updates/libgcc-s1:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy-updates/gcc-12-base:amd64=12.3.0-1ubuntu1~22.04.3",
+                "/jammy/libacl1:amd64=2.3.1-1",
+                "/jammy-updates/zlib1g:amd64=1:1.2.11.dfsg-2ubuntu9.2",
+                "/jammy/libzstd1:amd64=1.4.8+dfsg-3build1",
+                "/jammy-updates/liblzma5:amd64=5.2.5-2ubuntu1.2",
+                "/jammy-updates/libbz2-1.0:amd64=1.0.8-5ubuntu0.1",
+                "/jammy-updates/openssl:amd64=3.0.2-0ubuntu1.30",
+                "/jammy-updates/libssl3:amd64=3.0.2-0ubuntu1.30"
+              ],
+              "dep_filemaps": [
+                "@@rules_distroless++apt+jammy_debconf-amd64_1.5.79ubuntu1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_perl-base-amd64_5.34.0-3ubuntu1.10_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_dpkg-amd64_1.21.1ubuntu2.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_tar-amd64_1.34-dfsg-1ubuntu0.1.22.04.6_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libselinux1-amd64_3.3-1build2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libpcre2-8-0-amd64_10.39-3ubuntu0.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libc6-amd64_2.35-0ubuntu3.18_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libcrypt1-amd64_1-4.4.27-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libgcc-s1-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_gcc-12-base-amd64_12.3.0-1ubuntu1_22.04.3_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libacl1-amd64_2.3.1-1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_zlib1g-amd64_1-1.2.11.dfsg-2ubuntu9.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy_libzstd1-amd64_1.4.8-dfsg-3build1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_liblzma5-amd64_5.2.5-2ubuntu1.2_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libbz2-1.0-amd64_1.0.8-5ubuntu0.1_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_openssl-amd64_3.0.2-0ubuntu1.30_filemap//:filemap.json",
+                "@@rules_distroless++apt+jammy-updates_libssl3-amd64_3.0.2-0ubuntu1.30_filemap//:filemap.json"
+              ],
+              "package_name": "ca-certificates"
+            }
+          }
+        },
+        "moduleExtensionMetadata": {
+          "useAllRepos": "NO",
+          "reproducible": false
+        }
+      }
+    },
     "@@rules_m4+//m4/internal:default_toolchain_ext.bzl%default_toolchain_ext": {
       "general": {
         "bzlTransitiveDigest": "tdX+2sxsI0cUAT/hNag1pWuAZVRyakmuNkW1hjVYEqA=",
@@ -2255,7 +3709,7 @@
     "@@yq.bzl+//yq:extensions.bzl%yq": {
       "general": {
         "bzlTransitiveDigest": "pBdvRkVUaEmOKUs6XG10RiM1hOIlKNePWVmOVaSA3zU=",
-        "usagesDigest": "hd8MT/67pD7UqQ3AU0Jhz5KEui9gNjbek0zoPemsW/c=",
+        "usagesDigest": "/79T4WKXWmr70Lq+W7iPmX4FvZfpcacFL+4MgJNF2zU=",
         "recordedInputs": [
           "REPO_MAPPING:yq.bzl+,bazel_lib bazel_lib+"
         ],
@@ -2338,6 +3792,30 @@
     }
   },
   "facts": {
+    "@@rules_distroless+//apt:extensions.bzl%apt": {
+      "formats": {
+        "jammy-security/main/amd64/Contents/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "unavailable",
+        "jammy-security/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": ".xz",
+        "jammy-security/main/arm64/Contents/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "unavailable",
+        "jammy-security/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": ".xz",
+        "jammy-updates/main/amd64/Contents/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "unavailable",
+        "jammy-updates/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": ".xz",
+        "jammy-updates/main/arm64/Contents/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "unavailable",
+        "jammy-updates/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": ".xz",
+        "jammy/main/amd64/Contents/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "unavailable",
+        "jammy/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": ".xz",
+        "jammy/main/arm64/Contents/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "unavailable",
+        "jammy/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": ".xz"
+      },
+      "indices": {
+        "jammy-security/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "sha256-A6v3LMjtpRfcm1XusIsBQnDGG90CpDVanIXX0zvf7A4=",
+        "jammy-security/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "sha256-jDAwyvJlmtHyciPnL6c5Wd95ZYfWbduUWu9QMI0QSCw=",
+        "jammy-updates/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "sha256-JfSoGHp+winZV8A0qgVHzO8jDKQpLmPpoG84BHNKF8o=",
+        "jammy-updates/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "sha256-ytv4bUuPvbvFHzXnN+3eq0KVVcPDvqRhUu2cK+1Z13g=",
+        "jammy/main/amd64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "sha256-N8tX8VVMv6ccWinun/7hipqMF4K7BWjgh0t/9M6PnBE=",
+        "jammy/main/arm64/Packages/https://snapshot.ubuntu.com/ubuntu/20261113T000000Z": "sha256-uA0fCXGY9KLYD4TbAlImPZAgUaaVBArLwIXwMwSLybs="
+      }
+    },
     "@@rules_go+//go:extensions.bzl%go_sdk": {
       "1.22.4": {
         "aix_ppc64": [
