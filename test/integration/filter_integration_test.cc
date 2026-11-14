@@ -1729,5 +1729,35 @@ TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
   }
 }
 
+TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
+  // Encoding order: add-trailers-filter, wait-for-whole-request-and-response-filter.
+  prependFilter(R"EOF(
+  name: add-trailers-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+  )EOF");
+  prependFilter(R"EOF(
+  name: wait-for-whole-request-and-response-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.WaitForWholeRequestAndResponseFilterConfig
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  // The buffering filter waits for the end of the stream, which the added trailers now carry.
+  upstream_request_->encodeData(128, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(128, response->body().size());
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
+  }
+}
+
 } // namespace
 } // namespace Envoy
