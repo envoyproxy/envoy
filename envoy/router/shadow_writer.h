@@ -8,6 +8,9 @@
 #include "envoy/http/message.h"
 
 namespace Envoy {
+namespace Upstream {
+class OdCdsContext;
+}
 namespace Router {
 
 struct ShadowPolicyStats;
@@ -28,10 +31,13 @@ public:
    * @param message supplies the complete request to shadow.
    * @param options supplies the request options for the underlying asynchronous request.
    * @param stats supplies the stats of the mirror policy, or nullptr if it has none.
+   * @param discovery_context supplies the resolved discovery policy, or nullptr to skip missing
+   *                          clusters. Pending requests retain their own reference.
    */
-  virtual void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-                      const Http::AsyncClient::RequestOptions& options,
-                      const ShadowPolicyStatsSharedPtr& stats) PURE;
+  virtual void
+  shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
+         const Http::AsyncClient::RequestOptions& options, const ShadowPolicyStatsSharedPtr& stats,
+         const std::shared_ptr<const Upstream::OdCdsContext>& discovery_context = nullptr) PURE;
 
   /**
    * Initialize shadowing a request. Differs from the above in that additional
@@ -40,14 +46,16 @@ public:
    * @param headers supplies the headers for initializing the shadow.
    * @param options supplies the request options for the underlying asynchronous request.
    * @param stats supplies the stats of the mirror policy, or nullptr if it has none.
+   * @param discovery_context supplies the resolved discovery policy, or nullptr to skip missing
+   *                          clusters. Pending requests retain their own reference.
    * @return OngoingRequest* pointer owned by the AsyncClient which can have additional data and
    *                         trailers sent to it. Can be null if the stream is immediately
    *                         cancelled.
    */
-  virtual Http::AsyncClient::OngoingRequest*
-  streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
-                  const Http::AsyncClient::RequestOptions& options,
-                  const ShadowPolicyStatsSharedPtr& stats) PURE;
+  virtual Http::AsyncClient::OngoingRequest* streamingShadow(
+      const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
+      const Http::AsyncClient::RequestOptions& options, const ShadowPolicyStatsSharedPtr& stats,
+      const std::shared_ptr<const Upstream::OdCdsContext>& discovery_context = nullptr) PURE;
 };
 
 using ShadowWriterPtr = std::unique_ptr<ShadowWriter>;

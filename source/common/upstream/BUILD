@@ -10,6 +10,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "od_cds_context_lib",
+    hdrs = ["od_cds_context.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/stream_info:filter_state_interface",
+        "//envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_api_helper_lib",
     srcs = ["cds_api_helper.cc"],
     hdrs = ["cds_api_helper.h"],

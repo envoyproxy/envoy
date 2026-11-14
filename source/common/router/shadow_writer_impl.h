@@ -6,6 +6,8 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/http/on_demand_async_client.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -13,35 +15,32 @@ namespace Router {
  * Implementation of ShadowWriter that takes incoming requests to shadow and implements "fire and
  * forget" behavior using an async client.
  */
-class ShadowWriterImpl : Logger::Loggable<Logger::Id::router>,
-                         public ShadowWriter,
-                         public Http::AsyncClient::Callbacks {
+class ShadowWriterImpl : Logger::Loggable<Logger::Id::router>, public ShadowWriter {
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm) : cm_(cm) {}
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               const Http::AsyncClient::RequestOptions& options,
-              const ShadowPolicyStatsSharedPtr& stats) override;
+              const ShadowPolicyStatsSharedPtr& stats,
+              const Upstream::OdCdsContextSharedPtr& discovery_context = nullptr) override;
 
   Http::AsyncClient::OngoingRequest*
   streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
                   const Http::AsyncClient::RequestOptions& options,
-                  const ShadowPolicyStatsSharedPtr& stats) override;
-
-  // Http::AsyncClient::Callbacks
-  void onSuccess(const Http::AsyncClient::Request& request,
-                 Http::ResponseMessagePtr&& response) override;
-  void onFailure(const Http::AsyncClient::Request& request,
-                 Http::AsyncClient::FailureReason) override;
-  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
-                                    const Http::ResponseHeaderMap*) override {}
+                  const ShadowPolicyStatsSharedPtr& stats,
+                  const Upstream::OdCdsContextSharedPtr& discovery_context = nullptr) override;
 
 private:
   Upstream::ThreadLocalCluster*
   getClusterAndPreprocessHeadersAndOptions(absl::string_view cluster,
                                            Http::RequestHeaderMap& headers,
                                            const Http::AsyncClient::RequestOptions& options);
+  Http::AsyncClient::OngoingRequest*
+  discover(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
+           const Http::AsyncClient::RequestOptions& options,
+           const ShadowPolicyStatsSharedPtr& stats,
+           const Upstream::OdCdsContextSharedPtr& discovery_context, bool end_stream);
   Upstream::ClusterManager& cm_;
 };
 
@@ -63,9 +62,13 @@ public:
    * Records a failure, unless an outcome was already recorded.
    */
   void recordFailure();
+  void onDiscoveryStart();
+  void onDiscoveryComplete(Http::OnDemandAsyncClient::DiscoveryResult result,
+                           std::chrono::milliseconds elapsed);
 
 private:
   const ShadowPolicyStatsSharedPtr stats_;
+  bool http_started_{true};
   bool outcome_recorded_{};
 };
 

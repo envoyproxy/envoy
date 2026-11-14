@@ -68,10 +68,12 @@ public:
 
   // Http::AsyncClient
   Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
-                const AsyncClient::RequestOptions& options) override;
+                const AsyncClient::RequestOptions& options,
+                Tracing::SpanPtr span = nullptr) override;
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
   OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
-                               const AsyncClient::RequestOptions& options) override;
+                               const AsyncClient::RequestOptions& options,
+                               Tracing::SpanPtr span = nullptr) override;
   Server::Configuration::CommonFactoryContext& factory_context_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -352,8 +354,12 @@ public:
   }
 
 protected:
+  // Cluster discovery may outlive the downstream parent span. Accept ownership of a span
+  // created before discovery so the HTTP request can continue and finalize that same span.
   AsyncRequestSharedImpl(AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                         const AsyncClient::RequestOptions& options, absl::Status& creation_status);
+                         const AsyncClient::RequestOptions& options, absl::Status& creation_status,
+                         Tracing::SpanPtr span);
+  void onCreationFailure();
   void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) final;
   void onData(Buffer::Instance& data, bool end_stream) final;
   void onTrailers(ResponseTrailerMapPtr&& trailers) final;
@@ -374,11 +380,13 @@ class AsyncOngoingRequestImpl final : public AsyncClient::OngoingRequest,
 public:
   static AsyncOngoingRequestImpl* create(RequestHeaderMapPtr&& request_headers,
                                          AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                                         const AsyncClient::RequestOptions& options) {
+                                         const AsyncClient::RequestOptions& options,
+                                         Tracing::SpanPtr span) {
     absl::Status creation_status = absl::OkStatus();
     auto* ret = new AsyncOngoingRequestImpl(std::move(request_headers), parent, callbacks, options,
-                                            creation_status);
+                                            creation_status, std::move(span));
     if (!creation_status.ok()) {
+      ret->onCreationFailure();
       delete ret;
       return nullptr;
     }
@@ -392,8 +400,9 @@ public:
 private:
   AsyncOngoingRequestImpl(RequestHeaderMapPtr&& request_headers, AsyncClientImpl& parent,
                           AsyncClient::Callbacks& callbacks,
-                          const AsyncClient::RequestOptions& options, absl::Status& creation_status)
-      : AsyncRequestSharedImpl(parent, callbacks, options, creation_status),
+                          const AsyncClient::RequestOptions& options, absl::Status& creation_status,
+                          Tracing::SpanPtr span)
+      : AsyncRequestSharedImpl(parent, callbacks, options, creation_status, std::move(span)),
         request_headers_(std::move(request_headers)) {
     ASSERT(request_headers_);
   }
@@ -409,11 +418,13 @@ class AsyncRequestImpl final : public AsyncRequestSharedImpl {
 public:
   static AsyncRequestImpl* create(RequestMessagePtr&& request, AsyncClientImpl& parent,
                                   AsyncClient::Callbacks& callbacks,
-                                  const AsyncClient::RequestOptions& options) {
+                                  const AsyncClient::RequestOptions& options,
+                                  Tracing::SpanPtr span) {
     absl::Status creation_status = absl::OkStatus();
-    auto* ret =
-        new AsyncRequestImpl(std::move(request), parent, callbacks, options, creation_status);
+    auto* ret = new AsyncRequestImpl(std::move(request), parent, callbacks, options,
+                                     creation_status, std::move(span));
     if (!creation_status.ok()) {
+      ret->onCreationFailure();
       delete ret;
       return nullptr;
     }
@@ -423,8 +434,8 @@ public:
 private:
   AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
                    AsyncClient::Callbacks& callbacks, const AsyncClient::RequestOptions& options,
-                   absl::Status& creation_status)
-      : AsyncRequestSharedImpl(parent, callbacks, options, creation_status),
+                   absl::Status& creation_status, Tracing::SpanPtr span)
+      : AsyncRequestSharedImpl(parent, callbacks, options, creation_status, std::move(span)),
         request_(std::move(request)) {}
 
   void initialize();

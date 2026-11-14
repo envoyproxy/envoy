@@ -465,6 +465,7 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:od_cds_context_lib",
         "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
@@ -542,11 +543,14 @@ envoy_cc_library(
     deps = [
         "//envoy/router:router_interface",
         "//envoy/router:shadow_writer_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:on_demand_async_client_lib",
         "//source/common/http:utility_lib",
     ],
 )
