@@ -2974,6 +2974,49 @@ TEST_P(TcpProxyIntegrationTest, NoDataDoesNotTriggerConnection) {
   tcp_client->close();
 }
 
+// Verifies that a client which half-closes without sending any data is closed at once in
+// ON_DOWNSTREAM_DATA mode, without an upstream connection, and that the close reason is logged.
+TEST_P(TcpProxyIntegrationTest, OnDownstreamDataEmptyFinClosesWithoutUpstream) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+    tcp_proxy_config.mutable_max_early_data_bytes()->set_value(8192);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%DOWNSTREAM_LOCAL_CLOSE_REASON%");
+    std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  // Half-close the downstream without sending any data.
+  ASSERT_TRUE(tcp_client->write("", /*end_stream=*/true));
+  // Envoy closes the downstream connection instead of leaving it open until idle_timeout.
+  tcp_client->waitForDisconnect();
+
+  // No upstream connection is made for a connection that never sent data.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(1000)));
+
+  EXPECT_EQ(waitForAccessLog(access_log_path), "tcp_proxy_downstream_closed_without_data");
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_closed_without_data", Eq(1));
+}
+
 // Test edge case where max_buffered_bytes=0 with ON_DOWNSTREAM_DATA mode.
 TEST_P(TcpProxyIntegrationTest, ZeroBufferWithOnDownstreamData) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

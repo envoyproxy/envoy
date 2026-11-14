@@ -69,6 +69,8 @@ and how early data is buffered.
 * ``ON_DOWNSTREAM_DATA``: Wait for initial data from the downstream connection before establishing the upstream
   connection. This allows preceding filters to inspect the initial data before the upstream connection is established.
   This mode **requires** ``max_early_data_bytes`` to be set.
+  If the downstream half-closes without sending any data, the connection is closed immediately, without connecting upstream.
+  The close reason is ``tcp_proxy_downstream_closed_without_data``, and the connection is counted in ``downstream_cx_closed_without_data``.
 * ``ON_DOWNSTREAM_TLS_HANDSHAKE``: Wait for the downstream TLS handshake to complete before establishing the upstream
   connection. This allows access to the full TLS connection information, including client certificates and negotiated
   parameters. This mode is only effective when the downstream connection uses TLS. For non-TLS connections, it behaves
@@ -228,6 +230,7 @@ The downstream statistics are rooted at *tcp.<stat_prefix>.* with the following 
   downstream_cx_total, Counter, Total number of connections handled by the filter
   downstream_cx_no_route, Counter, Number of connections for which no matching route was found or the cluster for the route was not found
   downstream_cx_drain_close, Counter, Total number of connections closed due to drain close
+  downstream_cx_closed_without_data, Counter, "Total number of connections closed because the downstream half-closed without sending any data in ``ON_DOWNSTREAM_DATA`` mode before any upstream connection was attempted"
   downstream_cx_overload_close, Counter, Total number of connections closed due to overload manager load shedding
   downstream_cx_tx_bytes_total, Counter, Total bytes written to the downstream connection
   downstream_cx_tx_bytes_buffered, Gauge, Total bytes currently buffered to the downstream connection
