@@ -270,6 +270,8 @@ EXTENSIONS = {
     "envoy.filters.network.ext_proc":                             "//source/extensions/filters/network/ext_proc:config",
     "envoy.filters.network.reverse_tunnel":                       "//source/extensions/filters/network/reverse_tunnel:config",
     "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager": "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
+    "envoy.reverse_tunnel.initiator_handshake.http1":             "//source/extensions/bootstrap/reverse_tunnel/http1:http1_handshake_lib",
+    "envoy.reverse_tunnel.responder_handshake.http1":             "//source/extensions/bootstrap/reverse_tunnel/http1:http1_handshake_responder_lib",
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",

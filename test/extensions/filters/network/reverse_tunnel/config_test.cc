@@ -1,12 +1,18 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
+#include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/core/v3/protocol.pb.validate.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/reverse_tunnel/config.h"
 #include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -308,6 +314,26 @@ validation:
   ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse node_id_format")));
 }
 
+TEST_F(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithInvalidClusterIdFormatter) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "valid-node"
+  cluster_id_format: "%INVALID_FORMATTER_COMMAND()%"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse cluster_id_format")));
+}
+
 TEST_F(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyNodeIdValidation) {
   ReverseTunnelFilterConfigFactory factory;
 
@@ -474,6 +500,162 @@ TEST_F(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitAcceptedWhenCapIsGre
   Network::MockFilterManager filter_manager;
   EXPECT_CALL(filter_manager, addReadFilter(_));
   cb(filter_manager);
+}
+
+namespace {
+
+using ReverseTunnelProto = envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ResponderHandshake;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ResponderHandshakeCallbacks;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ResponderHandshakeConfigurator;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorFactory;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorSharedPtr;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ResponderHandshakePtr;
+
+// Minimal responder handshake used by the test factory below.
+class TestResponderHandshake : public ResponderHandshake {
+  Network::FilterStatus onData(Buffer::Instance&) override {
+    return Network::FilterStatus::StopIteration;
+  }
+};
+
+class TestResponderHandshakeConfigurator : public ResponderHandshakeConfigurator {
+public:
+  ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks&) const override {
+    return std::make_unique<TestResponderHandshake>();
+  }
+};
+
+// Test factory registered under a distinct name so custom_handshake selection can be observed.
+// Its typed config type is distinct from the in-tree factories' types, which the factory registry
+// requires within a category.
+class TestResponderHandshakeConfiguratorFactory : public ResponderHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::core::v3::KeepaliveSettings>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.responder_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.responder_handshake.test"; }
+
+  absl::StatusOr<ResponderHandshakeConfiguratorSharedPtr>
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext&) override {
+    MessageUtil::downcastAndValidate<const envoy::config::core::v3::KeepaliveSettings&>(
+        config, ProtobufMessage::getStrictValidationVisitor());
+    return configurator_;
+  }
+
+  std::shared_ptr<TestResponderHandshakeConfigurator> configurator_{
+      std::make_shared<TestResponderHandshakeConfigurator>()};
+};
+
+} // namespace
+
+// A config with only the top-level framing fields leaves the handshake oneof unset and keeps the
+// HTTP/1 framing derived from those fields.
+TEST_F(ReverseTunnelFilterConfigFactoryTest, LegacyFramingLeavesHandshakeOneofUnset) {
+  const std::string yaml_string = R"EOF(
+request_path: "/legacy"
+request_method: POST
+)EOF";
+  ReverseTunnelProto proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  EXPECT_EQ(ReverseTunnelProto::HANDSHAKE_TYPE_NOT_SET, proto_config.handshake_type_case());
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto config = ReverseTunnelFilterConfig::create(proto_config, context);
+  ASSERT_OK(config);
+  EXPECT_EQ("/legacy", config.value()->requestPath());
+  EXPECT_EQ("POST", config.value()->requestMethod());
+  EXPECT_FALSE(config.value()->useHttpUpgrade());
+}
+
+// The ``http1_handshake`` oneof arm replaces the top-level framing fields when set.
+TEST_F(ReverseTunnelFilterConfigFactoryTest, Http1HandshakeSpecSetsFraming) {
+  const std::string yaml_string = R"EOF(
+http1_handshake:
+  request_path: "/explicit"
+  request_method: PUT
+  use_http_upgrade: true
+)EOF";
+  ReverseTunnelProto proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto config = ReverseTunnelFilterConfig::create(proto_config, context);
+  ASSERT_OK(config);
+  EXPECT_EQ("/explicit", config.value()->requestPath());
+  EXPECT_EQ("PUT", config.value()->requestMethod());
+  EXPECT_TRUE(config.value()->useHttpUpgrade());
+}
+
+TEST_F(ReverseTunnelFilterConfigFactoryTest, Http1HandshakeWithLegacyFramingFieldsRejected) {
+  ReverseTunnelProto proto_config;
+  proto_config.set_request_path("/legacy");
+  proto_config.mutable_http1_handshake()->set_request_path("/explicit");
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = ReverseTunnelFilterConfig::create(proto_config, context);
+  ASSERT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("http1_handshake cannot be set together with")));
+}
+
+TEST_F(ReverseTunnelFilterConfigFactoryTest, CustomHandshakeWithLegacyFramingFieldsRejected) {
+  ReverseTunnelProto proto_config;
+  proto_config.set_request_path("/legacy");
+  proto_config.mutable_custom_handshake()->set_name(
+      "envoy.reverse_tunnel.responder_handshake.test");
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = ReverseTunnelFilterConfig::create(proto_config, context);
+  ASSERT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("custom_handshake cannot be set together with")));
+}
+
+// A custom_handshake extension selects its factory by name and the factory's configurator is
+// installed on the filter config.
+TEST_F(ReverseTunnelFilterConfigFactoryTest, CustomHandshakeSelectsFactory) {
+  TestResponderHandshakeConfiguratorFactory test_factory;
+  Registry::InjectFactory<ResponderHandshakeConfiguratorFactory> injection(test_factory);
+
+  ReverseTunnelProto proto_config;
+  auto* custom = proto_config.mutable_custom_handshake();
+  custom->set_name("envoy.reverse_tunnel.responder_handshake.test");
+  envoy::config::core::v3::KeepaliveSettings keepalive;
+  keepalive.mutable_timeout()->set_seconds(1);
+  std::ignore = custom->mutable_typed_config()->PackFrom(keepalive);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto config = ReverseTunnelFilterConfig::create(proto_config, context);
+  ASSERT_OK(config);
+  EXPECT_EQ(test_factory.configurator_, config.value()->handshakeConfigurator());
+}
+
+// The built-in HTTP/1 handshake selected through custom_handshake does not accept framing fields
+// in its typed config; explicit framing goes through http1_handshake.
+TEST_F(ReverseTunnelFilterConfigFactoryTest, CustomHandshakeHttp1TypedConfigFieldsRejected) {
+  ReverseTunnelProto proto_config;
+  auto* custom = proto_config.mutable_custom_handshake();
+  custom->set_name("envoy.reverse_tunnel.responder_handshake.http1");
+  envoy::extensions::filters::network::reverse_tunnel::v3::Http1HandshakeConfig http1_config;
+  http1_config.set_request_path("/explicit");
+  std::ignore = custom->mutable_typed_config()->PackFrom(http1_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = ReverseTunnelFilterConfig::create(proto_config, context);
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("does not support request_path")));
+}
+
+TEST_F(ReverseTunnelFilterConfigFactoryTest, CustomHandshakeUnknownFactoryNameRejected) {
+  ReverseTunnelProto proto_config;
+  proto_config.mutable_custom_handshake()->set_name(
+      "envoy.reverse_tunnel.responder_handshake.unknown");
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(std::ignore = ReverseTunnelFilterConfig::create(proto_config, context),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: "
+                            "'envoy.reverse_tunnel.responder_handshake.unknown'");
 }
 
 } // namespace
