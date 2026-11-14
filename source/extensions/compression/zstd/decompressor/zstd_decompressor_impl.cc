@@ -2,6 +2,8 @@
 
 #include <limits>
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
@@ -19,7 +21,7 @@ ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::strin
 void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
   const uint64_t input_size = input_buffer.length();
-  if (input_size == 0) {
+  if (input_size == 0 || stopped_on_ratio_limit_) {
     return;
   }
   constexpr uint64_t max_output = std::numeric_limits<uint64_t>::max();
@@ -66,7 +68,13 @@ bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t& re
       stats_.zstd_generic_error_.inc();
       ENVOY_LOG(trace, "excessive decompression ratio detected: {} bytes for {} bytes remaining",
                 output_.pos, remaining_output);
-      output_.pos = 0;
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.zstd_decompressor_stop_on_ratio_limit")) {
+        // Once a step is discarded, later output would leave a gap in the body.
+        stopped_on_ratio_limit_ = true;
+      } else {
+        getOutput(output_buffer);
+      }
       return false;
     }
     remaining_output -= output_.pos;

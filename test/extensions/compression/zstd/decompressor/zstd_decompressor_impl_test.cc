@@ -4,6 +4,7 @@
 #include "source/extensions/compression/zstd/decompressor/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -226,6 +227,47 @@ TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatio) {
   ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
   decompressor.decompress(buffer, output_buffer);
   ASSERT_EQ(stats_store.counterFromString("test.zstd_generic_error").value(), 1);
+}
+
+TEST_F(ZstdDecompressorImplTest, RatioLimitFailureAcrossInputCalls) {
+  Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
+                                                  default_enable_checksum_, default_strategy_,
+                                                  default_cdict_manager_, 4096};
+  const std::string block_text(4096, 'a');
+  Buffer::OwnedImpl prefix("prefix");
+  Buffer::OwnedImpl block(block_text);
+  Buffer::OwnedImpl suffix("suffix");
+  compressor.compress(prefix, Envoy::Compression::Compressor::State::Flush);
+  compressor.compress(block, Envoy::Compression::Compressor::State::Flush);
+  compressor.compress(suffix, Envoy::Compression::Compressor::State::Finish);
+  ASSERT_GT(block_text.size(), 100 * block.length());
+
+  auto decode = [](ZstdDecompressorImpl& decompressor, const Buffer::Instance& input) {
+    Buffer::OwnedImpl output;
+    decompressor.decompress(input, output);
+    return output.toString();
+  };
+
+  Stats::IsolatedStoreImpl stats_store;
+  ZstdDecompressorImpl strict{*stats_store.rootScope(), "strict.", default_ddict_manager_, 4096};
+  ASSERT_EQ("prefix", decode(strict, prefix));
+  EXPECT_EQ("", decode(strict, block));
+  EXPECT_EQ(1, stats_store.counterFromString("strict.zstd_generic_error").value());
+  EXPECT_EQ("", decode(strict, suffix));
+
+  ZstdDecompressorImpl other{*stats_store.rootScope(), "other.", default_ddict_manager_, 4096};
+  EXPECT_EQ("prefix", decode(other, prefix));
+
+  TestScopedStaticReloadableFeaturesRuntime runtime(
+      {{"zstd_decompressor_stop_on_ratio_limit", false}});
+  EXPECT_EQ("", decode(strict, suffix));
+  EXPECT_EQ(1, stats_store.counterFromString("strict.zstd_generic_error").value());
+
+  ZstdDecompressorImpl legacy{*stats_store.rootScope(), "legacy.", default_ddict_manager_, 4096};
+  ASSERT_EQ("prefix", decode(legacy, prefix));
+  EXPECT_EQ(block_text, decode(legacy, block));
+  EXPECT_EQ("suffix", decode(legacy, suffix));
+  EXPECT_EQ(1, stats_store.counterFromString("legacy.zstd_generic_error").value());
 }
 
 TEST_F(ZstdDecompressorImplTest, BlockAllowanceIsSharedAcrossSlicesInOneCall) {

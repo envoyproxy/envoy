@@ -66,6 +66,7 @@ private:
   const uint32_t max_inflate_ratio_;
   const uint32_t max_block_size_;
   bool is_dictionary_set_{false};
+  bool stopped_on_ratio_limit_{false};
 };
 
 } // namespace Decompressor
