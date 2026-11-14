@@ -42,7 +42,10 @@ jobs:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
         --config=rbe
-      target: release.server_only
+      target: >-
+        ${{ fromJSON(inputs.request).config.release-publish
+            && 'release.publish'
+            || 'release.server_only' }}
       target-suffix: ${{ inputs.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
@@ -54,7 +57,9 @@ jobs:
       trusted: ${{ inputs.trusted }}
       uploads: |
         release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
+        ${{ fromJSON(inputs.request).config.release-publish && format('oci.{0}: container/envoy/{0}/build_images', inputs.arch) || '' }}
 
+  # Branches whose binary jobs do not build the container images (`release-publish`).
   docker:
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
@@ -63,6 +68,7 @@ jobs:
       contents: read
       packages: read
     name: Docker OCI
+    if: ${{ !fromJSON(inputs.request).config.release-publish }}
     needs:
     - binary
     uses: ./.github/workflows/_run.yml

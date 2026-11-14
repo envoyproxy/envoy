@@ -34,7 +34,7 @@ also build as follows:
 
   $ pwd
   src/envoy
-  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only'
+  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server'
 
 For more information on building and different build targets, please refer to :repo:`ci/README.md`.
 
