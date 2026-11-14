@@ -355,6 +355,7 @@ private:
     }
 
     std::optional<Router::ConfigConstSharedPtr> routeConfig();
+    bool createFilterChainAndTraceRequest();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
