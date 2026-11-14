@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <list>
 #include <memory>
@@ -158,8 +159,9 @@ public:
 
   /**
    * @brief Run all callbacks
+   * @param coalesce if true, do not post a callback that is already scheduled.
    */
-  void runCallbacks();
+  void runCallbacks(bool coalesce = false);
 
   size_t size() const noexcept;
 
@@ -174,6 +176,7 @@ private:
     Callback cb_;
     Event::Dispatcher& callback_dispatcher_;
     std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+    std::atomic<bool> scheduled_{false};
 
     typename std::list<CallbackListEntry>::iterator it_;
   };
@@ -190,6 +193,8 @@ private:
   mutable Thread::MutexBasicLockable lock_{};
 
   std::list<CallbackListEntry> callbacks_ ABSL_GUARDED_BY(lock_);
+  // Allow callers to skip the registry lock when there are no callbacks.
+  std::atomic<size_t> size_{0};
 };
 
 } // namespace Common
