@@ -6,7 +6,7 @@ load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":changes.bzl", "envoy_signed_changes")
-load(":packages.bzl", "envoy_pkg_distros", "release_version_for")
+load(":packages.bzl", "MAINTAINER", "envoy_pkg_distros", "release_version_for")
 
 licenses(["notice"])  # Apache 2
 
@@ -20,8 +20,6 @@ licenses(["notice"])  # Apache 2
 # All other targets are ordinary, cacheable/remotable actions - no secrets.
 
 envoy_package()
-
-MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
 
 exports_files(glob([
     "custom/envoy*",
