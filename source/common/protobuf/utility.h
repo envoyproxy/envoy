@@ -441,7 +441,8 @@ public:
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string, with additional support for
-   * google.protobuf.Struct and xds.type.v3.TypedStruct which are serialized to JSON.
+   * google.protobuf.Struct, xds.type.v3.TypedStruct and udpa.type.v1.TypedStruct, which are
+   * serialized to JSON.
    * @param any source google.protobuf.Any message.
    *
    * @return std::string consists of bytes (StringValue/BytesValue), JSON (Struct/TypedStruct), or

@@ -957,6 +957,16 @@ ProcessingResult DecodingProcessorState::startLocalResponse(
     return ProcessingResult{.status = mut_status, .processing_complete = true};
   }
 
+  // The :status pseudo-header is mandatory in HTTP response headers. protoToHeaders() validates
+  // the value of :status when the server supplies one, but does not require its presence.
+  if (local_response_headers->Status() == nullptr) {
+    filter_.stats().rejected_header_mutations_.inc();
+    const auto status =
+        absl::InvalidArgumentError("streamed immediate response headers missing status");
+    filter_.onProcessStreamingImmediateResponse(response, status);
+    return ProcessingResult{.status = status, .processing_complete = true};
+  }
+
   local_response_started_ = true;
   onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp());
   filter_.onProcessStreamingImmediateResponse(response, absl::OkStatus());

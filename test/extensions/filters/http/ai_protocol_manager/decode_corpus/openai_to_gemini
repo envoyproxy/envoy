@@ -1,0 +1,7 @@
+path: "/v1/chat/completions"
+body: "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"system\",\"content\":\"Return structured output.\"},{\"role\":\"user\",\"content\":\"Compute 12 + 30.\"},{\"role\":\"assistant\",\"content\":\"Calling add tool.\"},{\"role\":\"tool\",\"content\":\"{\\\"sum\\\":42}\"}],\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"add\"}},\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"math_reply\",\"schema\":{\"type\":\"object\",\"properties\":{\"answer\":{\"type\":\"integer\"}}}}},\"max_completion_tokens\":256,\"temperature\":0.3,\"top_p\":0.95,\"seed\":7,\"stop\":[\"STOP_NOW\"]}"
+fragmentation_seed: 1311768467463790321
+request_protocol: OPENAI_CHAT_COMPLETIONS
+response_protocol: GEMINI_GENERATE_CONTENT
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

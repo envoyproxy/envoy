@@ -65,18 +65,9 @@ void UpstreamRoleBasedAccessControlFilter::onHostSelected(
 
   ENVOY_LOG(debug, "checking upstream host {} for request", address->asString());
 
-  // Reuse the downstream RBAC filter's shadow + enforced evaluation. evaluateEnforcedEngine() sends
-  // the 403 local reply on denial (aborting the upstream connection) and returns StopIteration.
-  Protobuf::Struct metrics;
-  const bool shadow_engine_evaluated = evaluateShadowEngine(*request_headers, metrics);
-  const Http::FilterHeadersStatus status = evaluateEnforcedEngine(*request_headers, metrics);
-  const bool enforced_engine_evaluated =
-      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced) != nullptr;
-
-  if (shadow_engine_evaluated || enforced_engine_evaluated) {
-    callbacks_->streamInfo().setDynamicMetadata(std::string(DynamicMetadataKey), metrics);
-  }
-
+  // Reuse the downstream RBAC filter's shadow + enforced evaluation. evaluateEngines() sends the
+  // 403 local reply on denial (aborting the upstream connection) and returns StopIteration.
+  const Http::FilterHeadersStatus status = evaluateEngines(*request_headers, DynamicMetadataKey);
   if (status != Http::FilterHeadersStatus::StopIteration) {
     ENVOY_LOG(debug, "allowed by default or by policy");
   }

@@ -1384,6 +1384,41 @@ TEST_F(StreamingLocalReplyTest, ProcessLocalTrailersInvalid) {
   stream_callbacks_->onReceiveMessage(std::move(response2));
 }
 
+// A streamed immediate response whose headers omit the mandatory `:status` pseudo-header is
+// rejected before the header map reaches encodeHeaders(), and the filter surfaces the configured
+// status_on_error to the client instead.
+TEST_F(StreamingLocalReplyTest, LocalResponseHeadersMissingStatus) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  // The malformed local response headers must not be encoded.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
+                             "streamed_immediate_response_headers_missing_status"));
+  processRequestHeadersAndStartLocalResponse(
+      [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
+        auto* header = header_resp.mutable_headers()->add_headers();
+        header->set_key("x-some-other-header");
+        header->set_raw_value("no");
+        header_resp.set_end_of_stream(true);
+      });
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().rejected_header_mutations_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
