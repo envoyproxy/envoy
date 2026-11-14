@@ -1729,7 +1729,7 @@ TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
   }
 }
 
-TEST_P(FilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
+TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
   // Encoding order: add-trailers-filter, wait-for-whole-request-and-response-filter.
   prependFilter(R"EOF(
   name: add-trailers-filter

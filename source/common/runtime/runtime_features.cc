@@ -94,9 +94,10 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strat
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not
 // lost. See https://github.com/envoyproxy/envoy/issues/46841
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
-// Forward trailers added by a filter (or parked at a filter that stopped all iteration) from the
-// filter holding them, exactly once and only once that filter iterates, instead of dispatching them
-// from the adding filter at the end of the data pass.
+// Forward trailers from the filter holding them (the filter that added them, or a filter that
+// stopped all iteration when they arrived) exactly once, once that filter iterates, so they reach
+// every later filter, instead of dispatching them from the adding filter at the end of the data
+// pass.
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
