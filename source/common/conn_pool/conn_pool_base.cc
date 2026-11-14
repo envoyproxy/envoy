@@ -108,6 +108,28 @@ PendingStreamPtr ConnPoolImplBase::removePendingStream(PendingStream& stream) {
   return pending_stream;
 }
 
+bool ConnPoolImplBase::maybeDropPendingStream() {
+  PendingStream* stream =
+      pending_stream_queue_->peekToDrop(dispatcher_.timeSource().monotonicTime());
+  if (stream == nullptr) {
+    updateQueueOverloadedGauge();
+    return false;
+  }
+
+  PendingStreamPtr pending_stream = removePendingStream(*stream);
+  cluster_connectivity_state_.decrPendingStreams(1);
+  updateQueueOverloadedGauge();
+  dropPendingStream(std::move(pending_stream));
+  return true;
+}
+
+void ConnPoolImplBase::dropPendingStream(PendingStreamPtr pending_stream) {
+  ENVOY_LOG(debug, "dropping pending stream due to CoDel overload");
+  host_->cluster().trafficStats()->upstream_rq_pending_dropped_codel_.inc();
+  onPoolFailure(nullptr, "pending request dropped by CoDel",
+                ConnectionPool::PoolFailureReason::Overflow, pending_stream->context());
+}
+
 void ConnPoolImplBase::updateQueueOverloadedGauge() {
   const bool queue_overloaded = pending_stream_queue_->isOverloaded();
   if (queue_overloaded == queue_overloaded_) {
@@ -474,7 +496,12 @@ void ConnPoolImplBase::scheduleOnUpstreamReady() {
 
 void ConnPoolImplBase::onUpstreamReady() {
   while (hasPendingStreams() && !ready_clients_.empty()) {
+    if (maybeDropPendingStream()) {
+      continue;
+    }
+
     ActiveClientPtr& client = ready_clients_.front();
+    PendingStream& stream = pending_stream_queue_->peek();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
       PendingStreamPtr pending_stream = popPendingStream();
@@ -482,7 +509,6 @@ void ConnPoolImplBase::onUpstreamReady() {
       updateQueueOverloadedGauge();
       attachStreamToClient(*client, pending_stream->context());
     } else {
-      PendingStream& stream = pending_stream_queue_->peek();
       attachStreamToClient(*client, stream.context());
       cluster_connectivity_state_.decrPendingStreams(1);
       removePendingStream(stream);
@@ -877,28 +903,41 @@ void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
 
 void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
   ASSERT(!client.hasHandshakeCompleted() && client.readyForStream());
-  // Note that this is an O(n) search, but the expected queue size should be small. If this becomes
-  // a problem, we could split the pending stream queue into 2 queues.
-  pending_stream_queue_->forEach([this, &client](PendingStream& stream) -> bool {
-    if (client.currentUnusedCapacity() <= 0) {
-      return false;
-    }
-    if (stream.can_send_early_data_) {
-      ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
-        PendingStreamPtr pending_stream = removePendingStream(stream);
-        cluster_connectivity_state_.decrPendingStreams(1);
-        updateQueueOverloadedGauge();
-        attachStreamToClient(client, pending_stream->context());
-      } else {
-        attachStreamToClient(client, stream.context());
-        cluster_connectivity_state_.decrPendingStreams(1);
-        removePendingStream(stream);
-        updateQueueOverloadedGauge();
+  while (hasPendingStreams() && client.readyForStream() && client.currentUnusedCapacity() > 0) {
+    // Find the next eligible stream without mutating the queue during traversal. Repeating this
+    // scan can be O(n^2) with mixed eligibility, but the expected queue size should be small. If
+    // this becomes a problem, we could split the pending stream queue into 2 queues.
+    PendingStream* stream = nullptr;
+    pending_stream_queue_->forEach([&stream](PendingStream& candidate) -> bool {
+      if (!candidate.can_send_early_data_) {
+        return true;
       }
+      stream = &candidate;
+      return false;
+    });
+    if (stream == nullptr) {
+      break;
     }
-    return true;
-  });
+
+    // Only check for drops when a request can use the available capacity. A drop callback may
+    // cancel the selected stream, so restart selection after shedding.
+    if (maybeDropPendingStream()) {
+      continue;
+    }
+
+    ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
+      PendingStreamPtr pending_stream = removePendingStream(*stream);
+      cluster_connectivity_state_.decrPendingStreams(1);
+      updateQueueOverloadedGauge();
+      attachStreamToClient(client, pending_stream->context());
+    } else {
+      attachStreamToClient(client, stream->context());
+      cluster_connectivity_state_.decrPendingStreams(1);
+      removePendingStream(*stream);
+      updateQueueOverloadedGauge();
+    }
+  }
 }
 
 namespace {

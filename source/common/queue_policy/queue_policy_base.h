@@ -42,6 +42,12 @@ public:
   // ownership of the returned item.
   virtual ItemType& pop() PURE;
 
+  // Returns an item to drop before dispatch, or nullptr if no drop is needed. The queue must be
+  // nonempty. The item remains queued until the caller removes it with remove(). It need not be
+  // the item selected by peek().
+  // The caller repeats this check after each drop. Not called during cancellation or purging.
+  virtual ItemType* peekToDrop(MonotonicTime) { return nullptr; }
+
   // Removes a specific item from the queue without destroying it.
   virtual void remove(ItemType& item) PURE;
 
