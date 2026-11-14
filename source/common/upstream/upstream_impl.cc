@@ -627,9 +627,8 @@ HostDescriptionImplBase::HostDescriptionImplBase(
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
-      endpoint_metadata_(endpoint_metadata),
-      endpoint_metadata_hash_(endpoint_metadata ? MessageUtil::hash(*endpoint_metadata) : 0),
-      locality_metadata_(locality_metadata), locality_(std::move(locality)),
+      endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
+      locality_(std::move(locality)),
       locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
       // TODO(wbpcode): This should be resolved.
@@ -2676,8 +2675,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       hosts_changed |= updateEdsHealthFlag(*host, *existing_host);
 
-      // Did metadata change? Compare cached hashes for O(1) comparison.
-      const bool metadata_changed = host->metadataHash() != existing_host->metadataHash();
+      // Did metadata change? Hosts with equal metadata usually share one pooled object. Objects
+      // that differ can still hold equal metadata, so their hashes decide.
+      const bool metadata_changed = host->metadata() != existing_host->metadata() &&
+                                    host->metadataHash() != existing_host->metadataHash();
 
       if (metadata_changed) {
         // First, update the entire metadata for the endpoint.

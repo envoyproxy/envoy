@@ -10,6 +10,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/config/metadata.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
 #include "source/common/singleton/manager_impl.h"
@@ -114,8 +115,24 @@ public:
   // Set up an EDS config with multiple priorities, localities, weights and make sure
   // they are loaded as expected.
   void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, size_t num_hosts,
-                                         bool healthy) {
+                                         bool healthy, absl::string_view metadata_version = "") {
     state_.PauseTiming();
+
+    // Every endpoint gets the same metadata, as the endpoints of one workload do.
+    envoy::config::core::v3::Metadata metadata;
+    if (!metadata_version.empty()) {
+      Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "version")
+          .set_string_value(std::string(metadata_version));
+      Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "canary").set_bool_value(false);
+      Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "zone")
+          .set_string_value("us-east-1a");
+      Config::Metadata::mutableMetadataValue(metadata, "istio", "workload")
+          .set_string_value("reviews-v1");
+      Config::Metadata::mutableMetadataValue(metadata, "istio", "namespace")
+          .set_string_value("bookinfo");
+      Config::Metadata::mutableMetadataValue(metadata, "istio", "service_account")
+          .set_string_value("bookinfo-reviews");
+    }
 
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
@@ -132,6 +149,9 @@ public:
     uint32_t port = 1000;
     for (size_t i = 0; i < num_hosts; ++i) {
       auto* lb_endpoint = endpoints->add_lb_endpoints();
+      if (!metadata_version.empty()) {
+        *lb_endpoint->mutable_metadata() = metadata;
+      }
       if (healthy) {
         lb_endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
       } else {
@@ -227,6 +247,40 @@ static void duplicateUpdate(State& state) {
 }
 
 BENCHMARK(duplicateUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);
+
+static void duplicateUpdateWithEndpointMetadata(State& state) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Envoy::Logger::Context logging_state(spdlog::level::warn,
+                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
+
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3");
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3");
+  }
+}
+
+BENCHMARK(duplicateUpdateWithEndpointMetadata)
+    ->Ranges({{1, 100000}, {false, true}})
+    ->Unit(benchmark::kMillisecond);
+
+static void metadataOnlyUpdate(State& state) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Envoy::Logger::Context logging_state(spdlog::level::warn,
+                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
+
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3");
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.4");
+  }
+}
+
+BENCHMARK(metadataOnlyUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;

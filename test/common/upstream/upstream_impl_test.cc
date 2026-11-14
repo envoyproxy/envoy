@@ -2002,6 +2002,25 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ(1, host->priority());
 }
 
+TEST_F(HostImplTest, MetadataHashFollowsMetadataUpdates) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, "custom_namespace", "key")
+      .set_string_value("value");
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", metadata);
+  EXPECT_EQ(MessageUtil::hash(metadata), host->metadataHash());
+  // The second call returns the cached hash.
+  EXPECT_EQ(MessageUtil::hash(metadata), host->metadataHash());
+
+  Config::Metadata::mutableMetadataValue(metadata, "custom_namespace", "key")
+      .set_string_value("new_value");
+  host->metadata(std::make_shared<const envoy::config::core::v3::Metadata>(metadata));
+  EXPECT_EQ(MessageUtil::hash(metadata), host->metadataHash());
+
+  host->metadata(nullptr);
+  EXPECT_EQ(0, host->metadataHash());
+}
+
 TEST_F(HostImplTest, EmptyLocalityZoneStatName) {
   MockClusterMockPrioritySet cluster;
   std::unique_ptr<HostImpl> host = *HostImpl::create(

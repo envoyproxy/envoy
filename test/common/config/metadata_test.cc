@@ -4,7 +4,9 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/singleton/manager_impl.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -241,6 +243,26 @@ TEST(MetadataTest, MetadataLabelMatch) {
     labels.push_back({"key1", ValueUtil::stringValue("val1")});
     EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, "non_existent", false));
   }
+}
+
+TEST(MetadataTest, ConstMetadataSharedPoolSharesMetadataWithEqualBytes) {
+  Singleton::ManagerImpl singleton_manager;
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  ConstMetadataSharedPoolSharedPtr pool =
+      Metadata::getConstMetadataSharedPool(singleton_manager, dispatcher);
+
+  envoy::config::core::v3::Metadata metadata;
+  Metadata::mutableMetadataValue(metadata, "namespace", "a").set_string_value("1");
+  Metadata::mutableMetadataValue(metadata, "namespace", "b").set_string_value("2");
+  envoy::config::core::v3::Metadata reordered_metadata;
+  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "b").set_string_value("2");
+  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "a").set_string_value("1");
+  const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
+      pool->getObject(metadata);
+  EXPECT_EQ(shared_metadata, pool->getObject(reordered_metadata));
+
+  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "a").set_string_value("3");
+  EXPECT_NE(shared_metadata, pool->getObject(reordered_metadata));
 }
 
 class TypedMetadataTest : public testing::Test {
