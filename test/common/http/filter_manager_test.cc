@@ -2205,6 +2205,25 @@ TEST_F(FilterManagerTrailersTest, RequestTrailersNotForwardedAfterTooLargeReplyE
   EXPECT_EQ(0, records_[2].decoded_trailers);
 }
 
+TEST_F(FilterManagerTrailersTest,
+       RequestTrailersAddedByFilterContinuingOnDataAreDecodedTwiceWithoutGuard) {
+  initializeChain(false);
+  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[1].decoded_data);
+  // Sent once by the resumed filter 0 and again from filter 0 after the data loop.
+  EXPECT_EQ(2, records_[1].decoded_trailers);
+  EXPECT_EQ(2, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
