@@ -186,7 +186,7 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  // Parses unconfigured routes too, so a test can show the chain is not run there.
+  // Parses unconfigured routes too, so a test can show the chain runs there.
   void createFilterWithAiFilters(
       AiFilterFactories ai_filter_factories,
       envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
@@ -1711,11 +1711,11 @@ TEST_F(AiProtocolManagerFilterStateTest, FilterStateDoesNotDeclareARequestThatCa
   }
 }
 
-TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
+// A dynamic forward proxy's catch-all route declares no API, but its parsed payload still runs the
+// AI filters.
+TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRoute) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
-  int built = 0;
   createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
-    ++built;
     return std::make_unique<ContextRecordingAiFilter>(context, seen);
   }});
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1725,9 +1725,31 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen[0].request_binding, nullptr);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnparsedPayloadOnUnconfiguredRouteRunsNoAiFilters) {
+  int built = 0;
+  createFilterWithAiFilters({[&](const AiFilterContext&) -> AiFilterSharedPtr {
+    ++built;
+    return std::make_shared<PassThroughAiFilter>();
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = R"({"model":)";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(built, 0);
-  EXPECT_TRUE(seen.empty());
-  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "gpt-4");
+  EXPECT_EQ(counterValue("request_passthrough"), 1);
+  EXPECT_EQ(injected_.toString(), payload);
   EXPECT_TRUE(injected_end_stream_);
 }
 

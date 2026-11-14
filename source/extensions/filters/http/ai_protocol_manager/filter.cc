@@ -418,6 +418,7 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (end_stream) {
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
+    request_parsed_ = true;
     config_->stats().request_parsed_.inc();
   }
   return true;
@@ -514,7 +515,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     }
   };
 
-  if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
+  if (request_parsed_ && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{.stream_info = decoder_callbacks_->streamInfo(),
                                   .request_headers = *request_headers_,
