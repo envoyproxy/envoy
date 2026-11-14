@@ -266,7 +266,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
   EXPECT_FALSE(typed_config.disabled());
   EXPECT_TRUE(typed_config.grpcService().has_value());
 
-  const auto& grpc_service = typed_config.grpcService().value();
+  const auto& grpc_service = typed_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
 
@@ -427,7 +427,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitchingHttpToGrpc) {
   EXPECT_TRUE(merged_config.grpcService().has_value());
   EXPECT_FALSE(merged_config.httpService().has_value());
 
-  const auto& grpc_service = merged_config.grpcService().value();
+  const auto& grpc_service = merged_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_grpc_cluster");
   EXPECT_EQ(grpc_service.envoy_grpc().authority(), "ext-authz.example.com");
@@ -498,7 +498,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceWithTimeout) {
   EXPECT_TRUE(typed_config.grpcService().has_value());
   EXPECT_FALSE(typed_config.httpService().has_value());
 
-  const auto& grpc_service = typed_config.grpcService().value();
+  const auto& grpc_service = typed_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_custom_grpc");
   EXPECT_EQ(grpc_service.envoy_grpc().authority(), "custom-ext-authz.example.com");
@@ -544,7 +544,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteEmptyContextExtensionsMerging) {
 
   // Should use gRPC service from more specific
   EXPECT_TRUE(merged_config.grpcService().has_value());
-  EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "specific_cluster");
+  EXPECT_EQ(merged_config.grpcService()->config().envoy_grpc().cluster_name(), "specific_cluster");
 
   // Should preserve context extensions from less specific since more specific has none
   const auto& context_extensions = merged_config.contextExtensions();
@@ -598,7 +598,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
 
   // Check that more specific gRPC service is used
   EXPECT_TRUE(merged_config.grpcService().has_value());
-  const auto& grpc_service = merged_config.grpcService().value();
+  const auto& grpc_service = merged_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
 
