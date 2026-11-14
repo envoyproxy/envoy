@@ -18,6 +18,7 @@ public:
   const std::string LocalField = "local";
   const std::string LocalFilterStateKey = "envoy.filters.listener.original_dst.local_ip";
   const std::string RemoteFilterStateKey = "envoy.filters.listener.original_dst.remote_ip";
+  const std::string LocalPortFilterStateKey = "envoy.filters.listener.original_dst.local_port";
 };
 
 using FilterNames = ConstSingleton<FilterNameValues>;
