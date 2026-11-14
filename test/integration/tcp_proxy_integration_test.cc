@@ -3003,8 +3003,9 @@ TEST_P(TcpProxyIntegrationTest, OnDownstreamDataEmptyFinClosesWithoutUpstream) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  // Half-close the downstream without sending any data.
-  ASSERT_TRUE(tcp_client->write("", /*end_stream=*/true));
+  // Half-close the downstream without sending any data. Envoy may close the connection before the
+  // write is verified, so do not verify it.
+  ASSERT_TRUE(tcp_client->write("", /*end_stream=*/true, /*verify=*/false));
   // Envoy closes the downstream connection instead of leaving it open until idle_timeout.
   tcp_client->waitForDisconnect();
 
