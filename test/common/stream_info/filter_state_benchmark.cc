@@ -1,4 +1,6 @@
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "envoy/stream_info/filter_state.h"
 
@@ -55,6 +57,26 @@ static void BM_FilterStateStringCycle(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FilterStateStringCycle);
+
+// As BM_FilterStateStringCycle, but with keys that have no index, so that they are stored in the
+// string-keyed map; the HCM's per-connection proxy protocol state is one such key.
+static void BM_FilterStateUnindexedCycle(benchmark::State& state) {
+  std::vector<std::string> names;
+  for (int64_t i = 0; i < state.range(0); i++) {
+    names.push_back("my_custom_key_" + std::to_string(i));
+  }
+  for (auto _ : state) {
+    FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
+    for (const auto& name : names) {
+      filter_state.setData(name, std::make_shared<SimpleType>(42),
+                           FilterState::LifeSpan::FilterChain);
+    }
+    for (const auto& name : names) {
+      benchmark::DoNotOptimize(filter_state.getDataReadOnly<SimpleType>(name));
+    }
+  }
+}
+BENCHMARK(BM_FilterStateUnindexedCycle)->Arg(1)->Arg(4);
 
 static void BM_FilterStateIndexedCycle(benchmark::State& state) {
   const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
