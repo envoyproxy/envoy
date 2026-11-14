@@ -11,6 +11,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_responder.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
@@ -506,6 +507,43 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowParseError) {
   EXPECT_EQ(1, parse_error->value());
 }
 
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowBodyRejected) {
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      });
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t", "hello"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
+  auto body_rejected =
+      TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.body_rejected");
+  ASSERT_NE(nullptr, body_rejected);
+  EXPECT_EQ(1, body_rejected->value());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowAcceptsWithoutSocketManager) {
+  clearRegisteredUpstreamExtension();
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      });
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  // Without the worker-local socket manager the tunnel cannot be registered, so the handshake
+  // is answered with 503.
+  EXPECT_THAT(written, testing::HasSubstr("503 Service Unavailable"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.registration_failed"));
+}
+
 TEST_F(ReverseTunnelFilterUnitTest, NotFoundForNonReverseTunnelPath) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -647,14 +685,16 @@ TEST_F(ReverseTunnelFilterUnitTest, PipelinedRequestsUseCodecStatsAfterFirstDisp
 }
 
 // Exercise RequestDecoder interface methods by obtaining the decoder via
-// ReverseTunnelFilter::newStream (avoids accessing the private impl type).
+// Http1HandshakeResponder::newStream (avoids accessing the private impl type).
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream) {
   // Ensure filter has callbacks initialized so decoder can access time source.
   filter_->initializeReadFilterCallbacks(callbacks_);
 
-  // Get a decoder instance via newStream.
+  // Get a decoder instance via newStream on a standalone HTTP/1 responder.
   Http::MockResponseEncoder encoder;
-  Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
+  Http::Http1::CodecStats::AtomicPtr codec_stats;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats);
+  Http::RequestDecoder& decoder = responder.newStream(encoder, false);
 
   // Provide minimal headers so processIfComplete paths are safe if triggered.
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -924,7 +964,10 @@ TEST_F(ReverseTunnelFilterUnitTest, WrongHttpMethod) {
 // Test onGoAway method coverage.
 TEST_F(ReverseTunnelFilterUnitTest, OnGoAway) {
   // onGoAway is a no-op, but we need to test it for coverage.
-  filter_->onGoAway(Http::GoAwayErrorCode::NoError);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+  Http::Http1::CodecStats::AtomicPtr codec_stats;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats);
+  responder.onGoAway(Http::GoAwayErrorCode::NoError);
   // No assertions needed as it's a no-op method.
 }
 
@@ -1073,7 +1116,9 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
       });
 
   // Obtain a decoder and call sendLocalReply with a modifier.
-  Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
+  Http::Http1::CodecStats::AtomicPtr codec_stats;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats);
+  Http::RequestDecoder& decoder = responder.newStream(encoder, false);
   decoder.sendLocalReply(
       Http::Code::Forbidden, "",
       [](Http::ResponseHeaderMap& h) { h.addCopy(Http::LowerCaseString("x-custom-mod"), "v"); },

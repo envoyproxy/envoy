@@ -11,43 +11,19 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/http1/codec_impl.h"
-#include "source/common/http/utility.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_responder.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/server/generic_factory_context.h"
 
-#include "absl/strings/match.h"
-#include "absl/strings/numbers.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
-
-namespace {
-
-class RequestDecoderHandleImpl : public Http::RequestDecoderHandle {
-public:
-  RequestDecoderHandleImpl(std::weak_ptr<bool> valid, Http::RequestDecoder& decoder)
-      : valid_(std::move(valid)), decoder_(decoder) {}
-  OptRef<Http::RequestDecoder> get() override {
-    if (valid_.expired()) {
-      return {};
-    }
-    return decoder_;
-  }
-
-private:
-  std::weak_ptr<bool> valid_;
-  Http::RequestDecoder& decoder_;
-};
-
-} // namespace
 
 // Stats helper implementation.
 ReverseTunnelFilter::ReverseTunnelStats
@@ -174,7 +150,10 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       use_http_upgrade_(proto_config.use_http_upgrade()),
       skip_rebalancing_(proto_config.skip_rebalancing()),
       enable_connection_limit_(proto_config.enable_connection_limit()),
-      jwt_validator_(std::move(jwt_validator)) {}
+      jwt_validator_(std::move(jwt_validator)),
+      handshake_configurator_(
+          std::make_shared<Bootstrap::ReverseConnection::Http1HandshakeResponderConfigurator>(
+              http1_codec_stats_)) {}
 
 ReverseTunnelFilterConfig::~ReverseTunnelFilterConfig() = default;
 
@@ -288,7 +267,9 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(
 ReverseTunnelFilter::ReverseTunnelFilter(ReverseTunnelFilterConfigSharedPtr config,
                                          Stats::Scope& stats_scope,
                                          Server::OverloadManager& overload_manager)
-    : config_(std::move(config)), stats_scope_(stats_scope), overload_manager_(overload_manager),
+    : config_(std::move(config)),
+      request_spec_{config_->requestMethod(), config_->requestPath(), config_->useHttpUpgrade()},
+      stats_scope_(stats_scope), overload_manager_(overload_manager),
       stats_(ReverseTunnelStats::generateStats("reverse_tunnel.handshake.", stats_scope_)) {}
 
 Network::FilterStatus ReverseTunnelFilter::onNewConnection() {
@@ -322,207 +303,44 @@ void ReverseTunnelFilter::disarmHandshakeTimer() {
 }
 
 Network::FilterStatus ReverseTunnelFilter::onData(Buffer::Instance& data, bool) {
-  if (!codec_) {
-    Http::Http1Settings http1_settings;
-    auto& http1_stats = config_->http1CodecStats(stats_scope_);
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        read_callbacks_->connection(), http1_stats, *this, http1_settings,
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-        envoy::config::core::v3::HttpProtocolOptions::ALLOW, overload_manager_);
-  }
-
-  const Http::Status status = codec_->dispatch(data);
-  if (!status.ok()) {
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: codec dispatch error: {}", read_callbacks_->connection(),
-                   status.message());
-    // Close connection on codec error.
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return Network::FilterStatus::StopIteration;
-  }
-  return Network::FilterStatus::StopIteration;
+  return handshake_->onData(data);
 }
 
 void ReverseTunnelFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  handshake_ = config_->handshakeConfigurator().createHandshake(*this);
 }
 
-Http::RequestDecoder& ReverseTunnelFilter::newStream(Http::ResponseEncoder& response_encoder,
-                                                     bool) {
-  active_decoder_ = std::make_unique<RequestDecoderImpl>(*this, response_encoder);
-  return *active_decoder_;
+Network::Connection& ReverseTunnelFilter::connection() { return read_callbacks_->connection(); }
+
+const Bootstrap::ReverseConnection::HandshakeRequestSpec& ReverseTunnelFilter::requestSpec() {
+  return request_spec_;
 }
 
-// Private methods.
+Stats::Scope& ReverseTunnelFilter::statsScope() { return stats_scope_; }
 
-// RequestDecoderImpl
-void ReverseTunnelFilter::RequestDecoderImpl::decodeHeaders(
-    Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
-  headers_ = std::move(headers);
-  // Reverse tunnel handshakes carry no body. Reject a declared Content-Length up front; a chunked
-  // body is caught by decodeData as its bytes arrive. `Content-Length: 0` from older initiators is
-  // accepted.
-  const absl::string_view content_length = headers_->getContentLengthValue();
-  if (!content_length.empty() && content_length != "0") {
-    rejectBody();
+Server::OverloadManager& ReverseTunnelFilter::overloadManager() { return overload_manager_; }
+
+void ReverseTunnelFilter::onFramingRejection(
+    Bootstrap::ReverseConnection::HandshakeFramingRejection rejection) {
+  switch (rejection) {
+  case Bootstrap::ReverseConnection::HandshakeFramingRejection::ParseError:
+    stats_.parse_error_.inc();
+    return;
+  case Bootstrap::ReverseConnection::HandshakeFramingRejection::BodyRejected:
+    stats_.body_rejected_.inc();
     return;
   }
-  // For an Upgrade request, the HTTP/1 server codec calls decodeHeaders with
-  // end_stream=false because it now considers the connection a tunnel awaiting
-  // more bytes. The handshake has no body, so process the headers immediately
-  // rather than waiting for an end-of-stream that never comes.
-  if (end_stream || Http::Utility::isUpgrade(*headers_)) {
-    processIfComplete(true);
-  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void ReverseTunnelFilter::RequestDecoderImpl::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (complete_) {
-    return;
-  }
-  // Reverse tunnel handshakes carry no body. Any payload byte is rejected rather than buffered.
-  if (data.length() > 0) {
-    rejectBody();
-    return;
-  }
-  if (end_stream) {
-    processIfComplete(true);
-  }
-}
+void ReverseTunnelFilter::onTerminalRejection() { disarmHandshakeTimer(); }
 
-void ReverseTunnelFilter::RequestDecoderImpl::rejectBody() {
-  if (complete_) {
-    return;
-  }
-  complete_ = true;
-  parent_.stats_.body_rejected_.inc();
-  ENVOY_CONN_LOG(debug, "reverse_tunnel: rejecting handshake request with a body",
-                 parent_.read_callbacks_->connection());
-  sendLocalReply(Http::Code::BadRequest, "Reverse tunnel handshake must not carry a body", nullptr,
-                 std::nullopt, "reverse_tunnel_body_rejected");
-  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-}
-
-void ReverseTunnelFilter::RequestDecoderImpl::decodeTrailers(Http::RequestTrailerMapPtr&&) {
-  processIfComplete(true);
-}
-
-void ReverseTunnelFilter::RequestDecoderImpl::decodeMetadata(Http::MetadataMapPtr&&) {}
-
-void ReverseTunnelFilter::RequestDecoderImpl::sendLocalReply(
-    Http::Code code, absl::string_view body,
-    const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
-    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
-  // A local reply is always a terminal rejection, so the handshake deadline no longer applies.
-  parent_.disarmHandshakeTimer();
-  auto headers = Http::ResponseHeaderMapImpl::create();
-  headers->setStatus(static_cast<uint64_t>(code));
-  headers->setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-  if (modify_headers) {
-    modify_headers(*headers);
-  }
-  const bool end_stream = body.empty();
-  encoder_.encodeHeaders(*headers, end_stream);
-  if (!end_stream) {
-    Buffer::OwnedImpl buf(body);
-    encoder_.encodeData(buf, true);
-  }
-}
-
-StreamInfo::StreamInfo& ReverseTunnelFilter::RequestDecoderImpl::streamInfo() {
-  return stream_info_;
-}
-
-AccessLog::InstanceSharedPtrVector ReverseTunnelFilter::RequestDecoderImpl::accessLogHandlers() {
-  return {};
-}
-
-Http::RequestDecoderHandlePtr ReverseTunnelFilter::RequestDecoderImpl::getRequestDecoderHandle() {
-  return std::make_unique<RequestDecoderHandleImpl>(still_alive_, *this);
-}
-
-void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream) {
-  if (!end_stream || complete_) {
-    return;
-  }
-  complete_ = true;
-
-  // Validate method/path.
-  const absl::string_view method = headers_->getMethodValue();
-  const absl::string_view path = headers_->getPathValue();
-  ENVOY_LOG(trace,
-            "ReverseTunnelFilter::RequestDecoderImpl::processIfComplete: method: {}, path: {}",
-            method, path);
-  if (!absl::EqualsIgnoreCase(method, parent_.config_->requestMethod()) ||
-      path != parent_.config_->requestPath()) {
-    sendLocalReply(Http::Code::NotFound, "Not a reverse tunnel request", nullptr, std::nullopt,
-                   "reverse_tunnel_not_found");
-    // Close the connection after sending the response.
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
-  // When upgrade negotiation is enabled, require the request to advertise the
-  // `reverse-tunnel` upgrade. The HTTP/1 server codec already validates the
-  // `Connection: Upgrade` paired token, so we only re-check the `Upgrade` value here.
-  if (parent_.config_->useHttpUpgrade()) {
-    const auto upgrade = headers_->getUpgradeValue();
-    if (!absl::EqualsIgnoreCase(upgrade, Bootstrap::ReverseConnection::ReverseConnectionUtility::
-                                             REVERSE_TUNNEL_UPGRADE_PROTOCOL)) {
-      parent_.stats_.parse_error_.inc();
-      ENVOY_CONN_LOG(debug,
-                     "reverse_tunnel: upgrade negotiation enabled but Upgrade header missing or "
-                     "unexpected (got '{}')",
-                     parent_.read_callbacks_->connection(), upgrade);
-      sendLocalReply(
-          Http::Code::UpgradeRequired, "Upgrade: reverse-tunnel required",
-          [](Http::ResponseHeaderMap& h) {
-            h.setReferenceKey(Http::Headers::get().Upgrade,
-                              Bootstrap::ReverseConnection::ReverseConnectionUtility::
-                                  REVERSE_TUNNEL_UPGRADE_PROTOCOL);
-          },
-          std::nullopt, "reverse_tunnel_upgrade_required");
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-      return;
-    }
-  }
-
-  // Extract node/cluster/tenant identifiers from HTTP headers.
-  const auto node_vals =
-      headers_->get(Extensions::Bootstrap::ReverseConnection::reverseTunnelNodeIdHeader());
-  const auto cluster_vals =
-      headers_->get(Extensions::Bootstrap::ReverseConnection::reverseTunnelClusterIdHeader());
-  const auto tenant_vals =
-      headers_->get(Extensions::Bootstrap::ReverseConnection::reverseTunnelTenantIdHeader());
-
-  if (node_vals.empty() || cluster_vals.empty() || tenant_vals.empty()) {
-    parent_.stats_.parse_error_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: missing required headers (node/cluster/tenant)",
-                   parent_.read_callbacks_->connection());
-    sendLocalReply(Http::Code::BadRequest, "Missing required reverse tunnel headers", nullptr,
-                   std::nullopt, "reverse_tunnel_missing_headers");
-    // Close the connection after sending the response.
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
-  const absl::string_view node_id = node_vals[0]->value().getStringView();
-  const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
-  const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
-
-  // Reject a present-but-empty tenant id the same way as a missing header. An empty tenant
-  // silently disables tenant scoping when the socket is registered, since
-  // maybeBuildTenantScopedIdentifier returns the bare identifier for an empty tenant, while
-  // empty node and cluster ids are already rejected at registration by
-  // UpstreamSocketManager::addConnectionSocket.
-  if (tenant_id.empty()) {
-    parent_.stats_.parse_error_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: empty tenant-id header value",
-                   parent_.read_callbacks_->connection());
-    sendLocalReply(Http::Code::BadRequest, "Empty tenant-id header value", nullptr, std::nullopt,
-                   "reverse_tunnel_empty_tenant_id");
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
+Bootstrap::ReverseConnection::HandshakePolicyResult
+ReverseTunnelFilter::evaluatePolicy(const Http::RequestHeaderMap& headers,
+                                    absl::string_view node_id, absl::string_view cluster_id,
+                                    absl::string_view tenant_id) {
+  Network::Connection& conn = read_callbacks_->connection();
 
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   bool tenant_isolation_enabled = false;
@@ -538,171 +356,104 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     };
     if (contains_delimiter(node_id) || contains_delimiter(cluster_id) ||
         contains_delimiter(tenant_id)) {
-      parent_.stats_.parse_error_.inc();
+      stats_.parse_error_.inc();
       ENVOY_CONN_LOG(debug,
                      "reverse_tunnel: identifier contains reserved delimiter '{}' while tenant "
                      "isolation is enabled",
-                     parent_.read_callbacks_->connection(), delimiter);
-      sendLocalReply(
-          Http::Code::BadRequest,
-          fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant isolation is "
-                      "enabled",
-                      delimiter),
-          nullptr, std::nullopt, "reverse_tunnel_invalid_identifier");
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-      return;
+                     conn, delimiter);
+      return {false, Http::Code::BadRequest,
+              fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant isolation "
+                          "is enabled",
+                          delimiter),
+              "reverse_tunnel_invalid_identifier"};
     }
   }
 
   // Check for upstream cluster name header and validate if required.
-  if (!parent_.config_->requiredClusterName().empty()) {
-    const auto upstream_cluster_vals = headers_->get(
-        Extensions::Bootstrap::ReverseConnection::reverseTunnelUpstreamClusterNameHeader());
+  if (!config_->requiredClusterName().empty()) {
+    const auto upstream_cluster_vals =
+        headers.get(Bootstrap::ReverseConnection::reverseTunnelUpstreamClusterNameHeader());
 
     if (upstream_cluster_vals.empty()) {
-      parent_.stats_.parse_error_.inc();
+      stats_.parse_error_.inc();
       ENVOY_CONN_LOG(
           debug, "reverse_tunnel: missing upstream cluster name header when enforcement is enabled",
-          parent_.read_callbacks_->connection());
-      sendLocalReply(Http::Code::BadRequest, "Missing upstream cluster name header", nullptr,
-                     std::nullopt, "reverse_tunnel_missing_cluster_name_header");
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-      return;
+          conn);
+      return {false, Http::Code::BadRequest, "Missing upstream cluster name header",
+              "reverse_tunnel_missing_cluster_name_header"};
     }
 
     const absl::string_view upstream_cluster_name =
         upstream_cluster_vals[0]->value().getStringView();
-    if (upstream_cluster_name != parent_.config_->requiredClusterName()) {
-      parent_.stats_.validation_failed_.inc();
+    if (upstream_cluster_name != config_->requiredClusterName()) {
+      stats_.validation_failed_.inc();
       ENVOY_CONN_LOG(debug,
                      "reverse_tunnel: upstream cluster name mismatch. Expected: '{}', Actual: '{}'",
-                     parent_.read_callbacks_->connection(), parent_.config_->requiredClusterName(),
-                     upstream_cluster_name);
-      sendLocalReply(Http::Code::BadRequest, "Cluster name mismatch", nullptr, std::nullopt,
-                     "reverse_tunnel_cluster_mismatch");
-      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-      return;
+                     conn, config_->requiredClusterName(), upstream_cluster_name);
+      return {false, Http::Code::BadRequest, "Cluster name mismatch",
+              "reverse_tunnel_cluster_mismatch"};
     }
   }
-
-  auto& connection = parent_.read_callbacks_->connection();
 
   // Authenticate the handshake's bearer token (if configured) before validation and before the
   // socket is registered, so a forged or expired token can never yield a usable reverse tunnel.
   // On success this publishes the verified claims as dynamic metadata for %DYNAMIC_METADATA%
   // binding in the validation block below.
-  if (parent_.config_->jwtEnabled() &&
-      !parent_.config_->verifyHandshakeJwt(*headers_, connection.streamInfo())) {
-    if (parent_.config_->jwtRequired()) {
-      parent_.stats_.jwt_denied_.inc();
-      ENVOY_CONN_LOG(debug, "reverse_tunnel: jwt authentication failed", connection);
-      sendLocalReply(Http::Code::Unauthorized, "JWT authentication failed", nullptr, std::nullopt,
-                     "reverse_tunnel_jwt_denied");
-      connection.close(Network::ConnectionCloseType::FlushWrite);
-      return;
+  if (config_->jwtEnabled() && !config_->verifyHandshakeJwt(headers, conn.streamInfo())) {
+    if (config_->jwtRequired()) {
+      stats_.jwt_denied_.inc();
+      ENVOY_CONN_LOG(debug, "reverse_tunnel: jwt authentication failed", conn);
+      return {false, Http::Code::Unauthorized, "JWT authentication failed",
+              "reverse_tunnel_jwt_denied"};
     }
     // In audit mode (allow_missing_or_failed) count what enforcement would have rejected but let
     // the handshake proceed. No claims were published, so any %DYNAMIC_METADATA% binding will not
     // match.
-    parent_.stats_.jwt_would_deny_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: jwt authentication failed (audit mode, allowing)",
-                   connection);
+    stats_.jwt_would_deny_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: jwt authentication failed (audit mode, allowing)", conn);
   }
 
   // Validate node_id, cluster_id, and tenant_id if validation is configured.
-  const ReverseTunnelValidationResult validation_result = parent_.config_->validateIdentifiers(
-      node_id, cluster_id, tenant_id, *headers_, connection.streamInfo());
+  const ReverseTunnelValidationResult validation_result =
+      config_->validateIdentifiers(node_id, cluster_id, tenant_id, headers, conn.streamInfo());
 
   // Emit validation metadata if configured.
-  parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_result,
-                                          connection.streamInfo());
+  config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_result,
+                                  conn.streamInfo());
 
   if (validation_result != ReverseTunnelValidationResult::ValidationPassed) {
     if (validation_result == ReverseTunnelValidationResult::Rejected) {
-      parent_.stats_.rejected_.inc();
+      stats_.rejected_.inc();
     } else {
-      parent_.stats_.validation_failed_.inc();
+      stats_.validation_failed_.inc();
     }
     ENVOY_CONN_LOG(debug,
                    "reverse_tunnel: handshake denied for node '{}', cluster '{}', tenant '{}', "
                    "result: {}",
-                   parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id,
-                   toStringView(validation_result));
-    sendLocalReply(
+                   conn, node_id, cluster_id, tenant_id, toStringView(validation_result));
+    return {
+        false,
         validation_result == ReverseTunnelValidationResult::Rejected ? Http::Code::TooManyRequests
                                                                      : Http::Code::Forbidden,
-        toStringView(validation_result), nullptr, std::nullopt, toStringView(validation_result));
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
+        std::string(toStringView(validation_result)), std::string(toStringView(validation_result))};
   }
 
-  // Parse the optional initiator metadata carried on the handshake. All three are optional so older
-  // initiators that do not advertise them are handled gracefully (empty values).
-  int64_t initiation_time_ms = 0;
-  const auto initiation_time_vals =
-      headers_->get(Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
-  if (!initiation_time_vals.empty()) {
-    if (!absl::SimpleAtoi(initiation_time_vals[0]->value().getStringView(), &initiation_time_ms)) {
-      ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'",
-                     parent_.read_callbacks_->connection(),
-                     initiation_time_vals[0]->value().getStringView());
-      initiation_time_ms = 0;
-    }
-  }
-  const auto initiator_worker_vals =
-      headers_->get(Bootstrap::ReverseConnection::reverseTunnelWorkerIdHeader());
-  const absl::string_view initiator_worker_id =
-      initiator_worker_vals.empty() ? absl::string_view{}
-                                    : initiator_worker_vals[0]->value().getStringView();
-  const auto initiator_connection_vals =
-      headers_->get(Bootstrap::ReverseConnection::reverseTunnelConnectionIdHeader());
-  const absl::string_view initiator_connection_id =
-      initiator_connection_vals.empty() ? absl::string_view{}
-                                        : initiator_connection_vals[0]->value().getStringView();
-
-  // Phase one. Duplicate the socket and resolve the registration target before responding, so a
-  // tunnel that cannot be registered is answered with 503 rather than a 200 over a dropped socket.
-  if (!parent_.prepareAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms,
-                                         initiator_worker_id, initiator_connection_id)) {
-    parent_.stats_.registration_failed_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: cannot register tunnel, rejecting handshake",
-                   parent_.read_callbacks_->connection());
-    sendLocalReply(Http::Code::ServiceUnavailable, "Reverse tunnel registration unavailable",
-                   nullptr, std::nullopt, "reverse_tunnel_registration_failed");
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
-  // Stop reading further bytes on the handshake connection so no later pipelined request is
-  // dispatched while the socket is handed off.
-  parent_.read_callbacks_->connection().readDisable(true);
-
-  // Send the acceptance response. In upgrade mode this is `101 Switching Protocols`.
-  auto resp_headers = Http::ResponseHeaderMapImpl::create();
-  if (parent_.config_->useHttpUpgrade()) {
-    resp_headers->setStatus(101);
-    resp_headers->setReferenceKey(Http::Headers::get().Connection,
-                                  Http::Headers::get().ConnectionValues.Upgrade);
-    resp_headers->setReferenceKey(
-        Http::Headers::get().Upgrade,
-        Bootstrap::ReverseConnection::ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
-  } else {
-    resp_headers->setStatus(200);
-  }
-  encoder_.encodeHeaders(*resp_headers, true);
-
-  // Phase two runs once the acceptance response has reached the wire, so the response is ordered
-  // ahead of any first byte a consumer writes into the tunnel.
-  const uint64_t response_wire_bytes = encoder_.getStream().bytesMeter()->wireBytesSent();
-  parent_.installAcceptanceFlushCallback(response_wire_bytes);
+  return {true, Http::Code::OK, ""};
 }
 
-bool ReverseTunnelFilter::prepareAcceptedConnection(absl::string_view node_id,
-                                                    absl::string_view cluster_id,
-                                                    absl::string_view tenant_id,
-                                                    int64_t initiation_time_ms,
-                                                    absl::string_view initiator_worker_id,
-                                                    absl::string_view initiator_connection_id) {
+bool ReverseTunnelFilter::prepareAcceptedConnection(
+    const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info) {
+  if (!prepareAcceptedConnectionInternal(info)) {
+    stats_.registration_failed_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: cannot register tunnel, rejecting handshake",
+                   read_callbacks_->connection());
+    return false;
+  }
+  return true;
+}
+
+bool ReverseTunnelFilter::prepareAcceptedConnectionInternal(
+    const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info) {
   Network::Connection& connection = read_callbacks_->connection();
 
   // The worker-local socket manager owns the idle pool. Without it the tunnel cannot be registered.
@@ -732,16 +483,16 @@ bool ReverseTunnelFilter::prepareAcceptedConnection(absl::string_view node_id,
 
   // Hold the duplicated socket and identifiers until the acceptance response is flushed.
   pending_socket_ = std::move(wrapped_socket);
-  pending_node_id_ = std::string(node_id);
-  pending_cluster_id_ = std::string(cluster_id);
-  pending_tenant_id_ = std::string(tenant_id);
-  pending_initiator_worker_id_ = std::string(initiator_worker_id);
-  pending_initiator_connection_id_ = std::string(initiator_connection_id);
-  pending_initiation_time_ms_ = initiation_time_ms;
+  pending_node_id_ = info.node_id;
+  pending_cluster_id_ = info.cluster_id;
+  pending_tenant_id_ = info.tenant_id;
+  pending_initiator_worker_id_ = info.initiator_worker_id;
+  pending_initiator_connection_id_ = info.initiator_connection_id;
+  pending_initiation_time_ms_ = info.initiation_time_ms;
   return true;
 }
 
-void ReverseTunnelFilter::installAcceptanceFlushCallback(uint64_t response_wire_bytes) {
+void ReverseTunnelFilter::onAcceptanceResponseEncoded(uint64_t response_wire_bytes) {
   // The bytes-sent callback reports the byte count of each write event, not a running total, so
   // accumulate until the whole acceptance response has reached the wire before detaching the
   // tunnel. A response split across writes under backpressure would otherwise never satisfy the

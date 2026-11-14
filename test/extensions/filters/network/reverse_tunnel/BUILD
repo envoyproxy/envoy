@@ -46,6 +46,7 @@ envoy_extension_cc_test(
         "//source/common/jwt:jwt_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stream_info:uint64_accessor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/http1:http1_handshake_responder_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",

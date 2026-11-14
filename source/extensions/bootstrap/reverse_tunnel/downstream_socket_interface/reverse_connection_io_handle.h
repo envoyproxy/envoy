@@ -23,6 +23,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
@@ -95,6 +96,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  // Creates the per-connection initiator handshake. Null means the built-in HTTP/1 handshake.
+  std::shared_ptr<const InitiatorHandshakeConfigurator> handshake_configurator;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
   // Deadline for receiving the handshake response after a dial opens the connection.
@@ -266,13 +269,14 @@ public:
    * Called when a reverse connection handshake completes. This method wakes up accept() if the
    * reverse connection handshake was successful. If not, it performs necessary cleanup and triggers
    * backoff for the host.
-   * @param error error message if the handshake failed, empty string if successful.
+   * @param outcome the terminal handshake outcome; success flag drives accept, message drives the
+   * access log on failure.
    * @param wrapper pointer to the connection wrapper that wraps over the established connection.
    * @param closed whether the connection was closed during handshake.
    * @param retry_after optional server-provided cool-off hint (from a ``Retry-After`` header on a
    * 429 handshake response) to use as the per-host backoff; ignored when unset.
    */
-  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+  void onConnectionDone(const HandshakeOutcome& outcome, RCConnectionWrapper* wrapper, bool closed,
                         std::optional<std::chrono::milliseconds> retry_after = std::nullopt);
 
   // Backoff logic for connection failures.
@@ -416,6 +420,14 @@ public:
    */
   std::chrono::milliseconds handshakeTimeout() const {
     return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
+  /**
+   * @return the factory creating per-connection initiator handshakes, or nullptr when the
+   * built-in HTTP/1 handshake applies.
+   */
+  const InitiatorHandshakeConfigurator* handshakeConfigurator() const {
+    return config_.handshake_configurator.get();
   }
 
   /**

@@ -22,6 +22,7 @@
 #include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_initiator.h"
 #include "source/server/generic_factory_context.h"
 
 namespace Envoy {
@@ -100,6 +101,10 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
             "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
             "socket interface with stat_prefix: {}, access_logs: {}",
             stat_prefix_, access_logs_.size());
+
+  // HTTP/1 is the only built-in handshake; it is selected here, before any socket can be created,
+  // and carried on the socket config so every dial negotiates the same protocol.
+  handshake_configurator_ = std::make_shared<Http1HandshakeConfigurator>();
 }
 
 void ReverseTunnelInitiatorExtension::emitAccessLog(
