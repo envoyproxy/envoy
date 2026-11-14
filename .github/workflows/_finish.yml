@@ -47,7 +47,7 @@ jobs:
       actions: read
       contents: read
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/jq@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       name: Incoming data
       id: needs
       with:
@@ -128,7 +128,7 @@ jobs:
                    summary: "Check has finished",
                    text: ($text + $allowed_failure_text)}}}}
 
-    - uses: envoyproxy/toolshed/actions/jq@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/jq@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       name: Print summary
       with:
         input: ${{ toJSON(steps.needs.outputs.value).summary-title }}
@@ -136,13 +136,13 @@ jobs:
           "## \(.)"
         options: -Rr
         output-path: GITHUB_STEP_SUMMARY
-    - uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/github/checks@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       name: Update check
       with:
         action: update

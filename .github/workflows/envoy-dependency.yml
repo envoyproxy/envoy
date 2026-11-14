@@ -68,13 +68,13 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         token: ${{ steps.appauth.outputs.token }}
     - if: ${{ inputs.task == 'bazel' && ! inputs.dependency }}
@@ -82,7 +82,7 @@ jobs:
       run: |
         echo "::error::\`dependency\` is required for the \`bazel\` task"
         exit 1
-    - uses: envoyproxy/toolshed/actions/bson@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/bson@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       id: update
       name: Update (${{ inputs.task }})
       with:
@@ -120,7 +120,7 @@ jobs:
         else
             echo "changes=false" > "$GITHUB_OUTPUT"
         fi
-    - uses: envoyproxy/toolshed/actions/upload/diff@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/upload/diff@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       name: Upload diff
       if: ${{ steps.changes.outputs.changes == 'true' }}
       with:
@@ -128,7 +128,7 @@ jobs:
     - id: pr
       name: Create a PR
       if: ${{ inputs.pr && steps.changes.outputs.changes == 'true' }}
-      uses: envoyproxy/toolshed/actions/github/pr@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/pr@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         base: main
         body: |
@@ -210,11 +210,11 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/bind-mounts@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/bind-mounts@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       if: ! github.event.repository.private
       with:
         mounts: |
@@ -226,12 +226,12 @@ jobs:
             chown: "runner:runner"
     - name: Free disk space
       if: github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/diskspace@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         to_remove: |
           /usr/local/.ghcup
           /usr/local/lib/android
-    - uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -286,7 +286,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/actions/docker/shas@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/docker/shas@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         images: |
            sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
@@ -321,7 +321,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/pr@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         base: main
         body: Created by Envoy dependency bot
@@ -347,13 +347,13 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         token: ${{ steps.appauth.outputs.token }}
     - id: update
@@ -375,14 +375,14 @@ jobs:
         else
             echo "changes=false" > "$GITHUB_OUTPUT"
         fi
-    - uses: envoyproxy/toolshed/actions/upload/diff@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+    - uses: envoyproxy/toolshed/actions/upload/diff@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       name: Upload diff
       if: ${{ steps.changes.outputs.changes == 'true' }}
       with:
         name: release-images-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr && steps.changes.outputs.changes == 'true' }}
-      uses: envoyproxy/toolshed/actions/github/pr@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/pr@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         base: main
         body: |

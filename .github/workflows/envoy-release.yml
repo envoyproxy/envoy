@@ -146,13 +146,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         config: |
           fetch-depth: 0
@@ -182,13 +182,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - name: Checkout repository
-      uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}

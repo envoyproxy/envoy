@@ -99,14 +99,14 @@ jobs:
 
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         branch: ${{ inputs.branch }}
         committer-name: ${{ env.COMMITTER_NAME }}
@@ -133,13 +133,13 @@ jobs:
         echo "committer=${COMMITTER}" >> "$GITHUB_OUTPUT"
     - name: Validate signoff email
       if: inputs.task == 'create-release' && inputs.author
-      uses: envoyproxy/toolshed/actions/email/validate@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/email/validate@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         email: ${{ inputs.author }}
 
     - name: Sync version histories
       if: inputs.task == 'sync-version-histories'
-      uses: envoyproxy/toolshed/actions/github/run@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/run@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         report-name: ci-report-sync.json
         # The command is split on whitespace and not parsed by a shell, so the signoff, which
@@ -157,7 +157,7 @@ jobs:
 
     - name: Create release
       if: inputs.task == 'create-release'
-      uses: envoyproxy/toolshed/actions/github/run@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/run@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         report-name: ci-report-release.json
         source: |
@@ -182,7 +182,7 @@ jobs:
 
     - name: Re-open branch
       if: inputs.task == 'reopen-branch'
-      uses: envoyproxy/toolshed/actions/github/run@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/run@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         report-name: ci-report-dev.json
         source: |
@@ -295,7 +295,7 @@ jobs:
         fi
 
     - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/github/pr@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         base: ${{ inputs.branch }}
         commit: false

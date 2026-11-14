@@ -42,13 +42,13 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
         fi
     - if: steps.tip.outputs.skip != 'true'
-      uses: envoyproxy/toolshed/actions/appauth@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
     - if: steps.tip.outputs.skip != 'true'
-      uses: envoyproxy/toolshed/actions/dispatch@0b8831c802e19cf74905c23a37b7b3caa5e6ad90  # actions-v0.4.30
+      uses: envoyproxy/toolshed/actions/dispatch@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
