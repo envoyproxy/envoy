@@ -23,18 +23,18 @@ fi
 for FILE in "$@"; do
     case "$FILE" in
         *.pem|*.der)
-            cp "$FILE" "$OUT_DIR/certs"
+            cp -f "$FILE" "$OUT_DIR/certs"
             ;;
         *.lua|*.wasm|*.so)
-            cp "$FILE" "$OUT_DIR/lib"
+            cp -f "$FILE" "$OUT_DIR/lib"
             ;;
         *.pb)
-            cp "$FILE" "$OUT_DIR/protos"
+            cp -f "$FILE" "$OUT_DIR/protos"
             ;;
         *)
             FILENAME="$(echo "$FILE" | sed -e 's/.*examples\///g')"
             # Configuration filenames may conflict. To avoid this we use the full path.
-            cp "$FILE" "$OUT_DIR/${FILENAME//\//_}"
+            cp -f "$FILE" "$OUT_DIR/${FILENAME//\//_}"
             ;;
     esac
 done

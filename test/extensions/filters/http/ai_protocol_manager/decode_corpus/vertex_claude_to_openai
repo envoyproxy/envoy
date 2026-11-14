@@ -1,0 +1,10 @@
+path: "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:streamRawPredict"
+body: "{\"anthropic_version\":\"vertex-2023-10-16\",\"max_tokens\":256,\"system\":\"Translate Vertex Claude to OpenAI.\",\"messages\":[{\"role\":\"user\",\"content\":\"List the primary colors.\"}],\"tool_choice\":{\"type\":\"any\"}}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: OPENAI_CHAT_COMPLETIONS
+response_binding {
+  uri_pattern: "/v1/chat/completions"
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

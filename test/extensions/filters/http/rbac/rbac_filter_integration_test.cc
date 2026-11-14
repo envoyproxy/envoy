@@ -731,6 +731,120 @@ TEST_P(RBACIntegrationTest, Denied) {
               testing::HasSubstr("rbac_access_denied_matched_policy[none]"));
 }
 
+// The engine result and the matched policy reach the access log through the stream's dynamic
+// metadata, on an allowed and on a denied request.
+TEST_P(RBACIntegrationTest, AccessLogReadsEngineResultWithAllowAction) {
+  useAccessLog("result=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_engine_result)% "
+               "policy=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_effective_policy_id)%;");
+  config_helper_.prependFilter(RBAC_CONFIG);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto allowed = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(allowed->waitForEndStream());
+  EXPECT_EQ("200", allowed->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              testing::HasSubstr("result=allowed policy=foo;"));
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto denied = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(denied->waitForEndStream());
+  EXPECT_EQ("403", denied->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("result=denied policy=-;"));
+}
+
+TEST_P(RBACIntegrationTest, AccessLogReadsEngineResultWithDenyAction) {
+  useAccessLog("result=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_engine_result)% "
+               "policy=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_effective_policy_id)%;");
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_DENY_ACTION);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto denied = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(denied->waitForEndStream());
+  EXPECT_EQ("403", denied->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              testing::HasSubstr("result=denied policy=deny policy;"));
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto allowed = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(allowed->waitForEndStream());
+  EXPECT_EQ("200", allowed->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              testing::HasSubstr("result=allowed policy=-;"));
+}
+
+// The access log reads a shadow result too, while the local reply, whose body the local reply
+// mapper renders inside sendLocalReply(), sees no field of the filter that denied.
+TEST_P(RBACIntegrationTest, AccessLogReadsShadowResultAndLocalReplyDoesNot) {
+  useAccessLog("result=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_engine_result)% "
+               "shadow=%DYNAMIC_METADATA(envoy.filters.http.rbac:shadow_shadow_engine_result)% "
+               "shadow_policy=%DYNAMIC_METADATA(envoy.filters.http.rbac:shadow_shadow_effective_"
+               "policy_id)%;");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_local_reply_config()
+            ->mutable_body_format()
+            ->mutable_text_format_source()
+            ->set_inline_string(
+                "reply result=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_engine_result)% "
+                "shadow=%DYNAMIC_METADATA(envoy.filters.http.rbac:shadow_shadow_engine_result)%");
+      });
+  config_helper_.prependFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  shadow_rules_stat_prefix: shadow_
+  rules:
+    policies:
+      foo:
+        permissions:
+          - header: {name: ":method", string_match: {exact: "GET"}}
+        principals:
+          - any: true
+  shadow_rules:
+    action: DENY
+    policies:
+      "shadow deny":
+        permissions:
+          - header: {name: ":method", string_match: {exact: "POST"}}
+        principals:
+          - any: true
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto allowed = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(allowed->waitForEndStream());
+  EXPECT_EQ("200", allowed->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              testing::HasSubstr("result=allowed shadow=allowed shadow_policy=-;"));
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto denied = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(denied->waitForEndStream());
+  EXPECT_EQ("403", denied->headers().getStatusValue());
+  EXPECT_EQ("reply result=- shadow=-", denied->body());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              testing::HasSubstr("result=denied shadow=denied shadow_policy=shadow deny;"));
+}
+
 TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(RBAC_CONFIG_WITH_DENY_ACTION);
@@ -1062,6 +1176,48 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// A route config that sets its own rules stat prefix and denies writes the route's prefixed result
+// field, which the access log reads.
+TEST_P(RBACIntegrationTest, RouteOverrideStatPrefixReachesAccessLog) {
+  useAccessLog("result=%DYNAMIC_METADATA(envoy.filters.http.rbac:route_enforced_engine_result)% "
+               "listener=%DYNAMIC_METADATA(envoy.filters.http.rbac:enforced_engine_result)%;");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) {
+        envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route_config;
+        TestUtility::loadFromYaml(R"EOF(
+rbac:
+  rules_stat_prefix: route_
+  rules:
+    action: DENY
+    policies:
+      deny-all:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+)EOF",
+                                  per_route_config);
+
+        auto* config = cfg.mutable_route_config()
+                           ->mutable_virtual_hosts()
+                           ->Mutable(0)
+                           ->mutable_typed_per_filter_config();
+
+        std::ignore = (*config)["rbac"].PackFrom(per_route_config);
+      });
+  config_helper_.prependFilter(RBAC_CONFIG);
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("result=denied listener=-;"));
 }
 
 TEST_P(RBACIntegrationTest, PathWithQueryAndFragmentWithOverride) {

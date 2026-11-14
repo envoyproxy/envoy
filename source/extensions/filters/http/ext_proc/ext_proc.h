@@ -357,8 +357,12 @@ public:
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
   }
 
-  const std::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
+  const std::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
     return grpc_service_;
+  }
+
+  const Grpc::GrpcServiceConfigWithHashKey& grpcServiceConfigWithHashKey() const {
+    return grpc_service_config_with_hash_key_;
   }
 
   bool gracefulGrpcClose() const { return graceful_grpc_close_; }
@@ -414,6 +418,7 @@ private:
   const AllowedOverrideModesSet allowed_override_modes_;
 
   const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const Grpc::GrpcServiceConfigWithHashKey grpc_service_config_with_hash_key_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
   const Protobuf::Struct filter_metadata_;
   const ExpressionManager expression_manager_;
@@ -555,9 +560,6 @@ class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
 public:
   Filter(const FilterConfigSharedPtr& config, ClientBasePtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
-                                                        : envoy::config::core::v3::GrpcService()),
-        config_with_hash_key_(grpc_service_),
         decoding_state_(
             *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
             config->typedForwardingMetadataNamespaces(),
@@ -580,7 +582,7 @@ public:
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
-    return config_with_hash_key_.config();
+    return grpcServiceConfigWithHashKey().config();
   }
 
   const ExtProcFilterStats& stats() const { return stats_; }
@@ -652,6 +654,11 @@ public:
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status status);
 
 private:
+  const Grpc::GrpcServiceConfigWithHashKey& grpcServiceConfigWithHashKey() const {
+    return route_config_with_hash_key_ != nullptr ? *route_config_with_hash_key_
+                                                  : config_->grpcServiceConfigWithHashKey();
+  }
+
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
@@ -741,8 +748,8 @@ private:
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
   ExtProcLoggingInfo* logging_info_;
-  envoy::config::core::v3::GrpcService grpc_service_;
-  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
+  // Set when the per-route config overrides the gRPC service or its initial metadata.
+  std::unique_ptr<const Grpc::GrpcServiceConfigWithHashKey> route_config_with_hash_key_;
 
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;

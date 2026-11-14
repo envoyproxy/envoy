@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_protocol_manager;
+
+import "envoy/type/ai/v3/llm_binding.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+message DecodeFuzzInput {
+  string path = 1;
+  string body = 2;
+  uint64 fragmentation_seed = 3;
+  envoy.type.ai.v3.LLMProtocol request_protocol = 4;
+  envoy.type.ai.v3.LLMProtocol response_protocol = 5;
+  envoy.type.ai.v3.LLMBinding request_binding = 6;
+  envoy.type.ai.v3.LLMBinding response_binding = 7;
+  uint32 inline_string_threshold_bytes = 8;
+  uint32 decoder_buffer_limit = 9;
+}

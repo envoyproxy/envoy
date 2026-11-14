@@ -490,3 +490,39 @@ envoy_extension_cc_fuzz_test(
         "@envoy_api//envoy/extensions/http/ai_filters/transcoder/v3:pkg_cc_proto",
     ],
 )
+
+envoy_proto_library(
+    name = "decode_fuzz_proto",
+    srcs = ["decode_fuzz.proto"],
+    deps = [
+        "@envoy_api//envoy/type/ai/v3:pkg",
+    ],
+)
+
+envoy_extension_cc_fuzz_test(
+    name = "decode_fuzz_test",
+    srcs = ["decode_fuzz_test.cc"],
+    corpus = "decode_corpus",
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":decode_fuzz_proto_cc_proto",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:transcoding_engine_lib",
+        "//source/extensions/http/ai_filters/request_info:filter_lib",
+        "//source/extensions/http/ai_filters/transcoder:filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ai_filters/request_info/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ai_filters/transcoder/v3:pkg_cc_proto",
+    ],
+)

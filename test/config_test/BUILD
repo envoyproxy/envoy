@@ -108,5 +108,7 @@ py_binary(
         "//configs:files",
         "@envoy_api//:v3_proto_set",
     ],
+    # envoy.base.utils depends on uvloop, which does not support Windows.
+    tags = ["skip_on_windows"],
     deps = [requirement("envoy.base.utils")],
 )

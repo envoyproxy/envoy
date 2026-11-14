@@ -59,6 +59,14 @@ Http::FilterDataStatus Http1BridgeFilter::decodeData(Buffer::Instance& data, boo
     return Http::FilterDataStatus::Continue;
   }
 
+  if (end_stream && !buffering_request_) {
+    // The whole body arrived in this frame (possibly empty, e.g. a chunked request with no
+    // chunks), so frame it in place. Adding it to the buffer while iterating would only reach
+    // further filters if the filter manager forwards the buffered data instead of this frame.
+    Grpc::Common::prependGrpcFrameHeader(data);
+    return Http::FilterDataStatus::Continue;
+  }
+
   decoder_callbacks_->addDecodedData(data, true);
   if (end_stream && do_framing_) {
     decoder_callbacks_->modifyDecodingBuffer(
@@ -66,6 +74,7 @@ Http::FilterDataStatus Http1BridgeFilter::decodeData(Buffer::Instance& data, boo
     return Http::FilterDataStatus::Continue;
   }
 
+  buffering_request_ = true;
   return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
