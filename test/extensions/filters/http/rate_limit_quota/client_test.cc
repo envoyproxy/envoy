@@ -1263,6 +1263,115 @@ TEST_F(GlobalClientTest, TestAbandonAction) {
   ASSERT_FALSE(bucket_after);
 }
 
+// The TLS cache must be updated entry by entry.
+// Creating or updating a bucket must not replace the per-thread BucketsCache
+// with a copy of the whole source-of-truth:
+// that copy made bucket creation O(N^2) on the main thread.
+TEST_F(GlobalClientTest, TestTlsCacheUpdatedPerEntry) {
+  mock_stream_client->expectStreamCreation(1);
+  // One expiration timer: the blanket assignment below; the abandon starts none.
+  mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 1);
+  EXPECT_CALL(mock_stream_client->stream_, sendMessageRaw_(::testing::_, false))
+      .Times(::testing::AnyNumber());
+
+  BucketId sample_bucket_id2 = sample_bucket_id_;
+  (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
+  (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value4";
+  size_t sample_id_hash2 = MessageUtil::hash(sample_bucket_id2);
+
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
+                               std::chrono::milliseconds::zero(), true);
+  cb_ptr_->waitForExpectedBuckets();
+
+  auto cache_ref = buckets_tls_->get();
+  ASSERT_TRUE(cache_ref.has_value());
+  ASSERT_TRUE(cache_ref->quota_buckets_);
+  // Remember the map object the thread owns.
+  const BucketsCache* thread_map = cache_ref->quota_buckets_.get();
+  ASSERT_EQ(thread_map->size(), 1);
+
+  // A second bucket is inserted into the same map object.
+  cb_ptr_->expectBuckets({sample_id_hash2});
+  global_client_->createBucket(sample_bucket_id2, sample_id_hash2, default_allow_action, nullptr,
+                               std::chrono::milliseconds::zero(), true);
+  cb_ptr_->waitForExpectedBuckets();
+  cache_ref = buckets_tls_->get();
+  ASSERT_TRUE(cache_ref.has_value());
+  ASSERT_EQ(cache_ref->quota_buckets_.get(), thread_map);
+  EXPECT_EQ(thread_map->size(), 2);
+  std::shared_ptr<CachedBucket> bucket1_before = getBucket(*buckets_tls_, sample_id_hash_);
+  ASSERT_TRUE(bucket1_before);
+
+  // A response replaces one entry and erases another, still in place.
+  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  response->add_bucket_action()->CopyFrom(buildBlanketAction(sample_bucket_id_, true));
+  response->add_bucket_action()->CopyFrom(buildAbandonAction(sample_bucket_id2));
+  global_client_->onReceiveMessage(std::move(response));
+  waitForNotification(cb_ptr_->response_processed);
+
+  cache_ref = buckets_tls_->get();
+  ASSERT_TRUE(cache_ref.has_value());
+  ASSERT_EQ(cache_ref->quota_buckets_.get(), thread_map);
+  EXPECT_EQ(thread_map->size(), 1);
+  EXPECT_FALSE(getBucket(*buckets_tls_, sample_id_hash2));
+  std::shared_ptr<CachedBucket> bucket1_after = getBucket(*buckets_tls_, sample_id_hash_);
+  ASSERT_TRUE(bucket1_after);
+  // The entry now points at the new CachedBucket carrying the assignment.
+  EXPECT_NE(bucket1_after.get(), bucket1_before.get());
+  ASSERT_TRUE(bucket1_after->cached_action);
+  EXPECT_TRUE(bucket1_after->cached_action->has_quota_assignment_action());
+}
+
+// Within one response the actions on a bucket may come in any order.
+// Whatever the order, the per-thread caches must end up matching the source-of-truth:
+// here both orders leave the bucket abandoned,
+// and re-creating it must go through createBucket again.
+TEST_F(GlobalClientTest, TestTlsCacheAbandonAndAssignInOneResponse) {
+  mock_stream_client->expectStreamCreation(1);
+  // One expiration timer: the assignment that precedes the abandon in the first response.
+  // The assignment that follows an abandon in the second response targets an unknown bucket
+  // and is dropped.
+  mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 1);
+  EXPECT_CALL(mock_stream_client->stream_, sendMessageRaw_(::testing::_, false))
+      .Times(::testing::AnyNumber());
+
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
+                               std::chrono::milliseconds::zero(), true);
+  cb_ptr_->waitForExpectedBuckets();
+  ASSERT_TRUE(getBucket(*buckets_tls_, sample_id_hash_));
+
+  // Assign, then abandon: the erase must win over the preceding upsert.
+  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  response->add_bucket_action()->CopyFrom(buildBlanketAction(sample_bucket_id_, true));
+  response->add_bucket_action()->CopyFrom(buildAbandonAction(sample_bucket_id_));
+  global_client_->onReceiveMessage(std::move(response));
+  waitForNotification(cb_ptr_->response_processed);
+  EXPECT_FALSE(getBucket(*buckets_tls_, sample_id_hash_));
+
+  // The source-of-truth agrees: the bucket has to be created from scratch.
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
+                               std::chrono::milliseconds::zero(), true);
+  cb_ptr_->waitForExpectedBuckets();
+  ASSERT_TRUE(getBucket(*buckets_tls_, sample_id_hash_));
+
+  // Abandon, then assign: the assignment targets a bucket that no longer exists and is ignored.
+  response = std::make_unique<RateLimitQuotaResponse>();
+  response->add_bucket_action()->CopyFrom(buildAbandonAction(sample_bucket_id_));
+  response->add_bucket_action()->CopyFrom(buildBlanketAction(sample_bucket_id_, true));
+  global_client_->onReceiveMessage(std::move(response));
+  waitForNotification(cb_ptr_->response_processed);
+  EXPECT_FALSE(getBucket(*buckets_tls_, sample_id_hash_));
+
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
+                               std::chrono::milliseconds::zero(), true);
+  cb_ptr_->waitForExpectedBuckets();
+  EXPECT_TRUE(getBucket(*buckets_tls_, sample_id_hash_));
+}
+
 TEST_F(GlobalClientTest, TestResponseBucketMissingId) {
   mock_stream_client->expectStreamCreation(1);
   // Expect expiration timers to start for each of the response's assignments &

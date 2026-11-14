@@ -44,8 +44,9 @@ struct QuotaUsage {
   std::atomic<std::chrono::nanoseconds> last_report;
 };
 
-// This object stores the data for single bucket entry. The usage cache & action
-// cache are in separate pointers to enable separate pointer-swapping.
+// This object stores the data for single bucket entry.
+// The usage cache & action cache are in separate pointers,
+// so a CachedBucket replaced on a new assignment can keep the QuotaUsage of the old one.
 struct CachedBucket {
   CachedBucket(const BucketId& bucket_id, std::shared_ptr<QuotaUsage> quota_usage,
                std::unique_ptr<BucketAction> cached_action,
@@ -88,8 +89,8 @@ struct CachedBucket {
   // fallback_action has its own TTL.
   Envoy::Event::TimerPtr fallback_expiration_timer = nullptr;
 
-  // Rate limiter based on token bucket algorithm. Shared to make a single
-  // TokenBucket reusable when copying & pointer-swapping the overall cache.
+  // Rate limiter based on token bucket algorithm.
+  // Shared so that a CachedBucket replaced on a new assignment can keep the same TokenBucket.
   std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter;
 };
 
@@ -121,8 +122,10 @@ public:
   ThreadLocalBucketsCache(std::shared_ptr<BucketsCache> quota_buckets)
       : quota_buckets_(quota_buckets) {}
 
-  // Thread-unsafe operations like index creation should only be done by the
-  // global ThreadLocalClient.
+  // Owned by one thread: the global client mutates it only from that thread
+  // (TypedSlot::runOnAllThreads) and the local client only reads it there,
+  // so no locking is needed.
+  // Entries are shared_ptrs to the CachedBuckets held in the global client's source-of-truth.
   std::shared_ptr<BucketsCache> quota_buckets_;
 };
 
