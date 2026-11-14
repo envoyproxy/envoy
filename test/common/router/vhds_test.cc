@@ -4,6 +4,8 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -21,6 +23,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -106,6 +109,12 @@ vhds:
       EXPECT_OK(MessageUtil::unpackTo(receiver.configInfo().value().config_, route_config));
     }
     return route_config;
+  }
+
+  bool configAwaitingInitialVhdsUpdate(const RouteConfigUpdateReceiver& receiver) {
+    const auto config =
+        std::dynamic_pointer_cast<const Router::Config>(receiver.parsedConfiguration());
+    return config != nullptr && config->awaitingInitialVhdsUpdate();
   }
 
   ProtoTraitsImpl proto_traits_;
@@ -765,6 +774,521 @@ vhds:
   EXPECT_EQ("vhost.rds.domain", virtual_hosts[0].domains(0));
   EXPECT_EQ("overlapping_vhost", virtual_hosts[1].name());
   EXPECT_EQ("vhost.vhds.domain", virtual_hosts[1].domains(0));
+}
+
+const char warming_blocks_unmatched_requests_config[] = R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF";
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsDoesNotBlockInitAndWarmsImmediately) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(config_update_info->warmingBlocksUnmatchedRequests());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  // updateOnDemand is a no-op when warming_blocks_unmatched_requests is enabled.
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(_))
+      .Times(0);
+  config_update_info->updateOnDemand("vhost1");
+
+  // Push the initial VHDS update.
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "2"));
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  const auto current_config = routeConfiguration(*config_update_info);
+  EXPECT_EQ(1, current_config.virtual_hosts().size());
+  EXPECT_EQ("vhost1", current_config.virtual_hosts(0).name());
+}
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsEmptyInitialUpdateResolvesWarming) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+  const auto config_before_update = config_update_info->parsedConfiguration();
+
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  // Send an empty initial VHDS response.
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      {}, {}, "2"));
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  EXPECT_EQ(config_before_update, config_update_info->parsedConfiguration());
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("1", config_update_info->configInfo()->version_);
+  EXPECT_EQ(0, routeConfiguration(*config_update_info).virtual_hosts().size());
+}
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailureResolvesWarming) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  // Send an update failure.
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, nullptr);
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("1", config_update_info->configInfo()->version_);
+}
+
+class WarmingPerRouteFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  explicit WarmingPerRouteFilterFactory(Init::TargetImpl& init_target)
+      : init_target_(init_target) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks&) {};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createHttpFilterRouteConfig(const Protobuf::Message&,
+                              Server::Configuration::ServerFactoryContext&,
+                              Server::Configuration::ExtraFactoryContext& extra_context) override {
+    extra_context.init_manager->add(init_target_);
+    on_create_http_filter_route_config_.Call();
+    return std::make_shared<Router::RouteSpecificFilterConfig>();
+  }
+
+  std::string name() const override { return "envoy.filters.http.warming_test"; }
+
+  testing::MockFunction<void()> on_create_http_filter_route_config_;
+
+private:
+  Init::TargetImpl& init_target_;
+};
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailurePreservesWarmingRdsVersionInfo) {
+  Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
+  WarmingPerRouteFilterFactory filter_factory(filter_init_target);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      filter_factory);
+
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+typed_per_filter_config:
+  envoy.filters.http.warming_test:
+    "@type": type.googleapis.com/google.protobuf.Struct
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  EXPECT_CALL(filter_factory.on_create_http_filter_route_config_, Call());
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "rds_v1"));
+
+  // The RDS update is still warming (waiting on the per-route filter's init target), so
+  // configInfo() is not populated yet and the version ("rds_v1") lives in warming_state_.
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->configInfo().has_value());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+
+  // The initial VHDS fetch fails while the RDS update is still warming, and the per-route filter
+  // then finishes warming. Failing VHDS must not rebuild or restart warming for the per-route
+  // filter.
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
+  filter_init_target.ready();
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  EXPECT_FALSE(config_update_info->configWarming());
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("rds_v1", config_update_info->configInfo()->version_);
+}
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsEmptyInitialUpdatePreservesWarmingRdsVersionInfo) {
+  Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
+  WarmingPerRouteFilterFactory filter_factory(filter_init_target);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      filter_factory);
+
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+typed_per_filter_config:
+  envoy.filters.http.warming_test:
+    "@type": type.googleapis.com/google.protobuf.Struct
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  EXPECT_CALL(filter_factory.on_create_http_filter_route_config_, Call());
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "rds_v1"));
+
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->configInfo().has_value());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+
+  // An empty initial VHDS response while RDS is still warming clears awaitingInitialVhdsUpdate on
+  // the warming config without rebuilding or restarting warming for the per-route filter.
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      {}, {}, "vhds_v1"));
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->configInfo().has_value());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+
+  filter_init_target.ready();
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  EXPECT_FALSE(config_update_info->configWarming());
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("rds_v1", config_update_info->configInfo()->version_);
+}
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailureWakesHeldRequestWhileNextRdsWarms) {
+  const auto rds_v1 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(rds_v1);
+  ASSERT_FALSE(config_update_info->configWarming());
+  ASSERT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  auto callback_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback.AsStdFunction());
+
+  // Request for 'bar.com' arrives while initial wildcard VHDS is still in flight on rds_v1.
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, callback_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  // rds_v2 arrives with unchanged VHDS config and a warming per-route filter, keeping
+  // configWarming() true while rds_v1 stays published.
+  Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
+  WarmingPerRouteFilterFactory filter_factory(filter_init_target);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      filter_factory);
+  const auto rds_v2 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+typed_per_filter_config:
+  envoy.filters.http.warming_test:
+    "@type": type.googleapis.com/google.protobuf.Struct
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  EXPECT_CALL(filter_factory.on_create_http_filter_route_config_, Call());
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v2, "rds_v2"));
+  EXPECT_TRUE(config_update_info->configWarming());
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("1", config_update_info->configInfo()->version_);
+
+  // Initial VHDS failure while rds_v2 is warming wakes the held callback immediately before
+  // filter_init_target.ready() fires, and subsequent requests resolve immediately too.
+  EXPECT_CALL(mock_callback, Call(false));
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  EXPECT_CALL(mock_callback, Call(false));
+  config_update_info->requestVirtualHostsUpdate("baz.com", local_dispatcher, callback_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  filter_init_target.ready();
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("rds_v2", config_update_info->configInfo()->version_);
+}
+
+TEST_F(VhdsTest,
+       WarmingBlocksUnmatchedRequestsEmptyInitialUpdateWakesHeldRequestWhileNextRdsWarms) {
+  const auto rds_v1 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(rds_v1);
+  ASSERT_FALSE(config_update_info->configWarming());
+  ASSERT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  auto callback_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback.AsStdFunction());
+
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, callback_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
+  WarmingPerRouteFilterFactory filter_factory(filter_init_target);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      filter_factory);
+  const auto rds_v2 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+typed_per_filter_config:
+  envoy.filters.http.warming_test:
+    "@type": type.googleapis.com/google.protobuf.Struct
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  EXPECT_CALL(filter_factory.on_create_http_filter_route_config_, Call());
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v2, "rds_v2"));
+  EXPECT_TRUE(config_update_info->configWarming());
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("1", config_update_info->configInfo()->version_);
+
+  // Empty initial VHDS update while rds_v2 is warming wakes the held callback immediately before
+  // filter_init_target.ready() fires, and subsequent requests resolve immediately too.
+  EXPECT_CALL(mock_callback, Call(false));
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      {}, {}, "vhds_v1"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  EXPECT_CALL(mock_callback, Call(false));
+  config_update_info->requestVirtualHostsUpdate("baz.com", local_dispatcher, callback_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  filter_init_target.ready();
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  ASSERT_TRUE(config_update_info->configInfo().has_value());
+  EXPECT_EQ("rds_v2", config_update_info->configInfo()->version_);
+}
+
+TEST_F(VhdsTest,
+       WarmingBlocksUnmatchedRequestsReplacingVhdsSubscriptionClearsLastUpdateResourceIds) {
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  ON_CALL(observer, onConfigWarmed()).WillByDefault([&config_update_info]() {
+    config_update_info->onVhdsConfigPublished();
+  });
+  config_update_info->setObserver(observer);
+
+  const auto rds_v1 =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v1, "1"));
+
+  // First subscription delivers an unresolved alias ("my_route/bar.com"), populating
+  // resource_ids_in_last_update_.
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_alias_resources;
+  empty_alias_resources.Add()->set_name("my_route/bar.com");
+  const auto decoded_empty_alias =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(empty_alias_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_empty_alias.refvec_, {}, "vhds_1"));
+  EXPECT_THAT(config_update_info->resourceIdsInLastVhdsUpdate(),
+              ::testing::UnorderedElementsAre("my_route/bar.com"));
+
+  // rds_v2 switches vhds.config_source to xds_cluster_2 with warming_blocks_unmatched_requests,
+  // starting a fresh initial VHDS wait and clearing stale last-update resource IDs.
+  const auto rds_v2 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster_2
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v2, "2"));
+  EXPECT_TRUE(config_update_info->resourceIdsInLastVhdsUpdate().empty());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  auto callback_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback.AsStdFunction());
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, callback_holder);
+
+  // Publishing rds_v3 (adding a static vhost while keeping xds_cluster_2) must not resolve the
+  // held callback using stale aliases from the replaced subscription.
+  const auto rds_v3 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: static_vhost
+  domains: ["static.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: my_service }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster_2
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v3, "3"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  // Delivering my_route/vhost_bar on xds_cluster_2 resolves the held callback with true.
+  EXPECT_CALL(mock_callback, Call(true));
+  const auto bar_resources =
+      buildAddedResources({buildVirtualHost("my_route/vhost_bar", "bar.com")});
+  const auto decoded_bar =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(bar_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_bar.refvec_, {}, "vhds_2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  // Removing VHDS in a later RDS update also clears resourceIdsInLastVhdsUpdate().
+  const auto rds_v4 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: static_vhost
+  domains: ["static.example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: my_service }
+)EOF");
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v4, "4"));
+  EXPECT_TRUE(config_update_info->resourceIdsInLastVhdsUpdate().empty());
+}
+
+TEST_F(VhdsTest,
+       WarmingBlocksUnmatchedRequestsNonEmptyInitialUpdateWaitsForWarmingPublishBeforeWaking) {
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  ON_CALL(observer, onConfigWarmed()).WillByDefault([&config_update_info]() {
+    config_update_info->onVhdsConfigPublished();
+  });
+  config_update_info->setObserver(observer);
+
+  const auto rds_v1 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v1, "rds_v1"));
+  ASSERT_FALSE(config_update_info->configWarming());
+  ASSERT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> bar_cb;
+  auto bar_cb_holder = std::make_shared<Http::RouteConfigUpdatedCallback>(bar_cb.AsStdFunction());
+  EXPECT_CALL(bar_cb, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, bar_cb_holder);
+
+  Init::TargetImpl filter_init_target("warming_per_route_filter", []() {});
+  WarmingPerRouteFilterFactory filter_factory(filter_init_target);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      filter_factory);
+  const auto rds_v2 = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+typed_per_filter_config:
+  envoy.filters.http.warming_test:
+    "@type": type.googleapis.com/google.protobuf.Struct
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF");
+  EXPECT_CALL(filter_factory.on_create_http_filter_route_config_, Call()).Times(2);
+  EXPECT_OK(config_update_info->onRdsUpdate(rds_v2, "rds_v2"));
+  EXPECT_TRUE(config_update_info->configWarming());
+
+  // Deliver a non-empty initial VHDS update while rds_v2 is warming. The new combined config
+  // supersedes rds_v2 warming and waits on filter_init_target, while published rds_v1 still has
+  // awaitingInitialVhdsUpdate() == true so neither queued nor newly arriving callbacks fire early.
+  const auto bar_resources =
+      buildAddedResources({buildVirtualHost("my_route/vhost_bar", "bar.com")});
+  const auto decoded_bar =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(bar_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_bar.refvec_, {}, "vhds_1"));
+
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  testing::MockFunction<void(bool)> late_bar_cb;
+  testing::MockFunction<void(bool)> late_baz_cb;
+  auto late_bar_cb_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(late_bar_cb.AsStdFunction());
+  auto late_baz_cb_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(late_baz_cb.AsStdFunction());
+  EXPECT_CALL(late_bar_cb, Call(_)).Times(0);
+  EXPECT_CALL(late_baz_cb, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, late_bar_cb_holder);
+  config_update_info->requestVirtualHostsUpdate("baz.com", local_dispatcher, late_baz_cb_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&bar_cb);
+  ::testing::Mock::VerifyAndClearExpectations(&late_bar_cb);
+  ::testing::Mock::VerifyAndClearExpectations(&late_baz_cb);
+
+  // Once the warming update publishes, all held callbacks resolve against the published config.
+  EXPECT_CALL(bar_cb, Call(true));
+  EXPECT_CALL(late_bar_cb, Call(true));
+  EXPECT_CALL(late_baz_cb, Call(false));
+  filter_init_target.ready();
+  ::testing::Mock::VerifyAndClearExpectations(&bar_cb);
+  ::testing::Mock::VerifyAndClearExpectations(&late_bar_cb);
+  ::testing::Mock::VerifyAndClearExpectations(&late_baz_cb);
+
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
 }
 
 } // namespace

@@ -323,6 +323,8 @@ envoy_cc_test(
     srcs = ["vhds_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
@@ -331,6 +333,7 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

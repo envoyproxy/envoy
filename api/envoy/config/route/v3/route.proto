@@ -199,6 +199,31 @@ message RouteConfiguration {
 message Vhds {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 
+  // Configuration for allowing listener and route initialization to complete immediately while
+  // holding only requests that do not match an existing virtual host until the initial wildcard
+  // VHDS response is received.
+  message WarmingBlocksUnmatchedRequests {
+  }
+
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // If set, initial VHDS warming does not block listener or route configuration initialization;
+  // instead, only HTTP requests that do not match an existing virtual host (including a catch-all
+  // ``*`` virtual host, if configured) are held until the initial wildcard VHDS update completes.
+  // Per-domain on-demand VHDS requests (via the ``envoy.filters.http.on_demand`` HTTP filter) are
+  // not issued when this option is enabled. When unset, initial VHDS warming at startup blocks
+  // listener and route initialization (blocking all requests until the initial VHDS update
+  // completes).
+  //
+  // .. note::
+  //   Holding unmatched requests is currently only supported when the route configuration is
+  //   configured via top-level :ref:`rds
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>`
+  //   or :ref:`route_config
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.route_config>`
+  //   (not :ref:`scoped_routes
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scoped_routes>`,
+  //   where initial VHDS warming is skipped without holding unmatched requests).
+  WarmingBlocksUnmatchedRequests warming_blocks_unmatched_requests = 2;
 }

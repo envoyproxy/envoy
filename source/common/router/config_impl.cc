@@ -2290,10 +2290,13 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(config.typed_per_filter_config(),
                                                          factory_context, validator, init_manager),
                                 std::unique_ptr<PerFilterConfigs>)),
+      vhost_header_(config.vhost_header()),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
       uses_vhds_(config.has_vhds()),
+      warming_blocks_unmatched_requests_(config.has_vhds() &&
+                                         config.vhds().has_warming_blocks_unmatched_requests()),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
   if (!config.request_mirror_policies().empty()) {

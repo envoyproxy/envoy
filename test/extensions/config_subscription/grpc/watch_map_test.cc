@@ -1,3 +1,4 @@
+#include <array>
 #include <memory>
 
 #include "envoy/common/exception.h"
@@ -918,6 +919,76 @@ TEST(WatchMapTest, AcceptOtherResourcesPrefixGlob) {
 
   expectDeltaUpdate(callbacks, expected_resources, {}, "version1");
   doDeltaUpdate(watch_map, updated_resources, {}, "version1");
+}
+
+// accept("<prefix>/*") scopes resource-name routing without suppressing empty delta updates when
+// the watch's wire subscription is wildcard (empty or "*").
+TEST(WatchMapTest, AcceptOtherResourcesPrefixGlobEmptyDeltaUpdate) {
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  MockSubscriptionCallbacks callbacks3;
+  MockSubscriptionCallbacks callbacks4;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+  Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
+  Watch* watch4 = watch_map.addWatch(callbacks4, resource_decoder);
+
+  // watch1 uses an implicit wildcard on the wire (empty resource_names_) with accept("prefix/*").
+  watch_map.accept(watch1, {"prefix/*"});
+
+  // watch2 watches a concrete resource name with accept("prefix/*").
+  watch_map.updateWatchInterest(watch2, {"alice"});
+  watch_map.accept(watch2, {"prefix/*"});
+
+  // watch3 uses an explicit "*" wildcard on the wire with accept("prefix/*").
+  watch_map.updateWatchInterest(watch3, {"*"});
+  watch_map.accept(watch3, {"prefix/*"});
+
+  // watch4 watches a concrete resource name with accept("*"): wire subscription is not wildcard,
+  // so it must not receive an empty delta update.
+  watch_map.updateWatchInterest(watch4, {"alice"});
+  watch_map.accept(watch4, {"*"});
+
+  expectDeltaUpdate(callbacks1, {}, {}, "version1");
+  expectNoUpdate(callbacks2, "version1");
+  expectDeltaUpdate(callbacks3, {}, {}, "version1");
+  expectNoUpdate(callbacks4, "version1");
+  doDeltaUpdate(watch_map, {}, {}, "version1");
+}
+
+// Adding watches (and forcing a watches_ rehash) from within an empty delta onConfigUpdate
+// callback must not invalidate iteration or deliver the in-flight empty update to newly added
+// watches.
+TEST(WatchMapTest, EmptyDeltaUpdateRehashDoesNotUseAfterFreeOrNotifyAddedWatches) {
+  MockSubscriptionCallbacks callbacks;
+  std::array<NiceMock<MockSubscriptionCallbacks>, 32> added_callbacks;
+  for (auto& cb : added_callbacks) {
+    EXPECT_CALL(cb, onConfigUpdate(_, _)).Times(0);
+    EXPECT_CALL(cb, onConfigUpdate(_, _, _)).Times(0);
+  }
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
+  watch_map.addWatch(callbacks, resource_decoder);
+
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _, "version1"))
+      .WillOnce([&](const std::vector<DecodedResourceRef>& gotten_resources,
+                    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                    const std::string&) {
+        EXPECT_TRUE(gotten_resources.empty());
+        EXPECT_TRUE(removed_resources.empty());
+        for (auto& cb : added_callbacks) {
+          watch_map.addWatch(cb, resource_decoder);
+        }
+        return absl::OkStatus();
+      });
+
+  doDeltaUpdate(watch_map, {}, {}, "version1");
 }
 
 // accept("*") makes the watch accept every resource, without an empty

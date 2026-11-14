@@ -19,6 +19,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/http/header_map.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
@@ -1151,6 +1152,36 @@ public:
    * @return whether router configuration uses VHDS.
    */
   virtual bool usesVhds() const PURE;
+
+  /**
+   * @return bool whether router configuration is awaiting initial wildcard VHDS update.
+   */
+  virtual bool awaitingInitialVhdsUpdate() const { return false; }
+
+  /**
+   * @return bool whether initial VHDS warming only holds requests that do not match an existing
+   * virtual host (and skips per-domain on-demand VHDS updates).
+   */
+  virtual bool warmingBlocksUnmatchedRequests() const { return false; }
+
+  /**
+   * @return the alternate header name used for virtual host lookup, or an empty header name when
+   * routing by ``:authority``.
+   */
+  virtual const Http::LowerCaseString& vhostHeader() const PURE;
+
+  /**
+   * @return the effective virtual-host lookup header value for ``headers``: the configured
+   * alternate ``vhost_header`` value (empty if absent or empty) or ``:authority`` when
+   * ``vhost_header`` is not configured.
+   */
+  absl::string_view vhostHeaderValue(const Http::RequestHeaderMap& headers) const {
+    if (!vhostHeader().get().empty()) {
+      const auto result = headers.get(vhostHeader());
+      return result.empty() ? absl::string_view{} : result[0]->value().getStringView();
+    }
+    return headers.getHostValue();
+  }
 
   /**
    * @return bool whether most specific header mutations should take precedence. The default

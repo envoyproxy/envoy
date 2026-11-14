@@ -54,6 +54,7 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/utility.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -419,6 +420,9 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  stream.state_.waiting_for_vhds_ = false;
+  stream.state_.deferred_to_next_io_iteration_ = false;
+  stream.vhds_update_callback_.reset();
   if (!stream.state_.is_internally_destroyed_) {
     ++closed_non_internally_destroyed_requests_;
     if (isPrematureRstStream(stream)) {
@@ -1793,48 +1797,33 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
-
-  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
-    filter_manager_.streamInfo().setTraceReason(
-        ConnectionManagerUtility::mutateTracingRequestHeader(
-            *request_headers_, connection_manager_.runtime_, *connection_manager_.config_,
-            cached_route_.value().get()));
-  }
-
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
-  const FilterManager::CreateChainResult create_chain_result =
-      filter_manager_.createDownstreamFilterChain();
-  if (create_chain_result.upgradeAccepted()) {
-    connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-    connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-    state_.successful_upgrade_ = true;
-  }
 
-  if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
-    log(AccessLog::AccessLogType::DownstreamStart);
-  }
-
-  // TODO if there are no filters when starting a filter iteration, the connection manager
-  // should return 404. The current returns no response if there is no router filter.
-  if (hasCachedRoute()) {
-    // Do not allow upgrades if the route does not support it.
-    if (create_chain_result.upgradeRejected()) {
-      // While downstream servers should not send upgrade payload without the upgrade being
-      // accepted, err on the side of caution and refuse to process any further requests on this
-      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
-      // contains a smuggled HTTP request.
-      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
-      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
+  // Holding unmatched requests until the initial VHDS response arrives currently requires a
+  // top-level RouteConfigProvider.
+  // TODO(antoniovleonti): Support holding unmatched requests during initial VHDS warming with
+  // Scoped RDS (scoped_routes).
+  if (!filter_manager_.streamInfo().virtualHost().has_value() &&
+      connection_manager_.config_->routeConfigProvider() != nullptr &&
+      snapped_route_config_ != nullptr && snapped_route_config_->awaitingInitialVhdsUpdate()) {
+    const absl::string_view vhost_domain =
+        snapped_route_config_->vhostHeaderValue(*request_headers_);
+    if (!vhost_domain.empty()) {
+      state_.waiting_for_vhds_ = true;
+      state_.deferred_end_stream_ = end_stream;
+      response_encoder_->getStream().readDisable(true);
+      vhds_update_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(
+          [this](bool) -> void { onInitialVhdsUpdateComplete(); });
+      connection_manager_.config_->routeConfigProvider()->requestVirtualHostsUpdate(
+          absl::AsciiStrToLower(vhost_domain), *connection_manager_.dispatcher_,
+          vhds_update_callback_);
+      resetIdleTimer();
       return;
     }
-    // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  // Check if tracing is enabled.
-  if (connection_manager_tracing_config_.has_value()) {
-    traceRequest();
+  if (!createFilterChainAndTraceRequest()) {
+    return;
   }
 
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
@@ -1879,7 +1868,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   maybeRecordLastByteReceived(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (!state_.deferred_to_next_io_iteration_ && !state_.waiting_for_vhds_) {
     filter_manager_.decodeData(data, end_stream);
   } else {
     if (!deferred_data_) {
@@ -1903,7 +1892,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
     return;
   }
   maybeRecordLastByteReceived(true);
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (!state_.deferred_to_next_io_iteration_ && !state_.waiting_for_vhds_) {
     request_trailers_ = std::move(trailers);
     filter_manager_.decodeTrailers(*request_trailers_);
   } else {
@@ -1917,7 +1906,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   resetIdleTimer();
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (!state_.deferred_to_next_io_iteration_ && !state_.waiting_for_vhds_) {
     // After going through filters, the ownership of metadata_map will be passed to terminal filter.
     // The terminal filter may encode metadata_map to the next hop immediately or store metadata_map
     // and encode later when connection pool is ready.
@@ -2127,6 +2116,12 @@ std::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream:
 }
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
+  if (state_.waiting_for_vhds_ || state_.deferred_to_next_io_iteration_) {
+    filter_manager_.abortDecoderFilterChain();
+    state_.waiting_for_vhds_ = false;
+    state_.deferred_to_next_io_iteration_ = false;
+    vhds_update_callback_.reset();
+  }
   // The BadRequest error code indicates there has been a messaging error.
   if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {
@@ -2847,13 +2842,16 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
 }
 
 void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
+  state_.waiting_for_vhds_ = false;
+  state_.deferred_to_next_io_iteration_ = false;
+  vhds_update_callback_.reset();
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
 }
 
 bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   // TODO(yanavlasov): Merge this with the filter manager continueIteration() method
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (state_.waiting_for_vhds_ || !state_.deferred_to_next_io_iteration_) {
     return false;
   }
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
@@ -2881,6 +2879,82 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
     filter_manager_.decodeTrailers(*request_trailers_);
   }
   return true;
+}
+
+bool ConnectionManagerImpl::ActiveStream::createFilterChainAndTraceRequest() {
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
+    filter_manager_.streamInfo().setTraceReason(
+        ConnectionManagerUtility::mutateTracingRequestHeader(
+            *request_headers_, connection_manager_.runtime_, *connection_manager_.config_,
+            cached_route_.value().get()));
+  }
+
+  const FilterManager::CreateChainResult create_chain_result =
+      filter_manager_.createDownstreamFilterChain();
+  if (create_chain_result.upgradeAccepted()) {
+    connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
+    connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
+    state_.successful_upgrade_ = true;
+  }
+
+  if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
+    log(AccessLog::AccessLogType::DownstreamStart);
+  }
+
+  // TODO if there are no filters when starting a filter iteration, the connection manager
+  // should return 404. The current returns no response if there is no router filter.
+  if (hasCachedRoute()) {
+    // Do not allow upgrades if the route does not support it.
+    if (create_chain_result.upgradeRejected()) {
+      // While downstream servers should not send upgrade payload without the upgrade being
+      // accepted, err on the side of caution and refuse to process any further requests on this
+      // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
+      // contains a smuggled HTTP request.
+      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+      filter_manager_.abortDecoderFilterChain();
+      sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
+      return false;
+    }
+    // Allow non websocket requests to go through websocket enabled routes.
+  }
+
+  // Check if tracing is enabled.
+  if (connection_manager_tracing_config_.has_value()) {
+    traceRequest();
+  }
+
+  return true;
+}
+
+void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
+  if (canDestroyStream() || !state_.waiting_for_vhds_) {
+    return;
+  }
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
+
+  state_.waiting_for_vhds_ = false;
+  vhds_update_callback_.reset();
+
+  refreshRouteConfigSnapshot();
+  clearRouteCache();
+  refreshCachedRoute();
+
+  if (!createFilterChainAndTraceRequest()) {
+    return;
+  }
+
+  response_encoder_->getStream().readDisable(false);
+
+  state_.deferred_to_next_io_iteration_ = true;
+  if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
+    onDeferredRequestProcessing();
+  }
+
+  resetIdleTimer();
 }
 
 bool ConnectionManagerImpl::shouldDeferRequestProxyingToNextIoCycle() {

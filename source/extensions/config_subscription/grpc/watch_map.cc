@@ -1,5 +1,7 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
+#include <vector>
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
@@ -65,11 +67,12 @@ void WatchMap::forgetAccept(Watch* watch) {
 
 void WatchMap::updateWildcardWatches(Watch* watch) {
   // accept() patterns are evaluated FIRST and take precedence: a watch that has declared any
-  // accept() pattern is routed by those patterns (plus its concrete names) only, so it is never a
-  // catch-all wildcard watch here -- even if its resource_names_ is empty or contains "*". This is
-  // what lets a watch subscribe to the wildcard on the wire while routing only a subset (e.g.
-  // VHDS). To keep wildcard routing while using accept(), the caller includes "*" in the accept()
-  // patterns, which is tracked separately in accept_wildcard_watches_.
+  // accept() pattern is routed by those patterns (plus its concrete names) only, so it is excluded
+  // from wildcard_watches_ for named-resource routing even if its resource_names_ is empty or
+  // contains "*". This is what lets a watch subscribe to the wildcard on the wire while routing
+  // only a subset (e.g. VHDS); empty delta updates still notify watches whose wire subscription
+  // is wildcard. To keep wildcard resource routing while using accept(), the caller includes "*"
+  // in the accept() patterns, which is tracked separately in accept_wildcard_watches_.
   if (!watch->accept_patterns_.empty()) {
     wildcard_watches_.erase(watch);
     return;
@@ -406,10 +409,24 @@ void WatchMap::onConfigUpdate(
     THROW_IF_NOT_OK(
         cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
   }
-  // notify empty update
+  // Notify empty update to watches with a wildcard wire subscription. Snapshot matching pointers
+  // first so addWatch() inside a callback cannot rehash watches_ mid-iteration or receive the
+  // in-flight empty update.
   if (added_resources.empty() && removed_resources.empty()) {
-    for (auto& cur_watch : wildcard_watches_) {
-      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
+    std::vector<Watch*> empty_update_watches;
+    for (auto& watch : watches_) {
+      if (deferred_removed_during_update_->count(watch.get()) > 0) {
+        continue;
+      }
+      if (watch->resource_names_.empty() || watch->resource_names_.contains(Wildcard)) {
+        empty_update_watches.push_back(watch.get());
+      }
+    }
+    for (Watch* watch : empty_update_watches) {
+      if (deferred_removed_during_update_->count(watch) > 0) {
+        continue;
+      }
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
     }
   }
 

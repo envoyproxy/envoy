@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -15,6 +17,7 @@
 #include "test/integration/vhds.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -610,6 +613,425 @@ TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
                                     "false");
   runVhdsOnDemandNoMatchingRoute();
   cleanupUpstreamAndDownstream();
+}
+
+class VhdsWarmingBlocksUnmatchedRequestsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                          public VhdsIntegrationTest {
+public:
+  using RouteConfigModifier = std::function<void(envoy::config::route::v3::RouteConfiguration&)>;
+
+  void initialize() override {
+    useRdsWithVhosts();
+    if (routeConfigType() == RouteConfigType::Static) {
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            auto* route_config = hcm.mutable_route_config();
+            route_config->CopyFrom(warmingBlocksUnmatchedRequestsRdsConfig());
+          });
+    }
+
+    setUpstreamCount(2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration,
+          {warmingBlocksUnmatchedRequestsRdsConfig()}, "1");
+    }
+
+    test_server_->waitUntilListenersReady();
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+        "listener_manager.listener_create_success", 1);
+    absl::Notification main_thread_done;
+    test_server_->server().dispatcher().post([&main_thread_done] { main_thread_done.Notify(); });
+    main_thread_done.WaitForNotification();
+    ASSERT_TRUE(workersStarted());
+    registerTestServerPorts({"http"});
+  }
+
+  // Deterministically synchronizes until Envoy's worker and main dispatchers have processed the
+  // incoming requests and queued their initial VHDS update callbacks without advancing SimTime.
+  void waitForHeldRequests(uint64_t expected_downstream_rq_total) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+        "http.config_test.downstream_rq_total", expected_downstream_rq_total);
+    test_server_->waitForWorkerThreads();
+    absl::Notification done;
+    test_server_->server().dispatcher().post([&done] { done.Notify(); });
+    done.WaitForNotification();
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  envoy::config::route::v3::RouteConfiguration warmingBlocksUnmatchedRequestsRdsConfig() const {
+    auto config = rdsConfig();
+    config.mutable_vhds()->mutable_warming_blocks_unmatched_requests();
+    if (route_config_modifier_ != nullptr) {
+      route_config_modifier_(config);
+    }
+    return config;
+  }
+
+  void startVhdsStreamAndExpectInitialWildcardRequest() {
+    AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    vhds_stream_->startGrpcStream();
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+  }
+
+  std::string vhdsStatPrefix() const {
+    return routeConfigType() == RouteConfigType::Rds ? "http.config_test.rds.vhds.my_route."
+                                                     : "vhds.my_route.";
+  }
+
+  RouteConfigModifier route_config_modifier_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       ServesStaticImmediatelyAndHoldsUnmatchedUntilVhdsUpdate) {
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  // 1. Static virtual host matched route is served immediately while VHDS is in flight.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+
+  // 2. Static virtual host unmatched path immediately returns 404 without waiting for VHDS.
+  Http::TestRequestHeaderMapImpl unmatched_path_headers{{":method", "GET"},
+                                                        {":path", "/unmatched"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "vhost.rds.first"}};
+  auto static_404_response = codec_client_->makeHeaderOnlyRequest(unmatched_path_headers);
+  ASSERT_TRUE(static_404_response->waitForEndStream());
+  EXPECT_EQ("404", static_404_response->headers().getStatusValue());
+
+  // 3. Concurrent unmatched-vhost requests are held while initial wildcard VHDS is in flight:
+  // - One matching request with headers, body, and request trailers.
+  // - One unmatched header-only request.
+  Http::TestRequestHeaderMapImpl request_headers1{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "trailer-value"}};
+  auto [encoder1, response1] = codec_client_->startRequest(request_headers1);
+  codec_client_->sendData(encoder1, "hello", false);
+  codec_client_->sendTrailers(encoder1, request_trailers);
+
+  Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers2);
+
+  waitForHeldRequests(4);
+  EXPECT_FALSE(response1->complete());
+  EXPECT_FALSE(response2->complete());
+
+  // 4. Deliver the initial wildcard VHDS response with sni.lyft.com.
+  sendInitialVhdsResponse();
+
+  // 5. Request 1 wakes with buffered body and trailers intact; request 2 wakes to 404 because
+  // unknown.com was not added.
+  waitForNextUpstreamRequest(1);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("hello", upstream_request_->body().toString());
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("404", response2->headers().getStatusValue());
+
+  // 6. Subsequent unmatched request immediately receives 404 without waiting.
+  Http::TestRequestHeaderMapImpl unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "still-unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       EmptyInitialVhdsResponseWakesHeldRequestTo404) {
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  // 1. Unmatched request is held while initial VHDS is in flight.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForHeldRequests(1);
+  EXPECT_FALSE(response->complete());
+
+  // 2. Deliver an empty initial wildcard VHDS response (no resources added or removed).
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {}, {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 3. Held request is woken up and completes with 404.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // 4. Subsequent unmatched request immediately receives 404 without waiting.
+  Http::TestRequestHeaderMapImpl unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       InitialVhdsFetchTimeoutWakesHeldRequestTo404) {
+  const MonotonicTime start_sim_time = timeSystem().monotonicTime();
+  route_config_modifier_ = [](envoy::config::route::v3::RouteConfiguration& config) {
+    config.mutable_vhds()->mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(1);
+  };
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  // 1. Static virtual host is served immediately while initial VHDS is in flight.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+
+  // 2. Unmatched request is held until the VHDS initial_fetch_timeout expires.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForHeldRequests(2);
+  EXPECT_FALSE(response->complete());
+
+  EXPECT_EQ(start_sim_time, timeSystem().monotonicTime());
+  timeSystem().advanceTimeWaitImpl(std::chrono::seconds(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+      vhdsStatPrefix() + "init_fetch_timeout", 1);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // 3. Subsequent unmatched request immediately receives 404 without waiting.
+  Http::TestRequestHeaderMapImpl unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       RejectedInitialVhdsUpdateWakesHeldRequestTo404) {
+  const MonotonicTime start_sim_time = timeSystem().monotonicTime();
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  // 1. Unmatched request is held while initial VHDS is in flight.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForHeldRequests(1);
+  EXPECT_FALSE(response->complete());
+
+  // 2. Send an invalid initial VHDS update (duplicate domain) that Envoy rejects and NACKs.
+  auto invalid_vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+name: my_route/vhost_invalid
+domains: ["sni.lyft.com", "sni.lyft.com"]
+routes:
+- match: { prefix: "/" }
+  route: { cluster: "my_service" }
+)EOF");
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {invalid_vhost}, {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(
+      Config::TestTypeUrl::get().VirtualHost, {}, {}, vhds_stream_.get(),
+      Grpc::Status::WellKnownGrpcStatus::Internal, "Duplicate entry of domain sni.lyft.com"));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+      vhdsStatPrefix() + "update_rejected", 1);
+
+  // 3. Rejection ends initial VHDS waiting and wakes held request to 404.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // 4. Subsequent unmatched request immediately receives 404 without waiting.
+  Http::TestRequestHeaderMapImpl unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+
+  EXPECT_EQ(start_sim_time, timeSystem().monotonicTime());
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       CatchAllStaticVirtualHostServesImmediatelyWithoutHolding) {
+  route_config_modifier_ = [](envoy::config::route::v3::RouteConfiguration& config) {
+    auto* catch_all = config.add_virtual_hosts();
+    catch_all->set_name("vhost_catchall");
+    catch_all->add_domains("*");
+    auto* route = catch_all->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_route()->set_cluster("my_service");
+  };
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  // 1. Because the static catch-all '*' virtual host matches, any host is served immediately while
+  // initial VHDS is still in flight.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl static_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "any.example.com"}};
+  auto static_response = codec_client_->makeHeaderOnlyRequest(static_headers);
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(static_response->waitForEndStream());
+  EXPECT_EQ("200", static_response->headers().getStatusValue());
+  EXPECT_TRUE(static_response->headers().get(Http::LowerCaseString("x-vhost-source")).empty());
+
+  // 2. Deliver a dynamic VHDS virtual host for sni.lyft.com and confirm subsequent requests match
+  // the dynamic virtual host ahead of the catch-all.
+  auto dynamic_vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+name: my_route/vhost_0
+domains: ["sni.lyft.com"]
+response_headers_to_add:
+- header:
+    key: "x-vhost-source"
+    value: "vhds"
+routes:
+- match: { prefix: "/" }
+  route: { cluster: "my_service" }
+)EOF");
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {dynamic_vhost}, {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+  test_server_->waitForWorkerThreads();
+
+  Http::TestRequestHeaderMapImpl dynamic_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto dynamic_response = codec_client_->makeHeaderOnlyRequest(dynamic_headers);
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(dynamic_response->waitForEndStream());
+  EXPECT_EQ("200", dynamic_response->headers().getStatusValue());
+  const auto source_header =
+      dynamic_response->headers().get(Http::LowerCaseString("x-vhost-source"));
+  ASSERT_EQ(1, source_header.size());
+  EXPECT_EQ("vhds", source_header[0]->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       StaticVirtualHostUnmatchedPathWithOnDemandFilterReturns404Immediately) {
+  config_helper_.prependFilter(R"EOF(
+  name: envoy.filters.http.on_demand
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+  )EOF");
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  // 1. Request matching static virtual host vhost.rds.first with an unmatched path immediately
+  // returns 404 without holding in HCM and without triggering an on-demand VHDS request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl unmatched_path_headers{{":method", "GET"},
+                                                        {":path", "/unmatched"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "vhost.rds.first"}};
+  auto static_404_response = codec_client_->makeHeaderOnlyRequest(unmatched_path_headers);
+  ASSERT_TRUE(static_404_response->waitForEndStream());
+  EXPECT_EQ("404", static_404_response->headers().getStatusValue());
+
+  // 2. Unmatched virtual host request is held by HCM until initial VHDS completes, and does not
+  // emit an extra on-demand DeltaDiscoveryRequest.
+  Http::TestRequestHeaderMapImpl dynamic_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto dynamic_response = codec_client_->makeHeaderOnlyRequest(dynamic_headers);
+  waitForHeldRequests(2);
+  EXPECT_FALSE(dynamic_response->complete());
+
+  sendInitialVhdsResponse();
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(dynamic_response->waitForEndStream());
+  EXPECT_EQ("200", dynamic_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       CustomVhostHeaderHoldsMatchingAndRejectsMissingHeader) {
+  route_config_modifier_ = [](envoy::config::route::v3::RouteConfiguration& config) {
+    config.set_vhost_header("x-vhost");
+  };
+  initialize();
+  startVhdsStreamAndExpectInitialWildcardRequest();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // 1. Request without x-vhost returns 404 immediately even if :authority matches a VHDS host.
+  Http::TestRequestHeaderMapImpl missing_vhost_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto missing_response = codec_client_->makeHeaderOnlyRequest(missing_vhost_headers);
+  ASSERT_TRUE(missing_response->waitForEndStream());
+  EXPECT_EQ("404", missing_response->headers().getStatusValue());
+
+  // 2. Request with an empty x-vhost header also returns 404 immediately.
+  Http::TestRequestHeaderMapImpl empty_vhost_headers{{":method", "GET"},
+                                                     {":path", "/"},
+                                                     {":scheme", "http"},
+                                                     {":authority", "ignored.lyft.com"},
+                                                     {"x-vhost", ""}};
+  auto empty_response = codec_client_->makeHeaderOnlyRequest(empty_vhost_headers);
+  ASSERT_TRUE(empty_response->waitForEndStream());
+  EXPECT_EQ("404", empty_response->headers().getStatusValue());
+
+  // 3. Request with x-vhost pointing to the dynamic host is held even when :authority matches the
+  // static virtual host, and resolves once the initial VHDS response arrives.
+  Http::TestRequestHeaderMapImpl custom_vhost_headers{{":method", "GET"},
+                                                      {":path", "/rdsone"},
+                                                      {":scheme", "http"},
+                                                      {":authority", "vhost.rds.first"},
+                                                      {"x-vhost", "SNI.LYFT.COM"}};
+  auto held_response = codec_client_->makeHeaderOnlyRequest(custom_vhost_headers);
+  waitForHeldRequests(3);
+  EXPECT_FALSE(held_response->complete());
+
+  sendInitialVhdsResponse();
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(held_response->waitForEndStream());
+  EXPECT_EQ("200", held_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace

@@ -482,6 +482,7 @@ envoy_cc_test(
         # Required so the trivial ``add-header-filter`` used by the
         # regression tests (to count decode-chain invocations) is available.
         "//test/integration/filters:add_header_filter_config_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

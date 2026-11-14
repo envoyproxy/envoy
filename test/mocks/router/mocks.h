@@ -655,6 +655,9 @@ public:
   MOCK_METHOD(const std::vector<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));
+  MOCK_METHOD(bool, awaitingInitialVhdsUpdate, (), (const));
+  MOCK_METHOD(bool, warmingBlocksUnmatchedRequests, (), (const));
+  MOCK_METHOD(const Http::LowerCaseString&, vhostHeader, (), (const));
   MOCK_METHOD(bool, mostSpecificHeaderMutationsWins, (), (const));
   MOCK_METHOD(uint32_t, maxDirectResponseBodySizeBytes, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
@@ -664,6 +667,7 @@ public:
   std::shared_ptr<MockRoute> route_;
   std::vector<Http::LowerCaseString> internal_only_headers_;
   std::string name_{"fake_config"};
+  Http::LowerCaseString vhost_header_{""};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
 };
@@ -722,6 +726,7 @@ public:
               (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& version_info));
+  MOCK_METHOD(void, onVhdsFailure, ());
 };
 
 class MockScopedConfig : public ScopedConfig {

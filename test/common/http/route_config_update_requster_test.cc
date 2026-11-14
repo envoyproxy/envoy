@@ -14,6 +14,7 @@ namespace {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 class TestRouteCache : public RouteCache {
 public:
@@ -64,6 +65,43 @@ TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateWithoutHostContinuesFilterCh
   updated = true;
   TestRequestHeaderMapImpl empty_host{{":method", "GET"}, {":path", "/"}, {":authority", ""}};
   requestUpdate(empty_host, updated);
+  EXPECT_FALSE(updated);
+}
+
+TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateSkippedWhenWarmingBlocksUnmatchedRequests) {
+  ON_CALL(*route_config_, warmingBlocksUnmatchedRequests()).WillByDefault(Return(true));
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+
+  bool updated = true;
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}};
+  requestUpdate(headers, updated);
+  EXPECT_FALSE(updated);
+}
+
+TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateWithAlternateVhostHeader) {
+  const Http::LowerCaseString vhost_header("x-vhost");
+  ON_CALL(*route_config_, vhostHeader()).WillByDefault(ReturnRef(vhost_header));
+
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate("custom.host", _, _));
+  bool updated = false;
+  TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                   {":path", "/"},
+                                   {":authority", "Ignored.Host"},
+                                   {"x-vhost", "Custom.Host"}};
+  requestUpdate(headers, updated);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&provider_));
+
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+  updated = true;
+  TestRequestHeaderMapImpl missing_vhost_header{
+      {":method", "GET"}, {":path", "/"}, {":authority", "Ignored.Host"}};
+  requestUpdate(missing_vhost_header, updated);
+  EXPECT_FALSE(updated);
+
+  updated = true;
+  TestRequestHeaderMapImpl empty_vhost_header{
+      {":method", "GET"}, {":path", "/"}, {":authority", "Ignored.Host"}, {"x-vhost", ""}};
+  requestUpdate(empty_vhost_header, updated);
   EXPECT_FALSE(updated);
 }
 
