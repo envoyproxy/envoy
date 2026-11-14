@@ -45,7 +45,8 @@ class ZstdDecompressorImpl : public Envoy::Compression::Zstd::Common::Base,
                              NonCopyable {
 public:
   ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
-                       const ZstdDDictManagerPtr& ddict_manager, uint32_t chunk_size);
+                       const ZstdDDictManagerPtr& ddict_manager, uint32_t chunk_size,
+                       uint32_t max_inflate_ratio = 100, uint32_t max_block_size = 0);
 
   // Envoy::Compression::Decompressor::Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
@@ -56,16 +57,15 @@ private:
   }
 
   friend class ZstdDecompressorStatsTest;
-  bool process(Buffer::Instance& output_buffer, uint64_t limit);
+  bool process(Buffer::Instance& output_buffer, uint64_t& remaining_output);
   bool isError(size_t result);
 
   std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> dctx_;
   const ZstdDDictManagerPtr& ddict_manager_;
   const ZstdDecompressorStats stats_;
+  const uint32_t max_inflate_ratio_;
+  const uint32_t max_block_size_;
   bool is_dictionary_set_{false};
-  // A zstd block can emit output while processing a later input chunk.
-  uint64_t compressed_bytes_{0};
-  uint64_t decompressed_bytes_{0};
 };
 
 } // namespace Decompressor

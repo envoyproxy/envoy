@@ -63,34 +63,61 @@ TEST_F(ZstdDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   EXPECT_EQ(0, stats_store.counterFromString("test.zstd_generic_error").value());
 }
 
-// Network chunk boundaries must not reset the expansion budget of a stream.
-// In particular, a low-ratio request can have a highly compressible tail.
-TEST_F(ZstdDecompressorImplTest, CompressionRatioIncludesEarlierInputChunks) {
+TEST_F(ZstdDecompressorImplTest, FinalByteCanReleaseBufferedBlock) {
+  constexpr uint32_t max_block_size = 12288;
+  constexpr uint32_t max_inflate_ratio = 200;
   Buffer::OwnedImpl buffer;
-  TestUtility::feedBufferWithRandomCharacters(buffer, 32768, 42);
-  buffer.add(std::string(262144, 'a') + "END");
+  TestUtility::feedBufferWithRandomCharacters(buffer, 4096, 42);
+  buffer.add(std::string(max_block_size + max_inflate_ratio - buffer.length(), 'a'));
   const std::string expected = buffer.toString();
   Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
                                                   default_enable_checksum_, default_strategy_,
                                                   default_cdict_manager_, 4096};
   compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
   const std::string compressed = buffer.toString();
-  ASSERT_LT(expected.size(), 100 * compressed.size());
 
-  Stats::IsolatedStoreImpl stats_store{};
-  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_,
-                                    131072};
-  std::string actual;
-  for (size_t offset = 0; offset < compressed.size(); offset += 1024) {
-    Buffer::OwnedImpl input(compressed.substr(offset, 1024));
-    Buffer::OwnedImpl decoded;
-    decompressor.decompress(input, decoded);
-    actual.append(decoded.toString());
-  }
+  envoy::extensions::compression::zstd::decompressor::v3::Zstd config;
+  config.mutable_chunk_size()->set_value(4096);
+  config.mutable_max_inflate_ratio()->set_value(max_inflate_ratio);
+  config.mutable_max_block_size()->set_value(max_block_size);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ZstdDecompressorLibraryFactory lib_factory;
+  auto factory = lib_factory.createDecompressorFactoryFromProto(config, context);
+  auto decompressor = factory->createDecompressor("test.");
 
+  Buffer::OwnedImpl prefix(compressed.substr(0, compressed.size() - 1));
+  Buffer::OwnedImpl output;
+  decompressor->decompress(prefix, output);
+  ASSERT_EQ(0, output.length());
+  Buffer::OwnedImpl last_byte(compressed.substr(compressed.size() - 1));
+  decompressor->decompress(last_byte, output);
+  Buffer::OwnedImpl empty;
+  decompressor->decompress(empty, output);
+  EXPECT_EQ(expected, output.toString());
+  EXPECT_EQ(0, context.store_.counterFromString("test.zstd_generic_error").value());
+}
+
+TEST_F(ZstdDecompressorImplTest, InflateLimitDoesNotWrap) {
+  class LargeInput : public Buffer::OwnedImpl {
+  public:
+    using Buffer::OwnedImpl::OwnedImpl;
+    uint64_t length() const override { return uint64_t{1} << 63; }
+  };
+
+  const std::string expected = "zstd payload";
+  Buffer::OwnedImpl buffer(expected);
+  Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
+                                                  default_enable_checksum_, default_strategy_,
+                                                  default_cdict_manager_, 4096};
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  LargeInput input(buffer.toString());
+  Buffer::OwnedImpl output;
+  Stats::IsolatedStoreImpl stats_store;
+  ZstdDecompressorImpl decompressor{
+      *stats_store.rootScope(), "test.", default_ddict_manager_, 4096, 2, 0};
+  decompressor.decompress(input, output);
+  EXPECT_EQ(expected, output.toString());
   EXPECT_EQ(0, stats_store.counterFromString("test.zstd_generic_error").value());
-  ASSERT_EQ(expected.size(), actual.size());
-  EXPECT_EQ(expected, actual);
 }
 
 TEST_F(ZstdDecompressorImplTest, WrongInput) {
@@ -201,37 +228,39 @@ TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatio) {
   ASSERT_EQ(stats_store.counterFromString("test.zstd_generic_error").value(), 1);
 }
 
-// Earlier incompressible input must not disable the expansion limit. The
-// decompressor still stops within one output chunk of the stream-wide budget.
-TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatioAcrossInputChunks) {
-  Buffer::OwnedImpl buffer;
-  TestUtility::feedBufferWithRandomCharacters(buffer, 256, 42);
-  buffer.add(std::string(65536, 'a'));
+TEST_F(ZstdDecompressorImplTest, BlockAllowanceIsSharedAcrossSlicesInOneCall) {
+  constexpr uint32_t max_inflate_ratio = 4;
+  constexpr uint32_t max_block_size = 16384;
   Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
                                                   default_enable_checksum_, default_strategy_,
                                                   default_cdict_manager_, 4096};
-  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
-  const std::string compressed = buffer.toString();
-  ASSERT_GT(256 + 65536, 100 * compressed.size());
+  Buffer::OwnedImpl prefix;
+  TestUtility::feedBufferWithRandomCharacters(prefix, 32768, 42);
+  compressor.compress(prefix, Envoy::Compression::Compressor::State::Flush);
 
-  Stats::IsolatedStoreImpl stats_store{};
-  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_, 16};
-  uint64_t input_size = 0;
-  uint64_t output_size = 0;
-  for (size_t offset = 0; offset < compressed.size(); offset += 64) {
-    Buffer::OwnedImpl input(compressed.substr(offset, 64));
-    Buffer::OwnedImpl decoded;
-    input_size += input.length();
-    decompressor.decompress(input, decoded);
-    output_size += decoded.length();
-    if (stats_store.counterFromString("test.zstd_generic_error").value() != 0) {
-      break;
-    }
-  }
+  Stats::IsolatedStoreImpl stats_store;
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.",
+                                    default_ddict_manager_,   32768,
+                                    max_inflate_ratio,        max_block_size};
+  Buffer::OwnedImpl prefix_output;
+  decompressor.decompress(prefix, prefix_output);
+  ASSERT_EQ(32768, prefix_output.length());
 
+  Buffer::OwnedImpl first_block(std::string(max_block_size, 'a'));
+  Buffer::OwnedImpl second_block(std::string(max_block_size, 'b'));
+  compressor.compress(first_block, Envoy::Compression::Compressor::State::Flush);
+  compressor.compress(second_block, Envoy::Compression::Compressor::State::Finish);
+  Buffer::OwnedImpl input;
+  input.appendSliceForTest(first_block.toString());
+  input.appendSliceForTest(second_block.toString());
+  const uint64_t limit = input.length() * max_inflate_ratio + max_block_size;
+  ASSERT_LT(limit, 2 * max_block_size);
+
+  Buffer::OwnedImpl output;
+  decompressor.decompress(input, output);
   EXPECT_EQ(1, stats_store.counterFromString("test.zstd_generic_error").value());
-  EXPECT_GT(output_size, 100 * input_size);
-  EXPECT_LE(output_size, 100 * input_size + 16);
+  EXPECT_GE(output.length(), max_block_size);
+  EXPECT_LE(output.length(), limit);
 }
 
 } // namespace
