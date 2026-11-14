@@ -1,12 +1,14 @@
 #include <atomic>
 #include <thread>
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/server/admin/config_tracker_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -1932,6 +1934,45 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
 }
 
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
+  auto config = newOptionalHooksConfig();
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  auto collect = [&]() {
+    return envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+        config->thisAsVoidPtr(), providers, 1);
+  };
+  EXPECT_EQ(collect(), nullptr);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  EXPECT_EQ(collect(), nullptr);
+  Server::ConfigTrackerImpl tracker;
+  auto provider = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
+    auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    dump->mutable_bootstrap()->mutable_node()->set_id("test-node");
+    return dump;
+  });
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  auto snapshot = collect();
+  ASSERT_NE(snapshot, nullptr);
+  config->onShutdown();
+  EXPECT_EQ(collect(), nullptr);
+  config.reset();
+  std::string json;
+  std::thread worker([&]() {
+    EXPECT_TRUE(envoy_dynamic_module_callback_config_snapshot_serialize(
+        snapshot,
+        [](envoy_dynamic_module_type_envoy_buffer buffer, void* result) {
+          static_cast<std::string*>(result)->assign(buffer.ptr, buffer.length);
+        },
+        &json));
+    envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
+  });
+  worker.join();
+  EXPECT_THAT(json, testing::HasSubstr("test-node"));
+}
+
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.
 TEST_F(BootstrapAbiImplTest, EnableClusterLifecycle) {
   auto dynamic_module =
@@ -2317,6 +2358,11 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        [] {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot",
+       [] {
+         EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+                                nullptr, nullptr, 0));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {

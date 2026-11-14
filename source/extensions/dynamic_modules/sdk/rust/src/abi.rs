@@ -9904,6 +9904,47 @@ pub enum envoy_dynamic_module_type_bootstrap_active_resource_kind {
     TransportSocketMatch = 2,
     Secret = 3,
 }
+/** A configuration snapshot owned by the module. Release it with
+ envoy_dynamic_module_callback_config_snapshot_delete. It remains valid after server destruction
+ and can move between threads, but must not be used concurrently.*/
+pub type envoy_dynamic_module_type_config_snapshot_ptr = *mut ::std::os::raw::c_void;
+/// Receives JSON owned by Envoy and valid only during this invocation.
+pub type envoy_dynamic_module_type_config_snapshot_json_fn = ::std::option::Option<
+    unsafe extern "C" fn(
+        json: envoy_dynamic_module_type_envoy_buffer,
+        user_data: *mut ::std::os::raw::c_void,
+    ),
+>;
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Collects and redacts the named providers on the main thread after server initialization.
+ Missing providers are omitted; an empty selection collects nothing. Returns null before
+ initialization, after shutdown, without admin, or if collection fails. Must not run during an
+ xDS callback.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        providers: *const envoy_dynamic_module_type_module_buffer,
+        providers_count: usize,
+    ) -> envoy_dynamic_module_type_config_snapshot_ptr;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread.
+ On success, calls json_fn synchronously once; returns false if encoding fails. Does not consume
+ the snapshot. Sensitive application metadata requires additional module redaction.*/
+    pub fn envoy_dynamic_module_callback_config_snapshot_serialize(
+        snapshot: envoy_dynamic_module_type_config_snapshot_ptr,
+        json_fn: envoy_dynamic_module_type_config_snapshot_json_fn,
+        user_data: *mut ::std::os::raw::c_void,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /// Deletes a snapshot on any thread.
+    pub fn envoy_dynamic_module_callback_config_snapshot_delete(
+        snapshot: envoy_dynamic_module_type_config_snapshot_ptr,
+    );
+}
 /** The callback type invoked once per active resource name during enumeration.
 
  @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the

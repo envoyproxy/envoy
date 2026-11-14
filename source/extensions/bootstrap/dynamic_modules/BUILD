@@ -10,6 +10,23 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "config_snapshot_lib",
+    srcs = ["config_snapshot.cc"],
+    hdrs = ["config_snapshot.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/server:config_tracker_interface",
+        "//source/common/common:matchers_lib",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_writer_lib",
     srcs = ["cluster_writer.cc"],
     hdrs = ["cluster_writer.h"],
@@ -99,10 +116,12 @@ envoy_cc_library(
     hdrs = ["extension_config.h"],
     deps = [
         ":cluster_writer_lib",
+        ":config_snapshot_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/server:admin_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:options_interface",
@@ -140,6 +159,7 @@ envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [
+        ":config_snapshot_lib",
         ":extension_config_lib",
         ":extension_lib",
         "//envoy/server:admin_interface",
