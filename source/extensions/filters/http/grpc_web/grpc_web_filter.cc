@@ -21,10 +21,9 @@ namespace GrpcWeb {
 
 namespace {
 
-// This is the maximum buffered plaintext data length when we have buffered data in the encoding
-// buffer. This is effectively used (to limit the length of grpc-message) only when we have encoding
-// buffer filled with data. The value is arbitrarily chosen. This can be made configurable when it
-// is required.
+// This is the maximum length of the response body that is transformed into the grpc-message
+// header value. It also limits how much body is buffered for that purpose. The value is arbitrarily
+// chosen. This can be made configurable when it is required.
 constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 
 // This builds grpc-message header value from body data.
@@ -130,16 +129,16 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
     });
   } else if (last_data != nullptr) {
     // In the case of local reply and when the response only contains a single data chunk,
-    // "encoding_buffer" is nullptr and we only have filled "last_data".
-    output.move(*last_data);
+    // "encoding_buffer" is nullptr and we only have filled "last_data". A single chunk can be
+    // arbitrarily large too, so limit it the same way.
+    output.move(*last_data, MAX_BUFFERED_PLAINTEXT_LENGTH);
     last_data->drain(last_data->length());
   }
 }
 
 void GrpcWebFilter::setTransformedNonProtoEncodedResponseHeaders(Buffer::Instance* data) {
   Buffer::OwnedImpl merged_data;
-  // When we have buffered data in encoding buffer, we limit the length of the output to be smaller
-  // than MAX_BUFFERED_PLAINTEXT_LENGTH. However, when we only have "last" data, we send it all.
+  // The length of the output is limited to MAX_BUFFERED_PLAINTEXT_LENGTH.
   mergeAndLimitNonProtoEncodedResponseData(merged_data, data);
 
   const std::string grpc_message = buildGrpcMessage(merged_data);
