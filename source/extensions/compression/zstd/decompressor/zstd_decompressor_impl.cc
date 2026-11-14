@@ -1,30 +1,33 @@
 #include "source/extensions/compression/zstd/decompressor/zstd_decompressor_impl.h"
 
+#include <limits>
+
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Zstd {
 namespace Decompressor {
 
-namespace {
-
-// How many times the output buffer is allowed to be bigger than the size of
-// accumulated input. This value is used to detect compression bombs.
-// TODO(rojkov): Re-design the Decompressor interface to handle compression
-// bombs gracefully instead of this quick solution.
-constexpr uint64_t MaxInflateRatio = 100;
-
-} // namespace
-
 ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                            const ZstdDDictManagerPtr& ddict_manager,
-                                           uint32_t chunk_size)
+                                           uint32_t chunk_size, uint32_t max_inflate_ratio,
+                                           uint32_t max_block_size)
     : Envoy::Compression::Zstd::Common::Base(chunk_size), dctx_(ZSTD_createDCtx(), &ZSTD_freeDCtx),
-      ddict_manager_(ddict_manager), stats_(generateStats(stats_prefix, scope)) {}
+      ddict_manager_(ddict_manager), stats_(generateStats(stats_prefix, scope)),
+      max_inflate_ratio_(max_inflate_ratio), max_block_size_(max_block_size) {}
 
 void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
-  uint64_t limit = MaxInflateRatio * input_buffer.length();
+  const uint64_t input_size = input_buffer.length();
+  if (input_size == 0 || stopped_on_ratio_limit_) {
+    return;
+  }
+  constexpr uint64_t max_output = std::numeric_limits<uint64_t>::max();
+  uint64_t remaining_output = max_inflate_ratio_ > (max_output - max_block_size_) / input_size
+                                  ? max_output
+                                  : input_size * max_inflate_ratio_ + max_block_size_;
 
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     if (input_slice.len_ > 0) {
@@ -47,32 +50,35 @@ void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
       }
 
       setInput(input_slice);
-      if (!process(output_buffer, limit)) {
+      if (!process(output_buffer, remaining_output)) {
         return;
       }
     }
   }
 }
 
-bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t limit) {
+bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t& remaining_output) {
   while (input_.pos < input_.size) {
     const size_t result = ZSTD_decompressStream(dctx_.get(), &output_, &input_);
     if (isError(result)) {
       return false;
     }
 
-    getOutput(output_buffer);
-
-    // Check bomb protection after every decompression step, not after the
-    // entire slice is drained. This matches gzip and brotli behavior.
-    if (output_buffer.length() > limit) {
+    if (output_.pos > remaining_output) {
       stats_.zstd_generic_error_.inc();
-      ENVOY_LOG(trace,
-                "excessive decompression ratio detected: output "
-                "size {} for limit {}",
-                output_buffer.length(), limit);
+      ENVOY_LOG(trace, "excessive decompression ratio detected: {} bytes for {} bytes remaining",
+                output_.pos, remaining_output);
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.zstd_decompressor_stop_on_ratio_limit")) {
+        // Once a step is discarded, later output would leave a gap in the body.
+        stopped_on_ratio_limit_ = true;
+      } else {
+        getOutput(output_buffer);
+      }
       return false;
     }
+    remaining_output -= output_.pos;
+    getOutput(output_buffer);
   }
 
   return true;

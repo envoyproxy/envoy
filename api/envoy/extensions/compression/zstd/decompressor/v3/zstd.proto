@@ -31,4 +31,15 @@ message Zstd {
   // Value for decompressor's next output buffer. If not set, defaults to the zstd recommended
   // output buffer size, ``ZSTD_DStreamOutSize()`` (128 KiB).
   google.protobuf.UInt32Value chunk_size = 2 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+
+  // Maximum ratio of decompressed output to compressed input for a single decompression call,
+  // before adding the allowance from ``max_block_size``.
+  // Defaults to 100.
+  google.protobuf.UInt32Value max_inflate_ratio = 3 [(validate.rules).uint32 = {gte: 1}];
+
+  // Additional output allowance in bytes per decompression call. Set this to the sender's maximum
+  // uncompressed zstd block size to allow for a block that spans input chunks. The output limit
+  // for a call is its compressed input size times ``max_inflate_ratio`` plus ``max_block_size``.
+  // Defaults to 0. The largest zstd block is 128 KiB.
+  google.protobuf.UInt32Value max_block_size = 4 [(validate.rules).uint32 = {lte: 131072}];
 }

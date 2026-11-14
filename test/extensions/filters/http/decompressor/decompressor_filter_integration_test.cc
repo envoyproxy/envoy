@@ -511,15 +511,9 @@ TEST_P(DecompressorIntegrationTest, LimitZstdDecompression) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  const double ratio = static_cast<double>(upstream_request_->bodyLength()) / bomb_bytes.size();
-
-  // MaxInflateRatio is 100; overshoot is at most one chunk (131072 bytes).
-  EXPECT_LT(ratio, 200.0) << "Bomb protection should have limited output. "
-                          << "Wire: " << bomb_bytes.size() << " bytes, "
-                          << "Decompressed: " << upstream_request_->bodyLength() << " bytes.";
-
+  EXPECT_LE(upstream_request_->bodyLength(), 100 * bomb_bytes.size());
   test_server_->waitForCounter(
-      "http.config_test.decompressor.bomb.zstd.decompressor_library.zstd_generic_error", Ge(1));
+      "http.config_test.decompressor.bomb.zstd.decompressor_library.zstd_generic_error", Eq(1));
 
   // Complete the stream cleanly.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
