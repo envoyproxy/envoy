@@ -94,6 +94,11 @@ on:
         type: boolean
       downloads:
         type: string
+      # Fetch `downloads` from this run (eg the run that triggered this one) rather than the
+      # current one.
+      downloads-run-id:
+        type: string
+        default:
       entrypoint:
         type: string
         default:
@@ -403,6 +408,7 @@ jobs:
         container-output: ${{ inputs.container-output }}
         context: ${{ steps.context.outputs.value }}
         downloads: ${{ inputs.downloads }}
+        downloads-run-id: ${{ inputs.downloads-run-id }}
         entrypoint: ${{ inputs.entrypoint }}
         error-match: ${{ inputs.error-match }}
         fail-match: ${{ inputs.fail-match }}
