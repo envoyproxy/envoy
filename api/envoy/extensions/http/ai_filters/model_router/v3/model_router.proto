@@ -3,8 +3,13 @@ syntax = "proto3";
 package envoy.extensions.http.ai_filters.model_router.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -23,6 +28,33 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // ModelRouter AI filter :ref:`configuration overview
 // <config_http_filters_ai_protocol_manager_ai_filters>`.
 // [#extension: envoy.http.ai_filters.model_router]
+
+// Time window unit for evaluating model usage quotas.
+enum TimeUnit {
+  // Unspecified time unit.
+  TIME_UNSPECIFIED = 0;
+
+  // One-minute rolling window.
+  MINUTE = 1;
+
+  // One-hour rolling window.
+  HOUR = 2;
+
+  // One-day (24-hour) rolling window.
+  DAY = 3;
+}
+
+// Type of usage metric tracked by a model quota.
+enum QuotaType {
+  // Unspecified quota type.
+  QUOTA_UNSPECIFIED = 0;
+
+  // Total number of requests sent to the model.
+  REQUESTS = 1;
+
+  // Total number of input and output tokens consumed by the model.
+  TOKENS = 2;
+}
 
 // Represents an upstream LLM service provider or API endpoint host.
 //
@@ -49,11 +81,29 @@ message Provider {
   type.ai.v3.LLMBinding binding = 4;
 }
 
+// Defines a usage limit for a model over a rolling time window.
+message Quota {
+  // The metric counted by this quota (requests or tokens).
+  QuotaType quota_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // The rolling time window over which usage is aggregated.
+  TimeUnit time_unit = 2 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // Maximum allowed usage within the time window. Setting ``limit`` to ``0`` disables the model.
+  uint32 limit = 3;
+
+  // The number of time units in the quota window. For example, a value of ``6`` with a
+  // ``time_unit`` of ``HOUR`` specifies a 6-hour rolling window. If not specified, defaults to
+  // ``1``.
+  google.protobuf.UInt32Value unit_multiplier = 4 [(validate.rules).uint32 = {gt: 0}];
+}
+
 // Represents a concrete LLM model offered by a :ref:`Provider
 // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Provider>`.
 //
 // Associates an upstream model identifier and authentication credentials with a specific backend
 // provider.
+// [#next-free-field: 6]
 message Model {
   // Unique name for this model definition, referenced by :ref:`RoutingTarget.model
   // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.RoutingTarget.model>`.
@@ -72,6 +122,10 @@ message Model {
   // is trimmed. When set, Envoy populates the provider-specific authentication header
   // (``Authorization`` or ``x-goog-api-key``) when routing to this model.
   config.core.v3.DataSource api_key = 4 [(udpa.annotations.sensitive) = true];
+
+  // Usage quotas enforced for this model. If any configured quota is reached or exceeded, the
+  // model is skipped during route resolution.
+  repeated Quota quotas = 5;
 }
 
 // A single candidate destination model within a :ref:`RoutingEntry
@@ -94,6 +148,23 @@ message RoutingEntry {
   // previous attempt fails, enabling automatic multi-model fallback. All models in a route must
   // have the same provider.
   repeated RoutingTarget targets = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
+// Configuration for tracking model usage quotas locally in memory.
+message LocalQuotaConfig {
+}
+
+// Configuration for tracking model usage quotas via an external gRPC RateLimitService (RLS).
+message RlsQuotaConfig {
+  // Specifies the gRPC service that hosts the rate limit service.
+  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // The rate limit domain to use when calling the rate limit service.
+  // If unset, defaults to ``model_router``.
+  string domain = 2;
+
+  // The timeout for rate limit service gRPC calls. If unset, defaults to 1000ms.
+  google.protobuf.Duration timeout = 3 [(validate.rules).duration = {gt {}}];
 }
 
 // Configuration for the Model Router AI filter.
@@ -121,4 +192,13 @@ message ModelRouter {
 
   // Routing rules mapping incoming requested model names to candidate targets.
   repeated RoutingEntry routes = 3;
+
+  // Quota backend configuration (e.g., :ref:`LocalQuotaConfig
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.LocalQuotaConfig>` or
+  // :ref:`RlsQuotaConfig
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RlsQuotaConfig>`). Must be
+  // specified if any configured :ref:`Model
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Model>` defines :ref:`quotas
+  // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.Model.quotas>`.
+  config.core.v3.TypedExtensionConfig quota_config = 4;
 }

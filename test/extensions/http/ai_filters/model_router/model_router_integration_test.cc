@@ -7,6 +7,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
+#include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/type/ai/v3/llm_protocol.pb.h"
 
 #include "test/integration/http_integration.h"
@@ -150,11 +152,18 @@ class ModelRouterIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   ModelRouterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    if (enable_rls_) {
+      addFakeUpstream(Http::CodecType::HTTP2);
+    }
+  }
+
   void initialize() override {
     // Upstream 0 represents the Anthropic cluster.
     setUpstreamCount(1);
 
-    config_helper_.addConfigModifier([ip_version = GetParam()](
+    config_helper_.addConfigModifier([this, ip_version = GetParam()](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.mutable_static_resources()->clear_clusters();
 
@@ -171,11 +180,20 @@ public:
       auto* address = lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
       address->set_address(Network::Test::getLoopbackAddressString(ip_version));
       address->set_port_value(0);
+
+      if (enable_rls_) {
+        auto* rls_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        rls_cluster->MergeFrom(*cluster);
+        rls_cluster->set_name("rls_cluster");
+        rls_cluster->mutable_load_assignment()->set_cluster_name("rls_cluster");
+        ConfigHelper::setHttp2(*rls_cluster);
+      }
     });
 
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
           virtual_host->set_include_request_attempt_count(true);
 
@@ -211,14 +229,34 @@ public:
                   .PackFrom(gemini_per_route);
 
           hcm.clear_http_filters();
+          auto* downstream_filter = hcm.add_http_filters();
           TestUtility::loadFromYaml(std::string(DownstreamAiProtocolManagerConfig),
-                                    *hcm.add_http_filters());
+                                    *downstream_filter);
+          if (enable_rls_) {
+            envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager ai_mgr;
+            ASSERT_TRUE(downstream_filter->typed_config().UnpackTo(&ai_mgr));
+            for (auto& filter : *ai_mgr.mutable_filters()) {
+              if (filter.name() == "envoy.http.ai_filters.model_router") {
+                envoy::extensions::http::ai_filters::model_router::v3::ModelRouter router_proto;
+                ASSERT_TRUE(filter.typed_config().UnpackTo(&router_proto));
+                envoy::extensions::http::ai_filters::model_router::v3::RlsQuotaConfig rls_config;
+                rls_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+                    "rls_cluster");
+                rls_config.mutable_timeout()->set_seconds(5);
+                router_proto.mutable_quota_config()->set_name("rls");
+                ASSERT_TRUE(router_proto.mutable_quota_config()->mutable_typed_config()->PackFrom(
+                    rls_config));
+                ASSERT_TRUE(filter.mutable_typed_config()->PackFrom(router_proto));
+              }
+            }
+            ASSERT_TRUE(downstream_filter->mutable_typed_config()->PackFrom(ai_mgr));
+          }
           TestUtility::loadFromYaml(std::string(RouterWithUpstreamAiProtocolManagerConfig),
                                     *hcm.add_http_filters());
         });
 
     HttpIntegrationTest::initialize();
-    test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(1));
+    test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(enable_rls_ ? 2 : 1));
   }
 
   IntegrationStreamDecoderPtr sendChatCompletionsRequest() {
@@ -237,6 +275,33 @@ public:
                                        {"content-type", "application/json"}},
         request_body.dump());
   }
+
+  void waitForAnthropicUpstreamRequest(absl::string_view expected_model, bool stream = false) {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+    const Http::RequestHeaderMap& headers = upstream_request_->headers();
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
+    EXPECT_THAT(headers,
+                ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
+    EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
+
+    nlohmann::json expected_body = {
+        {"model", expected_model},
+        {"max_tokens", 1024},
+        {"messages", {{{"role", "user"}, {"content", Question}}}},
+    };
+    if (stream) {
+      expected_body["stream"] = true;
+    }
+    EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()), expected_body);
+  }
+
+  bool enable_rls_{false};
+  FakeHttpConnectionPtr fake_rls_connection_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ModelRouterIntegrationTest,
@@ -247,24 +312,7 @@ TEST_P(ModelRouterIntegrationTest, FirstTargetSucceeds) {
   initialize();
 
   IntegrationStreamDecoderPtr response = sendChatCompletionsRequest();
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& headers = upstream_request_->headers();
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-haiku-5-5"},
-                {"max_tokens", 1024},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
+  waitForAnthropicUpstreamRequest("claude-haiku-5-5");
 
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
@@ -292,48 +340,14 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
 
   // Attempt 1 goes to the Anthropic cluster (`fake_upstreams_[0]`) with the primary model and fails
   // with 503.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& attempt1_headers = upstream_request_->headers();
-  EXPECT_THAT(attempt1_headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(attempt1_headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(attempt1_headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(attempt1_headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(attempt1_headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-haiku-5-5"},
-                {"max_tokens", 1024},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
-
+  waitForAnthropicUpstreamRequest("claude-haiku-5-5");
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
   // Attempt 2 fails over to the fallback model on the same provider (`fake_upstreams_[0]`).
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& attempt2_headers = upstream_request_->headers();
-  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(attempt2_headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-sonnet-5-5"},
-                {"max_tokens", 1024},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
-
+  waitForAnthropicUpstreamRequest("claude-sonnet-5-5");
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       false);
@@ -371,25 +385,8 @@ TEST_P(ModelRouterIntegrationTest, GeminiSseStreamGenerateContentToAnthropicMess
           {"content-type", "application/json"}},
       request_body.dump());
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& headers = upstream_request_->headers();
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_TRUE(headers.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-haiku-5-5"},
-                {"max_tokens", 1024},
-                {"stream", true},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
+  waitForAnthropicUpstreamRequest("claude-haiku-5-5", /*stream=*/true);
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-goog-api-key")).empty());
 
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
@@ -419,6 +416,82 @@ TEST_P(ModelRouterIntegrationTest, GeminiSseStreamGenerateContentToAnthropicMess
   EXPECT_EQ(last["candidates"][0]["finishReason"], "STOP");
   EXPECT_EQ(last["usageMetadata"]["candidatesTokenCount"], 6);
   EXPECT_EQ(1, test_server_->counter("cluster.anthropic_cluster.upstream_rq_total")->value());
+}
+
+TEST_P(ModelRouterIntegrationTest, RlsQuotaFiltersOverLimitModelAndConsumesActualTokens) {
+  enable_rls_ = true;
+  initialize();
+
+  IntegrationStreamDecoderPtr response = sendChatCompletionsRequest();
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_rls_connection_));
+
+  // 1. CheckRateLimit for primary candidate model (`claude-haiku-5-5`) returns OVER_LIMIT.
+  FakeStreamPtr check_haiku_stream;
+  ASSERT_TRUE(fake_rls_connection_->waitForNewStream(*dispatcher_, check_haiku_stream));
+  envoy::service::ratelimit::v3::RateLimitRequest check_haiku_req;
+  ASSERT_TRUE(check_haiku_stream->waitForGrpcMessage(*dispatcher_, check_haiku_req));
+  ASSERT_TRUE(check_haiku_stream->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(check_haiku_stream->headers().getPathValue(),
+            "/envoy.service.ratelimit.v3.RateLimitService/CheckRateLimit");
+  EXPECT_EQ(check_haiku_req.domain(), "model_router");
+  ASSERT_EQ(check_haiku_req.descriptors_size(), 2);
+  EXPECT_EQ(check_haiku_req.descriptors(0).entries(1).value(), "claude-haiku-5-5");
+
+  check_haiku_stream->startGrpcStream();
+  envoy::service::ratelimit::v3::RateLimitResponse over_limit_resp;
+  over_limit_resp.set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
+  check_haiku_stream->sendGrpcMessage(over_limit_resp);
+  check_haiku_stream->finishGrpcStream(Grpc::Status::Ok);
+
+  // 2. CheckRateLimit for fallback candidate model (`claude-sonnet-5-5`) returns OK.
+  FakeStreamPtr check_sonnet_stream;
+  ASSERT_TRUE(fake_rls_connection_->waitForNewStream(*dispatcher_, check_sonnet_stream));
+  envoy::service::ratelimit::v3::RateLimitRequest check_sonnet_req;
+  ASSERT_TRUE(check_sonnet_stream->waitForGrpcMessage(*dispatcher_, check_sonnet_req));
+  ASSERT_TRUE(check_sonnet_stream->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(check_sonnet_stream->headers().getPathValue(),
+            "/envoy.service.ratelimit.v3.RateLimitService/CheckRateLimit");
+  ASSERT_EQ(check_sonnet_req.descriptors_size(), 2);
+  EXPECT_EQ(check_sonnet_req.descriptors(0).entries(1).value(), "claude-sonnet-5-5");
+
+  check_sonnet_stream->startGrpcStream();
+  envoy::service::ratelimit::v3::RateLimitResponse ok_resp;
+  ok_resp.set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+  check_sonnet_stream->sendGrpcMessage(ok_resp);
+  check_sonnet_stream->finishGrpcStream(Grpc::Status::Ok);
+
+  // 3. Request routes directly to `claude-sonnet-5-5` without trying `claude-haiku-5-5`.
+  waitForAnthropicUpstreamRequest("claude-sonnet-5-5");
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  upstream_request_->encodeData(std::string(ClaudeSonnetUnaryResponse), true);
+
+  // 4. ConsumeRateLimit is called with 1 request and 12 + 6 = 18 tokens for `claude-sonnet-5-5`.
+  FakeStreamPtr consume_stream;
+  ASSERT_TRUE(fake_rls_connection_->waitForNewStream(*dispatcher_, consume_stream));
+  envoy::service::ratelimit::v3::RateLimitRequest consume_req;
+  ASSERT_TRUE(consume_stream->waitForGrpcMessage(*dispatcher_, consume_req));
+  ASSERT_TRUE(consume_stream->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(consume_stream->headers().getPathValue(),
+            "/envoy.service.ratelimit.v3.RateLimitService/ConsumeRateLimit");
+  ASSERT_EQ(consume_req.descriptors_size(), 2);
+  EXPECT_EQ(consume_req.descriptors(0).entries(1).value(), "claude-sonnet-5-5");
+  EXPECT_EQ(consume_req.descriptors(0).hits_addend().value(), 1);
+  EXPECT_EQ(consume_req.descriptors(1).entries(2).value(), "tokens");
+  EXPECT_EQ(consume_req.descriptors(1).hits_addend().value(), 18);
+
+  consume_stream->startGrpcStream();
+  consume_stream->sendGrpcMessage(ok_resp);
+  consume_stream->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_THAT(response->headers(), Http::HttpStatusIs("200")) << response->body();
+
+  ASSERT_TRUE(fake_rls_connection_->close());
+  ASSERT_TRUE(fake_rls_connection_->waitForDisconnect());
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

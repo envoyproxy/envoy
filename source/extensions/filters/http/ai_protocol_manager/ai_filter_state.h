@@ -155,6 +155,7 @@ struct LlmRoute {
   std::string host_and_port;
   LlmBindingConstSharedPtr binding;
   std::string api_key;
+  std::string provider;
 };
 
 // An ordered list of candidate routes stored at `FilterStateKeys::ResolvedRoutes`.

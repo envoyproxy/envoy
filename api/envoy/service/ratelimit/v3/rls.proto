@@ -26,6 +26,14 @@ service RateLimitService {
   // Determine whether rate limiting should take place.
   rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
   }
+
+  // Check whether rate limiting would take place without consuming quota.
+  rpc CheckRateLimit(RateLimitRequest) returns (RateLimitResponse) {
+  }
+
+  // Consume rate limit quota without performing a limit check.
+  rpc ConsumeRateLimit(RateLimitRequest) returns (RateLimitResponse) {
+  }
 }
 
 // Main message for a rate limit request. The rate limit service is designed to be fully generic
