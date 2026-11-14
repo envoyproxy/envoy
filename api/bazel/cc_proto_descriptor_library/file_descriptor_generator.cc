@@ -1,6 +1,8 @@
 #include "bazel/cc_proto_descriptor_library/file_descriptor_generator.h"
 
+#include <cstddef>
 #include <memory>
+#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -20,6 +22,48 @@
 namespace cc_proto_descriptor_library {
 
 namespace {
+
+// The longest string literal to emit. MSVC rejects longer literals ("error C1091: compiler limit:
+// string exceeds 65535 bytes in length"), so larger descriptors are emitted as a char array
+// instead. This mirrors how protoc's C++ generator embeds descriptors.
+constexpr size_t kMaxStringLiteralBytes = 65535;
+// The number of descriptor bytes to emit per line of generated code.
+constexpr size_t kBytesPerLine = 40;
+
+// Returns `bytes` escaped for use inside a C++ string literal. '?' is escaped too so that the
+// literal can never contain a trigraph such as "??/".
+std::string escapeForStringLiteral(absl::string_view bytes) {
+  return absl::StrReplaceAll(absl::CEscape(bytes), {{"?", "\\?"}});
+}
+
+// Writes any definitions needed to embed `bytes` (which may contain any byte value, including
+// NUL) to `contents`, and returns a braced initializer for an `absl::string_view` that refers to
+// them.
+std::string emitStringViewInitializer(absl::string_view bytes, std::ostream& contents) {
+  if (bytes.size() <= kMaxStringLiteralBytes) {
+    // Emit a string literal split across lines. absl::CEscape always emits three-digit octal
+    // escapes, so an escape sequence never absorbs the digit that follows it and the literal can
+    // be split after any byte.
+    std::string literal;
+    for (size_t i = 0; i < bytes.size(); i += kBytesPerLine) {
+      absl::StrAppend(&literal, "\n    \"", escapeForStringLiteral(bytes.substr(i, kBytesPerLine)),
+                      "\"");
+    }
+    if (literal.empty()) {
+      literal = "\"\"";
+    }
+    return absl::StrCat("{", literal, ",\n    ", bytes.size(), "}");
+  }
+  contents << "static constexpr char kFileDescriptorBytes[] = {";
+  for (size_t i = 0; i < bytes.size(); ++i) {
+    if (i % kBytesPerLine == 0) {
+      contents << "\n    ";
+    }
+    contents << "'" << absl::CEscape(bytes.substr(i, 1)) << "',";
+  }
+  contents << "\n};\n";
+  return "{kFileDescriptorBytes, sizeof(kFileDescriptorBytes)}";
+}
 
 absl::string_view getFileBaseName(const google::protobuf::FileDescriptor* file) {
   absl::string_view stripped_name = file->name();
@@ -128,12 +172,16 @@ namespace %s {
   }
   contents << "nullptr};\n";
 
+  // Embed the serialized FileDescriptorProto as raw bytes. (Base64 would add a third to the size,
+  // compress worse and need decoding at run time.)
+  const std::string bytes_initializer =
+      emitStringViewInitializer(file_descriptor_proto.SerializeAsString(), contents);
   contents << absl::StrFormat(
       R"text(
 
 const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescriptorInfo{
     "%s",
-    "%s",
+    %s,
     kDeps
   };
 
@@ -142,8 +190,7 @@ const ::cc_proto_descriptor_library::internal::FileDescriptorInfo kFileDescripto
 } // namespace protobuf
 
 )text",
-      file->name(), absl::Base64Escape(file_descriptor_proto.SerializeAsString()),
-      unique_namespace);
+      file->name(), bytes_initializer, unique_namespace);
 
   google::protobuf::io::CodedOutputStream output(output_stream);
   output.WriteString(contents.str());

@@ -62,6 +62,68 @@ cc_proto_library(
     deps = ["test_extension_proto"],
 )
 
+proto_library(
+    name = "test_raw_bytes_proto",
+    testonly = True,
+    srcs = ["test-raw-bytes.proto"],
+    visibility = ["//visibility:private"],
+)
+
+cc_proto_library(
+    name = "test_raw_bytes_cc_proto",
+    testonly = True,
+    visibility = ["//visibility:private"],
+    deps = [":test_raw_bytes_proto"],
+)
+
+# Generates a proto whose serialized descriptor is larger than 64 KiB, which the generator embeds
+# as a char array rather than a string literal.
+genrule(
+    name = "gen_test_large_proto",
+    testonly = True,
+    srcs = ["test_large.proto.prefix"],
+    outs = ["test_large.proto"],
+    cmd = """(
+        cat $<
+        for i in $$(seq 100 1299); do
+          echo "  optional string field_with_a_long_name_to_pad_the_descriptor_past_sixty_four_kib$$i = $$i;"
+        done
+        echo "}"
+    ) > $@""",
+)
+
+proto_library(
+    name = "test_large_proto",
+    testonly = True,
+    srcs = ["test_large.proto"],
+    visibility = ["//visibility:private"],
+)
+
+cc_proto_library(
+    name = "test_large_cc_proto",
+    testonly = True,
+    visibility = ["//visibility:private"],
+    deps = [":test_large_proto"],
+)
+
+cc_proto_descriptor_library(
+    name = "test_raw_bytes_descriptors",
+    testonly = True,
+    visibility = ["//visibility:private"],
+    deps = [
+        ":test_raw_bytes_proto",
+    ],
+)
+
+cc_proto_descriptor_library(
+    name = "test_large_descriptors",
+    testonly = True,
+    visibility = ["//visibility:private"],
+    deps = [
+        ":test_large_proto",
+    ],
+)
+
 cc_proto_descriptor_library(
     name = "test_descriptors",
     testonly = True,
@@ -132,6 +194,25 @@ cc_test(
         "test_descriptors",
         "//bazel/cc_proto_descriptor_library:create_dynamic_message",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@googletest//:gtest_main",
+        "@protobuf",
+    ],
+)
+
+cc_test(
+    name = "file_descriptor_generator_test",
+    srcs = [
+        "file_descriptor_generator_test.cc",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        "test_large_cc_proto",
+        "test_large_descriptors",
+        "test_raw_bytes_cc_proto",
+        "test_raw_bytes_descriptors",
+        "//bazel/cc_proto_descriptor_library:file_descriptor_info",
+        "//bazel/cc_proto_descriptor_library:text_format_transcoder",
+        "@abseil-cpp//absl/strings",
         "@googletest//:gtest_main",
         "@protobuf",
     ],
