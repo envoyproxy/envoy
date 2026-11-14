@@ -3829,6 +3829,16 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_resource_monitor_config_scheduler_r
 WEAK_STUB_VOID(envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete,
                envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr)
 
+// ---------------------- Socket Interface callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the socket interface abi_impl.cc when the socket interface extension is used.
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_socket_interface_io_ready,
+               envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr, uint32_t)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_socket_interface_io_ready_delete,
+               envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr)
+
 #undef WEAK_STUB
 #undef WEAK_STUB_VOID
 

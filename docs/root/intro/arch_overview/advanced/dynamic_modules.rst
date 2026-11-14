@@ -29,6 +29,7 @@ Currently, dynamic modules are supported at the following extension points:
   (:ref:`configuration <config_stat_sinks_dynamic_modules>`).
 * As a :ref:`resource monitor <envoy_v3_api_msg_extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor>`
   (:ref:`configuration <config_overload_manager_dynamic_modules>`).
+* As a :ref:`socket interface <envoy_v3_api_msg_extensions.network.socket_interface.dynamic_modules.v3.DynamicModuleSocketInterface>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP early header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation>`.

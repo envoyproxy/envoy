@@ -49,6 +49,35 @@ fn test_log_level_callbacks() {
   assert!(is_log_enabled(Level::Trace));
 }
 
+// Mock readiness-handle callbacks so the socket interface unit tests can exercise the SDK
+// wrappers without the Envoy host symbols. The calls are recorded per handle value so parallel
+// tests with distinct handles do not interfere.
+pub static MOCK_SOCKET_IO_READY_CALLS: std::sync::Mutex<Vec<(usize, u32)>> =
+  std::sync::Mutex::new(Vec::new());
+pub static MOCK_SOCKET_IO_READY_DELETES: std::sync::Mutex<Vec<usize>> =
+  std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_socket_interface_io_ready(
+  handle: abi::envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr,
+  events: u32,
+) {
+  MOCK_SOCKET_IO_READY_CALLS
+    .lock()
+    .unwrap()
+    .push((handle as usize, events));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_socket_interface_io_ready_delete(
+  handle: abi::envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr,
+) {
+  MOCK_SOCKET_IO_READY_DELETES
+    .lock()
+    .unwrap()
+    .push(handle as usize);
+}
+
 // Mock runtime backing the runtime callbacks so the unit tests can exercise the SDK wrappers
 // without the Envoy host symbols. Keys absent from the map fall back to the caller's default,
 // mirroring the host behavior for an unknown key or an unreachable runtime.

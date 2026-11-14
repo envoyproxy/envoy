@@ -592,6 +592,7 @@ EXTENSIONS = {
     #
 
     "envoy.extensions.network.socket_interface.sockmap": "//source/extensions/network/socket_interface/sockmap:config",
+    "envoy.extensions.network.socket_interface.dynamic_modules": "//source/extensions/network/socket_interface/dynamic_modules:config",
 
     #
     # Address Resolvers
