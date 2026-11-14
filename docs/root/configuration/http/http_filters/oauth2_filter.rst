@@ -408,6 +408,14 @@ the possibility to update access token by using a refresh token. If this flag is
 A new access token is obtained using the refresh token without redirecting the user to log in again. This requires the refresh token to be provided by the authorization_endpoint when the user logs in.
 If the attempt to get an access token by using a refresh token fails then the user is redirected to the authorization endpoint.
 
+By default the refresh token request does not include a ``scope`` parameter. Some identity providers require one: Microsoft
+Entra ID, for example, rejects a refresh request without ``scope`` when the OAuth2 client is also the resource the access token
+is issued for. Setting
+:ref:`send_scopes_on_refresh <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.send_scopes_on_refresh>`
+makes the filter send the configured
+:ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_scopes>` on the refresh request, as
+permitted by `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_.
+
 Generally, allowlisting is inadvisable from a security standpoint.
 
 Browsers do not store a cookie larger than 4096 bytes, so an access, ID or refresh token above that size is dropped by the

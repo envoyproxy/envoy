@@ -368,6 +368,7 @@ typed_config:
 
     ASSERT_TRUE(oauth2_request_->waitForHeadersComplete());
 
+    last_oauth2_request_body_ = oauth2_request_->body().toString();
     checkClientSecretInRequest(token_secret);
 
     oauth2_request_->encodeHeaders(
@@ -501,6 +502,14 @@ typed_config:
 
   // The access token the fake authorization server returns.
   std::string access_token_value_{"bar"};
+  // The body of the last request the filter sent to the token endpoint.
+  std::string last_oauth2_request_body_;
+
+  // The `scope` parameter of the last token endpoint request, if any.
+  std::optional<std::string> lastOauth2RequestScope() const {
+    return Http::Utility::QueryParamsMulti::parseParameters(last_oauth2_request_body_, 0, true)
+        .getFirstValue("scope");
+  }
 
   const CookieNames default_cookie_names_{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
                                           "RefreshToken", "OauthNonce", "CodeVerifier"};
@@ -586,6 +595,8 @@ TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
 
   // 1. Do one authentication flow.
   doRefreshTokenFlow("token_secret", "hmac_secret");
+  // By default the refresh request carries no `scope`.
+  EXPECT_FALSE(lastOauth2RequestScope().has_value());
 
   // 2. Reload secrets.
   EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
@@ -753,6 +764,62 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
   initialize();
   doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
                        TEST_ENCRYPTED_CODE_VERIFIER);
+}
+
+class OauthIntegrationTestSendScopesOnRefresh : public OauthIntegrationTest {
+  void setOauthConfig() override {
+    config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
+name: oauth
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+  config:
+    token_endpoint:
+      cluster: oauth
+      uri: oauth.com/token
+      timeout: 3s
+    authorization_endpoint: https://oauth.com/oauth/authorize/
+    redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_path_matcher:
+      path:
+        exact: /callback
+    signout_path:
+      path:
+        exact: /signout
+    credentials:
+      client_id: foo
+      token_secret:
+        name: token
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/token_secret.yaml"
+      hmac_secret:
+        name: hmac
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/hmac_secret.yaml"
+    auth_scopes:
+    - user
+    - openid
+    - email
+    send_scopes_on_refresh: true
+)EOF"));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthIntegrationTestSendScopesOnRefresh,
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
+
+// With send_scopes_on_refresh, the refresh request to the token endpoint carries the configured
+// auth_scopes as a space-separated `scope` parameter.
+TEST_P(OauthIntegrationTestSendScopesOnRefresh, RefreshTokenFlowSendsScopes) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+  doRefreshTokenFlow("token_secret", "hmac_secret");
+  EXPECT_EQ(lastOauth2RequestScope(), std::optional<std::string>("user openid email"));
 }
 
 class OauthUseRefreshTokenDisabled : public OauthIntegrationTest {
