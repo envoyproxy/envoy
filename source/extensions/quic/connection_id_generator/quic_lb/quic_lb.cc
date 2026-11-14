@@ -116,10 +116,17 @@ QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_v
   if (!lb_config.has_value()) {
     return absl::InvalidArgumentError("error generating quic::LoadBalancerConfig");
   }
+  if (version_ == version) {
+    // The encoder refuses a config with the active config ID, so the active one is deleted first.
+    // Nothing runs on this thread in between, so no connection ID is generated without a config.
+    encoder_.DeleteConfig();
+  }
   bool success = encoder_.UpdateConfig(lb_config.value(), server_id_);
   if (!success) {
+    version_.reset();
     return absl::InvalidArgumentError("Error setting configuration of quic-lb CID encoder");
   }
+  version_ = version;
 
   return absl::OkStatus();
 }
@@ -138,12 +145,9 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
   }
 }
 
-struct KeyAndVersion {
-  std::string encryption_key_;
-  uint8_t configuration_version_;
-};
+} // namespace
 
-absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
+absl::StatusOr<Factory::KeyAndVersion> Factory::getAndValidateKeyAndVersion(
     const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret, Api::Api& api) {
   const auto& secrets = secret.secrets();
 
@@ -184,8 +188,6 @@ absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
 
   return KeyAndVersion{std::move(key), version};
 }
-
-} // namespace
 
 Factory::Factory(
     const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config)
@@ -291,6 +293,21 @@ absl::Status Factory::updateSecret(Api::Api& api) {
   auto data_or_result = getAndValidateKeyAndVersion(*secret, api);
 
   RETURN_IF_NOT_OK_REF(data_or_result.status());
+
+  if (key_and_version_.has_value() &&
+      key_and_version_->configuration_version_ == data_or_result->configuration_version_) {
+    // The key is not used in unencrypted mode, so only the version can change the configuration.
+    if (config_.unencrypted_mode() ||
+        key_and_version_->encryption_key_ == data_or_result->encryption_key_) {
+      return absl::OkStatus();
+    }
+    ENVOY_LOG_MISC(warn,
+                   "quic-lb: 'encryption_key' changed without changing 'configuration_version' "
+                   "{}; connection IDs issued under the previous key may no longer be routed to "
+                   "this server by a load balancer",
+                   data_or_result->configuration_version_);
+  }
+  key_and_version_ = data_or_result.value();
 
   tls_slot_->runOnAllThreads(
       [data = data_or_result.value()](OptRef<QuicLbConnectionIdGenerator::ThreadLocalData> obj) {
