@@ -7,6 +7,7 @@
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
@@ -106,16 +107,87 @@ absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterCo
     jwt_validator = std::move(validator_or_error.value());
   }
 
+  // Select the responder handshake. The top-level framing fields configure the built-in HTTP/1
+  // handshake and may not be mixed with an explicit handshake selection.
+  const bool legacy_handshake_fields_set =
+      !proto_config.request_path().empty() ||
+      proto_config.request_method() != envoy::config::core::v3::METHOD_UNSPECIFIED ||
+      proto_config.use_http_upgrade();
+  Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorSharedPtr handshake_configurator;
+  if (proto_config.has_http1_handshake()) {
+    if (legacy_handshake_fields_set) {
+      return absl::InvalidArgumentError(
+          "reverse_tunnel: http1_handshake cannot be set together with request_path, "
+          "request_method, or use_http_upgrade");
+    }
+  } else if (proto_config.has_custom_handshake()) {
+    if (legacy_handshake_fields_set) {
+      return absl::InvalidArgumentError(
+          "reverse_tunnel: custom_handshake cannot be set together with request_path, "
+          "request_method, or use_http_upgrade");
+    }
+    auto& factory = Config::Utility::getAndCheckFactoryByName<
+        Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorFactory>(
+        proto_config.custom_handshake().name());
+    auto typed_config =
+        Config::Utility::translateAnyToFactoryConfig(proto_config.custom_handshake().typed_config(),
+                                                     context.messageValidationVisitor(), factory);
+    auto custom_configurator = factory.createConfigurator(*typed_config, context);
+    if (!custom_configurator.ok()) {
+      return custom_configurator.status();
+    }
+    handshake_configurator = std::move(custom_configurator.value());
+  }
+  if (handshake_configurator == nullptr) {
+    handshake_configurator =
+        std::make_shared<Bootstrap::ReverseConnection::Http1HandshakeResponderConfigurator>();
+  }
+
   return std::shared_ptr<ReverseTunnelFilterConfig>(new ReverseTunnelFilterConfig(
       proto_config, std::move(node_id_formatter), std::move(cluster_id_formatter),
-      std::move(tenant_id_formatter), std::move(jwt_validator)));
+      std::move(tenant_id_formatter), std::move(jwt_validator), std::move(handshake_configurator)));
 }
+
+namespace {
+// The effective HTTP/1 framing comes from ``http1_handshake`` when set, otherwise from the
+// top-level fields; mixing the two forms is rejected at config load.
+std::string effectiveRequestPath(
+    const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config) {
+  if (proto_config.has_http1_handshake() &&
+      !proto_config.http1_handshake().request_path().empty()) {
+    return proto_config.http1_handshake().request_path();
+  }
+  if (proto_config.request_path().empty()) {
+    return std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                           DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+  }
+  return proto_config.request_path();
+}
+
+envoy::config::core::v3::RequestMethod effectiveRequestMethod(
+    const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config) {
+  envoy::config::core::v3::RequestMethod method =
+      proto_config.has_http1_handshake() ? proto_config.http1_handshake().request_method()
+                                         : proto_config.request_method();
+  if (method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
+    method = envoy::config::core::v3::GET;
+  }
+  return method;
+}
+
+bool effectiveUseHttpUpgrade(
+    const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config) {
+  return proto_config.has_http1_handshake() ? proto_config.http1_handshake().use_http_upgrade()
+                                            : proto_config.use_http_upgrade();
+}
+} // namespace
 
 ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Formatter::FormatterConstSharedPtr node_id_formatter,
     Formatter::FormatterConstSharedPtr cluster_id_formatter,
-    Formatter::FormatterConstSharedPtr tenant_id_formatter, JwtHandshakeValidatorPtr jwt_validator)
+    Formatter::FormatterConstSharedPtr tenant_id_formatter, JwtHandshakeValidatorPtr jwt_validator,
+    Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorSharedPtr handshake_configurator)
     : ping_interval_(proto_config.has_ping_interval()
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
@@ -124,18 +196,9 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                              ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
                                    proto_config.handshake_timeout()))
                              : std::chrono::milliseconds(10000)),
-      request_path_(
-          proto_config.request_path().empty()
-              ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
-                                ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)
-              : proto_config.request_path()),
-      request_method_string_([&proto_config]() -> std::string {
-        envoy::config::core::v3::RequestMethod method = proto_config.request_method();
-        if (method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
-          method = envoy::config::core::v3::GET;
-        }
-        return envoy::config::core::v3::RequestMethod_Name(method);
-      }()),
+      request_path_(effectiveRequestPath(proto_config)),
+      request_method_string_(
+          envoy::config::core::v3::RequestMethod_Name(effectiveRequestMethod(proto_config))),
       node_id_formatter_(std::move(node_id_formatter)),
       cluster_id_formatter_(std::move(cluster_id_formatter)),
       tenant_id_formatter_(std::move(tenant_id_formatter)),
@@ -147,13 +210,11 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
       required_cluster_name_(proto_config.required_cluster_name()),
-      use_http_upgrade_(proto_config.use_http_upgrade()),
+      use_http_upgrade_(effectiveUseHttpUpgrade(proto_config)),
       skip_rebalancing_(proto_config.skip_rebalancing()),
       enable_connection_limit_(proto_config.enable_connection_limit()),
       jwt_validator_(std::move(jwt_validator)),
-      handshake_configurator_(
-          std::make_shared<Bootstrap::ReverseConnection::Http1HandshakeResponderConfigurator>(
-              http1_codec_stats_)) {}
+      handshake_configurator_(std::move(handshake_configurator)) {}
 
 ReverseTunnelFilterConfig::~ReverseTunnelFilterConfig() = default;
 
@@ -285,7 +346,11 @@ void ReverseTunnelFilter::armHandshakeTimer() {
   }
   handshake_timer_ =
       read_callbacks_->connection().dispatcher().createTimer([this]() { onHandshakeTimeout(); });
-  handshake_timer_->enableTimer(config_->handshakeTimeout());
+  const std::chrono::milliseconds handshake_timeout =
+      config_->handshakeConfigurator()->handshakeTimeout();
+  handshake_timer_->enableTimer(handshake_timeout == std::chrono::milliseconds{0}
+                                    ? config_->handshakeTimeout()
+                                    : handshake_timeout);
 }
 
 void ReverseTunnelFilter::onHandshakeTimeout() {
@@ -308,7 +373,7 @@ Network::FilterStatus ReverseTunnelFilter::onData(Buffer::Instance& data, bool) 
 
 void ReverseTunnelFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  handshake_ = config_->handshakeConfigurator().createHandshake(*this);
+  handshake_ = config_->handshakeConfigurator()->createHandshake(*this);
 }
 
 Network::Connection& ReverseTunnelFilter::connection() { return read_callbacks_->connection(); }

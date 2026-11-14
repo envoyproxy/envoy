@@ -229,6 +229,11 @@ public:
   }
 
 private:
+  // Resolves the ``custom_handshake`` extension into a configurator. Throws on an unknown or
+  // invalid extension.
+  InitiatorHandshakeConfiguratorSharedPtr createCustomHandshakeConfigurator(
+      const envoy::config::core::v3::TypedExtensionConfig& custom_handshake);
+
   Server::Configuration::ServerFactoryContext& context_;
   // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
   Server::Instance* server_{nullptr};

@@ -2,11 +2,15 @@
 
 #include <algorithm>
 
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
@@ -259,6 +263,27 @@ void Http1HandshakeInitiator::cancel() {
 Buffer::InstancePtr Http1HandshakeInitiator::takeResidual() {
   return std::move(handshake_residual_);
 }
+
+InitiatorHandshakeConfiguratorSharedPtr
+Http1InitiatorHandshakeConfiguratorFactory::createConfigurator(
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
+  const auto& http_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+          DownstreamReverseConnectionSocketInterface::HttpHandshakeConfig&>(
+      config, context.messageValidationVisitor());
+  if (!http_config.request_path().empty() || http_config.additional_headers_size() > 0 ||
+      http_config.use_http_upgrade()) {
+    throw EnvoyException(
+        "reverse_tunnel: custom_handshake typed_config for "
+        "'envoy.reverse_tunnel.initiator_handshake.http1' does not support request_path, "
+        "additional_headers, or use_http_upgrade; the HTTP/1.1 handshake selected through "
+        "custom_handshake uses the default request framing");
+  }
+  return std::make_shared<Http1HandshakeConfigurator>(
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(http_config, handshake_timeout, 15000)));
+}
+
+REGISTER_FACTORY(Http1InitiatorHandshakeConfiguratorFactory, InitiatorHandshakeConfiguratorFactory);
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

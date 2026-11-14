@@ -8,10 +8,14 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/upstream.h"
+
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -239,6 +243,31 @@ public:
 
   virtual std::unique_ptr<InitiatorHandshake>
   createHandshake(InitiatorHandshakeCallbacks& callbacks) const = 0;
+
+  // Deadline for receiving the handshake response; the dialing wrapper arms it around the
+  // handshake. Defaults to the 15s the HTTP/1 handshake historically used.
+  virtual std::chrono::milliseconds handshakeTimeout() const {
+    return std::chrono::milliseconds{15000};
+  }
+};
+
+using InitiatorHandshakeConfiguratorSharedPtr =
+    std::shared_ptr<const InitiatorHandshakeConfigurator>;
+
+/**
+ * Creates initiator handshake configurators from the typed config carried on the
+ * ``custom_handshake`` extension of the downstream socket interface config. Implementations
+ * register under the ``envoy.reverse_tunnel.initiator_handshake`` category.
+ */
+class InitiatorHandshakeConfiguratorFactory : public Config::TypedFactory {
+public:
+  ~InitiatorHandshakeConfiguratorFactory() override = default;
+
+  // Creates a configurator from the extension's typed config. Called once per socket interface
+  // config, on the main thread, at configuration load.
+  virtual InitiatorHandshakeConfiguratorSharedPtr
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::ServerFactoryContext& context) PURE;
 };
 
 } // namespace ReverseConnection

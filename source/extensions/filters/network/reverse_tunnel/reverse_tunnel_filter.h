@@ -14,7 +14,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/http/http1/codec_stats.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/handshake_responder.h"
@@ -71,11 +70,6 @@ public:
   std::chrono::milliseconds handshakeTimeout() const { return handshake_timeout_; }
   const std::string& requestPath() const { return request_path_; }
 
-  // Returns the shared HTTP/1 codec stats, allocated once on the owning scope. Owning the stats on
-  // the config keeps them alive for the whole life of every per-connection handshake codec.
-  Http::Http1::CodecStats& http1CodecStats(Stats::Scope& scope) const {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, scope);
-  }
   const std::string& requestMethod() const { return request_method_string_; }
   static constexpr absl::string_view tenantDelimiter() {
     return Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
@@ -131,10 +125,11 @@ public:
   // Returns whether worker-thread rebalancing should be skipped for accepted connections.
   bool skipRebalancing() const { return skip_rebalancing_; }
 
-  // Returns the responder handshake factory; HTTP/1.1 is the only built-in handshake.
-  const Bootstrap::ReverseConnection::ResponderHandshakeConfigurator&
+  // Returns the responder handshake factory; HTTP/1.1 is the default, or a custom handshake when
+  // ``custom_handshake`` is configured.
+  const Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorSharedPtr&
   handshakeConfigurator() const {
-    return *handshake_configurator_;
+    return handshake_configurator_;
   }
 
 private:
@@ -143,7 +138,8 @@ private:
       Formatter::FormatterConstSharedPtr node_id_formatter,
       Formatter::FormatterConstSharedPtr cluster_id_formatter,
       Formatter::FormatterConstSharedPtr tenant_id_formatter,
-      JwtHandshakeValidatorPtr jwt_validator);
+      JwtHandshakeValidatorPtr jwt_validator,
+      Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorSharedPtr handshake_configurator);
 
   const std::chrono::milliseconds ping_interval_;
   const std::chrono::milliseconds handshake_timeout_;
@@ -172,12 +168,7 @@ private:
   // JWT handshake authentication (experimental). nullptr when `jwt_validator` is not set.
   const JwtHandshakeValidatorPtr jwt_validator_;
 
-  // HTTP/1 handshake codec stats, owned here so they outlive every per-connection codec. Declared
-  // before the factory, which holds a reference to it.
-  mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
-
-  std::shared_ptr<const Bootstrap::ReverseConnection::ResponderHandshakeConfigurator>
-      handshake_configurator_;
+  Bootstrap::ReverseConnection::ResponderHandshakeConfiguratorSharedPtr handshake_configurator_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

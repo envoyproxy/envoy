@@ -15,6 +15,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/headers.h"
@@ -74,21 +75,33 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   maintain_interval_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(
       config, maintain_interval, ReverseConnectionUtility::kDefaultMaintainIntervalMs);
   // Deadline for receiving the handshake response. Defaults to 15s.
-  handshake_timeout_ms_ =
-      PROTOBUF_GET_MS_OR_DEFAULT(config.http_handshake(), handshake_timeout, 15000);
-  if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
-    handshake_request_path_ = config.http_handshake().request_path();
-  } else {
+  if (config.has_custom_handshake()) {
+    // A custom handshake owns its protocol; the response deadline comes from its configurator.
+    handshake_configurator_ = createCustomHandshakeConfigurator(config.custom_handshake());
+    handshake_timeout_ms_ = handshake_configurator_->handshakeTimeout().count();
+    // Handshakes that reuse the HTTP/1 identity headers still need a request target; the
+    // protocol-specific framing stays with the handshake itself.
     handshake_request_path_ =
         std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
-  }
-  if (config.has_http_handshake()) {
-    additional_headers_ = {config.http_handshake().additional_headers().begin(),
-                           config.http_handshake().additional_headers().end()};
-    use_http_upgrade_ = config.http_handshake().use_http_upgrade();
-    // The formatters that evaluate these headers are built in onServerInitialized(), once the
-    // worker threads are registered with the ThreadLocal system that provider-backed formatters
-    // depend on.
+  } else {
+    handshake_timeout_ms_ =
+        PROTOBUF_GET_MS_OR_DEFAULT(config.http_handshake(), handshake_timeout, 15000);
+    if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
+      handshake_request_path_ = config.http_handshake().request_path();
+    } else {
+      handshake_request_path_ =
+          std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+    }
+    if (config.has_http_handshake()) {
+      additional_headers_ = {config.http_handshake().additional_headers().begin(),
+                             config.http_handshake().additional_headers().end()};
+      use_http_upgrade_ = config.http_handshake().use_http_upgrade();
+      // The formatters that evaluate these headers are built in onServerInitialized(), once the
+      // worker threads are registered with the ThreadLocal system that provider-backed formatters
+      // depend on.
+    }
+    handshake_configurator_ = std::make_shared<Http1HandshakeConfigurator>(
+        std::chrono::milliseconds(handshake_timeout_ms_));
   }
   // Instantiate access loggers from config.
   Server::GenericFactoryContextImpl generic_context(context, context.scope(),
@@ -105,6 +118,16 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   // HTTP/1 is the only built-in handshake; it is selected here, before any socket can be created,
   // and carried on the socket config so every dial negotiates the same protocol.
   handshake_configurator_ = std::make_shared<Http1HandshakeConfigurator>();
+}
+
+InitiatorHandshakeConfiguratorSharedPtr
+ReverseTunnelInitiatorExtension::createCustomHandshakeConfigurator(
+    const envoy::config::core::v3::TypedExtensionConfig& custom_handshake) {
+  auto& factory = Config::Utility::getAndCheckFactoryByName<InitiatorHandshakeConfiguratorFactory>(
+      custom_handshake.name());
+  auto typed_config = Config::Utility::translateAnyToFactoryConfig(
+      custom_handshake.typed_config(), context_.messageValidationVisitor(), factory);
+  return factory.createConfigurator(*typed_config, context_);
 }
 
 void ReverseTunnelInitiatorExtension::emitAccessLog(

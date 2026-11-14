@@ -1,8 +1,12 @@
 #include <algorithm>
 #include <memory>
 
+#include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/core/v3/protocol.pb.validate.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -12,8 +16,10 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
@@ -1366,6 +1372,120 @@ TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorker
   main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   tls.shutdownGlobalThreading();
   tls.shutdownThread();
+}
+
+namespace {
+
+// Test handshake configurator carrying a distinct response deadline so custom_handshake selection
+// and timeout propagation are observable.
+class TestInitiatorHandshakeConfigurator : public InitiatorHandshakeConfigurator {
+public:
+  explicit TestInitiatorHandshakeConfigurator(std::chrono::milliseconds timeout)
+      : timeout_(timeout) {}
+
+  std::unique_ptr<InitiatorHandshake> createHandshake(InitiatorHandshakeCallbacks&) const override {
+    PANIC("not used by these tests");
+  }
+
+  std::chrono::milliseconds handshakeTimeout() const override { return timeout_; }
+
+private:
+  std::chrono::milliseconds timeout_;
+};
+
+// Test factory registered under a distinct name so custom_handshake selection can be observed.
+// Its typed config type is distinct from the in-tree factories' types, which the factory registry
+// requires within a category.
+class TestInitiatorHandshakeConfiguratorFactory : public InitiatorHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::core::v3::KeepaliveSettings>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.initiator_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.initiator_handshake.test"; }
+
+  InitiatorHandshakeConfiguratorSharedPtr
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::ServerFactoryContext&) override {
+    MessageUtil::downcastAndValidate<const envoy::config::core::v3::KeepaliveSettings&>(
+        config, ProtobufMessage::getStrictValidationVisitor());
+    return configurator_;
+  }
+
+  std::shared_ptr<TestInitiatorHandshakeConfigurator> configurator_{
+      std::make_shared<TestInitiatorHandshakeConfigurator>(std::chrono::milliseconds{12345})};
+};
+
+} // namespace
+
+// The default configuration installs the HTTP/1 handshake with the default response deadline.
+TEST_F(ReverseTunnelInitiatorExtensionTest, DefaultHandshakeConfigurator) {
+  ASSERT_NE(extension_->handshakeConfigurator(), nullptr);
+  EXPECT_EQ(15000, extension_->handshakeTimeoutMs());
+  EXPECT_EQ(std::chrono::milliseconds{15000},
+            extension_->handshakeConfigurator()->handshakeTimeout());
+}
+
+// The http_handshake response deadline carries into the HTTP/1 handshake configurator.
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeTimeoutOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_http_handshake()->mutable_handshake_timeout()->set_seconds(25);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(25000, custom_extension->handshakeTimeoutMs());
+  EXPECT_EQ(std::chrono::milliseconds{25000},
+            custom_extension->handshakeConfigurator()->handshakeTimeout());
+}
+
+// A custom_handshake extension selects its factory by name and the response deadline comes from
+// the factory's configurator.
+TEST_F(ReverseTunnelInitiatorExtensionTest, CustomHandshakeSelectsFactory) {
+  TestInitiatorHandshakeConfiguratorFactory test_factory;
+  Registry::InjectFactory<InitiatorHandshakeConfiguratorFactory> injection(test_factory);
+
+  auto custom_config = config_;
+  auto* custom = custom_config.mutable_custom_handshake();
+  custom->set_name("envoy.reverse_tunnel.initiator_handshake.test");
+  envoy::config::core::v3::KeepaliveSettings keepalive;
+  keepalive.mutable_timeout()->set_seconds(1);
+  std::ignore = custom->mutable_typed_config()->PackFrom(keepalive);
+
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(test_factory.configurator_, custom_extension->handshakeConfigurator());
+  EXPECT_EQ(12345, custom_extension->handshakeTimeoutMs());
+}
+
+// The built-in HTTP/1 handshake selected through custom_handshake does not accept framing fields
+// in its typed config; explicit framing goes through http_handshake.
+TEST_F(ReverseTunnelInitiatorExtensionTest, CustomHandshakeHttp1TypedConfigFieldsThrow) {
+  auto custom_config = config_;
+  auto* custom = custom_config.mutable_custom_handshake();
+  custom->set_name("envoy.reverse_tunnel.initiator_handshake.http1");
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface::HttpHandshakeConfig http_config;
+  http_config.set_request_path("/explicit");
+  std::ignore = custom->mutable_typed_config()->PackFrom(http_config);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      std::ignore = std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config),
+      EnvoyException,
+      "reverse_tunnel: custom_handshake typed_config for "
+      "'envoy.reverse_tunnel.initiator_handshake.http1' does not support request_path, "
+      "additional_headers, or use_http_upgrade; the HTTP/1.1 handshake selected through "
+      "custom_handshake uses the default request framing");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, CustomHandshakeUnknownFactoryNameThrows) {
+  auto custom_config = config_;
+  custom_config.mutable_custom_handshake()->set_name(
+      "envoy.reverse_tunnel.initiator_handshake.unknown");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      std::ignore = std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config),
+      EnvoyException,
+      "Didn't find a registered implementation for name: "
+      "'envoy.reverse_tunnel.initiator_handshake.unknown'");
 }
 
 } // namespace ReverseConnection

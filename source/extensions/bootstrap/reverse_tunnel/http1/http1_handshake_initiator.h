@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 
@@ -112,11 +113,43 @@ private:
  */
 class Http1HandshakeConfigurator : public InitiatorHandshakeConfigurator {
 public:
+  explicit Http1HandshakeConfigurator(
+      std::chrono::milliseconds handshake_timeout = std::chrono::milliseconds{15000})
+      : handshake_timeout_(handshake_timeout) {}
+
   std::unique_ptr<InitiatorHandshake>
   createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
     return std::make_unique<Http1HandshakeInitiator>(callbacks);
   }
+
+  std::chrono::milliseconds handshakeTimeout() const override { return handshake_timeout_; }
+
+private:
+  std::chrono::milliseconds handshake_timeout_;
 };
+
+/**
+ * Registered under the name ``envoy.reverse_tunnel.initiator_handshake.http1``. Its typed config
+ * is ``HttpHandshakeConfig``; only its ``handshake_timeout`` is read, and it sets the response
+ * deadline. The request framing is the built-in default; explicit framing goes through
+ * ``http_handshake`` on the socket interface config instead.
+ */
+class Http1InitiatorHandshakeConfiguratorFactory : public InitiatorHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+            DownstreamReverseConnectionSocketInterface::HttpHandshakeConfig>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.initiator_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.initiator_handshake.http1"; }
+
+  InitiatorHandshakeConfiguratorSharedPtr
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::ServerFactoryContext& context) override;
+};
+
+DECLARE_FACTORY(Http1InitiatorHandshakeConfiguratorFactory);
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

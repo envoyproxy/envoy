@@ -1,17 +1,22 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/http/codes.h"
+#include "source/common/protobuf/protobuf.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -115,6 +120,31 @@ public:
   virtual ~ResponderHandshakeConfigurator() = default;
 
   virtual ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks& callbacks) const = 0;
+
+  // Deadline the filter arms for completing the handshake. Returns 0 when the handshake has no
+  // deadline of its own and the filter's configured ``handshake_timeout`` applies.
+  virtual std::chrono::milliseconds handshakeTimeout() const {
+    return std::chrono::milliseconds{0};
+  }
+};
+
+using ResponderHandshakeConfiguratorSharedPtr =
+    std::shared_ptr<const ResponderHandshakeConfigurator>;
+
+/**
+ * Creates responder handshake configurators from the typed config carried on the
+ * ``custom_handshake`` extension of the filter config. Implementations register under the
+ * ``envoy.reverse_tunnel.responder_handshake`` category.
+ */
+class ResponderHandshakeConfiguratorFactory : public Config::TypedFactory {
+public:
+  ~ResponderHandshakeConfiguratorFactory() override = default;
+
+  // Creates a configurator from the extension's typed config. Called once per filter config, on
+  // the main thread, at configuration load.
+  virtual absl::StatusOr<ResponderHandshakeConfiguratorSharedPtr>
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& context) PURE;
 };
 
 } // namespace ReverseConnection

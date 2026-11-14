@@ -51,7 +51,19 @@ typed_config:
   enable_detailed_stats: true
 )EOF");
 
-    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
+    if (use_custom_handshake_) {
+      config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+  enable_detailed_stats: true
+  custom_handshake:
+    name: envoy.reverse_tunnel.initiator_handshake.http1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface.HttpHandshakeConfig
+)EOF");
+    } else {
+      config_helper_.addBootstrapExtension(fmt::format(R"EOF(
 name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
@@ -59,7 +71,8 @@ typed_config:
   http_handshake:
     request_path: "{}"
 )EOF",
-                                                     downstream_handshake_request_path_));
+                                                       downstream_handshake_request_path_));
+    }
 
     // Call parent initialize to complete setup.
     BaseIntegrationTest::initialize();
@@ -244,6 +257,9 @@ typed_config:
   std::string upstream_request_path_ =
       std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
                       DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+  // Selects the built-in HTTP/1 handshake through the custom_handshake extension path on both
+  // ends instead of the default configuration path.
+  bool use_custom_handshake_ = false;
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);
@@ -426,8 +442,15 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
     rt_config.mutable_ping_interval()->set_seconds(300);
     rt_config.set_auto_close_connections(false);
-    rt_config.set_request_path(upstream_request_path_);
-    rt_config.set_request_method(envoy::config::core::v3::GET);
+    if (use_custom_handshake_) {
+      auto* custom = rt_config.mutable_custom_handshake();
+      custom->set_name("envoy.reverse_tunnel.responder_handshake.http1");
+      std::ignore = custom->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::network::reverse_tunnel::v3::Http1HandshakeConfig());
+    } else {
+      rt_config.set_request_path(upstream_request_path_);
+      rt_config.set_request_method(envoy::config::core::v3::GET);
+    }
     std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
 
     auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
@@ -703,6 +726,14 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCus
   DISABLE_IF_ADMIN_DISABLED;
   downstream_handshake_request_path_ = "/custom/reverse";
   upstream_request_path_ = downstream_handshake_request_path_;
+  runEndToEndReverseConnectionHandshakeScenario();
+}
+
+// Both ends select the built-in HTTP/1 handshake through the custom_handshake extension path,
+// proving the factory lookup and configurator construction work end to end.
+TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCustomHandshake) {
+  DISABLE_IF_ADMIN_DISABLED;
+  use_custom_handshake_ = true;
   runEndToEndReverseConnectionHandshakeScenario();
 }
 

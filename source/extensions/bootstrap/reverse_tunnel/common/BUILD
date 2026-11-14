@@ -51,9 +51,11 @@ envoy_cc_library(
     deps = [
         "//envoy/api:api_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -66,11 +68,14 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:scope_interface",
         "//source/common/http:codes_lib",
+        "//source/common/protobuf",
     ],
 )

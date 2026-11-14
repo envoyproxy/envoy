@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
@@ -9,6 +10,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/handshake_responder.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -82,18 +84,36 @@ private:
 
 /**
  * Factory for the HTTP/1.1 responder handshake. One instance per filter config; the codec
- * stats it holds outlive every per-connection codec.
+ * stats it owns outlive every per-connection codec.
  */
 class Http1HandshakeResponderConfigurator : public ResponderHandshakeConfigurator {
 public:
-  explicit Http1HandshakeResponderConfigurator(Http::Http1::CodecStats::AtomicPtr& codec_stats)
-      : codec_stats_(codec_stats) {}
-
   ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks& callbacks) const override;
 
 private:
-  Http::Http1::CodecStats::AtomicPtr& codec_stats_;
+  mutable Http::Http1::CodecStats::AtomicPtr codec_stats_;
 };
+
+/**
+ * Registered under the name ``envoy.reverse_tunnel.responder_handshake.http1``. Its typed config
+ * is ``Http1HandshakeConfig`` and must be empty; the request framing is the built-in default.
+ * Explicit framing goes through ``http1_handshake`` on the filter config instead.
+ */
+class Http1ResponderHandshakeConfiguratorFactory : public ResponderHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::filters::network::reverse_tunnel::v3::Http1HandshakeConfig>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.responder_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.responder_handshake.http1"; }
+
+  absl::StatusOr<ResponderHandshakeConfiguratorSharedPtr>
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& context) override;
+};
+
+DECLARE_FACTORY(Http1ResponderHandshakeConfiguratorFactory);
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

@@ -1,8 +1,10 @@
 #include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_responder.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
@@ -10,6 +12,8 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/strings/match.h"
@@ -74,6 +78,26 @@ ResponderHandshakePtr
 Http1HandshakeResponderConfigurator::createHandshake(ResponderHandshakeCallbacks& callbacks) const {
   return std::make_unique<Http1HandshakeResponder>(callbacks, codec_stats_);
 }
+
+absl::StatusOr<ResponderHandshakeConfiguratorSharedPtr>
+Http1ResponderHandshakeConfiguratorFactory::createConfigurator(
+    const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
+  const auto& http1_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::filters::network::reverse_tunnel::v3::Http1HandshakeConfig&>(
+      config, context.messageValidationVisitor());
+  if (!http1_config.request_path().empty() ||
+      http1_config.request_method() != envoy::config::core::v3::METHOD_UNSPECIFIED ||
+      http1_config.use_http_upgrade()) {
+    return absl::InvalidArgumentError(
+        "reverse_tunnel: custom_handshake typed_config for "
+        "'envoy.reverse_tunnel.responder_handshake.http1' does not support request_path, "
+        "request_method, or use_http_upgrade; the HTTP/1.1 handshake selected through "
+        "custom_handshake uses the default request framing");
+  }
+  return std::make_shared<Http1HandshakeResponderConfigurator>();
+}
+
+REGISTER_FACTORY(Http1ResponderHandshakeConfiguratorFactory, ResponderHandshakeConfiguratorFactory);
 
 // RequestDecoderImpl
 void Http1HandshakeResponder::RequestDecoderImpl::decodeHeaders(
