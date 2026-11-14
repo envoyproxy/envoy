@@ -1819,7 +1819,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateFilterChain(
   return updated;
 }
 
-bool ListenerManagerImpl::removeFilterChain(const std::string& name) {
+bool ListenerManagerImpl::removeFilterChain(absl::string_view name) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto node = local_filter_chains_.extract(name);
   if (node.empty()) {

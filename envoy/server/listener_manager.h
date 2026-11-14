@@ -395,7 +395,7 @@ public:
    * @param name supplies the name of the filter chain.
    * @return TRUE if the filter chain was found and removed.
    */
-  virtual bool removeFilterChain(const std::string& /*name*/) { return false; }
+  virtual bool removeFilterChain(absl::string_view /*name*/) { return false; }
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

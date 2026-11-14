@@ -308,7 +308,7 @@ public:
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
   absl::StatusOr<bool>
   addOrUpdateFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain) override;
-  bool removeFilterChain(const std::string& name) override;
+  bool removeFilterChain(absl::string_view name) override;
   void
   drainFilterChains(ListenerImpl& listener,
                     std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
