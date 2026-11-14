@@ -194,9 +194,7 @@ message ModelRouter {
   repeated RoutingEntry routes = 3;
 
   // Quota backend configuration (e.g., :ref:`LocalQuotaConfig
-  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.LocalQuotaConfig>`,
-  // :ref:`RedisQuotaConfig
-  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RedisQuotaConfig>`, or
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.LocalQuotaConfig>` or
   // :ref:`RlsQuotaConfig
   // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RlsQuotaConfig>`). Must be
   // specified if any configured :ref:`Model
