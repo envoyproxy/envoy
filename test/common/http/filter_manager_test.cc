@@ -1500,78 +1500,6 @@ TEST_F(FilterManagerPerFilterBufferTest,
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersHeldByEarlierFilterAreNotForwardedEarly) {
-  initializeChain(true);
-  records_[0].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
-  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[1].decode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", false);
-  decodeTrailers();
-
-  // Trailers are held by filter 0, so filter 1 forwards only its data.
-  filters_[1]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(0, records_[1].decoded_trailers);
-  EXPECT_EQ(0, records_[2].decoded_trailers);
-
-  filters_[0]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersReachingStoppedFilterAreForwardedOnResume) {
-  initializeChain(true);
-  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[1].decode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-  records_[1].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
-
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", false);
-  decodeTrailers();
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-
-  filters_[1]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersHeldByEarlierFilterAreNotForwardedEarly) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_trailers = [] { return FilterTrailersStatus::StopIteration; };
-  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[1].encode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-
-  encodeHeaders(false);
-  encodeData("aaa", false);
-  encodeTrailers();
-
-  filters_[1]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(0, records_[1].encoded_trailers);
-  EXPECT_EQ(0, sent_trailers_);
-
-  filters_[2]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ(1, sent_trailers_);
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-
-  filter_manager_->destroyFilters();
-}
-
 TEST_F(FilterManagerPerFilterBufferTest, BodyAddedByTwoFiltersToHeaderOnlyRequestIsCoalesced) {
   initializeChain(true);
   records_[0].decode_headers = [this](bool) {
@@ -1741,79 +1669,6 @@ TEST_F(FilterManagerPerFilterBufferTest, StopAllBuffersRequestAtStoppedFilter) {
   filters_[1]->decoder_callbacks_->continueDecoding();
   EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[1].decoded_data);
   EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[2].decoded_data);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedBeforeStopAllFilterAreForwarded) {
-  initializeChain(true);
-  records_[0].decode_data = [this](Buffer::Instance&, bool end_stream) {
-    if (end_stream) {
-      filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
-    }
-    return FilterDataStatus::Continue;
-  };
-  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
-
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-  EXPECT_EQ(0, records_[1].decoded_trailers);
-
-  filters_[1]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedBeforeStoppedFilterAreForwarded) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
-    if (end_stream) {
-      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    }
-    return FilterDataStatus::Continue;
-  };
-  records_[1].encode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-  records_[1].encode_trailers = [] { return FilterTrailersStatus::StopIteration; };
-
-  encodeHeaders(false);
-  encodeData("aaa", true);
-  // Filter 1 gets the trailers while it holds the data.
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ(0, sent_trailers_);
-
-  filters_[1]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, records_[0].encoded_trailers);
-  EXPECT_EQ(1, sent_trailers_);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedBeforeStopAllFilterAreForwarded) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
-    if (end_stream) {
-      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    }
-    return FilterDataStatus::Continue;
-  };
-  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
-
-  encodeHeaders(false);
-  encodeData("aaa", true);
-  EXPECT_EQ(0, records_[1].encoded_trailers);
-
-  filters_[1]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ(1, sent_trailers_);
 
   filter_manager_->destroyFilters();
 }
@@ -2223,24 +2078,6 @@ TEST_F(FilterManagerPerFilterBufferTest, FilterStoppingAgainOnOwnBufferKeepsIt) 
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerPerFilterBufferTest,
-       RequestTrailersAddedByFilterContinuingOnDataAreDecodedOnce) {
-  initializeChain(true);
-  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[0].decode_data = [this](Buffer::Instance&, bool) {
-    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[1].decoded_data);
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
 TEST_F(FilterManagerPerFilterBufferTest, RequestDrainedAfterPayloadTooLargeReleasesNothing) {
   initializeChain(true);
   filters_[0]->decoder_callbacks_->setBufferLimit(5);
@@ -2352,196 +2189,6 @@ TEST_F(FilterManagerPerFilterBufferTest, InjectedEncodedHeadersWithEndStreamSetM
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedByStoppingFilterFollowItsData) {
-  initializeChain(true);
-  records_[0].decode_data = [this](Buffer::Instance&, bool) {
-    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-  EXPECT_TRUE(records_[1].decoded_data.empty());
-  EXPECT_EQ(0, records_[1].decoded_trailers);
-
-  filters_[0]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedByStoppingFilterFollowItsData) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_data = [this](Buffer::Instance&, bool) {
-    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-  encodeHeaders(false);
-  encodeData("aaa", true);
-  EXPECT_TRUE(sent_data_.empty());
-  EXPECT_EQ(0, records_[1].encoded_trailers);
-
-  filters_[2]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ(1, sent_trailers_);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest,
-       ResponseTrailersAddedByFilterContinuingOnDataAreEncodedOnce) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  records_[2].encode_data = [this](Buffer::Instance&, bool) {
-    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  encodeHeaders(false);
-  encodeData("aaa", true);
-
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ(1, sent_trailers_);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedBeforeStoppedFilterReachIt) {
-  initializeChain(true);
-  records_[0].decode_data = [this](Buffer::Instance&, bool) {
-    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  records_[1].decode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-  records_[1].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-  // Filter 1 gets the trailers while it holds the data.
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ(0, records_[2].decoded_trailers);
-
-  filters_[1]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest,
-       RequestTrailersAddedBeforeFilterContinuingOnDataAreDecodedOnce) {
-  initializeChain(true);
-  records_[0].decode_data = [this](Buffer::Instance&, bool) {
-    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest,
-       ResponseTrailersAddedBeforeFilterContinuingOnDataAreEncodedOnce) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_data = [this](Buffer::Instance&, bool) {
-    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
-  encodeHeaders(false);
-  encodeData("aaa", true);
-
-  // Previously the trailers were never sent.
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ(1, records_[0].encoded_trailers);
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, sent_trailers_);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedBeforeStopAllFilterWaitForItToResume) {
-  initializeChain(true);
-  records_[0].decode_data = [this](Buffer::Instance&, bool) {
-    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  records_[2].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-  EXPECT_EQ(0, records_[1].decoded_trailers);
-  EXPECT_EQ(0, records_[2].decoded_trailers);
-
-  // Filter 1 gets the trailers too, after its data.
-  filters_[2]->decoder_callbacks_->continueDecoding();
-  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
-  EXPECT_EQ(1, records_[1].decoded_trailers);
-  EXPECT_EQ(1, records_[2].decoded_trailers);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest,
-       ResponseTrailersAddedBeforeStopAllFilterWaitForItToResume) {
-  initializeChain(true);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_data = [this](Buffer::Instance&, bool) {
-    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  records_[0].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
-  encodeHeaders(false);
-  encodeData("aaa", true);
-  EXPECT_EQ(0, records_[1].encoded_trailers);
-  EXPECT_EQ(0, records_[0].encoded_trailers);
-  EXPECT_EQ(0, sent_trailers_);
-
-  // Filter 1 gets the trailers too, after its data.
-  filters_[0]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ(1, records_[1].encoded_trailers);
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, records_[0].encoded_trailers);
-  EXPECT_EQ(1, sent_trailers_);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest,
-       ResponseTrailersAddedBeforeStoppedFilterKeepLegacyBehaviorWithStreamBuffer) {
-  initializeChain(false);
-  filter_manager_->decodeHeaders(*request_headers_, true);
-  records_[2].encode_data = [this](Buffer::Instance&, bool) {
-    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
-    return FilterDataStatus::Continue;
-  };
-  records_[1].encode_data = [](Buffer::Instance&, bool) {
-    return FilterDataStatus::StopIterationAndBuffer;
-  };
-  encodeHeaders(false);
-  encodeData("aaa", true);
-  // Filter 1 never gets the trailers; they are sent from the filter after it on resume.
-  EXPECT_EQ(0, records_[1].encoded_trailers);
-
-  filters_[1]->encoder_callbacks_->continueEncoding();
-  EXPECT_EQ(0, records_[1].encoded_trailers);
-  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
-  EXPECT_EQ(1, sent_trailers_);
-
-  filter_manager_->destroyFilters();
-}
-
 TEST_F(FilterManagerPerFilterBufferTest, TerminalFilterKeepsBodyAddedInHeadersAfterContinue) {
   initializeChain(true);
   records_[2].decode_headers = [this](bool) {
@@ -2577,8 +2224,666 @@ TEST_F(FilterManagerPerFilterBufferTest, StopAllFilterReplayedOwnBufferKeepsItOn
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, RequestBufferDrainedAfterPayloadTooLargeReleasesNothing) {
+  initialize();
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        createDecoderFilterFactoryCb(filter)(callbacks);
+        return true;
+      });
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+  filter_manager_->createDownstreamFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->setBufferLimit(5);
+
+  ON_CALL(*filter, decodeData(_, _))
+      .WillByDefault(Return(FilterDataStatus::StopIterationAndBuffer));
+  filter_manager_->decodeHeaders(*headers, false);
+  // The buffering filter goes over the limit: a 413 instead of backpressure.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, onRequestDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  Buffer::OwnedImpl data("aaaaaa");
+  filter_manager_->decodeData(data, false);
+
+  // The buffer drops below the low watermark, but there is no backpressure to release.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(0);
+  filter_manager_->setBufferLimit(100);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ResponseBufferDrainedAfterTooLargeReleasesNothing) {
+  initialize();
+  std::shared_ptr<MockStreamFilter> filter(new NiceMock<MockStreamFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        createStreamFilterFactoryCb(filter)(callbacks);
+        return true;
+      });
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+  filter_manager_->createDownstreamFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*headers, true);
+  filter_manager_->setBufferLimit(5);
+  StrictMock<MockDownstreamWatermarkCallbacks> watermark_callbacks;
+  filter->decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks);
+
+  ON_CALL(*filter, encodeHeaders(_, _)).WillByDefault(Return(FilterHeadersStatus::StopIteration));
+  ON_CALL(*filter, encodeData(_, _))
+      .WillByDefault(Return(FilterDataStatus::StopIterationAndBuffer));
+  filter->decoder_callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
+  // The buffering filter goes over the limit: a 500 instead of backpressure.
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  Buffer::OwnedImpl data("aaaaaa");
+  filter->decoder_callbacks_->encodeData(data, false);
+
+  // The buffer drops below the low watermark, but there is no backpressure to release: the
+  // strict watermark callbacks would fail on a low watermark without a high one.
+  filter_manager_->setBufferLimit(100);
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+
+  filter->decoder_callbacks_->removeDownstreamWatermarkCallbacks(watermark_callbacks);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, InjectedDecodedDataKeepsStreamEndStream) {
+  // The legacy flag would rewrite the stream-level flag; the positional marker ignores it.
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
+  initializeChain(true);
+  records_[1].decode_data = [](Buffer::Instance& data, bool) {
+    data.drain(data.length());
+    return FilterDataStatus::StopIterationNoBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+  Buffer::OwnedImpl chunk2("a2");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
+  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
+  EXPECT_EQ((Chunks{{"a1", false}, {"a2", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, HalfCloseStopsInjectedRequestBodyOnceResponseCompletes) {
+  initializeChain(true);
+  ON_CALL(filter_manager_callbacks_, isHalfCloseEnabled()).WillByDefault(Return(true));
+  records_[1].decode_data = [](Buffer::Instance& data, bool) {
+    data.drain(data.length());
+    return FilterDataStatus::StopIterationNoBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+
+  // The client already sent end_stream, so a complete response closes the stream even though
+  // filter 1 is still injecting, as with half-close disabled.
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  encodeHeaders(true);
+
+  Buffer::OwnedImpl chunk2("a2");
+  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
+  EXPECT_EQ((Chunks{{"a1", false}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+class FilterManagerTrailersTest : public FilterManagerTest {
+public:
+  using Chunks = std::vector<std::pair<std::string, bool>>;
+
+  struct FilterRecord {
+    std::function<FilterHeadersStatus(bool)> decode_headers = [](bool) {
+      return FilterHeadersStatus::Continue;
+    };
+    std::function<FilterDataStatus(Buffer::Instance&, bool)> decode_data =
+        [](Buffer::Instance&, bool) { return FilterDataStatus::Continue; };
+    std::function<FilterTrailersStatus()> decode_trailers = [] {
+      return FilterTrailersStatus::Continue;
+    };
+    std::function<FilterHeadersStatus(bool)> encode_headers = [](bool) {
+      return FilterHeadersStatus::Continue;
+    };
+    std::function<FilterDataStatus(Buffer::Instance&, bool)> encode_data =
+        [](Buffer::Instance&, bool) { return FilterDataStatus::Continue; };
+    std::function<FilterTrailersStatus()> encode_trailers = [] {
+      return FilterTrailersStatus::Continue;
+    };
+    std::vector<bool> decoded_headers;
+    Chunks decoded_data;
+    int decoded_trailers{};
+    std::vector<bool> encoded_headers;
+    Chunks encoded_data;
+    int encoded_trailers{};
+  };
+
+  void initializeChain(bool forward_held_trailers) {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.filter_manager_forward_held_trailers",
+                                  forward_held_trailers ? "true" : "false"}});
+    initialize();
+
+    // The last filter consumes the request body, as the router does.
+    records_[2].decode_data = [](Buffer::Instance& data, bool) {
+      data.drain(data.length());
+      return FilterDataStatus::Continue;
+    };
+    for (size_t i = 0; i < filters_.size(); i++) {
+      filters_[i] = std::make_shared<NiceMock<MockStreamFilter>>();
+      FilterRecord& record = records_[i];
+      ON_CALL(*filters_[i], decodeHeaders(_, _))
+          .WillByDefault(Invoke([&record](RequestHeaderMap&, bool end_stream) {
+            record.decoded_headers.push_back(end_stream);
+            return record.decode_headers(end_stream);
+          }));
+      ON_CALL(*filters_[i], decodeData(_, _))
+          .WillByDefault(Invoke([&record](Buffer::Instance& data, bool end_stream) {
+            record.decoded_data.emplace_back(data.toString(), end_stream);
+            return record.decode_data(data, end_stream);
+          }));
+      ON_CALL(*filters_[i], decodeTrailers(_)).WillByDefault(Invoke([&record](RequestTrailerMap&) {
+        record.decoded_trailers++;
+        return record.decode_trailers();
+      }));
+      ON_CALL(*filters_[i], encodeHeaders(_, _))
+          .WillByDefault(Invoke([&record](ResponseHeaderMap&, bool end_stream) {
+            record.encoded_headers.push_back(end_stream);
+            return record.encode_headers(end_stream);
+          }));
+      ON_CALL(*filters_[i], encodeData(_, _))
+          .WillByDefault(Invoke([&record](Buffer::Instance& data, bool end_stream) {
+            record.encoded_data.emplace_back(data.toString(), end_stream);
+            return record.encode_data(data, end_stream);
+          }));
+      ON_CALL(*filters_[i], encodeTrailers(_)).WillByDefault(Invoke([&record](ResponseTrailerMap&) {
+        record.encoded_trailers++;
+        return record.encode_trailers();
+      }));
+    }
+
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillRepeatedly(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          // The filter manager keeps a view of the name, so it must outlive the stream.
+          constexpr std::array<absl::string_view, 3> names{"filter0", "filter1", "filter2"};
+          for (size_t i = 0; i < filters_.size(); i++) {
+            callbacks.setFilterConfigName(names[i]);
+            createStreamFilterFactoryCb(filters_[i])(callbacks);
+          }
+          return true;
+        }));
+
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers_)));
+    ON_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillByDefault(Invoke([this]() -> RequestTrailerMapOptRef {
+          return makeOptRefFromPtr(request_trailers_.get());
+        }));
+    ON_CALL(filter_manager_callbacks_, setRequestTrailers(_))
+        .WillByDefault(Invoke(
+            [this](RequestTrailerMapPtr&& trailers) { request_trailers_ = std::move(trailers); }));
+    ON_CALL(filter_manager_callbacks_, encodeHeaders(_, _))
+        .WillByDefault(Invoke(
+            [this](ResponseHeaderMap&, bool end_stream) { sent_headers_.push_back(end_stream); }));
+    ON_CALL(filter_manager_callbacks_, encodeData(_, _))
+        .WillByDefault(Invoke([this](Buffer::Instance& data, bool end_stream) {
+          sent_data_.emplace_back(data.toString(), end_stream);
+          data.drain(data.length());
+        }));
+    ON_CALL(filter_manager_callbacks_, encodeTrailers(_))
+        .WillByDefault(Invoke([this](ResponseTrailerMap&) { sent_trailers_++; }));
+
+    filter_manager_->createDownstreamFilterChain();
+    filter_manager_->requestHeadersInitialized();
+  }
+
+  void decodeData(absl::string_view body, bool end_stream) {
+    Buffer::OwnedImpl data(body);
+    filter_manager_->decodeData(data, end_stream);
+  }
+
+  void decodeTrailers() {
+    request_trailers_ = std::make_unique<TestRequestTrailerMapImpl>(
+        TestRequestTrailerMapImpl{{"trailer", "value"}});
+    filter_manager_->decodeTrailers(*request_trailers_);
+  }
+
+  // The response is originated by the last decoder filter, i.e. the first encoder filter.
+  void encodeHeaders(bool end_stream) {
+    filters_[2]->decoder_callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        end_stream, "details");
+  }
+
+  void encodeData(absl::string_view body, bool end_stream) {
+    Buffer::OwnedImpl data(body);
+    filters_[2]->decoder_callbacks_->encodeData(data, end_stream);
+  }
+
+  void encodeTrailers() {
+    filters_[2]->decoder_callbacks_->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
+        TestResponseTrailerMapImpl{{"trailer", "value"}}));
+  }
+
+  static std::string concat(const Chunks& chunks) {
+    std::string result;
+    for (const auto& chunk : chunks) {
+      result += chunk.first;
+    }
+    return result;
+  }
+
+  // Request body "aaa" is buffered at filter 1 and the final "bbb" at filter 0.
+  void bufferRequestBodyAtTwoFilters(FilterDataStatus buffer_status) {
+    records_[0].decode_data = [buffer_status](Buffer::Instance&, bool end_stream) {
+      return end_stream ? buffer_status : FilterDataStatus::Continue;
+    };
+    records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+    records_[1].decode_data = [buffer_status](Buffer::Instance&, bool end_stream) {
+      return end_stream ? FilterDataStatus::Continue : buffer_status;
+    };
+
+    filter_manager_->decodeHeaders(*request_headers_, false);
+    decodeData("aaa", false);
+    decodeData("bbb", true);
+  }
+
+  // Response body "aaa" is buffered at filter 1 and the final "bbb" at filter 2, which is the
+  // first encoder filter.
+  void bufferResponseBodyAtTwoFilters() {
+    filter_manager_->decodeHeaders(*request_headers_, true);
+    records_[2].encode_data = [](Buffer::Instance&, bool end_stream) {
+      return end_stream ? FilterDataStatus::StopIterationAndBuffer : FilterDataStatus::Continue;
+    };
+    records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+    records_[1].encode_data = [](Buffer::Instance&, bool end_stream) {
+      return end_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
+    };
+
+    encodeHeaders(false);
+    encodeData("aaa", false);
+    encodeData("bbb", true);
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  std::array<std::shared_ptr<MockStreamFilter>, 3> filters_;
+  std::array<FilterRecord, 3> records_;
+  RequestHeaderMapPtr request_headers_{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  RequestTrailerMapPtr request_trailers_;
+  std::vector<bool> sent_headers_;
+  Chunks sent_data_;
+  int sent_trailers_{};
+};
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersHeldByEarlierFilterAreNotForwardedEarly) {
+  initializeChain(true);
+  records_[0].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  decodeTrailers();
+
+  // Trailers are held by filter 0, so filter 1 forwards only its data.
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+  EXPECT_EQ(0, records_[2].decoded_trailers);
+
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+  // Filter 0 replays the drained shared buffer as an empty frame before the trailers.
+  EXPECT_EQ((Chunks{{"aaa", false}, {"", false}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersReachingStoppedFilterAreForwardedOnResume) {
+  initializeChain(true);
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  records_[1].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  decodeTrailers();
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersHeldByEarlierFilterAreNotForwardedEarly) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  encodeHeaders(false);
+  encodeData("aaa", false);
+  encodeTrailers();
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+  EXPECT_EQ(0, sent_trailers_);
+
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+  // Filter 2 replays the drained shared buffer as an empty frame before the trailers.
+  EXPECT_EQ((Chunks{{"aaa", false}, {"", false}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedBeforeStopAllFilterAreForwarded) {
+  initializeChain(true);
+  records_[0].decode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedBeforeStoppedFilterAreForwarded) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  records_[1].encode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  // Filter 1 gets the trailers while it holds the data.
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(0, sent_trailers_);
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[0].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedBeforeStopAllFilterAreForwarded) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedByFilterContinuingOnDataAreDecodedOnce) {
+  initializeChain(true);
+  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[1].decoded_data);
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedByStoppingFilterFollowItsData) {
+  initializeChain(true);
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_TRUE(records_[1].decoded_data.empty());
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedByStoppingFilterFollowItsData) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool) {
+    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  EXPECT_TRUE(sent_data_.empty());
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedByFilterContinuingOnDataAreEncodedOnce) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[2].encode_data = [this](Buffer::Instance&, bool) {
+    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  encodeHeaders(false);
+  encodeData("aaa", true);
+
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedBeforeStoppedFilterReachIt) {
+  initializeChain(true);
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  records_[1].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  // Filter 1 gets the trailers while it holds the data.
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(0, records_[2].decoded_trailers);
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedBeforeFilterContinuingOnDataAreDecodedOnce) {
+  initializeChain(true);
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedBeforeFilterContinuingOnDataAreEncodedOnce) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool) {
+    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  encodeHeaders(false);
+  encodeData("aaa", true);
+
+  // Previously the trailers were never sent.
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, records_[0].encoded_trailers);
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedBeforeStopAllFilterWaitForItToResume) {
+  initializeChain(true);
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  records_[2].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+  EXPECT_EQ(0, records_[2].decoded_trailers);
+
+  // Filter 1 gets the trailers too, after its data.
+  filters_[2]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedBeforeStopAllFilterWaitForItToResume) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool) {
+    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  records_[0].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+  EXPECT_EQ(0, records_[0].encoded_trailers);
+  EXPECT_EQ(0, sent_trailers_);
+
+  // Filter 1 gets the trailers too, after its data.
+  filters_[0]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[0].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest,
+       ResponseTrailersAddedBeforeStoppedFilterNeverReachItWithoutGuard) {
+  initializeChain(false);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool) {
+    filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  // Filter 1 never gets the trailers; they are sent from the filter after it on resume.
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
 enum class TrailersDirection { Request, Response };
+
 enum class TrailersAddPhase { None, Data, StoppingData, HeaderOnlyHeaders };
+
 enum class TrailersStopKind { None, BufferData, ContinueOnData, StopAll, StopTrailers };
 
 struct TrailersCase {
@@ -2630,7 +2935,7 @@ std::vector<TrailersCase> allTrailersCases() {
   return cases;
 }
 
-class FilterManagerTrailersInvariantTest : public FilterManagerPerFilterBufferTest,
+class FilterManagerTrailersInvariantTest : public FilterManagerTrailersTest,
                                            public testing::WithParamInterface<TrailersCase> {
 public:
   bool request() const { return GetParam().direction == TrailersDirection::Request; }
@@ -2822,7 +3127,7 @@ INSTANTIATE_TEST_SUITE_P(AllCases, FilterManagerTrailersInvariantTest,
 
 TEST_P(FilterManagerTrailersInvariantTest, TrailersFollowDataExactlyOnce) { run(); }
 
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedByResumedFilterWaitForLastStopAll) {
+TEST_F(FilterManagerTrailersTest, RequestTrailersAddedByResumedFilterWaitForLastStopAll) {
   initializeChain(true);
   // Filter 0 buffers the body, then adds trailers and resumes on the last frame.
   records_[0].decode_data = [this](Buffer::Instance&, bool end_stream) {
@@ -2849,7 +3154,7 @@ TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedByResumedFilterWait
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedByResumedFilterWaitForStopAll) {
+TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedByResumedFilterWaitForStopAll) {
   initializeChain(true);
   filter_manager_->decodeHeaders(*request_headers_, true);
   // Filter 2 is the first encoder filter: it buffers the body, then adds trailers and resumes on
@@ -2882,8 +3187,7 @@ TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedByResumedFilterWai
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerPerFilterBufferTest,
-       ResponseTrailersHeldAtStopAllFilterReachItOnceAfterResume) {
+TEST_F(FilterManagerTrailersTest, ResponseTrailersHeldAtStopAllFilterReachItOnceAfterResume) {
   initializeChain(true);
   filter_manager_->decodeHeaders(*request_headers_, true);
   records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
@@ -2912,77 +3216,7 @@ TEST_F(FilterManagerPerFilterBufferTest,
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerTest, RequestBufferDrainedAfterPayloadTooLargeReleasesNothing) {
-  initialize();
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
-        createDecoderFilterFactoryCb(filter)(callbacks);
-        return true;
-      });
-  RequestHeaderMapPtr headers{
-      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
-  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
-  filter_manager_->createDownstreamFilterChain();
-  filter_manager_->requestHeadersInitialized();
-  filter_manager_->setBufferLimit(5);
-
-  ON_CALL(*filter, decodeData(_, _))
-      .WillByDefault(Return(FilterDataStatus::StopIterationAndBuffer));
-  filter_manager_->decodeHeaders(*headers, false);
-  // The buffering filter goes over the limit: a 413 instead of backpressure.
-  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).Times(0);
-  EXPECT_CALL(filter_manager_callbacks_, onRequestDataTooLarge());
-  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
-  Buffer::OwnedImpl data("aaaaaa");
-  filter_manager_->decodeData(data, false);
-
-  // The buffer drops below the low watermark, but there is no backpressure to release.
-  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(0);
-  filter_manager_->setBufferLimit(100);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerTest, ResponseBufferDrainedAfterTooLargeReleasesNothing) {
-  initialize();
-  std::shared_ptr<MockStreamFilter> filter(new NiceMock<MockStreamFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly([&](FilterChainFactoryCallbacks& callbacks) -> bool {
-        createStreamFilterFactoryCb(filter)(callbacks);
-        return true;
-      });
-  RequestHeaderMapPtr headers{
-      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
-  filter_manager_->createDownstreamFilterChain();
-  filter_manager_->requestHeadersInitialized();
-  filter_manager_->decodeHeaders(*headers, true);
-  filter_manager_->setBufferLimit(5);
-  StrictMock<MockDownstreamWatermarkCallbacks> watermark_callbacks;
-  filter->decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks);
-
-  ON_CALL(*filter, encodeHeaders(_, _)).WillByDefault(Return(FilterHeadersStatus::StopIteration));
-  ON_CALL(*filter, encodeData(_, _))
-      .WillByDefault(Return(FilterDataStatus::StopIterationAndBuffer));
-  filter->decoder_callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
-  // The buffering filter goes over the limit: a 500 instead of backpressure.
-  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
-  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
-  Buffer::OwnedImpl data("aaaaaa");
-  filter->decoder_callbacks_->encodeData(data, false);
-
-  // The buffer drops below the low watermark, but there is no backpressure to release: the
-  // strict watermark callbacks would fail on a low watermark without a high one.
-  filter_manager_->setBufferLimit(100);
-  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
-
-  filter->decoder_callbacks_->removeDownstreamWatermarkCallbacks(watermark_callbacks);
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersNotForwardedAfterTooLargeReplyEndsStream) {
+TEST_F(FilterManagerTrailersTest, ResponseTrailersNotForwardedAfterTooLargeReplyEndsStream) {
   initializeChain(true);
   filters_[0]->decoder_callbacks_->setBufferLimit(2);
   filter_manager_->decodeHeaders(*request_headers_, true);
@@ -3012,7 +3246,7 @@ TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersNotForwardedAfterTooLar
   EXPECT_EQ(0, sent_trailers_);
 }
 
-TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersNotForwardedAfterTooLargeReplyEndsStream) {
+TEST_F(FilterManagerTrailersTest, RequestTrailersNotForwardedAfterTooLargeReplyEndsStream) {
   initializeChain(true);
   filters_[0]->decoder_callbacks_->setBufferLimit(2);
   records_[0].decode_data = [this](Buffer::Instance&, bool end_stream) {
@@ -3038,52 +3272,21 @@ TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersNotForwardedAfterTooLarg
   EXPECT_EQ(0, records_[2].decoded_trailers);
 }
 
-TEST_F(FilterManagerPerFilterBufferTest, InjectedDecodedDataKeepsStreamEndStream) {
-  // The legacy flag would rewrite the stream-level flag; the positional marker ignores it.
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
-  initializeChain(true);
-  records_[1].decode_data = [](Buffer::Instance& data, bool) {
-    data.drain(data.length());
-    return FilterDataStatus::StopIterationNoBuffer;
+TEST_F(FilterManagerTrailersTest,
+       RequestTrailersAddedByFilterContinuingOnDataAreDecodedTwiceWithoutGuard) {
+  initializeChain(false);
+  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[0].decode_data = [this](Buffer::Instance&, bool) {
+    filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    return FilterDataStatus::Continue;
   };
-
   filter_manager_->decodeHeaders(*request_headers_, false);
   decodeData("aaa", true);
-  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
 
-  Buffer::OwnedImpl chunk1("a1");
-  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
-  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
-  Buffer::OwnedImpl chunk2("a2");
-  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
-  EXPECT_TRUE(filter_manager_->decoderObservedEndStream());
-  EXPECT_EQ((Chunks{{"a1", false}, {"a2", true}}), records_[2].decoded_data);
-
-  filter_manager_->destroyFilters();
-}
-
-TEST_F(FilterManagerPerFilterBufferTest, HalfCloseStopsInjectedRequestBodyOnceResponseCompletes) {
-  initializeChain(true);
-  ON_CALL(filter_manager_callbacks_, isHalfCloseEnabled()).WillByDefault(Return(true));
-  records_[1].decode_data = [](Buffer::Instance& data, bool) {
-    data.drain(data.length());
-    return FilterDataStatus::StopIterationNoBuffer;
-  };
-
-  filter_manager_->decodeHeaders(*request_headers_, false);
-  decodeData("aaa", true);
-  Buffer::OwnedImpl chunk1("a1");
-  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
-
-  // The client already sent end_stream, so a complete response closes the stream even though
-  // filter 1 is still injecting, as with half-close disabled.
-  EXPECT_CALL(filter_manager_callbacks_, endStream());
-  encodeHeaders(true);
-
-  Buffer::OwnedImpl chunk2("a2");
-  filters_[1]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk2, true);
-  EXPECT_EQ((Chunks{{"a1", false}}), records_[2].decoded_data);
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[1].decoded_data);
+  // Sent once by the resumed filter 0 and again from filter 0 after the data loop.
+  EXPECT_EQ(2, records_[1].decoded_trailers);
+  EXPECT_EQ(2, records_[2].decoded_trailers);
 
   filter_manager_->destroyFilters();
 }
