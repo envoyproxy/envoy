@@ -510,8 +510,10 @@ envoy.filters.http.csrf:
 envoy.filters.http.decompressor:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.decompressor.v3.Decompressor
 envoy.filters.http.dynamic_forward_proxy:

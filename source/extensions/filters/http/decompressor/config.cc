@@ -46,6 +46,8 @@ DecompressorFilterFactory::createHttpFilterFactoryFromProtoTyped(
  * Static registration for the decompressor filter. @see NamedHttpFilterConfigFactory.
  */
 REGISTER_FACTORY(DecompressorFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamDecompressorFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Decompressor
 } // namespace HttpFilters

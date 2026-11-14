@@ -100,6 +100,17 @@ multiple decompressor filters enabled only for requests or responses. For instan
             default_value: false
             runtime_key: request_decompressor_enabled
 
+Upstream HTTP Filter Support
+----------------------------
+
+The decompressor filter can also be configured as an upstream HTTP filter, for example in the
+:ref:`router upstream filters <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_http_filters>`
+or the cluster's
+:ref:`HTTP protocol options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.http_filters>`.
+This is useful, for example, to decompress responses only from clusters that send compressed
+content, or to decompress requests before they are sent to a cluster that cannot accept them.
+When configured on a cluster, the filter's statistics are rooted at ``cluster.<name>.``.
+
 .. _decompressor-statistics:
 
 Statistics

@@ -26,7 +26,10 @@ private:
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
+using UpstreamDecompressorFilterFactory = DecompressorFilterFactory;
+
 DECLARE_FACTORY(DecompressorFilterFactory);
+DECLARE_FACTORY(UpstreamDecompressorFilterFactory);
 
 } // namespace Decompressor
 } // namespace HttpFilters
