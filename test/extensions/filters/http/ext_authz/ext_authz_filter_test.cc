@@ -3748,6 +3748,81 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   EXPECT_EQ("", request_headers_.get_("x-auth-reason"));
 }
 
+// Verify that in shadow mode a Denied response with non-UTF-8 response headers populates
+// HeaderValue.raw_value (leaving value empty) while keeping valid UTF-8 headers in
+// HeaderValue.value, and produces valid JSON from serializeAsString().
+TEST_F(HttpFilterTest, ShadowModeDeniedWithNonUtf8ResponseHeaders) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  const std::string valid_utf8_bytes = "utf8-\xc3\xa9";
+  const std::string non_utf8_bytes = std::string("raw-\xc3\x28", 6);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Unauthorized;
+  response.headers_to_set = {{"x-auth-reason", valid_utf8_bytes}, {"x-raw-header", non_utf8_bytes}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  const auto* shadow =
+      decoder_filter_callbacks_.streamInfo().filterState()->getDataReadOnly<ShadowDecisionObject>(
+          kShadowFilterStateKey);
+  ASSERT_NE(shadow, nullptr);
+  EXPECT_EQ(shadow->checkResult(),
+            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
+  EXPECT_EQ(shadow->statusCode(), Http::Code::Unauthorized);
+
+  auto serialized = shadow->serializeAsProto();
+  ASSERT_NE(serialized, nullptr);
+  const auto& proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::ext_authz::v3::ShadowDecision>(*serialized);
+  ASSERT_EQ(proto.response_headers().size(), 2);
+  EXPECT_EQ(proto.response_headers()[0].key(), "x-auth-reason");
+  EXPECT_EQ(proto.response_headers()[0].value(), valid_utf8_bytes);
+  EXPECT_TRUE(proto.response_headers()[0].raw_value().empty());
+  EXPECT_EQ(proto.response_headers()[1].key(), "x-raw-header");
+  EXPECT_TRUE(proto.response_headers()[1].value().empty());
+  EXPECT_EQ(proto.response_headers()[1].raw_value(), non_utf8_bytes);
+
+  auto serialized_str = shadow->serializeAsString();
+  ASSERT_TRUE(serialized_str.has_value());
+  EXPECT_THAT(*serialized_str, Not(testing::HasSubstr("Failed to convert")));
+  envoy::extensions::filters::http::ext_authz::v3::ShadowDecision decoded_from_json;
+  TestUtility::loadFromJson(*serialized_str, decoded_from_json);
+  EXPECT_EQ(decoded_from_json.check_result(),
+            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
+  EXPECT_EQ(decoded_from_json.status_code(), 401);
+  ASSERT_EQ(decoded_from_json.response_headers().size(), 2);
+  EXPECT_EQ(decoded_from_json.response_headers()[0].key(), "x-auth-reason");
+  EXPECT_EQ(decoded_from_json.response_headers()[0].value(), valid_utf8_bytes);
+  EXPECT_TRUE(decoded_from_json.response_headers()[0].raw_value().empty());
+  EXPECT_EQ(decoded_from_json.response_headers()[1].key(), "x-raw-header");
+  EXPECT_TRUE(decoded_from_json.response_headers()[1].value().empty());
+  EXPECT_EQ(decoded_from_json.response_headers()[1].raw_value(), non_utf8_bytes);
+}
+
 // Verify that in shadow mode an Error response sets FilterState and continues (no local reply).
 TEST_F(HttpFilterTest, ShadowModeErrorSetsFilterStateAndContinues) {
   InSequence s;

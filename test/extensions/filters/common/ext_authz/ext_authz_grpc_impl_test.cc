@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
@@ -12,6 +13,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,6 +37,12 @@ public:
 
   void initialize() {
     client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_);
+  }
+
+  void initializeWithRawHeaderValue() {
+    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
+                                               /*emit_client_span=*/true,
+                                               /*read_raw_header_value=*/true);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -751,6 +759,426 @@ TEST_F(ExtAuthzGrpcClientTest, SetEmitClientSpan) {
   EXPECT_CALL(request_callbacks_, onComplete_(_));
   client_->onSuccess(CheckResponsePtr(std::make_unique<envoy::service::auth::v3::CheckResponse>()),
                      Tracing::NullSpan::instance());
+}
+
+// Test the client when an ok response uses raw_value with fallback to value.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithRawValue) {
+  initializeWithRawHeaderValue();
+
+  const std::string non_utf8_bytes = std::string("raw-\xc0\xc0", 6);
+  const std::string raw_append_bytes = std::string("append-\xc3\x28", 9);
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* ok_response = check_response->mutable_ok_response();
+
+  auto add_header_with_append = [](auto* repeated_headers, absl::string_view key,
+                                   absl::string_view value, absl::string_view raw_value,
+                                   bool append) {
+    auto* entry = repeated_headers->Add();
+    entry->mutable_append()->set_value(append);
+    entry->mutable_header()->set_key(key);
+    if (!value.empty()) {
+      entry->mutable_header()->set_value(value);
+    }
+    if (!raw_value.empty()) {
+      entry->mutable_header()->set_raw_value(raw_value);
+    }
+  };
+
+  auto add_header_with_action =
+      [](auto* repeated_headers, absl::string_view key, absl::string_view value,
+         absl::string_view raw_value,
+         envoy::config::core::v3::HeaderValueOption::HeaderAppendAction action) {
+        auto* entry = repeated_headers->Add();
+        entry->set_append_action(action);
+        entry->mutable_header()->set_key(key);
+        if (!value.empty()) {
+          entry->mutable_header()->set_value(value);
+        }
+        if (!raw_value.empty()) {
+          entry->mutable_header()->set_raw_value(raw_value);
+        }
+      };
+
+  // Upstream request headers: raw_value only, fallback to value, explicit empty raw_value,
+  // both empty, and raw_value taking precedence.
+  add_header_with_append(ok_response->mutable_headers(), "x-raw-set", "", non_utf8_bytes, false);
+  add_header_with_append(ok_response->mutable_headers(), "x-raw-append", "", raw_append_bytes,
+                         true);
+  add_header_with_append(ok_response->mutable_headers(), "x-fallback-set", "legacy-set", "", false);
+  add_header_with_append(ok_response->mutable_headers(), "x-both-set", "legacy-ignored",
+                         "raw-preferred", false);
+
+  auto* explicit_empty_raw = ok_response->add_headers();
+  explicit_empty_raw->mutable_append()->set_value(false);
+  explicit_empty_raw->mutable_header()->set_key("x-empty-raw-fallback");
+  explicit_empty_raw->mutable_header()->set_value("explicit-empty-raw-fallback");
+  explicit_empty_raw->mutable_header()->set_raw_value("");
+
+  auto* both_empty = ok_response->add_headers();
+  both_empty->mutable_append()->set_value(false);
+  both_empty->mutable_header()->set_key("x-both-empty");
+  both_empty->mutable_header()->set_value("");
+  both_empty->mutable_header()->set_raw_value("");
+
+  // Downstream response headers across deprecated append, both-set precedence, and all
+  // append_action variants including an invalid append_action alongside raw_value.
+  add_header_with_append(ok_response->mutable_response_headers_to_add(), "x-resp-add", "",
+                         non_utf8_bytes, true);
+  add_header_with_append(ok_response->mutable_response_headers_to_add(), "x-resp-both",
+                         "legacy-resp-ignored", "resp-both-raw", true);
+  add_header_with_append(ok_response->mutable_response_headers_to_add(), "x-resp-set", "",
+                         "resp-set-raw", false);
+  add_header_with_action(ok_response->mutable_response_headers_to_add(), "x-action-append", "",
+                         raw_append_bytes, Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  add_header_with_action(ok_response->mutable_response_headers_to_add(), "x-action-absent", "",
+                         non_utf8_bytes, Router::HeaderValueOption::ADD_IF_ABSENT);
+  add_header_with_action(ok_response->mutable_response_headers_to_add(), "x-action-overwrite", "",
+                         "overwrite-raw", Router::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  add_header_with_action(ok_response->mutable_response_headers_to_add(), "x-action-overwrite-add",
+                         "fallback-value", "",
+                         Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  add_header_with_action(ok_response->mutable_response_headers_to_add(),
+                         "x-action-overwrite-add-raw", "", non_utf8_bytes,
+                         Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  add_header_with_action(
+      ok_response->mutable_response_headers_to_add(), "x-action-invalid", "", non_utf8_bytes,
+      static_cast<envoy::config::core::v3::HeaderValueOption::HeaderAppendAction>(404));
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
+    EXPECT_EQ(CheckStatus::OK, response->status);
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, response->grpc_status);
+    EXPECT_TRUE(response->saw_invalid_append_actions);
+    EXPECT_TRUE(response->headers_to_add.empty());
+    EXPECT_TRUE(response->headers_to_remove.empty());
+    EXPECT_TRUE(response->query_parameters_to_set.empty());
+    EXPECT_TRUE(response->query_parameters_to_remove.empty());
+    EXPECT_TRUE(TestCommon::compareHeaderVector(
+        response->headers_to_set, {{"x-raw-set", non_utf8_bytes},
+                                   {"x-fallback-set", "legacy-set"},
+                                   {"x-both-set", "raw-preferred"},
+                                   {"x-empty-raw-fallback", "explicit-empty-raw-fallback"},
+                                   {"x-both-empty", ""}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_append,
+                                                {{"x-raw-append", raw_append_bytes}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_add,
+                                                {{"x-resp-add", non_utf8_bytes},
+                                                 {"x-resp-both", "resp-both-raw"},
+                                                 {"x-action-append", raw_append_bytes}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_set,
+                                                {{"x-resp-set", "resp-set-raw"},
+                                                 {"x-action-overwrite-add", "fallback-value"},
+                                                 {"x-action-overwrite-add-raw", non_utf8_bytes}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_add_if_absent,
+                                                {{"x-action-absent", non_utf8_bytes}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_overwrite_if_exists,
+                                                {{"x-action-overwrite", "overwrite-raw"}}));
+  });
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when a denied response uses raw_value with fallback to value.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithRawValue) {
+  initializeWithRawHeaderValue();
+
+  const std::string non_utf8_bytes = std::string("denied-\xc0\xc0", 9);
+  const std::string raw_append_bytes = std::string("denied-append-\xc3\x28", 16);
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  auto* denied_response = check_response->mutable_denied_response();
+  denied_response->mutable_status()->set_code(envoy::type::v3::Unauthorized);
+
+  auto* raw_header = denied_response->add_headers();
+  raw_header->mutable_header()->set_key("x-denied-raw");
+  raw_header->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* fallback_header = denied_response->add_headers();
+  fallback_header->mutable_header()->set_key("x-denied-fallback");
+  fallback_header->mutable_header()->set_value("legacy-denied");
+
+  auto* both_header = denied_response->add_headers();
+  both_header->mutable_header()->set_key("x-denied-both");
+  both_header->mutable_header()->set_value("legacy-ignored");
+  both_header->mutable_header()->set_raw_value("raw-preferred");
+
+  auto* append_raw_header = denied_response->add_headers();
+  append_raw_header->mutable_append()->set_value(true);
+  append_raw_header->mutable_header()->set_key("x-denied-append-raw");
+  append_raw_header->mutable_header()->set_raw_value(raw_append_bytes);
+
+  auto* append_fallback_header = denied_response->add_headers();
+  append_fallback_header->mutable_append()->set_value(true);
+  append_fallback_header->mutable_header()->set_key("x-denied-append-fallback");
+  append_fallback_header->mutable_header()->set_value("legacy-denied-append");
+
+  auto* append_both_header = denied_response->add_headers();
+  append_both_header->mutable_append()->set_value(true);
+  append_both_header->mutable_header()->set_key("x-denied-append-both");
+  append_both_header->mutable_header()->set_value("legacy-append-ignored");
+  append_both_header->mutable_header()->set_raw_value("raw-append-preferred");
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
+    EXPECT_EQ(CheckStatus::Denied, response->status);
+    EXPECT_EQ(Http::Code::Unauthorized, response->status_code);
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::PermissionDenied, response->grpc_status);
+    EXPECT_TRUE(response->headers_to_add.empty());
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_set,
+                                                {{"x-denied-raw", non_utf8_bytes},
+                                                 {"x-denied-fallback", "legacy-denied"},
+                                                 {"x-denied-both", "raw-preferred"}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(
+        response->headers_to_append, {{"x-denied-append-raw", raw_append_bytes},
+                                      {"x-denied-append-fallback", "legacy-denied-append"},
+                                      {"x-denied-append-both", "raw-append-preferred"}}));
+  });
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when an error response uses raw_value with fallback to value.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithRawValue) {
+  initializeWithRawHeaderValue();
+
+  const std::string non_utf8_bytes = std::string("error-\xc0\xc0", 8);
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = check_response->mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::InternalServerError);
+
+  auto* raw_header = error_response->add_headers();
+  raw_header->mutable_header()->set_key("x-error-raw");
+  raw_header->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* both_set_header = error_response->add_headers();
+  both_set_header->mutable_append()->set_value(false);
+  both_set_header->mutable_header()->set_key("x-error-both-set");
+  both_set_header->mutable_header()->set_value("legacy-set-ignored");
+  both_set_header->mutable_header()->set_raw_value("raw-set-preferred");
+
+  auto* append_raw_header = error_response->add_headers();
+  append_raw_header->mutable_append()->set_value(true);
+  append_raw_header->mutable_header()->set_key("x-error-append-raw");
+  append_raw_header->mutable_header()->set_raw_value("append-raw");
+
+  auto* both_append_header = error_response->add_headers();
+  both_append_header->mutable_append()->set_value(true);
+  both_append_header->mutable_header()->set_key("x-error-both-append");
+  both_append_header->mutable_header()->set_value("legacy-append-ignored");
+  both_append_header->mutable_header()->set_raw_value("raw-append-preferred");
+
+  auto* fallback_header = error_response->add_headers();
+  fallback_header->mutable_header()->set_key("x-error-fallback");
+  fallback_header->mutable_header()->set_value("legacy-error");
+
+  auto* append_fallback_header = error_response->add_headers();
+  append_fallback_header->mutable_append()->set_value(true);
+  append_fallback_header->mutable_header()->set_key("x-error-append-fallback");
+  append_fallback_header->mutable_header()->set_value("legacy-error-append");
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
+    EXPECT_EQ(CheckStatus::Error, response->status);
+    EXPECT_EQ(Http::Code::InternalServerError, response->status_code);
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Internal, response->grpc_status);
+    EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_set,
+                                                {{"x-error-raw", non_utf8_bytes},
+                                                 {"x-error-both-set", "raw-set-preferred"},
+                                                 {"x-error-fallback", "legacy-error"}}));
+    EXPECT_TRUE(TestCommon::compareHeaderVector(
+        response->headers_to_append, {{"x-error-append-raw", "append-raw"},
+                                      {"x-error-both-append", "raw-append-preferred"},
+                                      {"x-error-append-fallback", "legacy-error-append"}}));
+  });
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test that by default (read_raw_header_value = false), raw_value is ignored and only value is
+// read across OK, denied, and error responses.
+TEST_F(ExtAuthzGrpcClientTest, ReadRawHeaderValueDisabledByDefault) {
+  initialize();
+
+  // OK response: only value is read across headers, headers_to_append, and response_headers_to_add.
+  {
+    auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+    check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+    auto* ok_response = check_response->mutable_ok_response();
+
+    auto* raw_only = ok_response->add_headers();
+    raw_only->mutable_header()->set_key("x-raw-only");
+    raw_only->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* both = ok_response->add_headers();
+    both->mutable_header()->set_key("x-both");
+    both->mutable_header()->set_value("legacy-value");
+    both->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* append_raw_only = ok_response->add_headers();
+    append_raw_only->mutable_append()->set_value(true);
+    append_raw_only->mutable_header()->set_key("x-append-raw-only");
+    append_raw_only->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* append_both = ok_response->add_headers();
+    append_both->mutable_append()->set_value(true);
+    append_both->mutable_header()->set_key("x-append-both");
+    append_both->mutable_header()->set_value("legacy-append");
+    append_both->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* resp_has_append_true = ok_response->add_response_headers_to_add();
+    resp_has_append_true->mutable_append()->set_value(true);
+    resp_has_append_true->mutable_header()->set_key("x-resp-add");
+    resp_has_append_true->mutable_header()->set_value("legacy-resp-add");
+    resp_has_append_true->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* resp_has_append_false = ok_response->add_response_headers_to_add();
+    resp_has_append_false->mutable_append()->set_value(false);
+    resp_has_append_false->mutable_header()->set_key("x-resp-set");
+    resp_has_append_false->mutable_header()->set_value("legacy-resp-set");
+    resp_has_append_false->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* resp_action_append = ok_response->add_response_headers_to_add();
+    resp_action_append->set_append_action(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+    resp_action_append->mutable_header()->set_key("x-resp-action-append");
+    resp_action_append->mutable_header()->set_value("legacy-action-append");
+    resp_action_append->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* resp_action_absent = ok_response->add_response_headers_to_add();
+    resp_action_absent->set_append_action(Router::HeaderValueOption::ADD_IF_ABSENT);
+    resp_action_absent->mutable_header()->set_key("x-resp-absent");
+    resp_action_absent->mutable_header()->set_value("legacy-absent");
+    resp_action_absent->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* resp_action_overwrite = ok_response->add_response_headers_to_add();
+    resp_action_overwrite->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS);
+    resp_action_overwrite->mutable_header()->set_key("x-resp-overwrite");
+    resp_action_overwrite->mutable_header()->set_value("legacy-overwrite");
+    resp_action_overwrite->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* resp_action_overwrite_add = ok_response->add_response_headers_to_add();
+    resp_action_overwrite_add->set_append_action(
+        Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+    resp_action_overwrite_add->mutable_header()->set_key("x-resp-overwrite-add");
+    resp_action_overwrite_add->mutable_header()->set_raw_value("ignored-raw");
+
+    envoy::service::auth::v3::CheckRequest request;
+    expectCallSend(request);
+    client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+    EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+    EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
+      EXPECT_EQ(CheckStatus::OK, response->status);
+      EXPECT_EQ(static_cast<Http::Code>(0), response->status_code);
+      EXPECT_FALSE(response->saw_invalid_append_actions);
+      EXPECT_TRUE(TestCommon::compareHeaderVector(
+          response->headers_to_set, {{"x-raw-only", ""}, {"x-both", "legacy-value"}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(
+          response->headers_to_append,
+          {{"x-append-raw-only", ""}, {"x-append-both", "legacy-append"}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(
+          response->response_headers_to_add,
+          {{"x-resp-add", "legacy-resp-add"}, {"x-resp-action-append", "legacy-action-append"}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(
+          response->response_headers_to_set,
+          {{"x-resp-set", "legacy-resp-set"}, {"x-resp-overwrite-add", ""}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_add_if_absent,
+                                                  {{"x-resp-absent", "legacy-absent"}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(response->response_headers_to_overwrite_if_exists,
+                                                  {{"x-resp-overwrite", "legacy-overwrite"}}));
+    });
+    client_->onSuccess(std::move(check_response), span_);
+  }
+
+  // Denied response: only value is read when read_raw_header_value is false.
+  {
+    auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+    check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+    auto* denied_response = check_response->mutable_denied_response();
+    denied_response->mutable_status()->set_code(envoy::type::v3::Unauthorized);
+
+    auto* denied_raw_only = denied_response->add_headers();
+    denied_raw_only->mutable_header()->set_key("x-denied-raw-only");
+    denied_raw_only->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* denied_both = denied_response->add_headers();
+    denied_both->mutable_header()->set_key("x-denied-both");
+    denied_both->mutable_header()->set_value("legacy-denied");
+    denied_both->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* denied_append = denied_response->add_headers();
+    denied_append->mutable_append()->set_value(true);
+    denied_append->mutable_header()->set_key("x-denied-append");
+    denied_append->mutable_header()->set_value("legacy-denied-append");
+    denied_append->mutable_header()->set_raw_value("ignored-raw");
+
+    envoy::service::auth::v3::CheckRequest request;
+    expectCallSend(request);
+    client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+    EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+    EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
+      EXPECT_EQ(CheckStatus::Denied, response->status);
+      EXPECT_EQ(Http::Code::Unauthorized, response->status_code);
+      EXPECT_TRUE(TestCommon::compareHeaderVector(
+          response->headers_to_set,
+          {{"x-denied-raw-only", ""}, {"x-denied-both", "legacy-denied"}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_append,
+                                                  {{"x-denied-append", "legacy-denied-append"}}));
+    });
+    client_->onSuccess(std::move(check_response), span_);
+  }
+
+  // Error response: only value is read when read_raw_header_value is false.
+  {
+    auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+    check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+    auto* error_response = check_response->mutable_error_response();
+    error_response->mutable_status()->set_code(envoy::type::v3::ServiceUnavailable);
+
+    auto* error_raw_only = error_response->add_headers();
+    error_raw_only->mutable_header()->set_key("x-error-raw-only");
+    error_raw_only->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* error_both = error_response->add_headers();
+    error_both->mutable_header()->set_key("x-error-both");
+    error_both->mutable_header()->set_value("legacy-error");
+    error_both->mutable_header()->set_raw_value("ignored-raw");
+
+    auto* error_append = error_response->add_headers();
+    error_append->mutable_append()->set_value(true);
+    error_append->mutable_header()->set_key("x-error-append");
+    error_append->mutable_header()->set_value("legacy-error-append");
+    error_append->mutable_header()->set_raw_value("ignored-raw");
+
+    envoy::service::auth::v3::CheckRequest request;
+    expectCallSend(request);
+    client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+    EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+    EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([&](ResponsePtr& response) {
+      EXPECT_EQ(CheckStatus::Error, response->status);
+      EXPECT_EQ(Http::Code::ServiceUnavailable, response->status_code);
+      EXPECT_TRUE(TestCommon::compareHeaderVector(
+          response->headers_to_set, {{"x-error-raw-only", ""}, {"x-error-both", "legacy-error"}}));
+      EXPECT_TRUE(TestCommon::compareHeaderVector(response->headers_to_append,
+                                                  {{"x-error-append", "legacy-error-append"}}));
+    });
+    client_->onSuccess(std::move(check_response), span_);
+  }
 }
 
 } // namespace ExtAuthz
