@@ -50,6 +50,43 @@ protected:
   bool are_stats_marked_for_deletion_ = false;
 };
 
+TEST_F(AllocatorTest, FindStats) {
+  const StatName counter_name = makeStat("counter");
+  const StatName gauge_name = makeStat("gauge");
+  const StatName text_name = makeStat("text");
+  EXPECT_EQ(nullptr, alloc_.findCounter(counter_name));
+  EXPECT_EQ(nullptr, alloc_.findGauge(gauge_name));
+  EXPECT_EQ(nullptr, alloc_.findTextReadout(text_name));
+
+  auto counter = alloc_.makeCounter(counter_name, counter_name, {});
+  auto gauge = alloc_.makeGauge(gauge_name, gauge_name, {}, Gauge::ImportMode::Uninitialized);
+  auto text = alloc_.makeTextReadout(text_name, text_name, {});
+  auto found_counter = alloc_.findCounter(counter_name);
+  auto found_gauge = alloc_.findGauge(gauge_name);
+  auto found_text = alloc_.findTextReadout(text_name);
+  EXPECT_EQ(counter.get(), found_counter.get());
+  EXPECT_EQ(gauge.get(), found_gauge.get());
+  EXPECT_EQ(text.get(), found_text.get());
+  EXPECT_EQ(2, counter->use_count());
+  EXPECT_EQ(2, gauge->use_count());
+  EXPECT_EQ(2, text->use_count());
+  counter.reset();
+  gauge.reset();
+  text.reset();
+  found_counter->inc();
+  found_gauge->set(7);
+  found_text->set("value");
+  EXPECT_EQ(1, alloc_.findCounter(counter_name)->value());
+  EXPECT_EQ(7, alloc_.findGauge(gauge_name)->value());
+  EXPECT_EQ("value", alloc_.findTextReadout(text_name)->value());
+  found_counter.reset();
+  found_gauge.reset();
+  found_text.reset();
+  EXPECT_EQ(nullptr, alloc_.findCounter(counter_name));
+  EXPECT_EQ(nullptr, alloc_.findGauge(gauge_name));
+  EXPECT_EQ(nullptr, alloc_.findTextReadout(text_name));
+}
+
 // Allocate 2 counters of the same name, and you'll get the same object.
 TEST_F(AllocatorTest, CountersWithSameName) {
   StatName counter_name = makeStat("counter.name");
@@ -96,6 +133,7 @@ TEST_F(AllocatorTest, GaugesWithSameName) {
 TEST_F(AllocatorTest, RefCountDecAllocRaceOrganic) {
   StatName counter_name = makeStat("counter.name");
   StatName gauge_name = makeStat("gauge.name");
+  StatName text_name = makeStat("text.name");
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
 
   const uint32_t num_threads = 12;
@@ -108,6 +146,10 @@ TEST_F(AllocatorTest, RefCountDecAllocRaceOrganic) {
       for (uint32_t i = 0; i < iters; ++i) {
         alloc_.makeCounter(counter_name, StatName(), {});
         alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::NeverImport);
+        alloc_.makeTextReadout(text_name, StatName(), {});
+        alloc_.findCounter(counter_name);
+        alloc_.findGauge(gauge_name);
+        alloc_.findTextReadout(text_name);
       }
     }));
   }
@@ -466,6 +508,7 @@ TEST_F(AllocatorTest, AskForDeletedStat) {
   // Reject a stat and remove it from "scope".
   StatName const rejected_counter_name = counters[4]->statName();
   alloc_.markCounterForDeletion(counters[4]);
+  EXPECT_EQ(nullptr, alloc_.findCounter(rejected_counter_name));
   // Save a local reference to rejected stat.
   Counter& rejected_counter = *counters[4];
   counters.erase(counters.begin() + 4);
@@ -475,6 +518,7 @@ TEST_F(AllocatorTest, AskForDeletedStat) {
 
   // Make the deleted stat again.
   CounterSharedPtr deleted_counter = alloc_.makeCounter(rejected_counter_name, StatName(), {});
+  EXPECT_EQ(deleted_counter.get(), alloc_.findCounter(rejected_counter_name).get());
 
   EXPECT_EQ(deleted_counter->value(), 0);
   EXPECT_EQ(rejected_counter.value(), 2);
@@ -487,6 +531,7 @@ TEST_F(AllocatorTest, AskForDeletedStat) {
   // Reject a stat and remove it from "scope".
   StatName const rejected_gauge_name = gauges[4]->statName();
   alloc_.markGaugeForDeletion(gauges[4]);
+  EXPECT_EQ(nullptr, alloc_.findGauge(rejected_gauge_name));
   // Save a local reference to rejected stat.
   Gauge& rejected_gauge = *gauges[4];
   gauges.erase(gauges.begin() + 4);
@@ -496,6 +541,7 @@ TEST_F(AllocatorTest, AskForDeletedStat) {
   // Make the deleted stat again.
   GaugeSharedPtr deleted_gauge =
       alloc_.makeGauge(rejected_gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(deleted_gauge.get(), alloc_.findGauge(rejected_gauge_name).get());
 
   EXPECT_EQ(deleted_gauge->value(), 0);
   EXPECT_EQ(rejected_gauge.value(), 10);
@@ -508,6 +554,7 @@ TEST_F(AllocatorTest, AskForDeletedStat) {
   // Reject a stat and remove it from "scope".
   StatName const rejected_text_readout_name = text_readouts[4]->statName();
   alloc_.markTextReadoutForDeletion(text_readouts[4]);
+  EXPECT_EQ(nullptr, alloc_.findTextReadout(rejected_text_readout_name));
   // Save a local reference to rejected stat.
   TextReadout& rejected_text_readout = *text_readouts[4];
   text_readouts.erase(text_readouts.begin() + 4);
@@ -517,6 +564,7 @@ TEST_F(AllocatorTest, AskForDeletedStat) {
   // Make the deleted stat again.
   TextReadoutSharedPtr deleted_text_readout =
       alloc_.makeTextReadout(rejected_text_readout_name, StatName(), {});
+  EXPECT_EQ(deleted_text_readout.get(), alloc_.findTextReadout(rejected_text_readout_name).get());
 
   EXPECT_EQ(deleted_text_readout->value(), "");
   EXPECT_EQ(rejected_text_readout.value(), "deleted value");
