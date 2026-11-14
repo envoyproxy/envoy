@@ -23,6 +23,31 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>());
 }
 
+SINGLETON_MANAGER_REGISTRATION(process_ratelimit_inline_limiter_cache);
+
+std::shared_ptr<LocalRateLimiterImpl>
+InlineRateLimiterCache::getRateLimiter(Server::Configuration::ServerFactoryContext& factory_context,
+                                       const envoy::type::v3::TokenBucket& config) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Pinned, since the cache holds only weak references and is cheap to keep.
+  auto cache = factory_context.singletonManager().getTyped<InlineRateLimiterCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(process_ratelimit_inline_limiter_cache),
+      [] { return std::make_shared<InlineRateLimiterCache>(); }, /*pin=*/true);
+
+  const size_t key = MessageUtil::hash(config);
+  if (auto it = cache->limiters_.find(key); it != cache->limiters_.end()) {
+    if (auto limiter = it->second.lock()) {
+      return limiter;
+    }
+  }
+
+  // Free expired entries only when a new rate limiter is created.
+  absl::erase_if(cache->limiters_, [](const auto& entry) { return entry.second.expired(); });
+  auto limiter = createRateLimiterImpl(config, factory_context.mainThreadDispatcher());
+  cache->limiters_[key] = limiter;
+  return limiter;
+}
+
 void RateLimiterProviderSingleton::RateLimiterWrapper::setLimiter(
     LocalRateLimiterSharedPtr limiter) {
   limiter_slot_.runOnAllThreads(
