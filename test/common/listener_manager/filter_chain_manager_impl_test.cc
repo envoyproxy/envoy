@@ -68,6 +68,11 @@ public:
               (const));
 };
 
+class MockFcdsListenerManagerCallbacks : public FcdsListenerManagerCallbacks {
+public:
+  MOCK_METHOD(void, notifyFilterChainUpdateCallbacks, (absl::string_view filter_chain_name));
+};
+
 class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
   struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
@@ -79,6 +84,9 @@ public:
   envoy::config::core::v3::ConfigSource fcds_config_source_;
   void SetUp() override {
     fcds_config_source_.mutable_ads();
+    ON_CALL(fcds_listener_manager_callbacks_, notifyFilterChainUpdateCallbacks(_))
+        .WillByDefault(
+            [this](absl::string_view name) { published_filter_chains_.emplace_back(name); });
     addresses_.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
     filter_chain_manager_ =
         std::make_unique<FilterChainManagerImpl>(addresses_, parent_context_, init_manager_);
@@ -133,15 +141,24 @@ public:
         empty_config_source_, dummy_fcds_callbacks_));
   }
 
-  std::shared_ptr<FcdsSharedFilterChainManager> createFcdsSharedManager(
-      ListenerComponentFactory& listener_component_factory,
-      FcdsSharedFilterChainManager::FilterChainPublishedCb filter_chain_published_cb = nullptr) {
+  std::shared_ptr<FcdsSharedFilterChainManager>
+  createFcdsSharedManager(ListenerComponentFactory& listener_component_factory) {
     // The manager takes ownership. The raw pointer lets the test drive the coalesced callback.
     fcds_tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(
         &parent_context_.server_factory_context_.dispatcher_);
     return std::make_shared<FcdsSharedFilterChainManager>(parent_context_.server_factory_context_,
                                                           listener_component_factory,
-                                                          std::move(filter_chain_published_cb));
+                                                          fcds_listener_manager_callbacks_);
+  }
+
+  // Subscribes a local caller to the name of the filter chain and adds the filter chain.
+  FcdsLocalSubscriptionHandleSharedPtr
+  addLocalFilterChain(FcdsSharedFilterChainManager& fcds_shared_manager,
+                      const envoy::config::listener::v3::FilterChain& filter_chain) {
+    FcdsLocalSubscriptionHandleSharedPtr local =
+        fcds_shared_manager.subscribeLocal(filter_chain.name()).value();
+    EXPECT_THAT(local->update(filter_chain), IsOkAndHolds(true));
+    return local;
   }
 
   void flushFcdsTlsUpdate() {
@@ -181,6 +198,9 @@ public:
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
   Event::MockSchedulableCallback* fcds_tls_update_cb_{};
+  NiceMock<MockFcdsListenerManagerCallbacks> fcds_listener_manager_callbacks_;
+  // The filter chains that the FCDS manager reported to the listener manager.
+  std::vector<std::string> published_filter_chains_;
   std::vector<Config::SubscriptionCallbacks*> fcds_subscription_callbacks_;
   const std::string fcds_filter_chain_type_url_{
       Config::getTypeUrl<envoy::config::listener::v3::FilterChain>()};
@@ -863,13 +883,12 @@ TEST_P(FilterChainManagerImplTest, FcdsInvalidConfigSourceFails) {
 // find it without an FCDS subscription.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainIsFoundWithoutSubscription) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  std::vector<std::string> published;
-  std::shared_ptr<FcdsSharedFilterChainManager> fcds_shared_manager;
-  fcds_shared_manager = createFcdsSharedManager(
-      listener_component_factory, [&published, &fcds_shared_manager](absl::string_view name) {
-        // The workers have the filter chain before the callbacks learn its name.
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
+  EXPECT_CALL(fcds_listener_manager_callbacks_, notifyFilterChainUpdateCallbacks(_))
+      .WillRepeatedly([this, &fcds_shared_manager](absl::string_view name) {
+        // The workers have the filter chain before the listener manager learns its name.
         EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain(std::string(name)), nullptr);
-        published.emplace_back(name);
+        published_filter_chains_.emplace_back(name);
       });
   setupFcdsUpdateMocks(listener_component_factory);
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
@@ -878,17 +897,18 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainIsFoundWithoutSubscriptio
 
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   // A write of another filter chain keeps the publish coalesced.
   envoy::config::listener::v3::FilterChain other_filter_chain;
   other_filter_chain.set_name("other");
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(other_filter_chain),
-              IsOkAndHolds(true));
+  const FcdsLocalSubscriptionHandleSharedPtr other_local =
+      addLocalFilterChain(*fcds_shared_manager, other_filter_chain);
   EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain("chain"), nullptr);
-  EXPECT_TRUE(published.empty());
+  EXPECT_TRUE(published_filter_chains_.empty());
   flushFcdsTlsUpdate();
   EXPECT_NE(fcds_shared_manager->findThreadLocalFilterChain("chain"), nullptr);
-  EXPECT_THAT(published, testing::UnorderedElementsAre("chain", "other"));
+  EXPECT_THAT(published_filter_chains_, testing::UnorderedElementsAre("chain", "other"));
 
   testing::StrictMock<MockFcdsClientCallbacks> callbacks;
   auto handle_or_status =
@@ -909,7 +929,8 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainUpdateDrainsReplacedVersi
   setupFcdsUpdateMocks(listener_component_factory);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   testing::StrictMock<MockFcdsClientCallbacks> callbacks;
   auto handle =
       fcds_shared_manager->subscribe(empty_config_source_, "chain", callbacks, init_manager_);
@@ -918,22 +939,24 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainUpdateDrainsReplacedVersi
 
   filter_chain.mutable_transport_socket_connect_timeout()->set_seconds(1);
   EXPECT_CALL(callbacks, drainFilterChain(first_version));
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  EXPECT_THAT(local->update(filter_chain), IsOkAndHolds(true));
   EXPECT_NE((*handle)->activeFilterChain(), first_version);
 
   EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _)).Times(0);
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(false));
+  EXPECT_THAT(local->update(filter_chain), IsOkAndHolds(false));
 }
 
-// A local filter chain stays once no listener uses it, and its removal drains the listeners that
-// do. A listener that uses the name after the removal waits for the next write.
+// The subscription of a local caller keeps its filter chain once no listener uses it, and a removal
+// drains the listeners that do. A listener that uses the name after the removal waits for the next
+// write.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRemovalDrainsTheListenersThatUseIt) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
   auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
   setupFcdsUpdateMocks(listener_component_factory);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   flushFcdsTlsUpdate();
 
   {
@@ -948,11 +971,11 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRemovalDrainsTheListeners
       fcds_shared_manager->subscribe(empty_config_source_, "chain", callbacks, init_manager_);
   ASSERT_TRUE(handle.ok());
   EXPECT_CALL(callbacks, drainFilterChain((*handle)->activeFilterChain()));
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  local->remove();
+  local.reset();
   EXPECT_FALSE(fcds_shared_manager->isFilterChainActive("chain"));
   flushFcdsTlsUpdate();
   EXPECT_EQ(fcds_shared_manager->findThreadLocalFilterChain("chain"), nullptr);
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
 
   Init::ManagerImpl later_init_manager("later");
   auto later_handle = fcds_shared_manager->subscribe(empty_config_source_, "chain",
@@ -963,11 +986,12 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRemovalDrainsTheListeners
 
   // The listener still uses the name, so a later write serves it again.
   EXPECT_CALL(later_init_watcher, ready());
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  local = addLocalFilterChain(*fcds_shared_manager, filter_chain);
   EXPECT_TRUE((*handle)->isActive());
   later_handle->reset();
   EXPECT_CALL(callbacks, drainFilterChain(_));
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  local->remove();
+  local.reset();
 
   // Once neither a listener nor a local caller uses the name, FCDS can subscribe to it.
   handle->reset();
@@ -992,27 +1016,29 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRemovedWhileWarming) {
   auto* transport_socket = filter_chain.mutable_transport_socket();
   transport_socket->set_name(transport_socket_config_factory.name());
   ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(Protobuf::BoolValue()));
-  // The listener keeps the state of the name through the removal.
+  // The listener keeps the state of the name after the removal.
   auto handle = fcds_shared_manager->subscribe(empty_config_source_, "chain", dummy_fcds_callbacks_,
                                                init_manager_);
   ASSERT_TRUE(handle.ok());
   testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
   init_manager_.initialize(init_watcher);
 
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   // The removal ends the wait of the listener.
   EXPECT_CALL(init_watcher, ready());
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  local->remove();
+  local.reset();
   testing::Mock::VerifyAndClearExpectations(&init_watcher);
   transport_socket_config_factory.init_target_.ready();
   EXPECT_FALSE(fcds_shared_manager->isFilterChainActive("chain"));
 
   EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _));
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  local = addLocalFilterChain(*fcds_shared_manager, filter_chain);
 }
 
-// A name that FCDS subscribes to cannot be written or removed locally, and a listener without an
-// FCDS config source cannot wait for it.
+// A name that FCDS subscribes to cannot be provided locally, and a listener without an FCDS config
+// source cannot wait for it.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRejectsDiscoveredName) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
   auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
@@ -1021,12 +1047,9 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRejectsDiscoveredName) {
                                                init_manager_);
   ASSERT_TRUE(handle.ok());
 
-  envoy::config::listener::v3::FilterChain filter_chain;
-  filter_chain.set_name("chain");
   EXPECT_THAT(
-      fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain),
+      fcds_shared_manager->subscribeLocal("chain"),
       HasStatus(absl::StatusCode::kAlreadyExists, "filter chain chain is discovered through FCDS"));
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
   EXPECT_THAT(
       fcds_shared_manager->subscribe(empty_config_source_, "chain", dummy_fcds_callbacks_,
                                      init_manager_),
@@ -1044,7 +1067,8 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionRejectsLocalName) {
       .Times(0);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("added");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   EXPECT_THAT(fcds_shared_manager->subscribe(fcds_config_source_, "added", dummy_fcds_callbacks_,
                                              init_manager_),
               HasStatus(absl::StatusCode::kAlreadyExists,
@@ -1059,7 +1083,8 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionRejectsLocalName) {
                         "filter chain awaited is added or awaited locally"));
 }
 
-// A local filter chain that cannot be built leaves no state behind, also when its build throws.
+// A local filter chain that cannot be built returns the error, also when its build throws, and
+// leaves no state behind once the local caller drops its subscription.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainThatFailsToBuildLeavesNoState) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
   auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
@@ -1069,12 +1094,12 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainThatFailsToBuildLeavesNoS
       .WillOnce(testing::Throw(EnvoyException("bad filter config")));
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain),
+  FcdsLocalSubscriptionHandleSharedPtr local = fcds_shared_manager->subscribeLocal("chain").value();
+  EXPECT_THAT(local->update(filter_chain),
               HasStatus(absl::StatusCode::kInvalidArgument, "bad filter"));
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain),
+  EXPECT_THAT(local->update(filter_chain),
               HasStatus(absl::StatusCode::kInvalidArgument, "bad filter config"));
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  local.reset();
 
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _));
@@ -1090,7 +1115,8 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainFailedUpdateKeepsTheActiv
   setupFcdsUpdateMocks(listener_component_factory);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   const Network::DrainableFilterChainSharedPtr active =
       fcds_shared_manager->activeFilterChain("chain");
   ASSERT_NE(active, nullptr);
@@ -1098,10 +1124,11 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainFailedUpdateKeepsTheActiv
   filter_chain.mutable_transport_socket_connect_timeout()->set_seconds(1);
   EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
       .WillOnce(Return(absl::InvalidArgumentError("bad filter")));
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain),
+  EXPECT_THAT(local->update(filter_chain),
               HasStatus(absl::StatusCode::kInvalidArgument, "bad filter"));
   EXPECT_EQ(active, fcds_shared_manager->activeFilterChain("chain"));
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  local->remove();
+  local.reset();
 
   // No listener used the name, so FCDS can subscribe to it at once.
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
@@ -1111,7 +1138,8 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainFailedUpdateKeepsTheActiv
                   .ok());
 }
 
-// The state of a local filter chain outlives a listener that goes away inside its write.
+// The subscription of the local caller keeps the state of the name when the last listener goes away
+// inside its write.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainWriteOutlivesTheLastListener) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
   auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
@@ -1125,11 +1153,13 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainWriteOutlivesTheLastListe
   EXPECT_CALL(init_watcher, ready()).WillOnce([&handle]() { handle->reset(); });
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
+  EXPECT_TRUE(fcds_shared_manager->isFilterChainActive("chain"));
 }
 
-// The state of a local filter chain outlives a listener that goes away inside its removal.
+// The subscription of the local caller keeps the state of the name when the last listener goes away
+// inside its removal.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRemovalOutlivesTheLastListener) {
   InitTargetTransportSocketConfigFactory transport_socket_config_factory;
   Registry::InjectFactory<Configuration::DownstreamTransportSocketConfigFactory>
@@ -1147,11 +1177,24 @@ TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainRemovalOutlivesTheLastLis
   ASSERT_TRUE(handle.ok());
   testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
   init_manager_.initialize(init_watcher);
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   // The removal ends the wait, and the listener fails to listen and goes away.
   EXPECT_CALL(init_watcher, ready()).WillOnce([&handle]() { handle->reset(); });
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("chain"));
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
+  local->remove();
+  Init::ManagerImpl fcds_init_manager("fcds");
+  EXPECT_THAT(fcds_shared_manager->subscribe(fcds_config_source_, "chain", dummy_fcds_callbacks_,
+                                             fcds_init_manager),
+              HasStatus(absl::StatusCode::kAlreadyExists,
+                        "filter chain chain is added or awaited locally"));
+
+  local.reset();
+  EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _));
+  EXPECT_TRUE(
+      fcds_shared_manager
+          ->subscribe(fcds_config_source_, "chain", dummy_fcds_callbacks_, fcds_init_manager)
+          .ok());
 }
 
 // A listener without an FCDS config source waits for a local caller to add the filter chain, also
@@ -1175,13 +1218,15 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionWithoutConfigSourceWaitsForLo
   EXPECT_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
       .WillOnce(Return(absl::InvalidArgumentError("bad filter")))
       .WillOnce(testing::DoDefault());
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain),
+  FcdsLocalSubscriptionHandleSharedPtr local = fcds_shared_manager->subscribeLocal("chain").value();
+  EXPECT_THAT(local->update(filter_chain),
               HasStatus(absl::StatusCode::kInvalidArgument, "bad filter"));
+  // The local caller keeps nothing of a first write that fails.
+  local.reset();
   EXPECT_FALSE((*handle)->isActive());
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
 
   EXPECT_CALL(init_watcher, ready());
-  EXPECT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  local = addLocalFilterChain(*fcds_shared_manager, filter_chain);
   EXPECT_TRUE((*handle)->isActive());
 }
 
@@ -1194,7 +1239,6 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionWithoutConfigSourceReleasesTh
   EXPECT_TRUE(fcds_shared_manager
                   ->subscribe(empty_config_source_, "chain", dummy_fcds_callbacks_, init_manager_)
                   .ok());
-  EXPECT_FALSE(fcds_shared_manager->removeLocalFilterChain("chain"));
 
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _));
@@ -1206,11 +1250,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionWithoutConfigSourceReleasesTh
 // A publish reports the filter chains from FCDS too, but not a filter chain removed before it.
 TEST_P(FilterChainManagerImplTest, FcdsPublishReportsCommittedFilterChains) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  std::vector<std::string> published;
-  auto fcds_shared_manager =
-      createFcdsSharedManager(listener_component_factory, [&published](absl::string_view name) {
-        published.emplace_back(name);
-      });
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
   setupFcdsUpdateMocks(listener_component_factory);
   auto handle = fcds_shared_manager->subscribe(fcds_config_source_, "discovered",
                                                dummy_fcds_callbacks_, init_manager_);
@@ -1227,71 +1267,62 @@ TEST_P(FilterChainManagerImplTest, FcdsPublishReportsCommittedFilterChains) {
 
   envoy::config::listener::v3::FilterChain removed;
   removed.set_name("removed");
-  // A listener keeps the state of the name through the removal.
-  Init::ManagerImpl removed_init_manager("removed");
-  auto removed_handle = fcds_shared_manager->subscribe(empty_config_source_, "removed",
-                                                       dummy_fcds_callbacks_, removed_init_manager);
-  ASSERT_TRUE(removed_handle.ok());
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(removed), IsOkAndHolds(true));
-  EXPECT_TRUE(fcds_shared_manager->removeLocalFilterChain("removed"));
+  // The local caller keeps the state of the name through the publish.
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, removed);
+  local->remove();
   flushFcdsTlsUpdate();
-  EXPECT_THAT(published, testing::ElementsAre("discovered"));
+  EXPECT_THAT(published_filter_chains_, testing::ElementsAre("discovered"));
 }
 
 // A write of a local filter chain whose committed version waits for its publish publishes that
-// version first, so the callbacks learn about it before the next version warms.
+// version first, so the listener manager learns about it before the next version warms.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainUpdatePublishesTheCommittedVersionFirst) {
   InitTargetTransportSocketConfigFactory transport_socket_config_factory;
   Registry::InjectFactory<Configuration::DownstreamTransportSocketConfigFactory>
       registered_transport_socket_config_factory(transport_socket_config_factory);
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  std::vector<std::string> published;
-  auto fcds_shared_manager =
-      createFcdsSharedManager(listener_component_factory, [&published](absl::string_view name) {
-        published.emplace_back(name);
-      });
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
   setupFcdsUpdateMocks(listener_component_factory);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
-  EXPECT_TRUE(published.empty());
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
+  EXPECT_TRUE(published_filter_chains_.empty());
   // The next version warms until its transport socket is ready.
   auto* transport_socket = filter_chain.mutable_transport_socket();
   transport_socket->set_name(transport_socket_config_factory.name());
   ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(Protobuf::BoolValue()));
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
-  EXPECT_THAT(published, testing::ElementsAre("chain"));
+  ASSERT_THAT(local->update(filter_chain), IsOkAndHolds(true));
+  EXPECT_THAT(published_filter_chains_, testing::ElementsAre("chain"));
   EXPECT_FALSE(fcds_tls_update_cb_->enabled_);
 
   transport_socket_config_factory.init_target_.ready();
   flushFcdsTlsUpdate();
-  EXPECT_THAT(published, testing::ElementsAre("chain", "chain"));
+  EXPECT_THAT(published_filter_chains_, testing::ElementsAre("chain", "chain"));
 }
 
 // A write of a local filter chain that commits at once publishes the committed version before it
 // builds the next one.
 TEST_P(FilterChainManagerImplTest, FcdsLocalFilterChainCommittedAtOncePublishesTheEarlierVersion) {
   NiceMock<MockListenerComponentFactory> listener_component_factory;
-  std::vector<std::string> published;
-  auto fcds_shared_manager =
-      createFcdsSharedManager(listener_component_factory, [&published](absl::string_view name) {
-        published.emplace_back(name);
-      });
+  auto fcds_shared_manager = createFcdsSharedManager(listener_component_factory);
   setupFcdsUpdateMocks(listener_component_factory);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   const Network::DrainableFilterChainSharedPtr first_version =
       fcds_shared_manager->activeFilterChain("chain");
 
   filter_chain.mutable_transport_socket_connect_timeout()->set_seconds(1);
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
-  EXPECT_THAT(published, testing::ElementsAre("chain"));
+  ASSERT_THAT(local->update(filter_chain), IsOkAndHolds(true));
+  EXPECT_THAT(published_filter_chains_, testing::ElementsAre("chain"));
   EXPECT_EQ(first_version.get(), fcds_shared_manager->findThreadLocalFilterChain("chain"));
   EXPECT_TRUE(fcds_tls_update_cb_->enabled_);
 
   flushFcdsTlsUpdate();
-  EXPECT_THAT(published, testing::ElementsAre("chain", "chain"));
+  EXPECT_THAT(published_filter_chains_, testing::ElementsAre("chain", "chain"));
   EXPECT_EQ(fcds_shared_manager->activeFilterChain("chain").get(),
             fcds_shared_manager->findThreadLocalFilterChain("chain"));
 }
@@ -1304,7 +1335,8 @@ TEST_P(FilterChainManagerImplTest, FcdsReplacedFilterChainIsDeletedOnTheMainThre
   setupFcdsUpdateMocks(listener_component_factory);
   envoy::config::listener::v3::FilterChain filter_chain;
   filter_chain.set_name("chain");
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  const FcdsLocalSubscriptionHandleSharedPtr local =
+      addLocalFilterChain(*fcds_shared_manager, filter_chain);
   flushFcdsTlsUpdate();
   const std::weak_ptr<Network::DrainableFilterChain> first_version =
       fcds_shared_manager->activeFilterChain("chain");
@@ -1313,7 +1345,7 @@ TEST_P(FilterChainManagerImplTest, FcdsReplacedFilterChainIsDeletedOnTheMainThre
       parent_context_.server_factory_context_.thread_local_.data_;
 
   filter_chain.mutable_transport_socket_connect_timeout()->set_seconds(1);
-  ASSERT_THAT(fcds_shared_manager->addOrUpdateLocalFilterChain(filter_chain), IsOkAndHolds(true));
+  ASSERT_THAT(local->update(filter_chain), IsOkAndHolds(true));
   flushFcdsTlsUpdate();
   // The main dispatcher reports thread safety on every thread until it runs.
   ON_CALL(parent_context_.server_factory_context_.dispatcher_, isThreadSafe())

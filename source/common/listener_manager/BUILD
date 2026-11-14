@@ -133,6 +133,7 @@ envoy_cc_library(
     deps = [
         ":fcds_api_lib",
         ":filter_chain_factory_context_callback",
+        "//envoy/common:optref_lib",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/config:xds_manager_interface",

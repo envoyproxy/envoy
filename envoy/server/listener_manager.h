@@ -371,12 +371,12 @@ public:
    * Add or update a filter chain that the listeners with fcds_config find by name, as FCDS would
    * deliver it. A listener whose fcds_config has no config_source waits, without a timeout, until
    * the filter chains that it finds by name are added and finished warming, and removing a filter
-   * chain that still warms ends the wait. The wait can hold server initialization. Envoy keeps the
-   * names that FCDS discovers apart from the names that are added or awaited here, and rejects a
-   * listener that would mix them. A listener holds its names until it is gone, also while it
-   * drains. The caller must use names that no other caller writes. This call can warm listeners and
-   * start the workers, and the callbacks that run inside it must not add, update or remove filter
-   * chains.
+   * chain that still warms ends the wait. The wait can hold server initialization. A filter chain
+   * name is either discovered through FCDS or added here, and Envoy rejects a listener that
+   * requests a name of the other kind. A listener keeps its names until it is removed and has
+   * finished draining. The caller must use names that no other caller writes. This call can warm
+   * listeners and start the workers, and the callbacks that run inside it must not add, update or
+   * remove filter chains.
    * @param filter_chain supplies the configuration of the filter chain.
    * @return TRUE if the filter chain was added or updated or FALSE if it equals the version added
    *         last, which can still warm. This routine will return an error if the filter chain

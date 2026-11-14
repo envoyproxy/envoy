@@ -1791,25 +1791,44 @@ std::shared_ptr<FcdsSharedFilterChainManager> ListenerManagerImpl::fcdsSharedFil
   return server_.serverFactoryContext().singletonManager().getTyped<FcdsSharedFilterChainManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
       [this]() -> Singleton::InstanceSharedPtr {
-        return std::make_shared<FcdsSharedFilterChainManager>(
-            server_.serverFactoryContext(), *factory_, [this](absl::string_view filter_chain_name) {
-              notifyFilterChainUpdateCallbacks(filter_chain_name);
-            });
+        return std::make_shared<FcdsSharedFilterChainManager>(server_.serverFactoryContext(),
+                                                              *factory_, *this);
       });
 }
 
 absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  if (local_fcds_manager_ == nullptr) {
-    local_fcds_manager_ = fcdsSharedFilterChainManager();
+  auto [it, inserted] = local_filter_chains_.try_emplace(filter_chain.name());
+  if (inserted) {
+    absl::StatusOr<FcdsLocalSubscriptionHandleSharedPtr> handle_or_error =
+        fcdsSharedFilterChainManager()->subscribeLocal(filter_chain.name());
+    if (!handle_or_error.ok()) {
+      local_filter_chains_.erase(it);
+      return handle_or_error.status();
+    }
+    it->second = std::move(handle_or_error).value();
   }
-  return local_fcds_manager_->addOrUpdateLocalFilterChain(filter_chain);
+  // The update can warm listeners, so the copy keeps the handle even if the map changes inside it.
+  const FcdsLocalSubscriptionHandleSharedPtr handle = it->second;
+  absl::StatusOr<bool> updated = handle->update(filter_chain);
+  if (!updated.ok() && inserted) {
+    // A first write that fails keeps nothing.
+    local_filter_chains_.erase(filter_chain.name());
+  }
+  return updated;
 }
 
 bool ListenerManagerImpl::removeFilterChain(const std::string& name) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  return local_fcds_manager_ != nullptr && local_fcds_manager_->removeLocalFilterChain(name);
+  auto node = local_filter_chains_.extract(name);
+  if (node.empty()) {
+    return false;
+  }
+  // The handle keeps the state of the name while the removal readies listeners, and the listeners
+  // that still use the name keep it once the handle goes away.
+  node.mapped()->remove();
+  return true;
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

@@ -268,7 +268,9 @@ private:
 /**
  * Implementation of ListenerManager.
  */
-class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
+class ListenerManagerImpl : public ListenerManager,
+                            public FcdsListenerManagerCallbacks,
+                            Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats,
@@ -447,7 +449,8 @@ private:
                                      Network::ListenerConfig& listener_config);
   void notifyListenerRemovalCallbacks(const std::string& listener_name);
   void notifyListenerListenFailureCallbacks(absl::string_view listener_name, bool removed);
-  void notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name);
+  // FcdsListenerManagerCallbacks
+  void notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name) override;
 
   absl::Status validateNoDuplicatedAddress(const std::string& name,
                                            const ListenerImpl& listener) const;
@@ -512,8 +515,8 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
-  // Keeps the filter chains of addOrUpdateFilterChain() when no listener uses them.
-  std::shared_ptr<FcdsSharedFilterChainManager> local_fcds_manager_;
+  // The subscriptions through which addOrUpdateFilterChain() provides filter chains, by name.
+  absl::flat_hash_map<std::string, FcdsLocalSubscriptionHandleSharedPtr> local_filter_chains_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {

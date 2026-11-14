@@ -10881,8 +10881,8 @@ TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, LocalFilterChainRejectsDiscover
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// An update that moves a listener from FCDS to local filter chains of the same names is rejected,
-// since the active version still holds the names.
+// An update that clears the FCDS config source of a listener but keeps its filter chain names is
+// rejected, since the active version still holds the names.
 TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, UpdateFromFcdsToLocalFilterChainsIsRejected) {
   startWorkers();
   ListenerHandle* listener_foo = addActiveFcdsListener();
@@ -10912,7 +10912,34 @@ TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, DrainingListenerKeepsItsFcdsNam
   listener_foo->drain_manager_->drain_sequence_completion_();
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
+  // The rejected write kept nothing, so the FCDS manager went away with the listener and the next
+  // write creates another one.
+  fcds_tls_update_cb_ =
+      new NiceMock<Event::MockSchedulableCallback>(&server_.server_factory_context_->dispatcher_);
   addLocalFilterChain("dynamic_1");
+}
+
+// A first write of a local filter chain that fails keeps nothing, so the FCDS manager goes away,
+// while a failed update keeps the filter chain until its removal, which releases the FCDS manager.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, FailedLocalFilterChainWrites) {
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("chain");
+  EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+      .WillOnce(Return(absl::InvalidArgumentError("bad filter")));
+  EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain), HasStatusMessage("bad filter"));
+  EXPECT_FALSE(manager_->removeFilterChain("chain"));
+
+  testing::MockFunction<void()> fcds_manager_destroyed;
+  fcds_tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(
+      &server_.server_factory_context_->dispatcher_, &fcds_manager_destroyed);
+  addLocalFilterChain("chain");
+  filter_chain.mutable_transport_socket_connect_timeout()->set_seconds(1);
+  EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+      .WillOnce(Return(absl::InvalidArgumentError("bad filter")));
+  EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain), HasStatusMessage("bad filter"));
+  EXPECT_CALL(fcds_manager_destroyed, Call());
+  EXPECT_TRUE(manager_->removeFilterChain("chain"));
+  EXPECT_FALSE(manager_->removeFilterChain("chain"));
 }
 
 // Listener managers and callbacks that predate local filter chains keep their behavior.
