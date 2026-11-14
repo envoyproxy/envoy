@@ -25,7 +25,8 @@ Configuration
 -------------
 
 The filter can be configured with multiple metadata entries, each targeting a specific namespace.
-Each entry can contain either static values or use the deprecated legacy configuration format.
+Each entry can contain static values, copy a filter state object via
+``filter_state``, or use the deprecated legacy configuration format.
 
 Metadata Merge Rules
 --------------------
@@ -33,6 +34,8 @@ Metadata Merge Rules
 Dynamic metadata values are updated with the following rules. If a key does not exist, it is copied into the current metadata. If the key exists, the following rules apply:
 
 * **Typed metadata values**: When :ref:`typed_value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.typed_value>` is used, it will overwrite existing values if and only if :ref:`allow_overwrite <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.allow_overwrite>` is set to ``true``. Otherwise, the operation is skipped.
+
+* **Filter state values**: When :ref:`filter_state <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.filter_state>` is used, the filter state object is serialized to a ``google.protobuf.Any`` and written to the typed metadata following the same rules as ``typed_value``.
 
 * **Untyped metadata values**: When :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.value>` is used and ``allow_overwrite`` is set to ``true``, or when the deprecated :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>` field is used, values are merged using the following scheme:
 
@@ -144,3 +147,5 @@ comes from the owning HTTP connection manager.
   :widths: 1, 1, 2
 
   overwrite_denied, Counter, Total number of denied attempts to overwrite an existing metadata value when ``allow_overwrite`` is ``false``
+  filter_state_not_found, Counter, Total number of times a configured ``filter_state`` key was not present in the stream's filter state
+  filter_state_not_serializable, Counter, Total number of times a configured ``filter_state`` object supported neither proto nor string serialization

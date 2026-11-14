@@ -18,7 +18,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
-#define ALL_SET_METADATA_FILTER_STATS(COUNTER) COUNTER(overwrite_denied)
+#define ALL_SET_METADATA_FILTER_STATS(COUNTER)                                                     \
+  COUNTER(overwrite_denied)                                                                        \
+  COUNTER(filter_state_not_found)                                                                  \
+  COUNTER(filter_state_not_serializable)
 
 struct FilterStats {
   ALL_SET_METADATA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -34,6 +37,12 @@ struct TypedMetadataEntry {
   std::string metadata_namespace;
   Protobuf::Any value;
 };
+struct FilterStateMetadataEntry {
+  bool allow_overwrite{};
+  std::string metadata_namespace;
+  std::string key;
+  bool value_is_serialized_any{};
+};
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
 public:
@@ -42,6 +51,7 @@ public:
 
   const std::vector<UntypedMetadataEntry>& untyped() const { return untyped_; }
   const std::vector<TypedMetadataEntry>& typed() const { return typed_; }
+  const std::vector<FilterStateMetadataEntry>& filterState() const { return filter_state_; }
   const FilterStats& stats() const { return stats_; }
 
 private:
@@ -49,6 +59,7 @@ private:
 
   std::vector<UntypedMetadataEntry> untyped_;
   std::vector<TypedMetadataEntry> typed_;
+  std::vector<FilterStateMetadataEntry> filter_state_;
   FilterStats stats_;
 };
 
