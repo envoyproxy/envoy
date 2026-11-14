@@ -453,6 +453,7 @@
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/health_checkers/dynamic_modules @basundhara-c @agrawroh @mathetake @wbpcode
+/*/extensions/network/socket_interface/dynamic_modules @basundhara-c @yanavaslov @agrawroh
 /*/extensions/http/early_header_mutation/dynamic_modules @wbpcode @agrawroh @mathetake
 /*/extensions/http/header_formatters/dynamic_modules @wbpcode @agrawroh @mathetake
 # Linux network namespace override

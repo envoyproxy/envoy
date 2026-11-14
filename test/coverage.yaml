@@ -74,6 +74,8 @@ directories:
   source/extensions/load_balancing_policies/maglev: 95.2
   source/extensions/load_balancing_policies/round_robin: 96.4
   source/extensions/load_balancing_policies/ring_hash: 96.9
+  # ENVOY_BUG defensive branches and IPv6/AF_UNIX paths the IPv4-only module test suite does not reach.
+  source/extensions/network/socket_interface/dynamic_modules: 83.5
   source/extensions/rate_limit_descriptors: 95.0
   source/extensions/rate_limit_descriptors/expr: 96.1
   source/extensions/stat_sinks/graphite_statsd: 82.8  # Death tests don't report LCOV

@@ -343,6 +343,7 @@ proto_library(
         "//envoy/extensions/network/dns_resolver/cares/v3:pkg",
         "//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg",
         "//envoy/extensions/network/dns_resolver/hickory/v3:pkg",
+        "//envoy/extensions/network/socket_interface/dynamic_modules/v3:pkg",
         "//envoy/extensions/network/socket_interface/sockmap/v3:pkg",
         "//envoy/extensions/network/socket_interface/v3:pkg",
         "//envoy/extensions/outlier_detection_monitors/common/v3:pkg",

@@ -21,6 +21,7 @@ package(default_visibility = [
     "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
+    "//test/extensions/network/socket_interface/dynamic_modules:__pkg__",
     "//test/extensions/resource_monitors/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
@@ -431,3 +432,23 @@ test_program(name = "resource_monitor_synchronous_feedback")
 test_program(name = "resource_monitor_synchronous_feedback_missing_get_resource_usage")
 
 test_program(name = "resource_monitor_synchronous_feedback_missing_load_accepted")
+
+test_program(name = "socket_interface_test")
+
+test_program(name = "socket_interface_creation_only")
+
+test_program(name = "socket_interface_config_new_fail")
+
+test_program(name = "socket_interface_missing_config_new")
+
+test_program(name = "socket_interface_missing_config_destroy")
+
+test_program(name = "socket_interface_missing_ip_family_supported")
+
+test_program(name = "socket_interface_missing_socket")
+
+test_program(name = "socket_interface_missing_socket_close")
+
+test_program(name = "socket_interface_missing_io_read")
+
+test_program(name = "socket_interface_missing_set_socket_handle")
