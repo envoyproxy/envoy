@@ -114,14 +114,7 @@ void GrpcClientImpl::onSuccess(
   ENVOY_LOG(trace, "Received CheckResponse: {}", response->DebugString());
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
   authz_response->grpc_status = response->status().code();
-  if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
-    span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
-    authz_response->status = CheckStatus::OK;
-    if (response->has_ok_response()) {
-      const auto& ok_response = response->ok_response();
-      copyOkResponseMutations(authz_response, ok_response);
-    }
-  } else if (response->has_error_response()) {
+  if (response->has_error_response()) {
     // If error_response is present, treat it as an error and not denial.
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceError);
     authz_response->status = CheckStatus::Error;
@@ -136,6 +129,13 @@ void GrpcClientImpl::onSuccess(
       authz_response->status_code = static_cast<Http::Code>(status_code);
     }
     authz_response->body = error_response.body();
+  } else if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
+    span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
+    authz_response->status = CheckStatus::OK;
+    if (response->has_ok_response()) {
+      const auto& ok_response = response->ok_response();
+      copyOkResponseMutations(authz_response, ok_response);
+    }
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;

@@ -415,6 +415,31 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithEmptyErrorResponseStatus) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+// An error_response takes precedence over proto3's default OK status when status is unset.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorWithUnsetGrpcStatus) {
+  initialize();
+
+  const std::string expected_body{"Service Unavailable"};
+  auto check_response = CheckResponsePtr();
+  check_response->mutable_error_response()->set_body(expected_body);
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Error, static_cast<Http::Code>(0), expected_body, HeaderValueOptionVector{},
+      HeaderValueOptionVector{}, Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(authz_response))));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 // Test the client when an error response with no attributes is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationErrorNoAttributes) {
   initialize();
