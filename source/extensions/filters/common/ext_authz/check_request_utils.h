@@ -89,6 +89,7 @@ public:
    * @param encode_raw_headers  when true, will set the check request headers as bytes.
    * @param include_peer_certificate whether to include the peer certificate in the check request.
    * @param include_tls_session whether to include the TLS session details in the check request.
+   * @param strip_query_params when true, strips the query string from the request path.
    */
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                               const Envoy::Http::RequestHeaderMap& headers,
@@ -98,7 +99,7 @@ public:
                               envoy::service::auth::v3::CheckRequest& request,
                               uint64_t max_request_bytes, bool pack_as_bytes,
                               bool encode_raw_headers, bool include_peer_certificate,
-                              bool include_tls_session,
+                              bool include_tls_session, bool strip_query_params,
                               const Protobuf::Map<std::string, std::string>& destination_labels,
                               const MatcherSharedPtr& allowed_headers_matcher,
                               const MatcherSharedPtr& disallowed_headers_matcher);
@@ -137,15 +138,18 @@ private:
                              const Buffer::Instance* decoding_buffer,
                              const Envoy::Http::RequestHeaderMap& headers,
                              uint64_t max_request_bytes, bool pack_as_bytes,
-                             bool encode_raw_headers,
+                             bool encode_raw_headers, bool strip_query_params,
                              const MatcherSharedPtr& allowed_headers_matcher,
                              const MatcherSharedPtr& disallowed_headers_matcher);
-  static void setAttrContextRequest(
-      envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
-      const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
-      const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-      bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
-      const MatcherSharedPtr& disallowed_headers_matcher);
+  static void setAttrContextRequest(envoy::service::auth::v3::AttributeContext::Request& req,
+                                    const uint64_t stream_id,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    const Buffer::Instance* decoding_buffer,
+                                    const Envoy::Http::RequestHeaderMap& headers,
+                                    uint64_t max_request_bytes, bool pack_as_bytes,
+                                    bool encode_raw_headers, bool strip_query_params,
+                                    const MatcherSharedPtr& allowed_headers_matcher,
+                                    const MatcherSharedPtr& disallowed_headers_matcher);
   static void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
                             const Envoy::Network::Connection& connection);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
