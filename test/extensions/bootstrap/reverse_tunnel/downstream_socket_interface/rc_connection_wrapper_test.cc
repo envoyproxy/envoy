@@ -1639,6 +1639,8 @@ TEST_F(RCConnectionWrapperTest, HandshakeTimeoutReleasesSlot) {
   EXPECT_TRUE(getConnWrapperToHostMap().empty());
   auto stat_map = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.failed"], 1);
+  EXPECT_EQ(handshakeCount("failed", "timeout"), 1);
+  EXPECT_EQ(handshakeCount("failed", "connection_close"), 0);
 
   while (!dispatcher_.to_delete_.empty()) {
     dispatcher_.to_delete_.pop_front();
@@ -2045,18 +2047,6 @@ TEST_F(RCConnectionWrapperTest, RetryAfterSetsHostBackoff) {
   EXPECT_TRUE(getConnectionWrappers().empty());
   EXPECT_EQ(handshakeCount("failed", "http.429"), 1);
   EXPECT_GE(dialedHostBackoff(), std::chrono::milliseconds(7000));
-}
-
-// The deadline counts a timeout failure, not a connection close.
-TEST_F(RCConnectionWrapperTest, HandshakeTimeoutCountsTimeoutReason) {
-  auto* handshake_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  dialOneTunnel();
-
-  handshake_timer->invokeCallback();
-
-  EXPECT_TRUE(getConnectionWrappers().empty());
-  EXPECT_EQ(handshakeCount("failed", "timeout"), 1);
-  EXPECT_EQ(handshakeCount("failed", "connection_close"), 0);
 }
 
 // A socket config without a handshake factory fails the dial loudly instead of dereferencing it.

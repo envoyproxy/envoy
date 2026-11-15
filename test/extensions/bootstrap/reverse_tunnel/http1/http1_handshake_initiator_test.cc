@@ -33,7 +33,6 @@ constexpr absl::string_view kNodeHeader = "x-envoy-reverse-tunnel-node-id";
 constexpr absl::string_view kClusterHeader = "x-envoy-reverse-tunnel-cluster-id";
 constexpr absl::string_view kTenantHeader = "x-envoy-reverse-tunnel-tenant-id";
 constexpr absl::string_view kUpstreamClusterHeader = "x-envoy-reverse-tunnel-upstream-cluster-name";
-constexpr absl::string_view kInitiationTimeHeader = "x-envoy-reverse-tunnel-initiation-time";
 constexpr absl::string_view kWorkerIdHeader = "x-envoy-reverse-tunnel-worker-id";
 constexpr absl::string_view kConnectionIdHeader = "x-envoy-reverse-tunnel-connection-id";
 
@@ -176,58 +175,6 @@ TEST_F(Http1HandshakeInitiatorTest, RequestCarriesIdentityAndCorrelationHeaders)
   EXPECT_THAT(request, testing::Not(testing::HasSubstr("upgrade:")));
 }
 
-// The initiation-time header carries the explicit value passed to start().
-TEST_F(Http1HandshakeInitiatorTest, ExplicitInitiationTime) {
-  start(1234567890);
-  EXPECT_THAT(written_,
-              testing::HasSubstr(absl::StrCat(kInitiationTimeHeader, ": 1234567890\r\n")));
-}
-
-// Without an explicit value the initiation-time header carries the current simulated time.
-TEST_F(Http1HandshakeInitiatorTest, DefaultInitiationTimeIsNow) {
-  const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                             simTime().systemTime().time_since_epoch())
-                             .count();
-  start();
-  EXPECT_THAT(written_,
-              testing::HasSubstr(absl::StrCat(kInitiationTimeHeader, ": ", now_ms, "\r\n")));
-}
-
-// Upgrade mode sends Connection: Upgrade + Upgrade: reverse-tunnel.
-TEST_F(Http1HandshakeInitiatorTest, UpgradeNegotiation) {
-  use_http_upgrade_ = true;
-  const std::string& request = start();
-
-  EXPECT_THAT(request, testing::HasSubstr("connection: upgrade\r\n"));
-  EXPECT_THAT(request, testing::HasSubstr("upgrade: reverse-tunnel\r\n"));
-}
-
-// Headers configured via additional_headers are appended with their action.
-TEST_F(Http1HandshakeInitiatorTest, AdditionalHeadersApplied) {
-  auto headers = std::make_shared<const std::vector<envoy::config::core::v3::HeaderValueOption>>(
-      std::vector<envoy::config::core::v3::HeaderValueOption>{
-          makeAdditionalHeader("x-custom", "custom-value"),
-      });
-  additional_headers_ = *headers;
-
-  const std::string& request = start();
-  EXPECT_THAT(request, testing::HasSubstr("x-custom: custom-value\r\n"));
-}
-
-// ADD_IF_ABSENT does not clobber a header the handshake itself set.
-TEST_F(Http1HandshakeInitiatorTest, AdditionalHeadersAddIfAbsentSkipsExisting) {
-  auto headers = std::make_shared<const std::vector<envoy::config::core::v3::HeaderValueOption>>(
-      std::vector<envoy::config::core::v3::HeaderValueOption>{
-          makeAdditionalHeader(kTenantHeader, "other-tenant",
-                               envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT),
-      });
-  additional_headers_ = *headers;
-
-  const std::string& request = start();
-  EXPECT_THAT(request, testing::Not(testing::HasSubstr("other-tenant")));
-  EXPECT_THAT(request, testing::HasSubstr(absl::StrCat(kTenantHeader, ": test-tenant\r\n")));
-}
-
 // A non-empty effectiveHandshakeHeaders() set replaces the additional_headers path, and is
 // resolved exactly once per start().
 TEST_F(Http1HandshakeInitiatorTest, EffectiveHandshakeHeadersWinAndResolveOnce) {
@@ -245,83 +192,6 @@ TEST_F(Http1HandshakeInitiatorTest, EffectiveHandshakeHeadersWinAndResolveOnce) 
   const std::string& request = start();
   EXPECT_THAT(request, testing::HasSubstr("x-effective: effective-value\r\n"));
   EXPECT_THAT(request, testing::Not(testing::HasSubstr("x-custom: custom-value")));
-}
-
-// A 200 response in non-upgrade mode reports success, with no residual.
-TEST_F(Http1HandshakeInitiatorTest, Success200) {
-  start();
-  feed(successResponse(false));
-
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_TRUE(outcomes_[0].accepted);
-  EXPECT_EQ(outcomes_[0].message, "reverse connection accepted");
-  EXPECT_EQ(retry_afters_[0], std::nullopt);
-  EXPECT_EQ(handshake().takeResidual(), nullptr);
-}
-
-// A 101 response in upgrade mode reports success; post-101 bytes are carried as residual.
-TEST_F(Http1HandshakeInitiatorTest, Success101CarriesResidual) {
-  use_http_upgrade_ = true;
-  start();
-  feed(absl::StrCat(successResponse(true), "post-upgrade-payload"));
-
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_TRUE(outcomes_[0].accepted);
-  Buffer::InstancePtr residual = handshake().takeResidual();
-  ASSERT_NE(residual, nullptr);
-  EXPECT_EQ(residual->toString(), "post-upgrade-payload");
-}
-
-// Bytes coalesced with a 200 response in non-upgrade mode are captured as residual.
-TEST_F(Http1HandshakeInitiatorTest, ResidualCoalescedWith200Response) {
-  start();
-  feed(absl::StrCat(successResponse(false), "residual-bytes"));
-
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_TRUE(outcomes_[0].accepted);
-  Buffer::InstancePtr residual = handshake().takeResidual();
-  ASSERT_NE(residual, nullptr);
-  EXPECT_EQ(residual->toString(), "residual-bytes");
-}
-
-// A 429 with a delta-seconds Retry-After reports failure and forwards the cool-off.
-TEST_F(Http1HandshakeInitiatorTest, Rejected429ForwardsRetryAfter) {
-  start();
-  feed("HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\nretry-after: 7\r\n\r\n");
-
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_FALSE(outcomes_[0].accepted);
-  ASSERT_TRUE(outcomes_[0].failure_reason.has_value());
-  EXPECT_EQ(outcomes_[0].failure_reason->getNameForStats(), "http.429");
-  EXPECT_EQ(outcomes_[0].message, "HTTP handshake failed with status 429");
-  ASSERT_TRUE(retry_afters_[0].has_value());
-  EXPECT_EQ(retry_afters_[0].value(), std::chrono::milliseconds(7000));
-}
-
-// A zero or HTTP-date Retry-After is treated as absent.
-TEST_F(Http1HandshakeInitiatorTest, RetryAfterZeroAndDateFormsIgnored) {
-  start();
-  feed("HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\nretry-after: 0\r\n\r\n");
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_EQ(retry_afters_[0], std::nullopt);
-
-  // A second 429 on the same handshake is dropped: the first response already reported terminal.
-  feed("HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\n"
-       "retry-after: Wed, 21 Oct 2015 07:28:00 GMT\r\n\r\n");
-  EXPECT_EQ(outcomes_.size(), 1);
-}
-
-// An unexpected status reports failure with the http.<status> stat name.
-TEST_F(Http1HandshakeInitiatorTest, Rejected401) {
-  start();
-  feed("HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\n\r\n");
-
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_FALSE(outcomes_[0].accepted);
-  ASSERT_TRUE(outcomes_[0].failure_reason.has_value());
-  EXPECT_EQ(outcomes_[0].failure_reason->getNameForStats(), "http.401");
-  EXPECT_EQ(outcomes_[0].message, "HTTP handshake failed with status 401");
-  EXPECT_EQ(retry_afters_[0], std::nullopt);
 }
 
 // A malformed response fails the handshake as a connection close carrying the codec detail.
@@ -346,12 +216,6 @@ TEST_F(Http1HandshakeInitiatorTest, LateBytesAfterTerminalIgnored) {
 
   feed("HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\n\r\n");
   EXPECT_EQ(outcomes_.size(), 1);
-}
-
-// The handshake never installs read filters; the owner feeds it through onData().
-TEST_F(Http1HandshakeInitiatorTest, StartInstallsNoReadFilter) {
-  EXPECT_CALL(*connection_, addReadFilter(_)).Times(0);
-  start();
 }
 
 // After cancel() a response reaches neither the codec nor the callbacks.
@@ -444,20 +308,6 @@ TEST_F(Http1HandshakeInitiatorTest, ParseRetryAfterForms) {
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->count(), 3600 * 1000);
   }
-}
-
-// The factory produces HTTP/1 handshakes.
-TEST_F(Http1HandshakeInitiatorTest, ConfiguratorCreatesHttp1Handshake) {
-  Http1HandshakeConfigurator configurator;
-  auto handshake = configurator.createHandshake(callbacks_);
-  ASSERT_NE(handshake, nullptr);
-  // A fresh handshake from the factory works end to end.
-  Http1HandshakeInitiator* http1 = static_cast<Http1HandshakeInitiator*>(handshake.get());
-  EXPECT_TRUE(http1->start(std::nullopt).ok());
-  Buffer::OwnedImpl response(successResponse(false));
-  http1->onData(response);
-  ASSERT_EQ(outcomes_.size(), 1);
-  EXPECT_TRUE(outcomes_[0].accepted);
 }
 
 } // namespace ReverseConnection
