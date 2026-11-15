@@ -97,6 +97,9 @@ TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
   // ClientHello spanning two Initial packets (for example when a PQC hybrid key_share is offered),
   // which raises the pre-validation send budget to roughly 7-8kb, so the chain is made more than
   // twice that large to reliably trip the amplification throttle.
+  // The chain size was tuned for zlib-only QUIC certificate compression.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "false");
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* ts = bootstrap.mutable_static_resources()
                    ->mutable_listeners(0)
