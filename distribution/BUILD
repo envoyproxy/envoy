@@ -7,10 +7,20 @@ load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_rbe.bzl", "envoy_exec_properties")
 load("//distribution/binary:debug.bzl", "compressed_debug_parts")
-load(":changes.bzl", "envoy_signed_changes")
-load(":packages.bzl", "MAINTAINER", "envoy_pkg_distros", "release_version_for")
+load(":changes.bzl", "debian_files", "envoy_signed_changes")
+load(":packages.bzl", "MAINTAINER", "PUBLISH_PACKAGING_TAGS", "envoy_pkg_distros", "release_version_for")
 
 licenses(["notice"])  # Apache 2
+
+# IMPORTANT: SECRET-HANDLING TARGETS
+#
+# The `pgp_sign_*` targets in this file process release-signing material via
+# the toolshed `@envoy_toolshed//pgp` rules (key/passphrase are host paths;
+# their bytes never enter the action graph, but the rules force local,
+# uncached execution of the signing actions themselves)
+#
+# All other targets are ordinary actions - no secrets. The ones bundling the
+# release (which changes with every commit) are local (`PUBLISH_PACKAGING_TAGS`).
 
 envoy_package()
 
@@ -151,6 +161,36 @@ label_flag(
     build_setting_default = ":placeholder",
 )
 
+# The `.deb`/`.changes` files of each arch, signed (with `signing-inputs=debs`) instead of the
+# packages tarballs, eg when they are built in the same invocation (`ci/do_ci.sh release.multiarch`).
+label_flag(
+    name = "x64-debs",
+    build_setting_default = ":placeholder",
+)
+
+label_flag(
+    name = "arm64-debs",
+    build_setting_default = ":placeholder",
+)
+
+string_flag(
+    name = "signing-inputs",
+    build_setting_default = "tarballs",
+    values = [
+        "debs",
+        "tarballs",
+    ],
+)
+
+config_setting(
+    name = "signing_inputs_debs",
+    flag_values = {":signing-inputs": "debs"},
+)
+
+# Which committed *public* key is bundled as `signing.key`. Deliberately a
+# constrained string_flag, not a label_flag: an arbitrary file can not be
+# passed in here, so key material can never enter the graph via this path.
+# The selected key is additionally validated by `pgp_public_key`.
 string_flag(
     name = "signing-key",
     build_setting_default = "maintainers",
@@ -175,6 +215,10 @@ pgp_public_key(
 
 SIGNED_CHANGES = envoy_signed_changes(
     name = "signed_changes",
+    arch_debs = {
+        "arm64": ":arm64-debs",
+        "x64": ":x64-debs",
+    },
     arch_packages = {
         "arm64": ":arm64-packages",
         "x64": ":x64-packages",
@@ -188,13 +232,15 @@ _SIGNED_CHANGES_COPY_CMD = "\n    ".join([
     for label, dest in SIGNED_CHANGES
 ])
 
+# Bundle the per-arch debs into a single flat debs.tar.gz, replacing unsigned
+# multi-distro `.changes` with signed per-distro `.changes`.
 genrule(
-    name = "multi_arch_debs",
+    name = "multi_arch_debs_tarballs",
     srcs = [
         ":arm64-packages",
         ":x64-packages",
     ] + [label for label, _dest in SIGNED_CHANGES],
-    outs = ["debs.tar.gz"],
+    outs = ["tarballs/debs.tar.gz"],
     cmd = """
     tmpdir=$$(mktemp -d)
     NEEDS_PATH=
@@ -209,22 +255,68 @@ genrule(
     fi
     tar xf $(location :x64-packages) -C "$$tmpdir"
     tar xf $(location :arm64-packages) -C "$$tmpdir"
-    mv "$$tmpdir/deb/"* "$$tmpdir"
-    rm -rf "$$tmpdir/deb/"
-    rm -f "$$tmpdir"/*.changes
+    mv "$${tmpdir}/deb/"* "$${tmpdir}"
+    rm -rf "$${tmpdir}/deb/"
+    rm -f "$${tmpdir}"/*.changes
     %s
-    chmod 0644 "$$tmpdir"/*
+    chmod 0644 "$${tmpdir}"/*
     tar czf $@ \
         --owner=0 \
         --group=0 \
         --numeric-owner \
         --mtime='2000-01-01 00:00:00Z' \
         --sort=name \
-        -C "$$tmpdir" .
+        -C "$${tmpdir}" .
     """ % _SIGNED_CHANGES_COPY_CMD,
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
+)
+
+# With `signing-inputs=debs`: the `.deb`s of both arches and the signed `.changes`, bundled directly
+# (as `multi_arch_debs_tarballs` does from the packages tarballs).
+[
+    debian_files(
+        name = "%s_debs" % arch,
+        srcs = [":%s-debs" % arch],
+        suffix = ".deb",
+        tags = ["manual"],
+    )
+    for arch in [
+        "arm64",
+        "x64",
+    ]
+]
+
+pkg_files(
+    name = "direct_debs_files",
+    srcs = [
+        ":arm64_debs",
+        ":x64_debs",
+    ] + [label for label, _dest in SIGNED_CHANGES],
+    attributes = pkg_attributes(mode = "0644"),
+    renames = {label: dest for label, dest in SIGNED_CHANGES},
     tags = ["manual"],
 )
 
+pkg_tar(
+    name = "direct/debs",
+    srcs = [":direct_debs_files"],
+    compressor = "@envoy_toolshed//pigz",
+    compressor_args = "-n",
+    extension = "tar.gz",
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
+)
+
+alias(
+    name = "multi_arch_debs",
+    actual = select({
+        ":signing_inputs_debs": ":direct/debs",
+        "//conditions:default": ":multi_arch_debs_tarballs",
+    }),
+    tags = ["manual"],
+)
+
+# Extract and rename the release binaries out of the per-arch release
+# tarballs. No secrets, but local (`PUBLISH_PACKAGING_TAGS`): the release changes with every commit.
 genrule(
     name = "release_binaries",
     srcs = [
@@ -259,9 +351,15 @@ genrule(
         $(location envoy-%s-linux-aarch_64) \
         $(location envoy-contrib-%s-linux-aarch_64)
     """ % (VERSION, VERSION, VERSION, VERSION, VERSION, VERSION, VERSION, VERSION),
+    tags = PUBLISH_PACKAGING_TAGS,
     tools = ["@zstd//:zstd_cli"],
 )
 
+# In-graph signing targets built on `@envoy_toolshed//pgp`.
+#
+# `manual`: pgp targets fail at analysis time (by design) unless
+# `--@envoy_toolshed//pgp:key_path` / `--@envoy_toolshed//pgp:passphrase_path`
+# are set, so they must never be reachable from wildcard builds.
 pgp_sign_checksums(
     name = "signed_checksums",
     srcs = [
@@ -269,12 +367,20 @@ pgp_sign_checksums(
         ":release_binaries",
     ],
     checksums_out = "checksums.txt",
-    tags = ["manual"],
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
 )
 
+# Final release bundle layout contract (matches prior `envoy.gpg.sign` output,
+# with pkg_tar normalizing modes, owners, and mtimes):
+# - `signing.key` at archive root.
+# - `bin/` contains `debs.tar.gz`, 4 release binaries, and `checksums.txt.asc`.
+# Publisher uploads `bin/*` non-recursively, and distro verification reads
+# `bin/debs.tar.gz` plus `signing.key`.
 pkg_files(
     name = "signed_bin_files",
-    srcs = [":release_binaries"],
+    srcs = [
+        ":release_binaries",
+    ],
     attributes = pkg_attributes(mode = "0755"),
     prefix = "bin",
     tags = ["manual"],
@@ -312,5 +418,5 @@ pkg_tar(
     compressor = "@zstd//:zstd_cli",
     compressor_args = "-T0",
     extension = "tar.zst",
-    tags = ["manual"],
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
 )

@@ -785,11 +785,47 @@ config_setting(
     define_values = {"engflow_rbe": "true"},
 )
 
+# Set by `ci/do_ci.sh release.multiarch`, which builds both arches from an x64 host: on EngFlow,
+# their actions run on x86_64 workers, whichever arch they target.
+bool_flag(
+    name = "multiarch",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "multiarch_build",
+    flag_values = {":multiarch": "true"},
+)
+
+config_setting(
+    name = "single_arch_build",
+    flag_values = {":multiarch": "false"},
+)
+
 selects.config_setting_group(
-    name = "engflow_rbe_x86_64",
+    name = "engflow_rbe_linux_x86_64",
     match_all = [
         ":engflow_rbe",
         ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_multiarch",
+    match_all = [
+        ":engflow_rbe",
+        ":multiarch_build",
+    ],
+)
+
+# EngFlow builds whose actions run on x86_64 workers, which is what the `linux_x64_*` pools are
+# pinned for (`envoy_exec_properties`): x64 builds, and both arches of a multiarch one. A native
+# arm64 build keeps its platform's arm pool.
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64",
+    match_any = [
+        ":engflow_rbe_linux_x86_64",
+        ":engflow_rbe_multiarch",
     ],
 )
 
@@ -849,11 +885,15 @@ selects.config_setting_group(
     ],
 )
 
+# EngFlow builds whose actions run on arm64 workers: native arm64 builds. Not the arm64 half of a
+# multiarch build, which runs on x86_64 workers (`engflow_rbe_x86_64`): this branch has selects
+# with both, so they must not match together.
 selects.config_setting_group(
     name = "engflow_rbe_aarch64",
     match_all = [
         ":engflow_rbe",
         ":linux_aarch64",
+        ":single_arch_build",
     ],
 )
 
