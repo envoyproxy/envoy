@@ -572,7 +572,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // TODO(penguingao): consider add request only / response only AI filter chain
   // when there is a need. Currently, all AI filters handle both request and
   // response.
-  const bool can_filter_response = filter_manager_ != nullptr && !payload_rejected_;
+  // A chain with no filters has nothing to do to a response, so it passes through untouched.
+  const bool can_filter_response =
+      filter_manager_ != nullptr && !filter_manager_->empty() && !payload_rejected_;
 
   // Route scoping: only declared AI endpoints are inspected unless the filter
   // opted into unconfigured routes, so enabling token usage on a mixed

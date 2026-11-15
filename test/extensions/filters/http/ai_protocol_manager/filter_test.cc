@@ -2380,6 +2380,28 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverSseResponse) {
             "data: {\"a\":1,\"first\":true,\"second\":true}\n\ndata: [DONE]\n\n");
 }
 
+// With no AI filters there is nothing to run over a response, so even one that would not parse
+// passes through untouched.
+TEST_F(AiProtocolManagerFilterTest, ResponsePassesThroughWithoutAiFilters) {
+  createFilter(/*parse_unconfigured_routes=*/true);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "8"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(resp_headers.getContentLengthValue(), "8");
+
+  Buffer::OwnedImpl resp_body("not json");
+  EXPECT_EQ(filter_->encodeData(resp_body, true), Http::FilterDataStatus::Continue);
+  EXPECT_EQ(resp_body.toString(), "not json");
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+}
+
 TEST_F(AiProtocolManagerFilterTest, SseResponseEndedByTrailersContinuesEncoding) {
   createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
     return std::make_shared<SseTaggingAiFilter>("tagged");
