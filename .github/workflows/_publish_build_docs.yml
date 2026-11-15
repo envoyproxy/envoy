@@ -46,6 +46,9 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -docs
       request: ${{ inputs.request }}
+      bazel-rbe-jobs: ${{ fromJSON(inputs.request).config.ci.publish-jobs || 200 }}
+      bazel-rbe-priority: ${{ fromJSON(inputs.request).config.ci.publish-priority || '' }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       trusted: ${{ inputs.trusted }}
       timeout-minutes: 90
       error-match: |
