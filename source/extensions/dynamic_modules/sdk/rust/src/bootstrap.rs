@@ -79,8 +79,9 @@ impl ConfigSnapshotProvider<'_> {
   }
 }
 
-/// A configuration snapshot that can outlive the server and move between threads.
-/// Drop it before unloading the module.
+/// A configuration snapshot that can move between threads.
+/// Drop it before its owning [`BootstrapExtensionConfig`] is destroyed. Join workers holding
+/// snapshots in the config's [`Drop`] implementation.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyBootstrapExtensionConfigSnapshot: Send {
   /// Encodes the snapshot as ConfigDump JSON.
@@ -95,7 +96,7 @@ struct EnvoyBootstrapExtensionConfigSnapshotImpl {
   raw: NonNull<std::ffi::c_void>,
 }
 
-// snapshot messages contain no server references or thread-local state
+// the ABI permits exclusive use and release on any thread
 unsafe impl Send for EnvoyBootstrapExtensionConfigSnapshotImpl {}
 
 impl EnvoyBootstrapExtensionConfigSnapshot for EnvoyBootstrapExtensionConfigSnapshotImpl {

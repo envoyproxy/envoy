@@ -203,9 +203,9 @@ the bootstrap config scheduler. Other callbacks during an xDS update, including 
 during cluster removal, must also defer collection: providers can contain partially applied changes
 with an old version until the update finishes.
 
-The snapshot is independent of the server and bootstrap configuration lifetime. JSON encoding and
-deletion can run on another thread, including after shutdown. A snapshot must not be used
-concurrently and must be released before the module is unloaded.
+JSON encoding and deletion can run on another thread. Release each snapshot before its owning
+bootstrap configuration's destroy hook returns. Modules must stop and join workers holding snapshots
+during configuration teardown. A snapshot must not be used concurrently.
 
 Redaction covers only protobuf fields annotated as sensitive, as with ``/config_dump``. Metadata,
 opaque strings and module configuration can still contain sensitive data. JSON encoding can fail

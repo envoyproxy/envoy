@@ -45,28 +45,22 @@ TEST(ConfigSnapshotTest, SelectsProvidersOnceWithoutTraversingEndpoints) {
   EXPECT_EQ(empty_json.value(), "{}");
 }
 
-TEST(ConfigSnapshotTest, EncodesOnWorkerAfterTrackerDestructionAndRedactsSecrets) {
-  std::unique_ptr<ConfigSnapshot> snapshot;
-  {
-    Server::ConfigTrackerImpl tracker;
-    auto owner = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
-      auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
-      (*dump->mutable_bootstrap()->mutable_node()->mutable_metadata()->mutable_fields())["opaque"]
-          .set_string_value("application-metadata");
-      auto* secret = dump->mutable_bootstrap()->mutable_static_resources()->add_secrets();
-      secret->set_name("referenced-secret");
-      secret->mutable_tls_certificate()->mutable_private_key()->set_inline_string(
-          "private-material");
-      return dump;
-    });
-    const std::vector<absl::string_view> providers{"bootstrap"};
-    auto collected =
-        ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
-    ASSERT_OK(collected);
-    snapshot = std::move(collected.value());
-  }
+TEST(ConfigSnapshotTest, EncodesOnWorkerAndRedactsSecrets) {
+  Server::ConfigTrackerImpl tracker;
+  auto owner = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
+    auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    (*dump->mutable_bootstrap()->mutable_node()->mutable_metadata()->mutable_fields())["opaque"]
+        .set_string_value("application-metadata");
+    auto* secret = dump->mutable_bootstrap()->mutable_static_resources()->add_secrets();
+    secret->set_name("referenced-secret");
+    secret->mutable_tls_certificate()->mutable_private_key()->set_inline_string("private-material");
+    return dump;
+  });
+  const std::vector<absl::string_view> providers{"bootstrap"};
+  auto collected = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  ASSERT_OK(collected);
   std::string json;
-  std::thread worker([snapshot = std::move(snapshot), &json]() {
+  std::thread worker([snapshot = std::move(collected.value()), &json]() {
     auto result = snapshot->serialize();
     EXPECT_OK(result);
     if (result.ok()) {

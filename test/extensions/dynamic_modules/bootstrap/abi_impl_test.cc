@@ -1958,9 +1958,6 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   ASSERT_NE(snapshot, nullptr);
   config->onShutdown();
   EXPECT_EQ(collect(), nullptr);
-  config->onExtensionDestroyed();
-  EXPECT_EQ(collect(), nullptr);
-  config.reset();
   std::string json;
   std::thread worker([&]() {
     EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
@@ -1973,6 +1970,9 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   });
   worker.join();
   EXPECT_THAT(json, testing::HasSubstr("test-node"));
+  config->onExtensionDestroyed();
+  EXPECT_EQ(collect(), nullptr);
+  config.reset();
 }
 
 TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHooks) {

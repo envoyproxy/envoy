@@ -9455,8 +9455,9 @@ typedef enum {
 
 /**
  * A configuration snapshot owned by the module. Release it with
- * envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete. It remains valid after
- * server destruction and can move between threads, but must not be used concurrently.
+ * envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete before
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy returns for its owning config.
+ * It may move between threads, but must not be used concurrently.
  */
 typedef void* envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr;
 
