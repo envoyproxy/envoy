@@ -64,6 +64,16 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
   decoder_->set_quirk(WUFFS_JSON__QUIRK_ALLOW_TRAILING_FILLER, 1);
 }
 
+absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
+  // Latch the first error. A failed call can leave token_buf_ and
+  // body_src_pos_ out of step with the chunk, so parsing must not resume.
+  if (!status_.ok()) {
+    return status_;
+  }
+  status_ = feedChunk(chunk, closed);
+  return status_;
+}
+
 // Feeds one body chunk into the Wuffs JSON tokenizer and dispatches tokens
 // to the Handler callbacks.
 //
@@ -101,7 +111,7 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
 //   short_read      — need more input; break and resume on next feed().
 //   short_write     — token_buf_ full; reset ring and retry.
 //   other           — malformed JSON; return InvalidArgumentError.
-absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
+absl::Status WuffsJsonCursor::feedChunk(absl::string_view chunk, bool closed) {
   if (!decoder_) {
     return absl::InternalError("wuffs json: alloc failed");
   }

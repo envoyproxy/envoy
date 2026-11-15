@@ -34,7 +34,10 @@ LlmProtocolFilterState::getField(absl::string_view field_name) const {
 }
 
 LlmBindingObject::LlmBindingObject(absl::string_view value)
-    : source_(value), binding_(LlmBinding::parse(value)) {}
+    : source_(std::string(value)), binding_(LlmBinding::parse(value)) {}
+
+LlmBindingObject::LlmBindingObject(LlmBindingConstSharedPtr binding)
+    : binding_(std::move(binding)) {}
 
 absl::StatusOr<LlmBindingConstSharedPtr>
 LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,

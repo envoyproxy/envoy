@@ -2,15 +2,19 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -25,7 +29,7 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
-class DynamicModuleNetworkFilterTest : public testing::Test {
+class DynamicModuleNetworkFilterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
@@ -387,6 +391,317 @@ TEST_F(DynamicModuleNetworkFilterTest, WorkerIndexParsedFromDispatcherName) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
   filter->initializeReadFilterCallbacks(read_callbacks);
   EXPECT_EQ(7U, filter->workerIndex());
+}
+
+// -----------------------------------------------------------------------------
+// Access Log Tests
+// -----------------------------------------------------------------------------
+
+// The connection logs through the filter, which forwards each record to every configured log.
+TEST_F(DynamicModuleNetworkFilterTest, AccessLogForwardsToConfiguredLogs) {
+  auto first_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  auto second_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {first_log, second_log};
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+
+  const Formatter::Context log_context{
+      nullptr, nullptr, nullptr, {}, AccessLog::AccessLogType::TcpConnectionEnd};
+  EXPECT_CALL(*first_log, log(testing::Ref(log_context), testing::Ref(connection_.stream_info_)));
+  EXPECT_CALL(*second_log, log(testing::Ref(log_context), testing::Ref(connection_.stream_info_)));
+  filter->log(log_context, connection_.stream_info_);
+}
+
+// A new connection gets a stream ID for its records, and no flush timer without an interval.
+TEST_F(DynamicModuleNetworkFilterTest, AccessLogsSetStreamIdOnNewConnection) {
+  filter_config_->access_logs_ = {std::make_shared<testing::StrictMock<AccessLog::MockInstance>>()};
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config_->random_generator_ = random;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  EXPECT_CALL(worker_thread_dispatcher_, createTimer_(testing::_)).Times(0);
+  EXPECT_CALL(connection_.stream_info_, setStreamIdProvider(testing::_))
+      .WillOnce([&random](StreamInfo::StreamIdProviderSharedPtr provider) {
+        EXPECT_EQ(random.uuid_, provider->toStringView().value());
+      });
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+}
+
+// A stream ID that the connection already has, such as one from an earlier filter, is kept.
+TEST_F(DynamicModuleNetworkFilterTest, AccessLogsKeepExistingStreamId) {
+  filter_config_->access_logs_ = {std::make_shared<testing::StrictMock<AccessLog::MockInstance>>()};
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  filter_config_->random_generator_ = random;
+  const StreamInfo::StreamIdProviderImpl existing_stream_id("existing-stream-id");
+  ON_CALL(connection_.stream_info_, getStreamIdProvider())
+      .WillByDefault(
+          testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(existing_stream_id)));
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  EXPECT_CALL(connection_.stream_info_, setStreamIdProvider(testing::_)).Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+}
+
+// Without access logs the filter leaves the connection as it was, even with a flush interval.
+TEST_F(DynamicModuleNetworkFilterTest, NoAccessLogStateWithoutAccessLogs) {
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  EXPECT_CALL(worker_thread_dispatcher_, createTimer_(testing::_)).Times(0);
+  EXPECT_CALL(connection_.stream_info_, setStreamIdProvider(testing::_)).Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  filter->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_FALSE(connection_.stream_info_.downstream_timing_.downstreamConnectionEnd().has_value());
+}
+
+// A connection that is closing or closed gets no stream ID, start record or flush timer.
+TEST_F(DynamicModuleNetworkFilterTest, NoAccessLogStateOnClosedConnection) {
+  filter_config_->access_logs_ = {std::make_shared<testing::StrictMock<AccessLog::MockInstance>>()};
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  filter_config_->flush_access_log_on_start_ = true;
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  filter_config_->random_generator_ = random;
+  EXPECT_CALL(worker_thread_dispatcher_, createTimer_(testing::_)).Times(0);
+  EXPECT_CALL(connection_.stream_info_, setStreamIdProvider(testing::_)).Times(0);
+  for (const Network::Connection::State state :
+       {Network::Connection::State::Closing, Network::Connection::State::Closed}) {
+    SCOPED_TRACE(static_cast<int>(state));
+    connection_.state_ = state;
+    auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+    filter->initializeReadFilterCallbacks(read_callbacks_);
+    EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  }
+}
+
+// A start flush logs the new connection after it gets its stream ID and before the module can
+// report on it.
+TEST_F(DynamicModuleNetworkFilterTest, FlushAccessLogOnStart) {
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {access_log};
+  filter_config_->flush_access_log_on_start_ = true;
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  filter_config_->random_generator_ = random;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  testing::InSequence s;
+  EXPECT_CALL(random, uuid());
+  EXPECT_CALL(connection_.stream_info_, setStreamIdProvider(testing::_));
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([&filter](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(AccessLog::AccessLogType::TcpConnectionStart, log_context.accessLogType());
+        EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_add_custom_flag(filter.get(),
+                                                                                  {"early", 5}));
+      });
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+}
+
+// The flush timer logs a periodic record and then snapshots the bytes meters that exist.
+TEST_F(DynamicModuleNetworkFilterTest, PeriodicAccessLog) {
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {access_log};
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config_->random_generator_ = random;
+  auto* timer = new NiceMock<Event::MockTimer>(&worker_thread_dispatcher_);
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(100), testing::_)).Times(3);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+  // Without bytes meters the flush only logs.
+  connection_.stream_info_.upstream_bytes_meter_ = nullptr;
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(AccessLog::AccessLogType::TcpPeriodic, log_context.accessLogType());
+      });
+  timer->invokeCallback();
+
+  auto downstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  auto upstream_bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  connection_.stream_info_.downstream_bytes_meter_ = downstream_bytes_meter;
+  connection_.stream_info_.upstream_bytes_meter_ = upstream_bytes_meter;
+  downstream_bytes_meter->addWireBytesReceived(10);
+  upstream_bytes_meter->addWireBytesSent(20);
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([&](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(AccessLog::AccessLogType::TcpPeriodic, log_context.accessLogType());
+        EXPECT_EQ(nullptr, downstream_bytes_meter->bytesAtLastDownstreamPeriodicLog());
+        EXPECT_EQ(nullptr, upstream_bytes_meter->bytesAtLastDownstreamPeriodicLog());
+      });
+  timer->invokeCallback();
+  const StreamInfo::BytesMeter::BytesSnapshot* downstream_snapshot =
+      downstream_bytes_meter->bytesAtLastDownstreamPeriodicLog();
+  ASSERT_NE(nullptr, downstream_snapshot);
+  EXPECT_EQ(10, downstream_snapshot->wire_bytes_received);
+  EXPECT_EQ(simTime().systemTime(), downstream_snapshot->snapshot_time);
+  const StreamInfo::BytesMeter::BytesSnapshot* upstream_snapshot =
+      upstream_bytes_meter->bytesAtLastDownstreamPeriodicLog();
+  ASSERT_NE(nullptr, upstream_snapshot);
+  EXPECT_EQ(20, upstream_snapshot->wire_bytes_sent);
+  EXPECT_EQ(simTime().systemTime(), upstream_snapshot->snapshot_time);
+}
+
+// A connected event, such as the end of a downstream TLS handshake, keeps the flush timer and does
+// not end the connection.
+TEST_F(DynamicModuleNetworkFilterTest, ConnectedEventsKeepAccessLogState) {
+  filter_config_->access_logs_ = {std::make_shared<testing::StrictMock<AccessLog::MockInstance>>()};
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config_->random_generator_ = random;
+  auto* timer = new NiceMock<Event::MockTimer>(&worker_thread_dispatcher_);
+  bool timer_destroyed = false;
+  timer->timer_destroyed_ = &timer_destroyed;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+  filter->onEvent(Network::ConnectionEvent::Connected);
+  filter->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_FALSE(timer_destroyed);
+  EXPECT_FALSE(connection_.stream_info_.downstream_timing_.downstreamConnectionEnd().has_value());
+}
+
+// Either close records when the connection ended and destroys the flush timer.
+TEST_F(DynamicModuleNetworkFilterTest, CloseRecordsConnectionEndAndStopsPeriodicAccessLogs) {
+  filter_config_->access_logs_ = {std::make_shared<testing::StrictMock<AccessLog::MockInstance>>()};
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid()).Times(2);
+  filter_config_->random_generator_ = random;
+  for (const Network::ConnectionEvent event :
+       {Network::ConnectionEvent::RemoteClose, Network::ConnectionEvent::LocalClose}) {
+    SCOPED_TRACE(static_cast<int>(event));
+    connection_.stream_info_.downstream_timing_ = {};
+    auto* timer = new NiceMock<Event::MockTimer>(&worker_thread_dispatcher_);
+    bool timer_destroyed = false;
+    timer->timer_destroyed_ = &timer_destroyed;
+    auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+    filter->initializeReadFilterCallbacks(read_callbacks_);
+    EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+    simTime().advanceTimeWait(std::chrono::seconds(1));
+    filter->onEvent(event);
+    EXPECT_TRUE(timer_destroyed);
+    EXPECT_EQ(simTime().monotonicTime(),
+              connection_.stream_info_.downstream_timing_.downstreamConnectionEnd());
+  }
+}
+
+// Without a module filter the connection still starts its access logs before the filter closes it,
+// and the close records the end and destroys the flush timer.
+TEST_F(DynamicModuleNetworkFilterTest, AccessLogsWithoutInModuleFilter) {
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("network_filter_new_fail", "c"), false);
+  EXPECT_OK(dynamic_module);
+  auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
+  EXPECT_OK(filter_config_or_status);
+  auto filter_config = filter_config_or_status.value();
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config->access_logs_ = {access_log};
+  filter_config->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  filter_config->flush_access_log_on_start_ = true;
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config->random_generator_ = random;
+  auto* timer = new NiceMock<Event::MockTimer>(&worker_thread_dispatcher_);
+  bool timer_destroyed = false;
+  timer->timer_destroyed_ = &timer_destroyed;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  EXPECT_CALL(connection_.stream_info_, setStreamIdProvider(testing::_));
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ(AccessLog::AccessLogType::TcpConnectionStart, log_context.accessLogType());
+      });
+  // The mock connection raises the close event when the filter closes it.
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onNewConnection());
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_EQ(simTime().monotonicTime(),
+            connection_.stream_info_.downstream_timing_.downstreamConnectionEnd());
+}
+
+// An access logger that closes the connection during a periodic flush destroys the flush timer,
+// which the flush then leaves alone.
+TEST_F(DynamicModuleNetworkFilterTest, ConnectionClosedDuringPeriodicAccessLog) {
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {access_log};
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config_->random_generator_ = random;
+  auto* timer = new NiceMock<Event::MockTimer>(&worker_thread_dispatcher_);
+  bool timer_destroyed = false;
+  timer->timer_destroyed_ = &timer_destroyed;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([this](const Formatter::Context&, const StreamInfo::StreamInfo&) {
+        connection_.close(Network::ConnectionCloseType::NoFlush);
+      });
+  timer->invokeCallback();
+  EXPECT_TRUE(timer_destroyed);
+}
+
+// An access logger that closes the connection while the filter writes the start record destroys
+// the flush timer, and the module does not see the new connection after the close.
+TEST_F(DynamicModuleNetworkFilterTest, ConnectionClosedDuringStartAccessLog) {
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {access_log};
+  filter_config_->access_log_flush_interval_ = std::chrono::milliseconds(100);
+  filter_config_->flush_access_log_on_start_ = true;
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config_->random_generator_ = random;
+  auto* timer = new NiceMock<Event::MockTimer>(&worker_thread_dispatcher_);
+  bool timer_destroyed = false;
+  timer->timer_destroyed_ = &timer_destroyed;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([this](const Formatter::Context&, const StreamInfo::StreamInfo&) {
+        // The mock connection is closed when it raises the close event.
+        connection_.close(Network::ConnectionCloseType::NoFlush);
+      });
+  // The network_no_op module would continue the new connection.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onNewConnection());
+  EXPECT_TRUE(timer_destroyed);
+  // The module never got the connection, so it cannot report on it.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_network_filter_add_custom_flag(filter.get(), {"late", 4}));
+}
+
+// An access logger that starts a flushed close during the start record also keeps the module from
+// seeing the new connection.
+TEST_F(DynamicModuleNetworkFilterTest, ConnectionClosingDuringStartAccessLog) {
+  auto access_log = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+  filter_config_->access_logs_ = {access_log};
+  filter_config_->flush_access_log_on_start_ = true;
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  EXPECT_CALL(random, uuid());
+  filter_config_->random_generator_ = random;
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  EXPECT_CALL(*access_log, log(testing::_, testing::Ref(connection_.stream_info_)))
+      .WillOnce([this](const Formatter::Context&, const StreamInfo::StreamInfo&) {
+        // A flushed close that waits for pending data raises no close event yet.
+        connection_.state_ = Network::Connection::State::Closing;
+      });
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onNewConnection());
 }
 
 // -----------------------------------------------------------------------------

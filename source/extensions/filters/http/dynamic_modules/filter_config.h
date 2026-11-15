@@ -5,6 +5,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/secret/secret_provider_impl.h"
@@ -92,13 +93,15 @@ public:
    * @param init_manager the init manager to register dynamic secret subscriptions with, if any.
    * This is only valid for the duration of ``envoy_dynamic_module_on_http_filter_config_new`` and
    * is cleared afterwards.
+   * @param load_shed_point_provider the provider of the load shed points the module can check, if
+   * any.
    */
-  DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
-                                const absl::string_view filter_config,
-                                const absl::string_view metrics_namespace,
-                                DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-                                Server::Configuration::ServerFactoryContext& context,
-                                OptRef<Init::Manager> init_manager = std::nullopt);
+  DynamicModuleHttpFilterConfig(
+      const absl::string_view filter_name, const absl::string_view filter_config,
+      const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+      Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context,
+      OptRef<Init::Manager> init_manager = std::nullopt,
+      OptRef<Server::LoadShedPointProvider> load_shed_point_provider = std::nullopt);
 
   ~DynamicModuleHttpFilterConfig();
 
@@ -169,6 +172,10 @@ public:
   // ``config_new`` hook is running: the referenced init manager belongs to the filter chain factory
   // context, so the factory clears this right after the hook returns.
   OptRef<Init::Manager> init_manager_;
+
+  // The provider of the load shed points that the module can check. It is empty for upstream
+  // filters and when the factory context of the filter bypasses the overload manager.
+  const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
 
   bool terminal_filter_ = false;
 
@@ -406,6 +413,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
  * @param init_manager the init manager that dynamic secret subscriptions created by the module are
  * registered with. When absent, such subscriptions start immediately instead of gating the owner's
  * initialization.
+ * @param load_shed_point_provider the provider of the load shed points the module can check, if
+ * any.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
@@ -413,7 +422,8 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
     const absl::string_view metrics_namespace, const bool terminal_filter,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Server::Configuration::ServerFactoryContext& context,
-    OptRef<Init::Manager> init_manager = std::nullopt);
+    OptRef<Init::Manager> init_manager = std::nullopt,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider = std::nullopt);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

@@ -63,15 +63,15 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
     NiceMock<Server::Configuration::MockServerFactoryContext> server;
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     Tracers::OpenTelemetry::Resource resource;
-    OtlpOptions options(sink_config, resource, server);
+    OtlpOptionsSharedPtr options = OtlpOptions::create(sink_config, resource, server).value();
 
     // Default options
-    EXPECT_FALSE(options.reportCountersAsDeltas());
-    EXPECT_FALSE(options.reportHistogramsAsDeltas());
-    EXPECT_TRUE(options.emitTagsAsAttributes());
-    EXPECT_TRUE(options.useTagExtractedName());
-    EXPECT_EQ("", options.statPrefix());
-    EXPECT_TRUE(options.resource_attributes().empty());
+    EXPECT_FALSE(options->reportCountersAsDeltas());
+    EXPECT_FALSE(options->reportHistogramsAsDeltas());
+    EXPECT_TRUE(options->emitTagsAsAttributes());
+    EXPECT_TRUE(options->useTagExtractedName());
+    EXPECT_EQ("", options->statPrefix());
+    EXPECT_TRUE(options->resource_attributes().empty());
   }
 
   {
@@ -83,16 +83,57 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
 
     Tracers::OpenTelemetry::Resource resource;
     resource.attributes_["key"] = "value";
-    OtlpOptions options(sink_config, resource, server);
-    EXPECT_FALSE(options.reportCountersAsDeltas());
-    EXPECT_FALSE(options.reportHistogramsAsDeltas());
-    EXPECT_FALSE(options.emitTagsAsAttributes());
-    EXPECT_FALSE(options.useTagExtractedName());
-    EXPECT_EQ("prefix.", options.statPrefix());
-    ASSERT_EQ(1, options.resource_attributes().size());
-    EXPECT_EQ("key", options.resource_attributes()[0].key());
-    EXPECT_EQ("value", options.resource_attributes()[0].value().string_value());
+    OtlpOptionsSharedPtr options = OtlpOptions::create(sink_config, resource, server).value();
+    EXPECT_FALSE(options->reportCountersAsDeltas());
+    EXPECT_FALSE(options->reportHistogramsAsDeltas());
+    EXPECT_FALSE(options->emitTagsAsAttributes());
+    EXPECT_FALSE(options->useTagExtractedName());
+    EXPECT_EQ("prefix.", options->statPrefix());
+    ASSERT_EQ(1, options->resource_attributes().size());
+    EXPECT_EQ("key", options->resource_attributes()[0].key());
+    EXPECT_EQ("value", options->resource_attributes()[0].value().string_value());
   }
+}
+
+TEST(OpenTelemetryConfigTest, InvalidResourceConversion) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  Server::Configuration::StatsSinkFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
+          OpenTelemetryName);
+  ASSERT_NE(factory, nullptr);
+
+  // Two tags of the conversion set the same resource attribute.
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  TestUtility::loadFromYaml(R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: otlp_grpc
+    custom_metric_conversions:
+      matcher_tree:
+        input:
+          name: stat_full_name_match_input
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput
+        prefix_match_map:
+          map:
+            "workload.":
+              action:
+                name: convert
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction
+                  resource_conversion:
+                    tags_to_resource_attributes:
+                    - {tag_name: pod, resource_attribute_key: name}
+                    - {tag_name: service, resource_attribute_key: name}
+  )EOF",
+                            sink_config);
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  TestUtility::jsonConvert(sink_config, *message);
+
+  const absl::StatusOr<Stats::SinkPtr> sink = factory->createStatsSink(*message, server);
+  EXPECT_EQ(absl::StatusCode::kInvalidArgument, sink.status().code());
+  EXPECT_EQ("resource_conversion: resource attribute 'name' is set more than once",
+            sink.status().message());
 }
 
 } // namespace

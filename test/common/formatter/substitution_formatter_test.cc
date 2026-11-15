@@ -305,17 +305,17 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
 
   {
-    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
+    time_system.advanceTimeWait(std::chrono::milliseconds(100));
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("100", formatForTest(duration_format, {}, stream_info));
   }
 
   {
-    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(200)));
+    time_system.advanceTimeWait(std::chrono::milliseconds(100));
     StreamInfoFormatter duration_format("DURATION");
     EXPECT_EQ("200", formatForTest(duration_format, {}, stream_info));
 
-    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
+    time_system.advanceTimeWait(std::chrono::milliseconds(100));
     EXPECT_THAT(formatValueForTest(duration_format, {}, stream_info),
                 ProtoEq(ValueUtil::numberValue(300.0)));
   }

@@ -183,7 +183,8 @@ public:
   // have already enabled envoy.reloadable_features.quic_support_web_transport. After this,
   // SupportsWebTransport() is true so QUICHE will create a session for a WebTransport CONNECT.
   void negotiateWebTransport() {
-    EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings()));
+    EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings(),
+                                              /*wire_order=*/{}));
     ASSERT_TRUE(quic_session_.SupportsWebTransport());
   }
 
@@ -967,7 +968,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectDeferredUntilSettings) {
 
   // Receiving the peer SETTINGS negotiates WebTransport and flushes the buffered request, which is
   // now written; QUICHE creates the upstream WebTransport session as part of writing it.
-  EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings()));
+  EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings(), /*wire_order=*/{}));
   EXPECT_GT(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(), 0);
   EXPECT_NE(nullptr, quic_stream_->web_transport());
 
@@ -997,7 +998,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectNotDeferredAfterSettings) {
   scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_support_web_transport", "true"}});
 
   // Negotiate WebTransport up front so SETTINGS are already received when the CONNECT is encoded.
-  EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings()));
+  EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings(), /*wire_order=*/{}));
   ASSERT_TRUE(quic_session_.settings_received());
 
   Http::TestRequestHeaderMapImpl wt_headers = {
@@ -1036,7 +1037,7 @@ TEST_F(EnvoyQuicClientStreamTest, WebTransportConnectResetWhilePending) {
 
   // A subsequent SETTINGS frame (even one negotiating WebTransport) must not flush the now-reset
   // request: nothing is written and no WebTransport session is created.
-  EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings()));
+  EXPECT_TRUE(quic_session_.OnSettingsFrame(webTransportSettings(), /*wire_order=*/{}));
   EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   EXPECT_EQ(nullptr, quic_stream_->web_transport());
 }

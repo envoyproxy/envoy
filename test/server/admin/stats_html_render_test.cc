@@ -131,5 +131,28 @@ TEST_F(StatsHtmlRenderTest, SanitizeNameInHistogramTextMode) {
   EXPECT_THAT(result, Not(HasSubstr("<script>alert(1)</script>:")));
 }
 
+TEST_F(StatsHtmlRenderTest, SanitizeNameInHistogramDetailedMode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_html_stats_names", "true"}});
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  Stats::ParentHistogram& histogram = populateHistogram("h1", {200, 300, 300});
+  std::string result = render<>(renderer, "</script><script>alert(1)</script>", histogram);
+  EXPECT_THAT(result, Not(HasSubstr("<script>alert(1)")));
+  EXPECT_THAT(result,
+              HasSubstr("{\"name\":\"&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;\","
+                        "\"totals\":["));
+}
+
+TEST_F(StatsHtmlRenderTest, DoNotSanitizeNameInHistogramDetailedModeWhenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_html_stats_names", "false"}});
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsHtmlRender renderer{response_headers_, response_, params_};
+  Stats::ParentHistogram& histogram = populateHistogram("h1", {200, 300, 300});
+  std::string result = render<>(renderer, "<b>h1</b>", histogram);
+  EXPECT_THAT(result, HasSubstr("{\"name\":\"<b>h1</b>\",\"totals\":["));
+}
+
 } // namespace Server
 } // namespace Envoy
