@@ -245,9 +245,6 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       target: publish
-      # The publish needs only the commit (its message is read from GitHub), not the history. The
-      # checkout verifies the commit is on the branch, which may have moved on since (so not 1).
-      checkout-fetch-depth: 100
       rbe: false
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       downloads: |
