@@ -55,6 +55,17 @@ jobs:
             && fromJSON(needs.load.outputs.trusted)
             && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
             || secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      # With `release-publish-multiarch`, the release is signed in the build (`release.multiarch`).
+      gpg-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
     permissions:
       actions: read
       contents: read

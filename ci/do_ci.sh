@@ -177,6 +177,40 @@ function collect_build_profile() {
     ((build_profile_count++))
 }
 
+# The bazel args that sign with the key and passphrase at `ENVOY_SIGNING_{KEY,PASSPHRASE}_PATH` (host
+# paths: their bytes never enter the action graph), in `PGP_ARGS`.
+function pgp_signing_args() {
+    local key_sha256
+    if [[ -z "${ENVOY_SIGNING_KEY_PATH}" || -z "${ENVOY_SIGNING_PASSPHRASE_PATH}" ]]; then
+        echo "FAIL: ENVOY_SIGNING_KEY_PATH and ENVOY_SIGNING_PASSPHRASE_PATH must be set" >&2
+        exit 1
+    fi
+    key_sha256="$(sha256sum "${ENVOY_SIGNING_KEY_PATH}" | cut -d' ' -f1)"
+    PGP_ARGS=(
+        "--@envoy_toolshed//pgp:key_path=${ENVOY_SIGNING_KEY_PATH}#sha256=${key_sha256}"
+        "--@envoy_toolshed//pgp:passphrase_path=${ENVOY_SIGNING_PASSPHRASE_PATH}"
+    )
+}
+
+# Audit the signing actions of the aquery (the first arg), with the bazel options given (as built).
+function pgp_signing_audit() {
+    local audit_json query="$1"
+    shift
+    echo "Auditing signing actions..."
+    audit_json="$(mktemp)"
+    bazel aquery \
+          "$@" \
+          --output=jsonproto --include_artifacts=true \
+          "$query" \
+          > "${audit_json}"
+    # NB: the passphrase is checked via `--forbid-file` (read from disk by the
+    # audit tool) so its value never appears in argv here.
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_toolshed//pgp/audit:audit -- \
+          --forbid-file "${ENVOY_SIGNING_PASSPHRASE_PATH}" \
+          --aquery-json "${audit_json}"
+    rm -f "${audit_json}"
+}
+
 function bazel_with_collection() {
   local failed_logs
   declare -r BAZEL_OUTPUT="${ENVOY_SRCDIR}"/bazel.output.txt
@@ -1080,8 +1114,9 @@ case $CI_TARGET in
         ;;
 
     # `release.server`: the release binaries and tools (`release.server_only` is the same).
-    # `release.publish`: as `release.server`, and the container images.
-    release|release.server|release.server_only|release.publish|release.test_only)
+    # `release.publish`: as `release.server`, and the container images and distro packages.
+    # `release.multiarch`: as `release.publish`, for each arch (x64 and arm64), from any host.
+    release|release.server|release.server_only|release.publish|release.multiarch|release.test_only)
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
@@ -1137,52 +1172,102 @@ case $CI_TARGET in
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
         echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
-        if [[ "$CI_TARGET" == "release.publish" ]]; then
-            # Everything published for this platform, in one invocation (`//distribution/publish`):
+        if [[ "$CI_TARGET" == "release.publish" || "$CI_TARGET" == "release.multiarch" ]]; then
+            # Everything published for an arch, in one invocation (`//distribution/publish:publish_<arch>`):
             # the release binaries and tools (as `release.server`), the container images (named as
-            # `docker` names them), and the distro packages (as `distribution` builds them).
-            ENVOY_OCI_DIR="${ENVOY_BUILD_DIR}/build_images"
-            ENVOY_PACKAGES_DIR="${ENVOY_BUILD_DIR}/packages"
-            for dir in "$ENVOY_OCI_DIR" "$ENVOY_PACKAGES_DIR"; do
-                if [[ -e "${dir}" ]]; then
-                    rm -rf "${dir}"
-                fi
-                mkdir -p "$dir"
+            # `docker` names them), and the distro packages (as `distribution` builds them), to
+            # `<build dir>/envoy/<arch>/{bin,build_images,packages}`. The binaries of another arch are
+            # cross-compiled.
+            # `release.multiarch` (`//distribution/publish:publish_multiarch_<arch>`) builds only what
+            # the pipeline uses from it: the container images (published), and the packages and the
+            # stripped release binaries (signed in this job), not the release tarball or the tools.
+            PUBLISH_SET=publish
+            if [[ "$CI_TARGET" == "release.multiarch" ]]; then
+                PUBLISH_ARCHES=(x64 arm64)
+                PUBLISH_SET=publish_multiarch
+            elif [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+                PUBLISH_ARCHES=(x64)
+            else
+                PUBLISH_ARCHES=(arm64)
+            fi
+            PUBLISH_TARGETS=()
+            for arch in "${PUBLISH_ARCHES[@]}"; do
+                for dir in bin build_images packages; do
+                    rm -rf "${BUILD_DIR}/envoy/${arch}/${dir}"
+                    mkdir -p "${BUILD_DIR}/envoy/${arch}/${dir}"
+                done
+                PUBLISH_TARGETS+=("//distribution/publish:${PUBLISH_SET}_${arch}")
             done
+            PUBLISH_OPTIONS=()
+            if [[ "$CI_TARGET" == "release.multiarch" ]]; then
+                # Both arches' actions run on x86_64 workers (`//distribution:multiarch`).
+                PUBLISH_OPTIONS+=(--//distribution:multiarch)
+            fi
+            # `release.multiarch` with a signing key (`ENVOY_SIGNING_KEY_PATH`) also signs the release
+            # of both arches (`//distribution:signed`, as `release.signed`), in the same invocation:
+            # the signing inputs are this build's `.deb`/`.changes` files and stripped release binaries.
+            SIGNING=
+            if [[ "$CI_TARGET" == "release.multiarch" && -n "${ENVOY_SIGNING_KEY_PATH}" ]]; then
+                SIGNING=1
+                echo "Signing binary packages..."
+                pgp_signing_args
+                PUBLISH_OPTIONS+=("${PGP_ARGS[@]}" --//distribution:signing-inputs=debs)
+                for arch in "${PUBLISH_ARCHES[@]}"; do
+                    PUBLISH_OPTIONS+=(
+                        "--//distribution:${arch}-debs=//distribution/publish:publish_multiarch_${arch}_debs"
+                        "--//distribution:${arch}-release=//distribution/publish:publish_multiarch_${arch}_release")
+                done
+                # The builds of the signing inputs (all unsigned), left out of the audit.
+                SIGNING_INPUT_TARGETS=()
+                for arch in "${PUBLISH_ARCHES[@]}"; do
+                    SIGNING_INPUT_TARGETS+=(
+                        "//distribution/publish:publish_multiarch_${arch}"
+                        "//distribution/publish:publish_multiarch_${arch}_debs")
+                done
+                PUBLISH_TARGETS+=(//distribution:signed)
+                rm -f "${BUILD_DIR}/envoy/release.signed.tar.zst"
+            fi
             # Strip locally: the client downloads the release binaries anyway (the release tarball
             # and the images are built locally), while a remote strip waits on a worker fetching the
             # freshly linked binary (~30s).
             bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  "${PUBLISH_OPTIONS[@]}" \
                   --remote_download_toplevel \
                   --modify_execution_info=CcStrip=+no-remote-exec \
-                  //distribution/publish
+                  "${PUBLISH_TARGETS[@]}"
             # The outputs are large (several GB): hardlink them where they are on the same filesystem
-            # (bazel replaces its outputs rather than writing to them), else copy them.
+            # (bazel replaces its outputs rather than writing to them), else copy them (dereferenced: some
+            # are symlinks, eg those of `arch_files`).
             publish_file () {
-                ln -fL "$1" "$2" 2> /dev/null || cp -a "$1" "$2"
+                ln -fL "$1" "$2" 2> /dev/null || cp -aL "$1" "$2"
             }
-            publish_file \
-               bazel-bin/distribution/binary/release.tar.zst \
-               "${ENVOY_BINARY_DIR}/release.tar.zst"
-            for tool in config_load_check router_check schema_validator; do
-                publish_file \
-                   "bazel-bin/tools/${tool}/${tool}_tool.stripped" \
-                   "${ENVOY_BINARY_DIR}/${tool}_tool"
+            for arch in "${PUBLISH_ARCHES[@]}"; do
+                outputs="bazel-bin/distribution/publish/${PUBLISH_SET}_${arch}"
+                arch_dir="${BUILD_DIR}/envoy/${arch}"
+                if [[ "$CI_TARGET" != "release.multiarch" ]]; then
+                    publish_file "${outputs}/release.tar.zst" "${arch_dir}/bin/release.tar.zst"
+                    for tool in config_load_check router_check schema_validator; do
+                        publish_file "${outputs}/${tool}_tool" "${arch_dir}/bin/${tool}_tool"
+                    done
+                fi
+                oci_arch="${arch/x64/amd64}"
+                for image in \
+                        envoy envoy-contrib envoy-contrib-debug envoy-contrib-distroless \
+                        envoy-debug envoy-distroless envoy-tools; do
+                    publish_file "${outputs}/${image}.tar" "${arch_dir}/build_images/${image}.${oci_arch}.tar"
+                done
+                if [[ "$CI_TARGET" != "release.multiarch" ]]; then
+                    publish_file "${outputs}/packages.tar.gz" "${arch_dir}/packages/packages.${arch}.tar.gz"
+                fi
+                echo "Published ${arch} in ${arch_dir}"
             done
-            OCI_ARCH="$(echo "${ENVOY_BUILD_ARCH}" | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
-            for image in \
-                    envoy envoy-contrib envoy-contrib-debug envoy-contrib-distroless \
-                    envoy-debug envoy-distroless envoy-tools; do
-                publish_file \
-                   "bazel-bin/distribution/docker/${image}.tar" \
-                   "${ENVOY_OCI_DIR}/${image}.${OCI_ARCH}.tar"
-            done
-            PACKAGES_ARCH="$(echo "${ENVOY_BUILD_ARCH}" | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')"
-            publish_file \
-               bazel-bin/distribution/publish/packages.tar.gz \
-               "${ENVOY_PACKAGES_DIR}/packages.${PACKAGES_ARCH}.tar.gz"
-            echo "Container images created in ${ENVOY_OCI_DIR}"
-            echo "Packages created in ${ENVOY_PACKAGES_DIR}"
+            if [[ -n "$SIGNING" ]]; then
+                cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
+                # The signing actions, without the (unsigned) builds of the inputs.
+                pgp_signing_audit \
+                    "deps(//distribution:signed) except deps(set(${SIGNING_INPUT_TARGETS[*]}))" \
+                    "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" "${PUBLISH_OPTIONS[@]}"
+            fi
         else
             # Build release binaries
             bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -1225,35 +1310,14 @@ case $CI_TARGET in
 
     release.signed)
         echo "Signing binary packages..."
-        if [[ -z "${ENVOY_SIGNING_KEY_PATH}" || -z "${ENVOY_SIGNING_PASSPHRASE_PATH}" ]]; then
-            echo "FAIL: ENVOY_SIGNING_KEY_PATH and ENVOY_SIGNING_PASSPHRASE_PATH must be set" >&2
-            exit 1
-        fi
-        KEY_SHA256="$(sha256sum "${ENVOY_SIGNING_KEY_PATH}" | cut -d' ' -f1)"
-        PGP_ARGS=(
-            "--@envoy_toolshed//pgp:key_path=${ENVOY_SIGNING_KEY_PATH}#sha256=${KEY_SHA256}"
-            "--@envoy_toolshed//pgp:passphrase_path=${ENVOY_SIGNING_PASSPHRASE_PATH}"
-        )
+        pgp_signing_args
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
               "${PGP_ARGS[@]}" \
               --remote_download_toplevel \
               //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        echo "Auditing signing actions..."
-        AUDIT_JSON="$(mktemp)"
-        bazel aquery \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
-              "${PGP_ARGS[@]}" \
-              --output=jsonproto --include_artifacts=true \
-              "deps(//distribution:signed)" \
-              > "${AUDIT_JSON}"
-        # NB: the passphrase is checked via `--forbid-file` (read from disk by the
-        # audit tool) so its value never appears in argv here.
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy_toolshed//pgp/audit:audit -- \
-              --forbid-file "${ENVOY_SIGNING_PASSPHRASE_PATH}" \
-              --aquery-json "${AUDIT_JSON}"
-        rm -f "${AUDIT_JSON}"
+        pgp_signing_audit "deps(//distribution:signed)" "${BAZEL_BUILD_OPTIONS[@]}" "${PGP_ARGS[@]}"
         ;;
 
     sizeopt)

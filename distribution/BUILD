@@ -1,14 +1,14 @@
-load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 load("@envoy_repo//:version.bzl", "VERSION")
 load("@envoy_toolshed//pgp:defs.bzl", "pgp_public_key", "pgp_sign_checksums")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_rbe.bzl", "envoy_exec_properties")
 load("//distribution/binary:debug.bzl", "compressed_debug_parts")
-load(":changes.bzl", "envoy_signed_changes")
-load(":packages.bzl", "MAINTAINER", "envoy_pkg_distros", "release_version_for")
+load(":changes.bzl", "debian_files", "envoy_signed_changes")
+load(":packages.bzl", "MAINTAINER", "PUBLISH_PACKAGING_TAGS", "envoy_pkg_distros", "release_version_for")
 
 licenses(["notice"])  # Apache 2
 
@@ -19,7 +19,8 @@ licenses(["notice"])  # Apache 2
 # their bytes never enter the action graph, but the rules force local,
 # uncached execution of the signing actions themselves)
 #
-# All other targets are ordinary, cacheable/remotable actions - no secrets.
+# All other targets are ordinary actions - no secrets. The ones bundling the
+# release (which changes with every commit) are local (`PUBLISH_PACKAGING_TAGS`).
 
 envoy_package()
 
@@ -60,6 +61,35 @@ label_flag(
     build_setting_default = "//contrib/exe:envoy-static.dwp",
 )
 
+# Set by `ci/do_ci.sh release.multiarch`, which builds both arches from an x64 host: on EngFlow,
+# their actions run on x86_64 workers, whichever arch they target.
+bool_flag(
+    name = "multiarch",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "multiarch_build",
+    flag_values = {":multiarch": "true"},
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_multiarch",
+    match_all = [
+        "//bazel:engflow_rbe",
+        ":multiarch_build",
+    ],
+)
+
+# EngFlow builds whose actions run on x86_64 workers: x64 builds, and both arches of a multiarch one.
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_workers",
+    match_any = [
+        "//bazel:engflow_rbe_x86_64",
+        ":engflow_rbe_multiarch",
+    ],
+)
+
 # The `.dwp`s with their debug sections compressed: llvm-dwp writes them uncompressed, several GB.
 # With zlib, which the debug images' gdb (12, Ubuntu 22.04) reads; it reads zstd only from gdb 13.
 # TODO(phlax): zstd (smaller, and ~3x faster to compress) once the images are based on Ubuntu 24.04
@@ -74,10 +104,13 @@ label_flag(
         name = "%s-parts" % dwarf,
         src = ":%s" % dwarf,
         compression = "zlib",
-        exec_properties = envoy_exec_properties(
-            rbe_pool = "linux_x64_large",
-            test = False,
-        ),
+        # The large x86_64 pool for x64 builds, and for both arches with `release.multiarch` (the
+        # arm64 release is built in the x64 job, on x86_64 workers). A native arm64 build keeps its
+        # platform's arm pool.
+        exec_properties = select({
+            ":engflow_rbe_x86_64_workers": {"Pool": "linux_x64_large"},
+            "//conditions:default": {},
+        }),
         parts = 4,
     )
     for dwarf in [
@@ -160,6 +193,32 @@ label_flag(
     build_setting_default = ":placeholder",
 )
 
+# The `.deb`/`.changes` files of each arch, signed (with `signing-inputs=debs`) instead of the
+# packages tarballs, eg when they are built in the same invocation (`ci/do_ci.sh release.multiarch`).
+label_flag(
+    name = "x64-debs",
+    build_setting_default = ":placeholder",
+)
+
+label_flag(
+    name = "arm64-debs",
+    build_setting_default = ":placeholder",
+)
+
+string_flag(
+    name = "signing-inputs",
+    build_setting_default = "tarballs",
+    values = [
+        "debs",
+        "tarballs",
+    ],
+)
+
+config_setting(
+    name = "signing_inputs_debs",
+    flag_values = {":signing-inputs": "debs"},
+)
+
 # Which committed *public* key is bundled as `signing.key`. Deliberately a
 # constrained string_flag, not a label_flag: an arbitrary file can not be
 # passed in here, so key material can never enter the graph via this path.
@@ -188,6 +247,10 @@ pgp_public_key(
 
 SIGNED_CHANGES = envoy_signed_changes(
     name = "signed_changes",
+    arch_debs = {
+        "arm64": ":arm64-debs",
+        "x64": ":x64-debs",
+    },
     arch_packages = {
         "arm64": ":arm64-packages",
         "x64": ":x64-packages",
@@ -204,12 +267,12 @@ _SIGNED_CHANGES_COPY_CMD = "\n    ".join([
 # Bundle the per-arch debs into a single flat debs.tar.gz, replacing unsigned
 # multi-distro `.changes` with signed per-distro `.changes`.
 genrule(
-    name = "multi_arch_debs",
+    name = "multi_arch_debs_tarballs",
     srcs = [
         ":arm64-packages",
         ":x64-packages",
     ] + [label for label, _dest in SIGNED_CHANGES],
-    outs = ["debs.tar.gz"],
+    outs = ["tarballs/debs.tar.gz"],
     cmd = """
     tmpdir=$$(mktemp -d)
     NEEDS_PATH=
@@ -237,11 +300,55 @@ genrule(
         --sort=name \
         -C "$${tmpdir}" .
     """ % _SIGNED_CHANGES_COPY_CMD,
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
+)
+
+# With `signing-inputs=debs`: the `.deb`s of both arches and the signed `.changes`, bundled directly
+# (as `multi_arch_debs_tarballs` does from the packages tarballs).
+[
+    debian_files(
+        name = "%s_debs" % arch,
+        srcs = [":%s-debs" % arch],
+        suffix = ".deb",
+        tags = ["manual"],
+    )
+    for arch in [
+        "arm64",
+        "x64",
+    ]
+]
+
+pkg_files(
+    name = "direct_debs_files",
+    srcs = [
+        ":arm64_debs",
+        ":x64_debs",
+    ] + [label for label, _dest in SIGNED_CHANGES],
+    attributes = pkg_attributes(mode = "0644"),
+    renames = {label: dest for label, dest in SIGNED_CHANGES},
+    tags = ["manual"],
+)
+
+pkg_tar(
+    name = "direct/debs",
+    srcs = [":direct_debs_files"],
+    compressor = "@envoy_toolshed//pigz",
+    compressor_args = "-n",
+    extension = "tar.gz",
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
+)
+
+alias(
+    name = "multi_arch_debs",
+    actual = select({
+        ":signing_inputs_debs": ":direct/debs",
+        "//conditions:default": ":multi_arch_debs_tarballs",
+    }),
     tags = ["manual"],
 )
 
 # Extract and rename the release binaries out of the per-arch release
-# tarballs. Ordinary, cacheable/remotable action.
+# tarballs. No secrets, but local (`PUBLISH_PACKAGING_TAGS`): the release changes with every commit.
 genrule(
     name = "release_binaries",
     srcs = [
@@ -276,6 +383,7 @@ genrule(
         $(location envoy-%s-linux-aarch_64) \
         $(location envoy-contrib-%s-linux-aarch_64)
     """ % (VERSION, VERSION, VERSION, VERSION, VERSION, VERSION, VERSION, VERSION),
+    tags = PUBLISH_PACKAGING_TAGS,
     tools = ["@zstd//:zstd_cli"],
 )
 
@@ -291,7 +399,7 @@ pgp_sign_checksums(
         ":release_binaries",
     ],
     checksums_out = "checksums.txt",
-    tags = ["manual"],
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
 )
 
 # Final release bundle layout contract (matches prior `envoy.gpg.sign` output,
@@ -342,5 +450,5 @@ pkg_tar(
     compressor = "@zstd//:zstd_cli",
     compressor_args = "-T0",
     extension = "tar.zst",
-    tags = ["manual"],
+    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
 )

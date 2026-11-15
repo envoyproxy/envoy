@@ -8,6 +8,8 @@ on:
     secrets:
       dockerhub-token:
       gcp-key:
+      gpg-key:
+      gpg-key-password:
     inputs:
       docs:
         type: boolean
@@ -37,18 +39,27 @@ jobs:
     if: inputs.server
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
     permissions:
       actions: read
       contents: read
       packages: read
-    name: Server
+    name: >-
+      ${{ fromJSON(inputs.request).config.release-publish
+          && fromJSON(inputs.request).config.release-publish-multiarch
+          && 'Server (multiarch)'
+          || format('Server ({0})', matrix.arch) }}
     uses: ./.github/workflows/_publish_build_server.yml
     strategy:
       fail-fast: false
       matrix:
-        arch:
-        - x64
-        - arm64
+        # With `release-publish-multiarch`, the x64 job builds both arches.
+        arch: >-
+          ${{ fromJSON(inputs.request).config.release-publish
+              && fromJSON(inputs.request).config.release-publish-multiarch
+              && fromJSON('["x64"]')
+              || fromJSON('["x64", "arm64"]') }}
     with:
       arch: ${{ matrix.arch }}
       request: ${{ inputs.request }}
