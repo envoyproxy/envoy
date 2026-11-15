@@ -32,6 +32,8 @@ package(default_visibility = [
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
+test_program(name = "blocking_program_init")
+
 test_program(name = "no_op")
 
 test_program(name = "no_op_no_optional_abi")
@@ -49,6 +51,10 @@ test_program(name = "no_program_init")
 test_program(name = "program_init_assert")
 
 test_program(name = "program_init_fail")
+
+test_program(name = "program_init_fail_once")
+
+test_program(name = "program_init_count")
 
 test_program(name = "abi_version_mismatch")
 

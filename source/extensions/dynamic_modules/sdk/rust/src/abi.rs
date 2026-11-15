@@ -832,9 +832,11 @@ pub enum envoy_dynamic_module_type_upstream_timing_event {
 pub type envoy_dynamic_module_type_load_shed_point_envoy_ptr = *mut ::std::os::raw::c_void;
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_on_program_init is called by the main thread exactly when the module is
- loaded. The function returns the ABI version of the dynamic module. If null is returned, the
- module will be unloaded immediately.
+    /** envoy_dynamic_module_on_program_init is called exactly when the module is loaded, on the thread
+ that loads it, which can be a worker thread, as with the upstream HTTP TCP bridge. Other loads of
+ the module wait until this function returns, and Envoy never runs it concurrently for the same
+ module. The function returns the ABI version of the dynamic module. If null is returned, the load
+ fails, and the next load of the module calls this function again.
 
  For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
  validate it against its own ABI version, so returning a version that differs from Envoy's does
@@ -848,7 +850,7 @@ unsafe extern "C" {
  report an error to Envoy.
 
  @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
- was built against. Null means the error and the module will be unloaded immediately.*/
+ was built against. Null means the error and the load fails.*/
     pub fn envoy_dynamic_module_on_program_init() -> envoy_dynamic_module_type_abi_version_module_ptr;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
@@ -912,7 +914,8 @@ unsafe extern "C" {
 unsafe extern "C" {
     /** envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
  module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
- NOTE: This function must be called on the main thread.
+ NOTE: This function must be called on the main thread, so envoy_dynamic_module_on_program_init
+ cannot call it when a worker thread loads the module.
 
  @return number of worker threads (concurrency) that the server is configured to use.*/
     pub fn envoy_dynamic_module_callback_get_concurrency() -> u32;
@@ -16272,8 +16275,9 @@ pub type envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr = *mut ::s
 pub type envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr = *const ::std::os::raw::c_void;
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new is called by the main thread when
- the bridge configuration is loaded. The function returns a
+    /** envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new is called on each thread that uses
+ the bridge configuration, usually a worker thread, the first time the thread uses it, and again
+ on its next use if it returned null. The function returns a
  envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr for given name and config.
 
  @param config_envoy_ptr is the pointer to the BridgeConfig object for the corresponding config.
@@ -16281,7 +16285,7 @@ unsafe extern "C" {
  @param config is the configuration for the module owned by Envoy.
  @return envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr is the pointer to
  the in-module bridge configuration. Returning nullptr indicates a failure to initialize the
- module. When it fails, the bridge configuration will be rejected.*/
+ module. When it fails, the request that uses the bridge configuration fails.*/
     pub fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
         config_envoy_ptr: envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr,
         name: envoy_dynamic_module_type_envoy_buffer,

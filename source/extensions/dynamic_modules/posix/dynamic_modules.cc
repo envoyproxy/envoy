@@ -10,6 +10,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
@@ -17,9 +18,11 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
+#include "source/extensions/dynamic_modules/module_init_registry.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
@@ -54,42 +57,66 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dynamic_modules_rtld_now")
           ? RTLD_NOW
           : RTLD_LAZY;
-  // From the man page of dlopen(3):
-  //
-  // > This can be used to test if the object is already resident (dlopen() returns NULL if it
-  // > is not, or the object's handle if it is resident).
-  //
-  // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
-  // to the init function. The binding mode is carried on this probe so an already resident object
-  // is resolved with the same binding as a fresh load.
-  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | binding_mode);
-  if (handle != nullptr) {
-    // This means the module is already loaded, and the return value is the handle of the already
-    // loaded module. We don't need to call the init function again.
-    return std::make_unique<DynamicModule>(handle);
-  }
-  int mode = binding_mode;
-  if (load_globally) {
-    mode |= RTLD_GLOBAL;
-  } else {
-    // RTLD_LOCAL is used by default to avoid collisions between multiple modules.
-    mode |= RTLD_LOCAL;
-  }
-  if (do_not_close) {
-    mode |= RTLD_NODELETE;
-  }
-  handle = dlopen(object_file_absolute_path.c_str(), mode);
-  if (handle == nullptr) {
-    // `dlerror()` returns null when no error is pending, so do not pass it along unchecked.
-    const char* dlopen_error = dlerror();
-    const absl::string_view reason =
-        dlopen_error != nullptr ? dlopen_error : "unknown dlopen error";
-    logModuleLoadFailure(object_file_absolute_path.c_str(), reason);
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", reason));
+  const bool rerun_failed_init = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.dynamic_modules_rerun_failed_program_init");
+  ModuleInitRegistry& init_registry = ModuleInitRegistry::get();
+  void* handle = nullptr;
+  bool must_init = false;
+  {
+    absl::MutexLock lock(init_registry.mutex());
+    // From the man page of dlopen(3):
+    //
+    // > This can be used to test if the object is already resident (dlopen() returns NULL if it
+    // > is not, or the object's handle if it is resident).
+    //
+    // So we can use RTLD_NOLOAD to find a module that is already loaded, whose init function the
+    // registry tracks. The binding mode is carried on this probe so an already resident object is
+    // resolved with the same binding as a fresh load.
+    handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | binding_mode);
+    const bool already_loaded = handle != nullptr;
+    if (!already_loaded) {
+      int mode = binding_mode;
+      if (load_globally) {
+        mode |= RTLD_GLOBAL;
+      } else {
+        // RTLD_LOCAL is used by default to avoid collisions between multiple modules.
+        mode |= RTLD_LOCAL;
+      }
+      if (do_not_close) {
+        mode |= RTLD_NODELETE;
+      }
+      handle = dlopen(object_file_absolute_path.c_str(), mode);
+      if (handle == nullptr) {
+        // `dlerror()` returns null when no error is pending, so do not pass it along unchecked.
+        const char* dlopen_error = dlerror();
+        const absl::string_view reason =
+            dlopen_error != nullptr ? dlopen_error : "unknown dlopen error";
+        logModuleLoadFailure(object_file_absolute_path.c_str(), reason);
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", reason));
+      }
+      // The probe did not find the shared object, so the init state of its handle belongs to a
+      // shared object that was unloaded, possibly by the dlclose of another shared object, unless
+      // a load that reached it by another path runs its init function.
+      init_registry.forgetSharedObject(handle);
+    }
+    if (already_loaded && !rerun_failed_init) {
+      init_registry.waitForSharedObjectInit(handle);
+    } else {
+      must_init = init_registry.startSharedObjectInit(handle);
+    }
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
+  if (!must_init) {
+    return dynamic_module;
+  }
+  // The init function runs without the lock, so that the loads of other modules do not wait for
+  // it, and the registry makes the other loads of this module wait.
+  bool init_succeeded = false;
+  Cleanup finish_init([&init_registry, handle, &init_succeeded] {
+    init_registry.finishSharedObjectInit(handle, init_succeeded);
+  });
 
   const auto init_function =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
@@ -121,6 +148,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
                         "Dynamic module ABI version {} matched.", module_abi_version);
   }
+  init_succeeded = true;
   return dynamic_module;
 }
 
@@ -314,7 +342,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   }
   auto temp_file_path = moduleTempPath(sha256);
   // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
-  // returns the existing handle without re-init.
+  // returns the existing handle, whose init function runs again only if it failed.
   auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
   if (!result.ok()) {
     // Clean up the invalid file.
@@ -324,6 +352,10 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
 }
 
 absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {
+  ModuleInitRegistry& init_registry = ModuleInitRegistry::get();
+  init_registry.startStaticModuleInit(module_name);
+  Cleanup finish_init(
+      [&init_registry, module_name] { init_registry.finishStaticModuleInit(module_name); });
   auto dynamic_module = std::make_unique<DynamicModule>(module_name);
 
   const auto init_function =

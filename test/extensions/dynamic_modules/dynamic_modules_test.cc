@@ -1,4 +1,10 @@
+#ifndef WIN32
+#include <dlfcn.h>
+#endif
+
+#include <atomic>
 #include <fstream>
+#include <thread>
 
 #include "envoy/extensions/dynamic_modules/v3/dynamic_modules.pb.h"
 
@@ -9,16 +15,22 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/module_init_registry.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
+#include "absl/time/clock.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -57,6 +69,185 @@ TEST(DynamicModuleTestGeneral, TruncatedSharedObject) {
                 HasStatusCode(absl::StatusCode::kInvalidArgument));
   });
   std::filesystem::remove(truncated);
+}
+
+// The parameter is the value of the dynamic_modules_rerun_failed_program_init runtime guard.
+class RerunFailedProgramInitTest : public testing::TestWithParam<bool> {
+protected:
+  RerunFailedProgramInitTest() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.dynamic_modules_rerun_failed_program_init",
+          GetParam() ? "true" : "false"}});
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(RuntimeGuard, RerunFailedProgramInitTest, testing::Bool(),
+                         testing::PrintToStringParamName());
+
+#ifndef WIN32
+// Returns the handle of the blocking_program_init shared object at the given path once a load runs
+// its program init function, or nullptr if the load returned without opening it.
+void* waitForBlockedProgramInit(const std::filesystem::path& path,
+                                const std::atomic<bool>& load_returned) {
+  // The shared object is opened before its program init function runs, so the test can reach its
+  // functions.
+  void* handle = nullptr;
+  while (!load_returned && (handle = dlopen(path.c_str(), RTLD_NOLOAD | RTLD_NOW)) == nullptr) {
+    std::this_thread::yield();
+  }
+  if (handle == nullptr) {
+    return nullptr;
+  }
+  const auto get_init_entered = reinterpret_cast<bool (*)()>(dlsym(handle, "get_init_entered"));
+  while (!get_init_entered() && !load_returned) {
+    std::this_thread::yield();
+  }
+  return handle;
+}
+
+TEST_P(RerunFailedProgramInitTest, ConcurrentLoadWaitsForProgramInit) {
+  const std::filesystem::path path = testSharedObjectPath("blocking_program_init", "c");
+  absl::StatusOr<DynamicModulePtr> first;
+  std::atomic<bool> first_load_returned{false};
+  std::thread first_load([&path, &first, &first_load_returned] {
+    first = newDynamicModule(path, /*do_not_close=*/false);
+    first_load_returned = true;
+  });
+  void* handle = waitForBlockedProgramInit(path, first_load_returned);
+  if (handle == nullptr) {
+    first_load.join();
+    FAIL() << "The first load returned without blocking in its program init function: "
+           << first.status();
+  }
+  bool init_finished_when_loaded_again = false;
+  std::thread second_load([&path, &handle, &init_finished_when_loaded_again] {
+    const absl::StatusOr<DynamicModulePtr> second = newDynamicModule(path, /*do_not_close=*/false);
+    init_finished_when_loaded_again =
+        second.ok() && reinterpret_cast<bool (*)()>(dlsym(handle, "get_init_finished"))();
+  });
+  // Gives the second load time to return early if it does not wait for the program init function.
+  absl::SleepFor(absl::Milliseconds(100));
+  reinterpret_cast<void (*)()>(dlsym(handle, "release_init"))();
+  second_load.join();
+  first_load.join();
+  const int most_running_inits =
+      reinterpret_cast<int (*)()>(dlsym(handle, "get_most_running_inits"))();
+  dlclose(handle);
+  ASSERT_OK(first);
+  EXPECT_TRUE(init_finished_when_loaded_again);
+  EXPECT_EQ(1, most_running_inits);
+}
+
+TEST(DynamicModuleTestGeneral, LoadOfAnotherModuleDoesNotWaitForProgramInit) {
+  const std::filesystem::path path = testSharedObjectPath("blocking_program_init", "c");
+  absl::StatusOr<DynamicModulePtr> blocked;
+  std::atomic<bool> blocked_load_returned{false};
+  std::thread blocked_load([&path, &blocked, &blocked_load_returned] {
+    blocked = newDynamicModule(path, /*do_not_close=*/false);
+    blocked_load_returned = true;
+  });
+  void* handle = waitForBlockedProgramInit(path, blocked_load_returned);
+  if (handle == nullptr) {
+    blocked_load.join();
+    FAIL() << "The first load returned without blocking in its program init function: "
+           << blocked.status();
+  }
+  absl::StatusOr<DynamicModulePtr> other;
+  absl::Notification other_load_returned;
+  std::thread other_load([&other, &other_load_returned] {
+    other = newDynamicModule(testSharedObjectPath("no_op", "c"), /*do_not_close=*/false);
+    other_load_returned.Notify();
+  });
+  const bool returned_during_init =
+      other_load_returned.WaitForNotificationWithTimeout(absl::Seconds(30));
+  reinterpret_cast<void (*)()>(dlsym(handle, "release_init"))();
+  other_load.join();
+  blocked_load.join();
+  dlclose(handle);
+  ASSERT_OK(blocked);
+  ASSERT_OK(other);
+  EXPECT_TRUE(returned_during_init);
+}
+#endif
+
+TEST_P(RerunFailedProgramInitTest, NextLoadAfterAFailedProgramInit) {
+  // Every run loads a copy of its own, since do_not_close keeps the module loaded after its program
+  // init function fails.
+  static int runs = 0;
+  const std::filesystem::path path =
+      TestEnvironment::temporaryPath(absl::StrCat("program_init_fail_once_", ++runs, ".so"));
+  // A copy that an earlier process left behind is read-only, like the shared object that it copies.
+  std::filesystem::remove(path);
+  std::filesystem::copy_file(testSharedObjectPath("program_init_fail_once", "c"), path);
+  EXPECT_LOG_CONTAINS("error", "envoy_dynamic_module_on_program_init returned null", {
+    EXPECT_THAT(newDynamicModule(path, /*do_not_close=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModule(path, /*do_not_close=*/true);
+  ASSERT_OK(module);
+  const auto get_init_calls = (*module)->getFunctionPointer<int (*)()>("get_init_calls");
+  ASSERT_OK(get_init_calls);
+  // Without the runtime guard, the next load uses the module without its program init function.
+  EXPECT_EQ(GetParam() ? 2 : 1, (*get_init_calls)());
+}
+
+TEST(DynamicModuleTestGeneral, ProgramInitRunsAgainAfterTheModuleIsUnloaded) {
+  for (int load = 0; load < 2; ++load) {
+    SCOPED_TRACE(load);
+    absl::StatusOr<DynamicModulePtr> module =
+        newDynamicModule(testSharedObjectPath("program_init_count", "c"), /*do_not_close=*/false);
+    ASSERT_OK(module);
+    const auto get_init_calls = (*module)->getFunctionPointer<int (*)()>("get_init_calls");
+    ASSERT_OK(get_init_calls);
+    // The previous load unloaded its copy, so every load initializes a fresh one, even when it gets
+    // the handle of the previous one.
+    EXPECT_EQ(1, (*get_init_calls)());
+  }
+}
+
+TEST(ModuleInitRegistry, ForgottenSharedObjectRunsItsInitAgain) {
+  ModuleInitRegistry& registry = ModuleInitRegistry::get();
+  // A handle that no shared object has.
+  const int handle = 0;
+  for (int load = 0; load < 2; ++load) {
+    SCOPED_TRACE(load);
+    {
+      absl::MutexLock lock(registry.mutex());
+      EXPECT_TRUE(registry.startSharedObjectInit(&handle));
+    }
+    registry.finishSharedObjectInit(&handle, /*succeeded=*/true);
+    absl::MutexLock lock(registry.mutex());
+    EXPECT_FALSE(registry.startSharedObjectInit(&handle));
+    registry.forgetSharedObject(&handle);
+  }
+}
+
+// A load that reaches a shared object by another path than the load that runs its init function
+// does not find it with its probe, and must wait for that init function instead of running it.
+TEST(ModuleInitRegistry, ForgettingASharedObjectKeepsItsRunningInit) {
+  ModuleInitRegistry& registry = ModuleInitRegistry::get();
+  // A handle that no shared object has.
+  static const int handle = 0;
+  {
+    absl::MutexLock lock(registry.mutex());
+    EXPECT_TRUE(registry.startSharedObjectInit(&handle));
+    registry.forgetSharedObject(&handle);
+  }
+  bool must_init = true;
+  absl::Notification other_load_stopped_waiting;
+  std::thread other_load([&registry, &must_init, &other_load_stopped_waiting] {
+    absl::MutexLock lock(registry.mutex());
+    must_init = registry.startSharedObjectInit(&handle);
+    other_load_stopped_waiting.Notify();
+  });
+  EXPECT_FALSE(other_load_stopped_waiting.WaitForNotificationWithTimeout(absl::Milliseconds(100)));
+  registry.finishSharedObjectInit(&handle, /*succeeded=*/true);
+  other_load.join();
+  EXPECT_FALSE(must_init);
+  absl::MutexLock lock(registry.mutex());
+  registry.forgetSharedObject(&handle);
 }
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
@@ -265,6 +456,67 @@ TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module_2 =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
   EXPECT_OK(c_module_2);
+}
+
+// The functions of the statically linked copy of the blocking_program_init test module.
+extern "C" {
+bool get_init_entered();
+int get_most_running_inits();
+int get_finished_inits();
+void release_init();
+void reset_init();
+}
+
+TEST(StaticModule, ConcurrentLoadsRunProgramInitOneAtATime) {
+  reset_init();
+  absl::StatusOr<DynamicModulePtr> first;
+  std::atomic<bool> first_load_returned{false};
+  std::thread first_load([&first, &first_load_returned] {
+    first = newStaticModule("blocking_program_init_static");
+    first_load_returned = true;
+  });
+  while (!get_init_entered() && !first_load_returned) {
+    std::this_thread::yield();
+  }
+  absl::StatusOr<DynamicModulePtr> second;
+  std::thread second_load([&second] { second = newStaticModule("blocking_program_init_static"); });
+  // Gives the second load time to run the program init function too if it does not wait for the
+  // first one.
+  absl::SleepFor(absl::Milliseconds(100));
+  release_init();
+  second_load.join();
+  first_load.join();
+  ASSERT_OK(first);
+  ASSERT_OK(second);
+  EXPECT_EQ(1, get_most_running_inits());
+  EXPECT_EQ(2, get_finished_inits());
+}
+
+TEST(StaticModule, LoadOfAnotherModuleDoesNotWaitForProgramInit) {
+  reset_init();
+  absl::StatusOr<DynamicModulePtr> static_module;
+  std::atomic<bool> static_load_returned{false};
+  std::thread static_load([&static_module, &static_load_returned] {
+    static_module = newStaticModule("blocking_program_init_static");
+    static_load_returned = true;
+  });
+  while (!get_init_entered() && !static_load_returned) {
+    std::this_thread::yield();
+  }
+  absl::StatusOr<DynamicModulePtr> other;
+  absl::Notification other_load_returned;
+  std::thread other_load([&other, &other_load_returned] {
+    other = newDynamicModule(testSharedObjectPath("no_op", "c"), /*do_not_close=*/false);
+    other_load_returned.Notify();
+  });
+  const bool returned_during_init =
+      other_load_returned.WaitForNotificationWithTimeout(absl::Seconds(30));
+  release_init();
+  other_load.join();
+  static_load.join();
+  ASSERT_OK(static_module);
+  ASSERT_OK(other);
+  EXPECT_TRUE(returned_during_init);
 }
 
 TEST(StaticModule, MultipleRustModules) {
