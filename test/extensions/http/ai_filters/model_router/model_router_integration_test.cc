@@ -146,6 +146,7 @@ typed_config:
 )EOF";
 
 class ModelRouterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                   public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
   ModelRouterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
@@ -310,10 +311,12 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
                 {"messages", {{{"role", "user"}, {"content", Question}}}},
             }));
 
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
 
   // Attempt 2 fails over to the fallback model on the same provider (`fake_upstreams_[0]`).
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
