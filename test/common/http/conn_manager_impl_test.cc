@@ -3760,7 +3760,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   // With a gRPC timeout of 20ms, and 5ms used already when the route was
   // refreshed, set a timer for 15ms.
   {
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(5)));
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));
@@ -3776,7 +3776,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   // With a gRPC timeout of 20ms, and 25ms used already when the route was
   // refreshed, set a timer for now (0ms)
   {
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(25)));
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(20));
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));

@@ -75,6 +75,8 @@ test_program(name = "bootstrap_config_names_test")
 
 test_program(name = "bootstrap_listener_lifecycle_test")
 
+test_program(name = "bootstrap_writer_test")
+
 test_program(name = "network_integration_test")
 
 test_program(name = "listener_integration_test")

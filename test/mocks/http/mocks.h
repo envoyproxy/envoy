@@ -572,6 +572,7 @@ public:
   ~MockAsyncClientRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(OptRef<AsyncClient::RequestContext>, context, (), (const));
 
   MockAsyncClient* client_;
 };

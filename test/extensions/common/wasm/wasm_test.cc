@@ -350,6 +350,12 @@ TEST_P(WasmCommonTest, BadSignature) {
   EXPECT_TRUE(wasm->load(code, false));
   EXPECT_FALSE(wasm->initialize());
   EXPECT_TRUE(wasm->isFailed());
+  EXPECT_EQ(wasm->fail_state(), proxy_wasm::FailState::UnableToInitializeCode);
+
+  // A VM that fails to initialize has not crashed.
+  auto crashed = TestUtility::findCounter(stats_store_, "wasm.wasm.envoy.wasm.runtime.v8.crashed");
+  ASSERT_NE(nullptr, crashed);
+  EXPECT_EQ(0, crashed->value());
 }
 
 TEST_P(WasmCommonTest, Segv) {
@@ -391,6 +397,51 @@ TEST_P(WasmCommonTest, Segv) {
   root_context->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Completed, {});
   Envoy::Stats::MockMetricSnapshot stats_snapshot;
   root_context->onStatsUpdate(stats_snapshot);
+}
+
+// The crashed counter counts a VM that fails with a runtime error once.
+TEST_P(WasmCommonTest, CrashedCounter) {
+#if defined(__has_feature)
+#if __has_feature(undefined_behavior_sanitizer)
+  GTEST_SKIP() << "This test is not expected to work with UBSAN.";
+#endif
+#endif
+  if (std::get<0>(GetParam()) != "v8") {
+    return;
+  }
+  auto vm_configuration = "segv";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
+  auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
+  auto crashed = TestUtility::findCounter(stats_store_, "wasm.wasm.envoy.wasm.runtime.v8.crashed");
+  ASSERT_NE(nullptr, crashed);
+
+  EXPECT_TRUE(wasm->load(code, true));
+  EXPECT_TRUE(wasm->initialize());
+  EXPECT_EQ(0, crashed->value());
+
+  wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("before badptr")));
+        return root_context;
+      });
+  wasm->start(plugin);
+  EXPECT_TRUE(wasm->isFailed());
+  EXPECT_EQ(1, crashed->value());
+
+  // Another runtime error in the same VM is not counted again.
+  wasm->wasm_vm()->fail(proxy_wasm::FailState::RuntimeError, "another runtime error");
+  EXPECT_EQ(1, crashed->value());
 }
 
 TEST_P(WasmCommonTest, DivByZero) {
@@ -2037,6 +2088,13 @@ public:
                                                     server_.initManager(), singleton);
   }
 
+  // The number of crashed VMs of the runtime. The stats store keeps it across test_func() runs.
+  uint64_t crashedVms(const std::string& runtime) {
+    auto counter = TestUtility::findCounter(
+        server_.store_, absl::StrCat("wasm.envoy.wasm.runtime.", runtime, ".crashed"));
+    return counter == nullptr ? 0 : counter->value();
+  }
+
   void createContext() {
     context_ = plugin_config_->createContext();
     if (context_ != nullptr) {
@@ -2094,6 +2152,7 @@ vm_config:
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
 
+    const uint64_t crashed_before = crashedVms(runtime_name);
     Wasm* initial_wasm = plugin_config_->wasm();
     EXPECT_NE(nullptr, initial_wasm);
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::Ok);
@@ -2101,6 +2160,7 @@ vm_config:
     // Create first context.
     createContext();
     EXPECT_NE(nullptr, context_.get());
+    EXPECT_EQ(crashedVms(runtime_name), crashed_before);
 
     EXPECT_CALL(decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
@@ -2111,6 +2171,9 @@ vm_config:
 
     // The wasm should be in runtime error state now.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+
+    // The crashed VM is counted once.
+    EXPECT_EQ(crashedVms(runtime_name) - crashed_before, 1);
 
     // Wait 2 seconds to avoid possible backoff.
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
@@ -2136,6 +2199,9 @@ vm_config:
 
     // The wasm should be in runtime error state again.
     EXPECT_EQ(context_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+
+    // The reloaded VM crashed too.
+    EXPECT_EQ(crashedVms(runtime_name) - crashed_before, 2);
 
     // The wasm failed again and the PluginConfig::wasm() will try to reload again but will backoff.
     // The previous wasm will be returned.
@@ -2214,6 +2280,7 @@ vm_config:
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
 
+    const uint64_t crashed_before = crashedVms(runtime_name);
     Wasm* initial_wasm = plugin_config_->wasm();
     EXPECT_NE(nullptr, initial_wasm);
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::Ok);
@@ -2221,6 +2288,7 @@ vm_config:
     // Create first context.
     createContext();
     EXPECT_NE(nullptr, context_.get());
+    EXPECT_EQ(crashedVms(runtime_name), crashed_before);
 
     // In the case of VM failure, failStream is called, so we need to make sure that we don't send
     // the local reply twice.
@@ -2233,6 +2301,7 @@ vm_config:
 
     // The wasm should be in runtime error state.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+    EXPECT_EQ(crashedVms(runtime_name) - crashed_before, 1);
 
     // Wait 2 seconds.
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
@@ -2253,6 +2322,9 @@ vm_config:
                                testing::Eq("wasm_fail_stream")));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
+
+    // Requests that fail on the crashed VM do not count it again.
+    EXPECT_EQ(crashedVms(runtime_name) - crashed_before, 1);
   };
 
   test_func(false);

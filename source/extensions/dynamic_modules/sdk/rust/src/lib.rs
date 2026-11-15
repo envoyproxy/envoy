@@ -106,11 +106,12 @@ pub fn log_ffi_panic(function_name: &str, payload: Box<dyn Any + Send>) {
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
-// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
-// `__darwin_pthread_handler_rec` on macOS.
+///
+/// `abi.rs` is generated from `abi/abi.h` by `//tools/dynamic_modules/bindgen` and checked in;
+/// `bazel run //tools/dynamic_modules/bindgen:fix` regenerates it after a header change.
 #[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
-  include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+  include!("abi.rs");
 }
 
 /// Declare the init functions for the dynamic module.
@@ -699,6 +700,50 @@ impl From<envoy_dynamic_module_type_metrics_result>
       Err(result)
     }
   }
+}
+
+/// NoopScheduler discards every commit. Useful as a test double when the
+/// scheduler's side effects are irrelevant.
+pub struct NoopScheduler;
+
+impl bootstrap::EnvoyBootstrapExtensionConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl cluster::EnvoyClusterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl http::EnvoyHttpFilterConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl http::EnvoyHttpFilterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl listener::EnvoyListenerFilterConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl listener::EnvoyListenerFilterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl network::EnvoyNetworkFilterConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl network::EnvoyNetworkFilterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl stats_sink::EnvoyStatSinkConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl tls_certificate_selector::EnvoyTlsCertificateSelectorConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
 }
 
 /// We wrap the Box<dyn T> in another Box to be able to pass the address of the Box to C, and

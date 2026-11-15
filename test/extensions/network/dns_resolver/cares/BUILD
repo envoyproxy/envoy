@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "asan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     # TODO(envoyproxy/windows-dev): Under winsock2 this is behaving unusually for windows, even as
     # 127.0.0.1 and ::1 are explicitly added to `c:\windows\system32\drivers\etc\hosts` ... see:
     # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
@@ -49,6 +52,7 @@ envoy_cc_fuzz_test(
     # Use --wrap to allow us to intercept calls to ares_rand_bytes. This is used to
     # use the fuzzer input in place of RNG data.
     linkopts = ["-Wl,--wrap=ares_rand_bytes"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/network:dns_resolver_interface",
         "//source/common/api:api_lib",
@@ -65,6 +69,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "dns_impl_integration_test",
     srcs = ["dns_impl_integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dns:dns_cluster_lib",

@@ -29,7 +29,7 @@ envoy_extension_cc_test(
         "//test/extensions/transport_sockets/tls/cert_validator/spiffe:test_data",
     ],
     extension_names = ["envoy.tls.cert_validator.spiffe"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/network:transport_socket_options_lib",
         "//source/common/router:string_accessor_lib",
@@ -65,7 +65,10 @@ envoy_extension_cc_test(
         "envoy.filters.listener.set_filter_state",
         "envoy.tls.cert_validator.spiffe",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
@@ -91,7 +94,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["spiffe_validator_fuzz_test.cc"],
     corpus = "spiffe_validator_corpus",
     extension_names = ["envoy.tls.cert_validator.spiffe"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":spiffe_validator_fuzz_proto_cc_proto",
         "//source/common/network:transport_socket_options_lib",

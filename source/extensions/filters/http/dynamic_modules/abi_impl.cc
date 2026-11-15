@@ -1790,15 +1790,16 @@ bool envoy_dynamic_module_callback_http_set_filter_state_object(
     return false;
   }
   absl::string_view key_view(key.ptr, key.length);
+  const auto filter_state_life_span = toFilterStateLifeSpan(life_span);
+  if (!ContextAccessor::canSetFilterState(filter_state, key_view, filter_state_life_span)) {
+    free_object();
+    return false;
+  }
   filter_state->setData(key_view,
                         std::make_shared<DynamicModuleFilterStateObject>(
                             filter->getFilterConfigSharedPtr(), module_object, destructor),
-                        toFilterStateLifeSpan(life_span));
-  // setData is a no-op when the key already exists at a conflicting life_span. The wrapper is then
-  // destroyed and the destructor has already freed the object. Confirm our object was stored by
-  // pointer identity (an address compare, never a dereference) and report a failed store otherwise.
-  auto* stored = filter_state->getDataMutable<DynamicModuleFilterStateObject>(key_view);
-  return stored != nullptr && stored->object() == module_object;
+                        filter_state_life_span);
+  return true;
 }
 
 envoy_dynamic_module_type_filter_state_object_module_ptr
