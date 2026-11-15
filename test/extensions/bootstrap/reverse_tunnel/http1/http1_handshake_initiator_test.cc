@@ -45,17 +45,10 @@ public:
   MOCK_METHOD(const std::string&, srcTenantId, (), (override));
   MOCK_METHOD(const std::string&, srcClusterId, (), (override));
   MOCK_METHOD(const std::string&, srcNodeId, (), (override));
-  MOCK_METHOD(const std::string&, requestPath, (), (override));
-  MOCK_METHOD(bool, useHttpUpgrade, (), (override));
-  MOCK_METHOD((const std::vector<envoy::config::core::v3::HeaderValueOption>&), additionalHeaders,
-              (), (override));
   MOCK_METHOD(HandshakeHeadersConstSharedPtr, effectiveHandshakeHeaders, (), (override));
-  MOCK_METHOD(void, onHandshakeSucceeded, (), (override));
   MOCK_METHOD(void, onHandshakeDone,
               (HandshakeOutcome outcome, std::optional<std::chrono::milliseconds> retry_after),
               (override));
-
-  int succeeded_count_{0};
 };
 
 // Builds one handshake header with a literal value.
@@ -103,14 +96,8 @@ protected:
     ON_CALL(callbacks_, srcTenantId()).WillByDefault(ReturnRef(tenant_id_));
     ON_CALL(callbacks_, srcClusterId()).WillByDefault(ReturnRef(cluster_id_));
     ON_CALL(callbacks_, srcNodeId()).WillByDefault(ReturnRef(node_id_));
-    ON_CALL(callbacks_, requestPath()).WillByDefault(ReturnRef(path_));
-    ON_CALL(callbacks_, useHttpUpgrade()).WillByDefault([this]() { return use_http_upgrade_; });
-    ON_CALL(callbacks_, additionalHeaders()).WillByDefault(ReturnRef(empty_additional_headers_));
     ON_CALL(callbacks_, effectiveHandshakeHeaders()).WillByDefault([this]() {
       return effective_handshake_headers_;
-    });
-    ON_CALL(callbacks_, onHandshakeSucceeded()).WillByDefault([this]() {
-      callbacks_.succeeded_count_++;
     });
     ON_CALL(callbacks_, onHandshakeDone(_, _))
         .WillByDefault(
@@ -118,20 +105,28 @@ protected:
               outcomes_.push_back(std::move(outcome));
               retry_afters_.push_back(retry_after);
             });
+  }
 
-    handshake_ = std::make_unique<Http1HandshakeInitiator>(callbacks_);
+  // Builds the handshake on first use from the framing the test configured.
+  Http1HandshakeInitiator& handshake() {
+    if (handshake_ == nullptr) {
+      handshake_ = std::make_unique<Http1HandshakeInitiator>(
+          callbacks_, std::make_shared<const Http1InitiatorFraming>(
+                          Http1InitiatorFraming{path_, use_http_upgrade_, additional_headers_}));
+    }
+    return *handshake_;
   }
 
   // Runs start() and returns the captured request bytes.
   const std::string& start(std::optional<int64_t> initiation_time_ms = std::nullopt) {
-    EXPECT_TRUE(handshake_->start(initiation_time_ms).ok());
+    EXPECT_TRUE(handshake().start(initiation_time_ms).ok());
     return written_;
   }
 
   // Feeds raw response bytes into the handshake.
   void feed(absl::string_view bytes) {
     Buffer::OwnedImpl buffer(bytes);
-    handshake_->onData(buffer);
+    handshake().onData(buffer);
   }
 
   // A minimal success response matching the configured mode.
@@ -155,7 +150,7 @@ protected:
   std::string path_{"/reverse-connections"};
   bool use_http_upgrade_{false};
   HandshakeHeadersConstSharedPtr effective_handshake_headers_;
-  std::vector<envoy::config::core::v3::HeaderValueOption> empty_additional_headers_;
+  std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
 
   std::vector<HandshakeOutcome> outcomes_;
   std::vector<std::optional<std::chrono::milliseconds>> retry_afters_;
@@ -213,7 +208,7 @@ TEST_F(Http1HandshakeInitiatorTest, AdditionalHeadersApplied) {
       std::vector<envoy::config::core::v3::HeaderValueOption>{
           makeAdditionalHeader("x-custom", "custom-value"),
       });
-  ON_CALL(callbacks_, additionalHeaders()).WillByDefault(ReturnRef(*headers));
+  additional_headers_ = *headers;
 
   const std::string& request = start();
   EXPECT_THAT(request, testing::HasSubstr("x-custom: custom-value\r\n"));
@@ -226,7 +221,7 @@ TEST_F(Http1HandshakeInitiatorTest, AdditionalHeadersAddIfAbsentSkipsExisting) {
           makeAdditionalHeader(kTenantHeader, "other-tenant",
                                envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT),
       });
-  ON_CALL(callbacks_, additionalHeaders()).WillByDefault(ReturnRef(*headers));
+  additional_headers_ = *headers;
 
   const std::string& request = start();
   EXPECT_THAT(request, testing::Not(testing::HasSubstr("other-tenant")));
@@ -244,7 +239,7 @@ TEST_F(Http1HandshakeInitiatorTest, EffectiveHandshakeHeadersWinAndResolveOnce) 
       std::vector<envoy::config::core::v3::HeaderValueOption>{
           makeAdditionalHeader("x-custom", "custom-value"),
       });
-  ON_CALL(callbacks_, additionalHeaders()).WillByDefault(ReturnRef(*headers));
+  additional_headers_ = *headers;
   EXPECT_CALL(callbacks_, effectiveHandshakeHeaders());
 
   const std::string& request = start();
@@ -257,12 +252,11 @@ TEST_F(Http1HandshakeInitiatorTest, Success200) {
   start();
   feed(successResponse(false));
 
-  EXPECT_EQ(callbacks_.succeeded_count_, 1);
   ASSERT_EQ(outcomes_.size(), 1);
   EXPECT_TRUE(outcomes_[0].accepted);
   EXPECT_EQ(outcomes_[0].message, "reverse connection accepted");
   EXPECT_EQ(retry_afters_[0], std::nullopt);
-  EXPECT_EQ(handshake_->takeResidual(), nullptr);
+  EXPECT_EQ(handshake().takeResidual(), nullptr);
 }
 
 // A 101 response in upgrade mode reports success; post-101 bytes are carried as residual.
@@ -271,10 +265,9 @@ TEST_F(Http1HandshakeInitiatorTest, Success101CarriesResidual) {
   start();
   feed(absl::StrCat(successResponse(true), "post-upgrade-payload"));
 
-  EXPECT_EQ(callbacks_.succeeded_count_, 1);
   ASSERT_EQ(outcomes_.size(), 1);
   EXPECT_TRUE(outcomes_[0].accepted);
-  Buffer::InstancePtr residual = handshake_->takeResidual();
+  Buffer::InstancePtr residual = handshake().takeResidual();
   ASSERT_NE(residual, nullptr);
   EXPECT_EQ(residual->toString(), "post-upgrade-payload");
 }
@@ -286,7 +279,7 @@ TEST_F(Http1HandshakeInitiatorTest, ResidualCoalescedWith200Response) {
 
   ASSERT_EQ(outcomes_.size(), 1);
   EXPECT_TRUE(outcomes_[0].accepted);
-  Buffer::InstancePtr residual = handshake_->takeResidual();
+  Buffer::InstancePtr residual = handshake().takeResidual();
   ASSERT_NE(residual, nullptr);
   EXPECT_EQ(residual->toString(), "residual-bytes");
 }
@@ -353,31 +346,37 @@ TEST_F(Http1HandshakeInitiatorTest, LateBytesAfterTerminalIgnored) {
 
   feed("HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\n\r\n");
   EXPECT_EQ(outcomes_.size(), 1);
-  EXPECT_EQ(callbacks_.succeeded_count_, 1);
 }
 
-// cancel() detaches the read filter so late data through it cannot reach the handshake.
-TEST_F(Http1HandshakeInitiatorTest, CancelDetachesReadFilter) {
-  std::vector<Network::ReadFilterSharedPtr> added;
-  std::vector<Network::ReadFilterSharedPtr> removed;
-  ON_CALL(*connection_, addReadFilter(_))
-      .WillByDefault([&added](Network::ReadFilterSharedPtr filter) { added.push_back(filter); });
-  ON_CALL(*connection_, removeReadFilter(_))
-      .WillByDefault(
-          [&removed](Network::ReadFilterSharedPtr filter) { removed.push_back(filter); });
-
+// The handshake never installs read filters; the owner feeds it through onData().
+TEST_F(Http1HandshakeInitiatorTest, StartInstallsNoReadFilter) {
+  EXPECT_CALL(*connection_, addReadFilter(_)).Times(0);
   start();
-  ASSERT_EQ(added.size(), 1);
-  EXPECT_TRUE(removed.empty());
+}
 
-  handshake_->cancel();
-  ASSERT_EQ(removed.size(), 1);
-  EXPECT_EQ(removed[0], added[0]);
+// After cancel() a response reaches neither the codec nor the callbacks.
+TEST_F(Http1HandshakeInitiatorTest, CancelStopsDispatch) {
+  start();
+  handshake().cancel();
 
-  // Data through the detached filter reaches neither the codec nor the callbacks.
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n");
-  EXPECT_EQ(added[0]->onData(buffer, false), Network::FilterStatus::StopIteration);
+  feed(successResponse(false));
   EXPECT_TRUE(outcomes_.empty());
+}
+
+// Codec events the handshake does not use leave the attempt in flight.
+TEST_F(Http1HandshakeInitiatorTest, UnusedDecoderEventsAreIgnored) {
+  start();
+  handshake().decode1xxHeaders(Http::ResponseHeaderMapImpl::create());
+  handshake().decodeTrailers(Http::ResponseTrailerMapImpl::create());
+  handshake().decodeMetadata(std::make_unique<Http::MetadataMap>());
+  handshake().onGoAway(Http::GoAwayErrorCode::NoError);
+  std::ostringstream state;
+  handshake().dumpState(state, 0);
+  EXPECT_TRUE(outcomes_.empty());
+
+  feed(successResponse(false));
+  ASSERT_EQ(outcomes_.size(), 1);
+  EXPECT_TRUE(outcomes_[0].accepted);
 }
 
 // Asserts abort at header insertion, so the codec encode failure is only observable here.
@@ -387,9 +386,9 @@ TEST_F(Http1HandshakeInitiatorTest, EncodeFailureReportsTerminal) {
       std::vector<envoy::config::core::v3::HeaderValueOption>{
           makeAdditionalHeader("x-bad", "bad\rvalue"),
       });
-  ON_CALL(callbacks_, additionalHeaders()).WillByDefault(ReturnRef(*headers));
+  additional_headers_ = *headers;
 
-  const auto status = handshake_->start(std::nullopt);
+  const auto status = handshake().start(std::nullopt);
   EXPECT_FALSE(status.ok());
   ASSERT_EQ(outcomes_.size(), 1);
   EXPECT_FALSE(outcomes_[0].accepted);
@@ -445,14 +444,6 @@ TEST_F(Http1HandshakeInitiatorTest, ParseRetryAfterForms) {
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->count(), 3600 * 1000);
   }
-}
-
-// A read filter with no parent swallows data without touching the codec.
-TEST_F(Http1HandshakeInitiatorTest, ReadFilterWithNullParentSwallowsData) {
-  SimpleConnReadFilter filter(nullptr);
-  Buffer::OwnedImpl buffer(successResponse(false));
-  EXPECT_EQ(filter.onData(buffer, false), Network::FilterStatus::StopIteration);
-  EXPECT_TRUE(outcomes_.empty());
 }
 
 // The factory produces HTTP/1 handshakes.

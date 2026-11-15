@@ -96,7 +96,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
-  // Creates the per-connection initiator handshake. Null means the built-in HTTP/1 handshake.
+  // Creates the per-connection initiator handshake. Always set by the extension; a dial without
+  // one fails.
   std::shared_ptr<const InitiatorHandshakeConfigurator> handshake_configurator;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
@@ -423,8 +424,8 @@ public:
   }
 
   /**
-   * @return the factory creating per-connection initiator handshakes, or nullptr when the
-   * built-in HTTP/1 handshake applies.
+   * @return the factory creating per-connection initiator handshakes. Null only when the socket
+   * was built without the extension, in which case a dial fails.
    */
   const InitiatorHandshakeConfigurator* handshakeConfigurator() const {
     return config_.handshake_configurator.get();

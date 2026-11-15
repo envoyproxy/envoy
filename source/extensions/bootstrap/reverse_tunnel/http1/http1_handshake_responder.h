@@ -17,6 +17,15 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 /**
+ * Request framing the HTTP/1.1 responder enforces, fixed when its factory is built.
+ */
+struct HandshakeRequestSpec {
+  std::string method;
+  std::string path;
+  bool use_http_upgrade{false};
+};
+
+/**
  * HTTP/1.1 responder handshake. Parses the handshake request with an HTTP/1 server codec, enforces
  * the request framing (method, path, upgrade token, no body), runs the policy gate on the filter,
  * and emits the acceptance or rejection response.
@@ -25,8 +34,10 @@ class Http1HandshakeResponder : public ResponderHandshake,
                                 public Http::ServerConnectionCallbacks,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
+  // ``spec`` is owned by the factory, which outlives every handshake it creates.
   Http1HandshakeResponder(ResponderHandshakeCallbacks& callbacks,
-                          Http::Http1::CodecStats::AtomicPtr& codec_stats);
+                          Http::Http1::CodecStats::AtomicPtr& codec_stats,
+                          const HandshakeRequestSpec& spec);
 
   // ResponderHandshake
   Network::FilterStatus onData(Buffer::Instance& data) override;
@@ -76,6 +87,7 @@ private:
 
   ResponderHandshakeCallbacks& callbacks_;
   Http::Http1::CodecStats::AtomicPtr& codec_stats_;
+  const HandshakeRequestSpec& spec_;
   Http::ServerConnectionPtr codec_;
   std::unique_ptr<RequestDecoderImpl> active_decoder_;
 };
@@ -86,13 +98,15 @@ private:
  */
 class Http1HandshakeResponderConfigurator : public ResponderHandshakeConfigurator {
 public:
-  explicit Http1HandshakeResponderConfigurator(Http::Http1::CodecStats::AtomicPtr& codec_stats)
-      : codec_stats_(codec_stats) {}
+  Http1HandshakeResponderConfigurator(Http::Http1::CodecStats::AtomicPtr& codec_stats,
+                                      HandshakeRequestSpec spec)
+      : codec_stats_(codec_stats), spec_(std::move(spec)) {}
 
   ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks& callbacks) const override;
 
 private:
   Http::Http1::CodecStats::AtomicPtr& codec_stats_;
+  const HandshakeRequestSpec spec_;
 };
 
 } // namespace ReverseConnection

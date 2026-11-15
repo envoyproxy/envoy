@@ -121,8 +121,7 @@ private:
  */
 struct HandshakeOutcome {
   bool accepted{false};
-  // Typed failure classification, set only when accepted is false. Transport-level failures that
-  // never produced a handshake response (e.g. a close before the response) may leave it unset.
+  // Typed failure classification; both failure() factories set it.
   std::optional<HandshakeFailureReason> failure_reason;
   // Human-readable outcome message used in logs.
   std::string message;
@@ -136,8 +135,7 @@ struct HandshakeOutcome {
     outcome.message = outcome.failure_reason->getDetailedName();
     return outcome;
   }
-  // Message-only failures classify as transport close for stats, so every terminal failure is
-  // counted; the message stays verbatim for logs.
+  // Classifies as a connection close; the message stays verbatim for logs.
   static HandshakeOutcome failure(absl::string_view message) {
     HandshakeOutcome outcome;
     outcome.failure_reason = HandshakeFailureReason::connectionClose(message);
@@ -169,22 +167,14 @@ public:
   virtual const std::string& srcClusterId() = 0;
   virtual const std::string& srcNodeId() = 0;
 
-  // Handshake request configuration.
-  virtual const std::string& requestPath() = 0;
-  virtual bool useHttpUpgrade() = 0;
-  virtual const std::vector<envoy::config::core::v3::HeaderValueOption>& additionalHeaders() = 0;
-
   // Handshake headers to send on the request. Resolved live at start() time — the value can change
   // between dials — so implementations must call this once per start() and never cache it.
   virtual HandshakeHeadersConstSharedPtr effectiveHandshakeHeaders() = 0;
 
-  // Called when the handshake response is classified as success, before the handshake hands the
-  // connection over. Bytes the responder coalesced with the response are still in flight; the
-  // terminal notification arrives via onHandshakeDone once they are captured.
-  virtual void onHandshakeSucceeded() = 0;
-
-  // Reports the terminal outcome. Called exactly once per handshake, after which the handshake
-  // makes no further callbacks.
+  // Reports the terminal outcome and ends the attempt: the deadline is disarmed and the outcome is
+  // counted. Called exactly once per handshake, after which the handshake makes no further
+  // callbacks. On success, bytes the responder coalesced with the response must already be
+  // readable via takeResidual().
   virtual void onHandshakeDone(HandshakeOutcome outcome,
                                std::optional<std::chrono::milliseconds> retry_after) = 0;
 };
@@ -203,15 +193,16 @@ public:
    * connection.
    * @param initiation_time_ms epoch millis advertised as the tunnel's initiation time; absent
    *        means the current time.
-   * @return ok when the request was dispatched. On a synchronous failure the terminal outcome has
-   *         already been reported, so the caller treats the attempt as terminal.
+   * @return ok when the request was dispatched and the attempt is still in flight. A terminal
+   *         outcome reported from within start() must come with a non-ok status.
    */
   virtual absl::Status start(std::optional<int64_t> initiation_time_ms) = 0;
 
   /**
-   * Feeds received bytes into the handshake. Called only from the worker that owns the
-   * connection, after start(). Bytes past the handshake response are captured as residual and
-   * replayed to the accepted tunnel; they are never interpreted as handshake input.
+   * Feeds bytes received on the connection into the handshake. The owner delivers every read
+   * after start() until the terminal outcome or cancel(), on the worker that owns the connection.
+   * Bytes past the handshake response are captured as residual and replayed to the accepted
+   * tunnel; they are never interpreted as handshake input.
    */
   virtual void onData(Buffer::Instance& buffer) = 0;
 
@@ -237,6 +228,7 @@ class InitiatorHandshakeConfigurator {
 public:
   virtual ~InitiatorHandshakeConfigurator() = default;
 
+  // Never returns null.
   virtual std::unique_ptr<InitiatorHandshake>
   createHandshake(InitiatorHandshakeCallbacks& callbacks) const = 0;
 };

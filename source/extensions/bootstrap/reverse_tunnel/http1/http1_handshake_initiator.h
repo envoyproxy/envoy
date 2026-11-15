@@ -4,16 +4,16 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
-#include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/response_decoder_impl_base.h"
-#include "source/common/network/filter_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/status/status.h"
 
@@ -23,25 +23,16 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 /**
- * Read filter that feeds received bytes into the owning HTTP/1 handshake's codec.
+ * Request framing of the HTTP/1.1 handshake, fixed when its factory is built.
  */
-class SimpleConnReadFilter : public Network::ReadFilterBaseImpl,
-                             public Logger::Loggable<Logger::Id::main> {
-public:
-  explicit SimpleConnReadFilter(void* parent) : parent_(parent) {}
-
-  /**
-   * Clear the back-pointer to the owning handshake. Called from cancel() so a late onData() after
-   * teardown cannot dispatch into a destroyed / half-destroyed codec.
-   */
-  void clearParent() { parent_ = nullptr; }
-
-  // Network::ReadFilter overrides
-  Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
-
-private:
-  void* parent_; // Pointer to Http1HandshakeInitiator to avoid circular dependency.
+struct Http1InitiatorFraming {
+  std::string request_path{ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH};
+  // Negotiate the handshake as an HTTP/1.1 Upgrade, expecting 101 instead of 200.
+  bool use_http_upgrade{false};
+  // Sent verbatim when the callbacks resolve no formatted handshake headers.
+  std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers;
 };
+using Http1InitiatorFramingConstSharedPtr = std::shared_ptr<const Http1InitiatorFraming>;
 
 /**
  * HTTP/1.1 initiator handshake: sends the reverse tunnel request and classifies the response.
@@ -52,7 +43,8 @@ class Http1HandshakeInitiator : public InitiatorHandshake,
                                 public Http::ConnectionCallbacks,
                                 public Logger::Loggable<Logger::Id::main> {
 public:
-  explicit Http1HandshakeInitiator(InitiatorHandshakeCallbacks& callbacks);
+  Http1HandshakeInitiator(InitiatorHandshakeCallbacks& callbacks,
+                          Http1InitiatorFramingConstSharedPtr framing);
 
   // InitiatorHandshake overrides
   absl::Status start(std::optional<int64_t> initiation_time_ms) override;
@@ -91,6 +83,7 @@ private:
   void captureHandshakeResidual(Buffer::Instance& buffer);
 
   InitiatorHandshakeCallbacks& callbacks_;
+  const Http1InitiatorFramingConstSharedPtr framing_;
   // HTTP/1 codec used to send request and parse response.
   std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
   // Base interface pointer used to call dispatch via public API.
@@ -104,7 +97,6 @@ private:
   // Bytes the responder coalesced with the handshake response (for example the HTTP/2 preface).
   // Null until the first such byte is captured, then carried with the tunnel.
   Buffer::InstancePtr handshake_residual_;
-  std::shared_ptr<SimpleConnReadFilter> read_filter_{std::make_shared<SimpleConnReadFilter>(this)};
 };
 
 /**
@@ -112,10 +104,16 @@ private:
  */
 class Http1HandshakeConfigurator : public InitiatorHandshakeConfigurator {
 public:
+  explicit Http1HandshakeConfigurator(Http1InitiatorFraming framing = {})
+      : framing_(std::make_shared<const Http1InitiatorFraming>(std::move(framing))) {}
+
   std::unique_ptr<InitiatorHandshake>
   createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
-    return std::make_unique<Http1HandshakeInitiator>(callbacks);
+    return std::make_unique<Http1HandshakeInitiator>(callbacks, framing_);
   }
+
+private:
+  const Http1InitiatorFramingConstSharedPtr framing_;
 };
 
 } // namespace ReverseConnection

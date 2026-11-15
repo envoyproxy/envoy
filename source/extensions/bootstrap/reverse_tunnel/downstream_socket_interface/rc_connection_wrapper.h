@@ -12,6 +12,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/filter_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
 
 #include "absl/status/status.h"
@@ -24,6 +25,24 @@ namespace ReverseConnection {
 // Forward declarations.
 class ReverseConnectionIOHandle;
 class ReverseTunnelInitiatorExtension;
+class RCConnectionWrapper;
+
+/**
+ * Read filter that forwards bytes received during the handshake to the owning wrapper.
+ */
+class SimpleConnReadFilter : public Network::ReadFilterBaseImpl {
+public:
+  explicit SimpleConnReadFilter(RCConnectionWrapper& parent) : parent_(&parent) {}
+
+  // Cleared on teardown so a late read cannot reach the wrapper.
+  void clearParent() { parent_ = nullptr; }
+
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
+
+private:
+  RCConnectionWrapper* parent_;
+};
 
 /**
  * Wrapper for reverse connections that manages the connection lifecycle and drives the configured
@@ -102,6 +121,9 @@ public:
    */
   Buffer::InstancePtr takeHandshakeResidual();
 
+  // Feeds bytes read from the connection into the handshake.
+  void onHandshakeData(Buffer::Instance& buffer);
+
   // InitiatorHandshakeCallbacks overrides.
   Network::ClientConnection& connection() override;
   Upstream::HostDescriptionConstSharedPtr host() override;
@@ -109,11 +131,7 @@ public:
   const std::string& srcTenantId() override { return src_tenant_id_; }
   const std::string& srcClusterId() override { return src_cluster_id_; }
   const std::string& srcNodeId() override { return src_node_id_; }
-  const std::string& requestPath() override;
-  bool useHttpUpgrade() override;
-  const std::vector<envoy::config::core::v3::HeaderValueOption>& additionalHeaders() override;
   HandshakeHeadersConstSharedPtr effectiveHandshakeHeaders() override;
-  void onHandshakeSucceeded() override;
   void onHandshakeDone(HandshakeOutcome outcome,
                        std::optional<std::chrono::milliseconds> retry_after) override;
 
@@ -136,9 +154,9 @@ private:
   std::string src_cluster_id_;
   std::string src_node_id_;
   bool shutdown_called_{false};
-  // Set once the handshake reached a terminal outcome through this wrapper (the terminal
-  // notification, or the deadline). Late handshake callbacks after this are dropped, so stats and
-  // the parent notification are never double-reported.
+  // Set once the handshake reached a terminal outcome through this wrapper. Late handshake
+  // callbacks after this are dropped, so stats and the parent notification are never
+  // double-reported.
   bool handshake_terminal_{false};
 
   // Deadline for receiving the handshake response. Disabled on success, failure, or shutdown.
@@ -146,6 +164,9 @@ private:
 
   // The protocol-specific handshake driving this connection. Created by the parent's factory.
   std::unique_ptr<InitiatorHandshake> handshake_;
+
+  // Feeds handshake bytes from the connection into handshake_.
+  std::shared_ptr<SimpleConnReadFilter> read_filter_{std::make_shared<SimpleConnReadFilter>(*this)};
 };
 
 } // namespace ReverseConnection

@@ -7,6 +7,8 @@
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
@@ -24,6 +26,18 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
+
+namespace {
+
+// Rejection body for an identifier carrying the tenant delimiter, built once.
+const std::string& tenantDelimiterRejectionBody() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant "
+                                     "isolation is enabled",
+                                     ReverseTunnelFilterConfig::tenantDelimiter()));
+}
+
+} // namespace
 
 // Stats helper implementation.
 ReverseTunnelFilter::ReverseTunnelStats
@@ -153,7 +167,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       jwt_validator_(std::move(jwt_validator)),
       handshake_configurator_(
           std::make_shared<Bootstrap::ReverseConnection::Http1HandshakeResponderConfigurator>(
-              http1_codec_stats_)) {}
+              http1_codec_stats_, Bootstrap::ReverseConnection::HandshakeRequestSpec{
+                                      request_method_string_, request_path_, use_http_upgrade_})) {}
 
 ReverseTunnelFilterConfig::~ReverseTunnelFilterConfig() = default;
 
@@ -267,9 +282,7 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(
 ReverseTunnelFilter::ReverseTunnelFilter(ReverseTunnelFilterConfigSharedPtr config,
                                          Stats::Scope& stats_scope,
                                          Server::OverloadManager& overload_manager)
-    : config_(std::move(config)),
-      request_spec_{config_->requestMethod(), config_->requestPath(), config_->useHttpUpgrade()},
-      stats_scope_(stats_scope), overload_manager_(overload_manager),
+    : config_(std::move(config)), stats_scope_(stats_scope), overload_manager_(overload_manager),
       stats_(ReverseTunnelStats::generateStats("reverse_tunnel.handshake.", stats_scope_)) {}
 
 Network::FilterStatus ReverseTunnelFilter::onNewConnection() {
@@ -303,19 +316,17 @@ void ReverseTunnelFilter::disarmHandshakeTimer() {
 }
 
 Network::FilterStatus ReverseTunnelFilter::onData(Buffer::Instance& data, bool) {
+  if (handshake_ == nullptr) {
+    handshake_ = config_->handshakeConfigurator().createHandshake(*this);
+  }
   return handshake_->onData(data);
 }
 
 void ReverseTunnelFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  handshake_ = config_->handshakeConfigurator().createHandshake(*this);
 }
 
 Network::Connection& ReverseTunnelFilter::connection() { return read_callbacks_->connection(); }
-
-const Bootstrap::ReverseConnection::HandshakeRequestSpec& ReverseTunnelFilter::requestSpec() {
-  return request_spec_;
-}
 
 Stats::Scope& ReverseTunnelFilter::statsScope() { return stats_scope_; }
 
@@ -342,6 +353,18 @@ ReverseTunnelFilter::evaluatePolicy(const Http::RequestHeaderMap& headers,
                                     absl::string_view tenant_id) {
   Network::Connection& conn = read_callbacks_->connection();
 
+  // Reject a present-but-empty tenant id the same way as a missing header. An empty tenant
+  // silently disables tenant scoping when the socket is registered, since
+  // maybeBuildTenantScopedIdentifier returns the bare identifier for an empty tenant, while
+  // empty node and cluster ids are already rejected at registration by
+  // UpstreamSocketManager::addConnectionSocket.
+  if (tenant_id.empty()) {
+    stats_.parse_error_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: empty tenant-id header value", conn);
+    return {false, Http::Code::BadRequest, "Empty tenant-id header value",
+            "reverse_tunnel_empty_tenant_id"};
+  }
+
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   bool tenant_isolation_enabled = false;
   if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
@@ -361,10 +384,7 @@ ReverseTunnelFilter::evaluatePolicy(const Http::RequestHeaderMap& headers,
                      "reverse_tunnel: identifier contains reserved delimiter '{}' while tenant "
                      "isolation is enabled",
                      conn, delimiter);
-      return {false, Http::Code::BadRequest,
-              fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant isolation "
-                          "is enabled",
-                          delimiter),
+      return {false, Http::Code::BadRequest, tenantDelimiterRejectionBody(),
               "reverse_tunnel_invalid_identifier"};
     }
   }
@@ -431,19 +451,29 @@ ReverseTunnelFilter::evaluatePolicy(const Http::RequestHeaderMap& headers,
                    "reverse_tunnel: handshake denied for node '{}', cluster '{}', tenant '{}', "
                    "result: {}",
                    conn, node_id, cluster_id, tenant_id, toStringView(validation_result));
-    return {
-        false,
-        validation_result == ReverseTunnelValidationResult::Rejected ? Http::Code::TooManyRequests
-                                                                     : Http::Code::Forbidden,
-        std::string(toStringView(validation_result)), std::string(toStringView(validation_result))};
+    return {false,
+            validation_result == ReverseTunnelValidationResult::Rejected
+                ? Http::Code::TooManyRequests
+                : Http::Code::Forbidden,
+            toStringView(validation_result), toStringView(validation_result)};
   }
 
-  return {true, Http::Code::OK, ""};
+  pending_node_id_ = std::string(node_id);
+  pending_cluster_id_ = std::string(cluster_id);
+  pending_tenant_id_ = std::string(tenant_id);
+  policy_approved_ = true;
+  return {true, Http::Code::OK, "", ""};
 }
 
 bool ReverseTunnelFilter::prepareAcceptedConnection(
     const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info) {
-  if (!prepareAcceptedConnectionInternal(info)) {
+  // Registration is allowed once, for the identifiers a passing policy approved.
+  const bool approved = policy_approved_;
+  policy_approved_ = false;
+  if (!approved) {
+    IS_ENVOY_BUG("reverse_tunnel: tunnel prepared without a passing policy decision");
+  }
+  if (!approved || !prepareAcceptedConnectionInternal(info)) {
     stats_.registration_failed_.inc();
     ENVOY_CONN_LOG(debug, "reverse_tunnel: cannot register tunnel, rejecting handshake",
                    read_callbacks_->connection());
@@ -483,9 +513,6 @@ bool ReverseTunnelFilter::prepareAcceptedConnectionInternal(
 
   // Hold the duplicated socket and identifiers until the acceptance response is flushed.
   pending_socket_ = std::move(wrapped_socket);
-  pending_node_id_ = info.node_id;
-  pending_cluster_id_ = info.cluster_id;
-  pending_tenant_id_ = info.tenant_id;
   pending_initiator_worker_id_ = info.initiator_worker_id;
   pending_initiator_connection_id_ = info.initiator_connection_id;
   pending_initiation_time_ms_ = info.initiation_time_ms;

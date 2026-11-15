@@ -162,8 +162,7 @@ public:
   const HandshakeHeadersConstSharedPtr& handshakeHeaders() const { return handshake_headers_; }
 
   /**
-   * @return the factory creating per-connection initiator handshakes; null means the built-in
-   * HTTP/1 handshake applies.
+   * @return the factory creating per-connection initiator handshakes. Never null.
    */
   const std::shared_ptr<const InitiatorHandshakeConfigurator>& handshakeConfigurator() const {
     return handshake_configurator_;

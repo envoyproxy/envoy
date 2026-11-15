@@ -525,7 +525,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowBodyRejected) {
   EXPECT_EQ(1, body_rejected->value());
 }
 
-TEST_F(ReverseTunnelFilterUnitTest, FullFlowAcceptsWithoutSocketManager) {
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowRejectsWithoutSocketManager) {
   clearRegisteredUpstreamExtension();
 
   std::string written;
@@ -626,6 +626,37 @@ TEST_F(ReverseTunnelFilterUnitTest, HandshakeTimeoutClosesConnection) {
   EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.timeout"));
 }
 
+// A rejection reply ends the handshake, so it disarms the deadline before the close.
+TEST_F(ReverseTunnelFilterUnitTest, RejectionDisarmsHandshakeDeadline) {
+  auto* timer = new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(*timer, disableTimer()).Times(testing::AtLeast(1));
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/not-reverse-tunnel", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  testing::Mock::VerifyAndClearExpectations(timer);
+}
+
+// Reads stop before the acceptance reply, so no pipelined request is dispatched during handoff.
+TEST_F(ReverseTunnelFilterUnitTest, AcceptanceStopsReadingBeforeReply) {
+  std::string written;
+  {
+    testing::InSequence order;
+    EXPECT_CALL(callbacks_.connection_, readDisable(true));
+    EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+        .WillRepeatedly([&written](Buffer::Instance& data, bool) {
+          written.append(data.toString());
+          data.drain(data.length());
+        });
+  }
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+}
+
 // The acceptance flush callback accumulates per-write byte counts, so a response split across
 // several writes still completes the handshake once the cumulative bytes reach the full response.
 TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {
@@ -693,7 +724,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream)
   // Get a decoder instance via newStream on a standalone HTTP/1 responder.
   Http::MockResponseEncoder encoder;
   Http::Http1::CodecStats::AtomicPtr codec_stats;
-  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats);
+  const ReverseConnection::HandshakeRequestSpec spec;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats, spec);
   Http::RequestDecoder& decoder = responder.newStream(encoder, false);
 
   // Provide minimal headers so processIfComplete paths are safe if triggered.
@@ -966,7 +998,8 @@ TEST_F(ReverseTunnelFilterUnitTest, OnGoAway) {
   // onGoAway is a no-op, but we need to test it for coverage.
   filter_->initializeReadFilterCallbacks(callbacks_);
   Http::Http1::CodecStats::AtomicPtr codec_stats;
-  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats);
+  const ReverseConnection::HandshakeRequestSpec spec;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats, spec);
   responder.onGoAway(Http::GoAwayErrorCode::NoError);
   // No assertions needed as it's a no-op method.
 }
@@ -1117,7 +1150,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
 
   // Obtain a decoder and call sendLocalReply with a modifier.
   Http::Http1::CodecStats::AtomicPtr codec_stats;
-  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats);
+  const ReverseConnection::HandshakeRequestSpec spec;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats, spec);
   Http::RequestDecoder& decoder = responder.newStream(encoder, false);
   decoder.sendLocalReply(
       Http::Code::Forbidden, "",

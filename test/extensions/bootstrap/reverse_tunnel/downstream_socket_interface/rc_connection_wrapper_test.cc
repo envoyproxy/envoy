@@ -23,6 +23,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -107,13 +108,16 @@ protected:
     config.src_node_id = "test-node";
     config.enable_circuit_breaker = true;
     config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 2));
-    // The extension always supplies this in production; mirror that here.
-    config.handshake_configurator = std::make_shared<Http1HandshakeConfigurator>();
     return config;
   }
 
+  // The extension builds the handshake factory from the framing it copies into the socket config;
+  // mirror that here.
   std::unique_ptr<ReverseConnectionIOHandle>
-  createTestIOHandle(const ReverseConnectionSocketConfig& config) {
+  createTestIOHandle(ReverseConnectionSocketConfig config) {
+    config.handshake_configurator =
+        std::make_shared<Http1HandshakeConfigurator>(Http1InitiatorFraming{
+            config.request_path, config.use_http_upgrade, config.additional_headers});
     return std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
                                                        config, cluster_manager_, extension_.get(),
                                                        *stats_scope_);
@@ -143,6 +147,81 @@ protected:
 
   void pushConnectionWrapper(std::unique_ptr<RCConnectionWrapper> wrapper) {
     io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  }
+
+  // Dials one tunnel to 192.168.1.1 through the io handle and returns the read filter the wrapper
+  // installed, so tests drive the real handshake with response bytes.
+  Network::ReadFilterSharedPtr dialOneTunnel() {
+    dial_cluster_ = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+        .WillRepeatedly(Return(dial_cluster_.get()));
+    dial_priority_set_ = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+    EXPECT_CALL(*dial_cluster_, prioritySet()).WillRepeatedly(ReturnRef(*dial_priority_set_));
+    auto host_map = std::make_shared<Upstream::HostMap>();
+    dial_host_ = createMockHost("192.168.1.1");
+    (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(dial_host_);
+    EXPECT_CALL(*dial_priority_set_, crossPriorityHostMap())
+        .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
+    addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+    auto connection = setupMockConnection();
+    Network::ReadFilterSharedPtr read_filter;
+    ON_CALL(*connection, addReadFilter(_))
+        .WillByDefault(
+            [&read_filter](Network::ReadFilterSharedPtr filter) { read_filter = filter; });
+    Upstream::MockHost::MockCreateConnectionData conn_data;
+    conn_data.connection_ = connection.get();
+    conn_data.host_description_ = dial_host_;
+    EXPECT_CALL(*dial_cluster_, tcpConn_(_)).WillOnce(Return(conn_data));
+    connection.release();
+
+    EXPECT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", dial_host_));
+    EXPECT_NE(read_filter, nullptr);
+    return read_filter;
+  }
+
+  // Feeds response bytes through the wrapper's read filter.
+  static void feed(const Network::ReadFilterSharedPtr& read_filter, absl::string_view bytes) {
+    Buffer::OwnedImpl buffer(bytes);
+    read_filter->onData(buffer, false);
+  }
+
+  // Bytes the accepted tunnel carries for replay, or empty when none.
+  std::string establishedResidual() {
+    if (io_handle_->established_connections_.empty()) {
+      return "<no tunnel>";
+    }
+    const auto& residual = io_handle_->established_connections_.front().residual_bytes;
+    return residual == nullptr ? "" : residual->toString();
+  }
+
+  // Backoff the io handle scheduled for the dialed host after its last failure.
+  std::chrono::milliseconds dialedHostBackoff() {
+    const auto& info = io_handle_->host_to_conn_info_map_.at("192.168.1.1");
+    return std::chrono::duration_cast<std::chrono::milliseconds>(info.backoff_until -
+                                                                 info.last_failure_time);
+  }
+
+  // The tagged handshake counter for a result and, for failures, a reason.
+  uint64_t handshakeCount(absl::string_view result, absl::string_view reason = "") {
+    auto& scope = extension_->getStatsScope();
+    Stats::SymbolTable& symbols = scope.symbolTable();
+    Stats::StatNameManagedStorage base("reverse_connections.handshake", symbols);
+    Stats::StatNameManagedStorage worker_key("worker", symbols);
+    Stats::StatNameManagedStorage worker_value("worker_0", symbols);
+    Stats::StatNameManagedStorage cluster_key("cluster", symbols);
+    Stats::StatNameManagedStorage cluster_value("test-cluster", symbols);
+    Stats::StatNameManagedStorage result_key("result", symbols);
+    Stats::StatNameManagedStorage result_value(result, symbols);
+    Stats::StatNameManagedStorage reason_key("failure_reason", symbols);
+    Stats::StatNameManagedStorage reason_value(reason, symbols);
+    Stats::StatNameTagVector tags{{worker_key.statName(), worker_value.statName()},
+                                  {cluster_key.statName(), cluster_value.statName()},
+                                  {result_key.statName(), result_value.statName()}};
+    if (!reason.empty()) {
+      tags.push_back({reason_key.statName(), reason_value.statName()});
+    }
+    return Stats::Utility::counterFromStatNames(scope, {base.statName()}, tags).value();
   }
 
   // Test Data Setup Helpers.
@@ -211,6 +290,11 @@ protected:
 
   // Mock socket for testing.
   std::unique_ptr<Network::ConnectionSocket> mock_socket_;
+
+  // Upstream state backing dialOneTunnel().
+  std::shared_ptr<NiceMock<Upstream::MockThreadLocalCluster>> dial_cluster_;
+  std::shared_ptr<NiceMock<Upstream::MockPrioritySet>> dial_priority_set_;
+  Upstream::HostConstSharedPtr dial_host_;
 };
 
 // Test RCConnectionWrapper::connect() method with HTTP/1.1 handshake success
@@ -1897,6 +1981,141 @@ TEST_F(RCConnectionWrapperTest, ShutdownIsIdempotent) {
   ASSERT_EQ(wrapper->getConnection(), nullptr);
 
   wrapper.reset();
+}
+
+// A read filter cleared on teardown swallows data without reaching the wrapper.
+TEST_F(RCConnectionWrapperTest, ClearedReadFilterSwallowsData) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  SimpleConnReadFilter filter(wrapper);
+  filter.clearParent();
+
+  const std::string response = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
+  Buffer::OwnedImpl buffer(response);
+  EXPECT_EQ(filter.onData(buffer, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(buffer.toString(), response);
+}
+
+// Bytes the responder coalesced with a 200 reach the accepted tunnel for replay.
+TEST_F(RCConnectionWrapperTest, ResidualCoalescedWith200ReachesTunnel) {
+  auto read_filter = dialOneTunnel();
+  feed(read_filter, "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\nresidual-bytes");
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(establishedResidual(), "residual-bytes");
+}
+
+// Post-101 bytes in upgrade mode reach the accepted tunnel for replay.
+TEST_F(RCConnectionWrapperTest, ResidualAfter101ReachesTunnel) {
+  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
+  upgrade_config.use_http_upgrade = true;
+  io_handle_ = createTestIOHandle(upgrade_config);
+
+  auto read_filter = dialOneTunnel();
+  feed(read_filter, "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\n"
+                    "upgrade: reverse-tunnel\r\n\r\npost-upgrade");
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(establishedResidual(), "post-upgrade");
+}
+
+// A response split across reads completes on the second read only.
+TEST_F(RCConnectionWrapperTest, ResponseSplitAcrossReads) {
+  auto read_filter = dialOneTunnel();
+  const uint64_t successes = handshakeCount("success");
+
+  feed(read_filter, "HTTP/1.1 200 OK\r\ncont");
+  EXPECT_EQ(getConnectionWrappers().size(), 1);
+  EXPECT_EQ(handshakeCount("success"), successes);
+  EXPECT_EQ(establishedResidual(), "<no tunnel>");
+
+  feed(read_filter, "ent-length: 0\r\n\r\n");
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(handshakeCount("success"), successes + 1);
+  EXPECT_EQ(establishedResidual(), "");
+}
+
+// A 429 Retry-After hint becomes the host's backoff instead of the computed one.
+TEST_F(RCConnectionWrapperTest, RetryAfterSetsHostBackoff) {
+  auto read_filter = dialOneTunnel();
+  feed(read_filter, "HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\n"
+                    "retry-after: 7\r\n\r\n");
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(handshakeCount("failed", "http.429"), 1);
+  EXPECT_GE(dialedHostBackoff(), std::chrono::milliseconds(7000));
+}
+
+// The deadline counts a timeout failure, not a connection close.
+TEST_F(RCConnectionWrapperTest, HandshakeTimeoutCountsTimeoutReason) {
+  auto* handshake_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  dialOneTunnel();
+
+  handshake_timer->invokeCallback();
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(handshakeCount("failed", "timeout"), 1);
+  EXPECT_EQ(handshakeCount("failed", "connection_close"), 0);
+}
+
+// A socket config without a handshake factory fails the dial loudly instead of dereferencing it.
+TEST_F(RCConnectionWrapperTest, ConnectWithoutConfiguratorFails) {
+  ReverseConnectionSocketConfig bare_config = createDefaultTestConfig();
+  auto bare_handle = std::make_unique<ReverseConnectionIOHandle>(-1, bare_config, cluster_manager_,
+                                                                 extension_.get(), *stats_scope_);
+  auto mock_connection = getDeletableConn(dispatcher_);
+  EXPECT_CALL(*mock_connection, addReadFilter(_)).Times(0);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*bare_handle, std::move(mock_connection), mock_host, "test-cluster");
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
+                   "socket config carries no handshake configurator");
+}
+
+namespace {
+
+// Handshake that reports a terminal outcome from start() and still returns ok.
+class TerminalInStartHandshake : public InitiatorHandshake {
+public:
+  explicit TerminalInStartHandshake(InitiatorHandshakeCallbacks& callbacks)
+      : callbacks_(callbacks) {}
+  absl::Status start(std::optional<int64_t>) override {
+    callbacks_.onHandshakeDone(HandshakeOutcome::failure("finished early"), std::nullopt);
+    return absl::OkStatus();
+  }
+  void onData(Buffer::Instance&) override {}
+  void cancel() override {}
+  Buffer::InstancePtr takeResidual() override { return nullptr; }
+
+private:
+  InitiatorHandshakeCallbacks& callbacks_;
+};
+
+class TerminalInStartConfigurator : public InitiatorHandshakeConfigurator {
+public:
+  std::unique_ptr<InitiatorHandshake>
+  createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
+    return std::make_unique<TerminalInStartHandshake>(callbacks);
+  }
+};
+
+} // namespace
+
+// An attempt that ended inside start() with an ok status is a contract violation: connect()
+// reports it rather than arming a deadline on a finished attempt.
+TEST_F(RCConnectionWrapperTest, TerminalOutcomeInsideStartWithOkStatusFails) {
+  ReverseConnectionSocketConfig config = createDefaultTestConfig();
+  config.handshake_configurator = std::make_shared<TerminalInStartConfigurator>();
+  auto handle = std::make_unique<ReverseConnectionIOHandle>(-1, config, cluster_manager_,
+                                                            extension_.get(), *stats_scope_);
+  auto mock_connection = getDeletableConn(dispatcher_);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*handle, std::move(mock_connection), mock_host, "test-cluster");
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
+                   "returned ok");
 }
 
 } // namespace ReverseConnection

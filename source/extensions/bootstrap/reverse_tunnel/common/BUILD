@@ -47,9 +47,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "handshake_initiator_lib",
     hdrs = ["handshake_initiator.h"],
-    visibility = ["//visibility:public"],
     deps = [
-        "//envoy/api:api_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_map_interface",
@@ -63,7 +61,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "handshake_responder_lib",
     hdrs = ["handshake_responder.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",

@@ -104,7 +104,8 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
 
   // HTTP/1 is the only built-in handshake; it is selected here, before any socket can be created,
   // and carried on the socket config so every dial negotiates the same protocol.
-  handshake_configurator_ = std::make_shared<Http1HandshakeConfigurator>();
+  handshake_configurator_ = std::make_shared<Http1HandshakeConfigurator>(
+      Http1InitiatorFraming{handshake_request_path_, use_http_upgrade_, additional_headers_});
 }
 
 void ReverseTunnelInitiatorExtension::emitAccessLog(

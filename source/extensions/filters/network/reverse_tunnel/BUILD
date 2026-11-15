@@ -37,6 +37,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:macros",
         "//source/common/formatter:http_speicific_formatter_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/formatter:substitution_formatter_lib",

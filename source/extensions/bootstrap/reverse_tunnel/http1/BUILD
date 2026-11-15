@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "http1_handshake_lib",
     srcs = ["http1_handshake_initiator.cc"],
     hdrs = ["http1_handshake_initiator.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:codec_interface",
         "//envoy/network:address_interface",
@@ -33,7 +32,6 @@ envoy_cc_library(
     name = "http1_handshake_responder_lib",
     srcs = ["http1_handshake_responder.cc"],
     hdrs = ["http1_handshake_responder.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:codec_interface",
         "//source/common/buffer:buffer_lib",

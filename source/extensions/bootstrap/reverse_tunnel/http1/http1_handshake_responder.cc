@@ -41,8 +41,9 @@ private:
 } // namespace
 
 Http1HandshakeResponder::Http1HandshakeResponder(ResponderHandshakeCallbacks& callbacks,
-                                                 Http::Http1::CodecStats::AtomicPtr& codec_stats)
-    : callbacks_(callbacks), codec_stats_(codec_stats) {}
+                                                 Http::Http1::CodecStats::AtomicPtr& codec_stats,
+                                                 const HandshakeRequestSpec& spec)
+    : callbacks_(callbacks), codec_stats_(codec_stats), spec_(spec) {}
 
 Network::FilterStatus Http1HandshakeResponder::onData(Buffer::Instance& data) {
   if (!codec_) {
@@ -72,7 +73,7 @@ Http::RequestDecoder& Http1HandshakeResponder::newStream(Http::ResponseEncoder& 
 
 ResponderHandshakePtr
 Http1HandshakeResponderConfigurator::createHandshake(ResponderHandshakeCallbacks& callbacks) const {
-  return std::make_unique<Http1HandshakeResponder>(callbacks, codec_stats_);
+  return std::make_unique<Http1HandshakeResponder>(callbacks, codec_stats_, spec_);
 }
 
 // RequestDecoderImpl
@@ -178,8 +179,7 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
   ENVOY_LOG(trace,
             "ReverseTunnelFilter::RequestDecoderImpl::processIfComplete: method: {}, path: {}",
             method, path);
-  if (!absl::EqualsIgnoreCase(method, callbacks.requestSpec().method) ||
-      path != callbacks.requestSpec().path) {
+  if (!absl::EqualsIgnoreCase(method, parent_.spec_.method) || path != parent_.spec_.path) {
     sendLocalReply(Http::Code::NotFound, "Not a reverse tunnel request", nullptr, std::nullopt,
                    "reverse_tunnel_not_found");
     // Close the connection after sending the response.
@@ -190,7 +190,7 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
   // When upgrade negotiation is enabled, require the request to advertise the
   // `reverse-tunnel` upgrade. The HTTP/1 server codec already validates the
   // `Connection: Upgrade` paired token, so we only re-check the `Upgrade` value here.
-  if (callbacks.requestSpec().use_http_upgrade) {
+  if (parent_.spec_.use_http_upgrade) {
     const auto upgrade = headers_->getUpgradeValue();
     if (!absl::EqualsIgnoreCase(upgrade, Bootstrap::ReverseConnection::ReverseConnectionUtility::
                                              REVERSE_TUNNEL_UPGRADE_PROTOCOL)) {
@@ -234,20 +234,6 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
-  // Reject a present-but-empty tenant id the same way as a missing header. An empty tenant
-  // silently disables tenant scoping when the socket is registered, since
-  // maybeBuildTenantScopedIdentifier returns the bare identifier for an empty tenant, while
-  // empty node and cluster ids are already rejected at registration by
-  // UpstreamSocketManager::addConnectionSocket.
-  if (tenant_id.empty()) {
-    callbacks.onFramingRejection(HandshakeFramingRejection::ParseError);
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: empty tenant-id header value", callbacks.connection());
-    sendLocalReply(Http::Code::BadRequest, "Empty tenant-id header value", nullptr, std::nullopt,
-                   "reverse_tunnel_empty_tenant_id");
-    callbacks.connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
   // Identity, authentication, and authorization checks.
   const HandshakePolicyResult policy_result =
       callbacks.evaluatePolicy(*headers_, node_id, cluster_id, tenant_id);
@@ -281,12 +267,9 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
       initiator_connection_vals.empty() ? absl::string_view{}
                                         : initiator_connection_vals[0]->value().getStringView();
 
-  // The identifiers are copied out of the request headers before phase one hands them to the
-  // filter, which holds them until phase two registers the socket.
+  // The metadata is copied out of the request headers; the filter holds it with the approved
+  // identifiers until phase two registers the socket.
   AcceptedTunnelInfo info;
-  info.node_id = std::string(node_id);
-  info.cluster_id = std::string(cluster_id);
-  info.tenant_id = std::string(tenant_id);
   info.initiation_time_ms = initiation_time_ms;
   info.initiator_worker_id = std::string(initiator_worker_id);
   info.initiator_connection_id = std::string(initiator_connection_id);
@@ -306,7 +289,7 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
 
   // Send the acceptance response. In upgrade mode this is `101 Switching Protocols`.
   auto resp_headers = Http::ResponseHeaderMapImpl::create();
-  if (callbacks.requestSpec().use_http_upgrade) {
+  if (parent_.spec_.use_http_upgrade) {
     resp_headers->setStatus(101);
     resp_headers->setReferenceKey(Http::Headers::get().Connection,
                                   Http::Headers::get().ConnectionValues.Upgrade);

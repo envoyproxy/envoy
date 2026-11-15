@@ -6,10 +6,10 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
-#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_initiator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +60,13 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
   parent_.onConnectionDone(HandshakeOutcome::failure("Connection closed"), this, true);
 }
 
+Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, bool) {
+  if (parent_ != nullptr) {
+    parent_->onHandshakeData(buffer);
+  }
+  return Network::FilterStatus::StopIteration;
+}
+
 absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
                                           const std::string& src_cluster_id,
                                           const std::string& src_node_id,
@@ -79,11 +86,29 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
             "request through HTTP",
             connection_->id());
 
-  handshake_ = parent_.handshakeConfigurator()->createHandshake(*this);
+  const InitiatorHandshakeConfigurator* configurator = parent_.handshakeConfigurator();
+  if (configurator == nullptr) {
+    IS_ENVOY_BUG("reverse_tunnel: socket config carries no handshake configurator");
+    onHandshakeDone(HandshakeOutcome::failure("No handshake configurator"), std::nullopt);
+    return absl::InternalError("no handshake configurator");
+  }
+
+  // Feed every read into the handshake until it completes or is cancelled.
+  connection_->addReadFilter(read_filter_);
+
+  handshake_ = configurator->createHandshake(*this);
   const absl::Status start_status = handshake_->start(initiation_time_ms);
+  if (handshake_terminal_) {
+    // The attempt already ended inside start(), and a success has released the connection.
+    if (start_status.ok()) {
+      IS_ENVOY_BUG("reverse_tunnel: handshake reported a terminal outcome but start() returned ok");
+      return absl::InternalError("handshake finished during start");
+    }
+    return start_status;
+  }
   if (!start_status.ok()) {
-    // The handshake already reported the terminal outcome; the caller treats the attempt as
-    // terminal.
+    IS_ENVOY_BUG("reverse_tunnel: start() failed without reporting a terminal outcome");
+    onHandshakeDone(HandshakeOutcome::failure(start_status.message()), std::nullopt);
     return start_status;
   }
 
@@ -101,37 +126,13 @@ void RCConnectionWrapper::onHandshakeTimeout() {
   if (handshake_terminal_) {
     return;
   }
-  handshake_terminal_ = true;
-  ENVOY_LOG(trace, "handshake failed: {}", HandshakeFailureReason::timeout().getDetailedName());
   handshake_->cancel();
-
-  auto* ext = getDownstreamExtension();
-  if (ext) {
-    ext->incrementHandshakeStats(cluster_name_, false,
-                                 HandshakeFailureReason::timeout().getNameForStats());
-  }
-  parent_.onConnectionDone(HandshakeOutcome::failure(HandshakeFailureReason::timeout()), this,
-                           false, std::nullopt);
+  onHandshakeDone(HandshakeOutcome::failure(HandshakeFailureReason::timeout()), std::nullopt);
 }
 
 void RCConnectionWrapper::disarmHandshakeTimer() {
   if (handshake_timer_ != nullptr) {
     handshake_timer_->disableTimer();
-  }
-}
-
-void RCConnectionWrapper::onHandshakeSucceeded() {
-  if (handshake_terminal_) {
-    return;
-  }
-  disarmHandshakeTimer();
-
-  ENVOY_LOG(debug, "handshake succeeded");
-
-  // Track handshake success stats.
-  auto* ext = getDownstreamExtension();
-  if (ext) {
-    ext->incrementHandshakeStats(cluster_name_, true, "");
   }
 }
 
@@ -143,7 +144,13 @@ void RCConnectionWrapper::onHandshakeDone(HandshakeOutcome outcome,
   handshake_terminal_ = true;
   disarmHandshakeTimer();
 
-  if (!outcome.accepted && outcome.failure_reason.has_value()) {
+  if (outcome.accepted) {
+    ENVOY_LOG(debug, "handshake succeeded");
+    auto* ext = getDownstreamExtension();
+    if (ext) {
+      ext->incrementHandshakeStats(cluster_name_, true, "");
+    }
+  } else if (outcome.failure_reason.has_value()) {
     ENVOY_LOG(trace, "handshake failed: {}", outcome.message);
     // Track handshake failure stats.
     auto* ext = getDownstreamExtension();
@@ -165,15 +172,6 @@ Upstream::HostDescriptionConstSharedPtr RCConnectionWrapper::host() { return hos
 
 const std::string& RCConnectionWrapper::clusterName() { return cluster_name_; }
 
-const std::string& RCConnectionWrapper::requestPath() { return parent_.requestPath(); }
-
-bool RCConnectionWrapper::useHttpUpgrade() { return parent_.useHttpUpgrade(); }
-
-const std::vector<envoy::config::core::v3::HeaderValueOption>&
-RCConnectionWrapper::additionalHeaders() {
-  return parent_.additionalHeaders();
-}
-
 HandshakeHeadersConstSharedPtr RCConnectionWrapper::effectiveHandshakeHeaders() {
   // Live formatters are preferred; the snapshot can predate extension init and is reused across
   // re-dials.
@@ -190,6 +188,7 @@ Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
   }
 
   connection_->removeConnectionCallbacks(*this);
+  connection_->removeReadFilter(read_filter_);
   // Disarm the deadline so it cannot fire on a connection that is no longer ours, then detach the
   // handshake without a terminal outcome; any residual it captured stays readable via
   // takeHandshakeResidual(). The handshake is absent when the connection is released pre-connect.
@@ -198,6 +197,12 @@ Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
     handshake_->cancel();
   }
   return std::move(connection_);
+}
+
+void RCConnectionWrapper::onHandshakeData(Buffer::Instance& buffer) {
+  if (handshake_ != nullptr) {
+    handshake_->onData(buffer);
+  }
 }
 
 Buffer::InstancePtr RCConnectionWrapper::takeHandshakeResidual() {
@@ -216,6 +221,7 @@ void RCConnectionWrapper::shutdown() {
 
   // Stop the handshake deadline and reads before tearing down the connection.
   handshake_timer_.reset();
+  read_filter_->clearParent();
 
   if (!connection_) {
     ENVOY_LOG(debug, "RCConnectionWrapper: Connection already null, nothing to shutdown");
@@ -234,6 +240,7 @@ void RCConnectionWrapper::shutdown() {
             static_cast<int>(state));
 
   connection_->removeConnectionCallbacks(*this);
+  connection_->removeReadFilter(read_filter_);
 
   // Close before deferred-delete so ConnectionImpl is not destroyed with an open socket.
   if (connection_->state() == Network::Connection::State::Open) {

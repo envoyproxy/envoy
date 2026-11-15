@@ -17,21 +17,9 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// SimpleConnReadFilter::onData implementation.
-Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, bool end_stream) {
-  if (parent_ == nullptr) {
-    return Network::FilterStatus::StopIteration;
-  }
-
-  auto* handshake = static_cast<Http1HandshakeInitiator*>(parent_);
-
-  handshake->onData(buffer);
-  UNREFERENCED_PARAMETER(end_stream);
-  return Network::FilterStatus::StopIteration;
-}
-
-Http1HandshakeInitiator::Http1HandshakeInitiator(InitiatorHandshakeCallbacks& callbacks)
-    : callbacks_(callbacks) {}
+Http1HandshakeInitiator::Http1HandshakeInitiator(InitiatorHandshakeCallbacks& callbacks,
+                                                 Http1InitiatorFramingConstSharedPtr framing)
+    : callbacks_(callbacks), framing_(std::move(framing)) {}
 
 absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_time_ms) {
   Network::ClientConnection& connection = callbacks_.connection();
@@ -44,9 +32,6 @@ absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_ti
       callbacks_.host()->cluster().maxResponseHeadersKb(),
       callbacks_.host()->cluster().maxResponseHeadersCount());
   http1_parse_connection_ = http1_client_codec_.get();
-
-  // Add a tiny read filter to feed bytes into the codec for response parsing.
-  connection.addReadFilter(read_filter_);
 
   // Build HTTP handshake headers with identifiers.
   absl::string_view tenant_id = callbacks_.srcTenantId();
@@ -62,9 +47,9 @@ absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_ti
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
       {{Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
-       {Http::Headers::get().Path, callbacks_.requestPath()},
+       {Http::Headers::get().Path, framing_->request_path},
        {Http::Headers::get().Host, host_value}});
-  if (callbacks_.useHttpUpgrade()) {
+  if (framing_->use_http_upgrade) {
     // Negotiate the handshake as an HTTP/1.1 Upgrade so HCM `upgrade_configs` can splice
     // the connection raw after `101 Switching Protocols`. Both ends must agree.
     headers->setReferenceKey(Http::Headers::get().Connection,
@@ -127,7 +112,7 @@ absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_ti
       apply_header(hdr.key, hdr.value_formatter->format({}, stream_info), hdr.append_action);
     }
   } else {
-    for (const auto& h : callbacks_.additionalHeaders()) {
+    for (const auto& h : framing_->additional_headers) {
       apply_header(Http::LowerCaseString(h.header().key()), h.header().value(), h.append_action());
     }
   }
@@ -155,10 +140,9 @@ void Http1HandshakeInitiator::decodeHeaders(Http::ResponseHeaderMapPtr&& headers
     return;
   }
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
-  const uint64_t expected = callbacks_.useHttpUpgrade() ? 101 : 200;
+  const uint64_t expected = framing_->use_http_upgrade ? 101 : 200;
   if (status == expected) {
     ENVOY_LOG(debug, "Received HTTP {} response", status);
-    callbacks_.onHandshakeSucceeded();
     pending_handoff_ = true;
     return;
   }
@@ -250,10 +234,8 @@ void Http1HandshakeInitiator::captureHandshakeResidual(Buffer::Instance& buffer)
 }
 
 void Http1HandshakeInitiator::cancel() {
-  read_filter_->clearParent();
   http1_parse_connection_ = nullptr;
   http1_client_codec_.reset();
-  callbacks_.connection().removeReadFilter(read_filter_);
 }
 
 Buffer::InstancePtr Http1HandshakeInitiator::takeResidual() {

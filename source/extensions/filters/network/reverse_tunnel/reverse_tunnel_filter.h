@@ -71,11 +71,6 @@ public:
   std::chrono::milliseconds handshakeTimeout() const { return handshake_timeout_; }
   const std::string& requestPath() const { return request_path_; }
 
-  // Returns the shared HTTP/1 codec stats, allocated once on the owning scope. Owning the stats on
-  // the config keeps them alive for the whole life of every per-connection handshake codec.
-  Http::Http1::CodecStats& http1CodecStats(Stats::Scope& scope) const {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, scope);
-  }
   const std::string& requestMethod() const { return request_method_string_; }
   static constexpr absl::string_view tenantDelimiter() {
     return Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
@@ -205,7 +200,6 @@ public:
 
   // Bootstrap::ReverseConnection::ResponderHandshakeCallbacks
   Network::Connection& connection() override;
-  const Bootstrap::ReverseConnection::HandshakeRequestSpec& requestSpec() override;
   Stats::Scope& statsScope() override;
   Server::OverloadManager& overloadManager() override;
   Bootstrap::ReverseConnection::HandshakePolicyResult
@@ -260,9 +254,6 @@ private:
   ReverseTunnelFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};
 
-  // Framing spec of the configured handshake, served to the responder.
-  Bootstrap::ReverseConnection::HandshakeRequestSpec request_spec_;
-
   Stats::Scope& stats_scope_;
   Server::OverloadManager& overload_manager_;
 
@@ -272,8 +263,13 @@ private:
   // Handshake deadline timer, spanning the first byte to registration.
   Event::TimerPtr handshake_timer_;
 
+  // Set by a passing evaluatePolicy() and consumed by the one prepareAcceptedConnection() it
+  // allows.
+  bool policy_approved_{false};
+
   // Socket duplicated in phase one and registered in phase two, held between the two phases along
-  // with the identifiers needed to register it.
+  // with the identifiers needed to register it. The identifiers are the ones evaluatePolicy()
+  // approved.
   Network::ConnectionSocketPtr pending_socket_;
   std::string pending_node_id_;
   std::string pending_cluster_id_;
@@ -282,7 +278,7 @@ private:
   std::string pending_initiator_connection_id_;
   int64_t pending_initiation_time_ms_{0};
 
-  // The per-connection handshake, created once read callbacks are available.
+  // The per-connection handshake, created on the first read.
   Bootstrap::ReverseConnection::ResponderHandshakePtr handshake_;
 };
 
