@@ -32,6 +32,7 @@ pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
+pub mod memory;
 pub mod network;
 pub mod resource_monitor;
 pub mod route_specifier;
