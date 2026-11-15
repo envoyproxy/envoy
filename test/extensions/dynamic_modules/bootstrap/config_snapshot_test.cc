@@ -1,7 +1,9 @@
 #include <thread>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "source/common/common/matchers.h"
 #include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
 #include "source/server/admin/config_tracker_impl.h"
 
@@ -28,14 +30,14 @@ TEST(ConfigSnapshotTest, SelectsProvidersOnceWithoutTraversingEndpoints) {
     return std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap", "routes", "bootstrap"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers);
+  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   EXPECT_EQ(calls, 1);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
   EXPECT_THAT(json.value(), testing::HasSubstr("BootstrapConfigDump"));
   EXPECT_THAT(json.value(), testing::Not(testing::HasSubstr("EndpointsConfigDump")));
-  auto empty = ConfigSnapshot::collect(tracker, {});
+  auto empty = ConfigSnapshot::collect(tracker, {}, Matchers::UniversalStringMatcher{});
   ASSERT_OK(empty);
   EXPECT_EQ(calls, 1);
   auto empty_json = empty.value()->serialize();
@@ -49,6 +51,8 @@ TEST(ConfigSnapshotTest, EncodesOnWorkerAfterTrackerDestructionAndRedactsSecrets
     Server::ConfigTrackerImpl tracker;
     auto owner = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
       auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+      (*dump->mutable_bootstrap()->mutable_node()->mutable_metadata()->mutable_fields())["opaque"]
+          .set_string_value("application-metadata");
       auto* secret = dump->mutable_bootstrap()->mutable_static_resources()->add_secrets();
       secret->set_name("referenced-secret");
       secret->mutable_tls_certificate()->mutable_private_key()->set_inline_string(
@@ -56,7 +60,8 @@ TEST(ConfigSnapshotTest, EncodesOnWorkerAfterTrackerDestructionAndRedactsSecrets
       return dump;
     });
     const std::vector<absl::string_view> providers{"bootstrap"};
-    auto collected = ConfigSnapshot::collect(tracker, providers);
+    auto collected =
+        ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
     ASSERT_OK(collected);
     snapshot = std::move(collected.value());
   }
@@ -70,6 +75,7 @@ TEST(ConfigSnapshotTest, EncodesOnWorkerAfterTrackerDestructionAndRedactsSecrets
   });
   worker.join();
   EXPECT_THAT(json, testing::HasSubstr("referenced-secret"));
+  EXPECT_THAT(json, testing::HasSubstr("application-metadata"));
   EXPECT_THAT(json, testing::Not(testing::HasSubstr("private-material")));
 }
 
@@ -78,7 +84,8 @@ TEST(ConfigSnapshotTest, ReportsProviderFailure) {
   auto owner = tracker.add(
       "failed", [](const Matchers::StringMatcher&) { return ProtobufTypes::MessagePtr{}; });
   const std::vector<absl::string_view> providers{"failed"};
-  EXPECT_FALSE(ConfigSnapshot::collect(tracker, providers).ok());
+  EXPECT_FALSE(
+      ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{}).ok());
 }
 
 TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
@@ -89,12 +96,44 @@ TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
     return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers);
+  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
   EXPECT_THAT(*json, testing::HasSubstr("BootstrapConfigDump"));
   EXPECT_TRUE(tracker.getCallbacksMap().empty());
+}
+
+TEST(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
+  Server::ConfigTrackerImpl tracker;
+  auto clusters = tracker.add("clusters", [](const Matchers::StringMatcher& matcher) {
+    auto dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
+    for (absl::string_view name : {"selected", "excluded"}) {
+      if (matcher.match(name)) {
+        envoy::config::cluster::v3::Cluster cluster;
+        cluster.set_name(name);
+        EXPECT_TRUE(dump->add_static_clusters()->mutable_cluster()->PackFrom(cluster));
+      }
+    }
+    return dump;
+  });
+  auto listeners = tracker.add("listeners", [](const Matchers::StringMatcher&) {
+    return std::make_unique<envoy::admin::v3::ListenersConfigDump>();
+  });
+  const std::vector<absl::string_view> providers{"listeners", "clusters", "clusters"};
+  auto snapshot = ConfigSnapshot::collect(
+      tracker, providers, Matchers::StringMatcherImpl::createExactMatcher("selected"));
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("selected"));
+  EXPECT_THAT(*json, testing::Not(testing::HasSubstr("excluded")));
+  const auto clusters_pos = json->find("ClustersConfigDump");
+  const auto listeners_pos = json->find("ListenersConfigDump");
+  ASSERT_NE(clusters_pos, std::string::npos);
+  ASSERT_NE(listeners_pos, std::string::npos);
+  EXPECT_LT(clusters_pos, listeners_pos);
+  EXPECT_EQ(json->find("ClustersConfigDump", clusters_pos + 1), std::string::npos);
 }
 
 TEST(ConfigSnapshotTest, ContainsProviderExceptions) {
@@ -104,7 +143,9 @@ TEST(ConfigSnapshotTest, ContainsProviderExceptions) {
         throw EnvoyException("provider failed");
       });
   const std::vector<absl::string_view> providers{"failed"};
-  EXPECT_THAT(ConfigSnapshot::collect(tracker, providers).status().message(),
+  EXPECT_THAT(ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{})
+                  .status()
+                  .message(),
               testing::HasSubstr("provider failed"));
 }
 
@@ -118,7 +159,7 @@ TEST(ConfigSnapshotTest, ReportsJsonEncodingFailure) {
     return dump;
   });
   const std::vector<absl::string_view> providers{"bootstrap"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers);
+  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   EXPECT_FALSE(snapshot.value()->serialize().ok());
 }

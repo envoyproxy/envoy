@@ -16,9 +16,8 @@ envoy_cc_library(
     deps = [
         "//envoy/common:exception_lib",
         "//envoy/server:config_tracker_interface",
-        "//source/common/common:matchers_lib",
         "//source/common/protobuf:utility_lib",
-        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
@@ -131,6 +130,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:message_lib",
         "//source/common/init:target_lib",
@@ -168,6 +168,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/strings",
     ],
 )

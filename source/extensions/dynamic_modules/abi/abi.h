@@ -9455,42 +9455,53 @@ typedef enum {
 
 /**
  * A configuration snapshot owned by the module. Release it with
- * envoy_dynamic_module_callback_config_snapshot_delete. It remains valid after server destruction
- * and can move between threads, but must not be used concurrently.
+ * envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete. It remains valid after
+ * server destruction and can move between threads, but must not be used concurrently.
  */
-typedef void* envoy_dynamic_module_type_config_snapshot_ptr;
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr;
 
 /**
  * Receives JSON owned by Envoy and valid only during this invocation.
  */
-typedef void (*envoy_dynamic_module_type_config_snapshot_json_fn)(
+typedef void (*envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn)(
     envoy_dynamic_module_type_envoy_buffer json, void* user_data);
 
 /**
- * Collects and redacts the named providers on the main thread after server initialization.
- * Missing providers are omitted; an empty selection collects nothing. Returns null before
- * initialization, after shutdown, without admin, or if collection fails. Must not run during an
- * xDS callback.
+ * Collects and redacts selected providers synchronously on the main thread after initialization
+ * and before shutdown. Missing providers are omitted; an empty selection collects nothing.
+ * name_regex applies a full-match resource name filter; a null name_regex.ptr disables filtering.
+ * Providers without name filtering ignore it. Cost grows with the selected resources, so combine
+ * frequent notifications into one collection.
+ *
+ * Returns null if collection fails or is unavailable. Collection is refused during cluster and
+ * listener lifecycle hooks. Use the bootstrap config scheduler to defer calls from these hooks and
+ * other callbacks during xDS updates, including callout failures during cluster removal. Providers
+ * may otherwise contain partial updates with previous versions.
+ *
+ * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+ * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
+ * not restrict access.
  */
-envoy_dynamic_module_type_config_snapshot_ptr
-envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
-    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count);
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex);
 
 /**
  * Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread.
  * On success, calls json_fn synchronously once; returns false if encoding fails. Does not consume
- * the snapshot. Sensitive application metadata requires additional module redaction.
+ * the snapshot. Encoding can fail if an Any contains an unknown or unlinked protobuf type.
  */
-bool envoy_dynamic_module_callback_config_snapshot_serialize(
-    envoy_dynamic_module_type_config_snapshot_ptr snapshot,
-    envoy_dynamic_module_type_config_snapshot_json_fn json_fn, void* user_data);
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn, void* user_data);
 
 /**
  * Deletes a snapshot on any thread.
  */
-void envoy_dynamic_module_callback_config_snapshot_delete(
-    envoy_dynamic_module_type_config_snapshot_ptr snapshot);
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot);
 
 /**
  * The callback type invoked once per active resource name during enumeration.

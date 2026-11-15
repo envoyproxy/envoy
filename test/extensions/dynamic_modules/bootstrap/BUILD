@@ -17,10 +17,12 @@ envoy_extension_cc_test(
     srcs = ["config_snapshot_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
+        "//source/common/common:matchers_lib",
         "//source/extensions/bootstrap/dynamic_modules:config_snapshot_lib",
         "//source/server/admin:config_tracker_lib",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

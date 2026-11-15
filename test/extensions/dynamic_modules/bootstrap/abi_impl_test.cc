@@ -1938,8 +1938,8 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   auto config = newOptionalHooksConfig();
   const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
   auto collect = [&]() {
-    return envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-        config->thisAsVoidPtr(), providers, 1);
+    return envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+        config->thisAsVoidPtr(), providers, 1, {nullptr, 0});
   };
   EXPECT_EQ(collect(), nullptr);
   testing::NiceMock<Server::MockListenerManager> listener_manager;
@@ -1963,13 +1963,13 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   config.reset();
   std::string json;
   std::thread worker([&]() {
-    EXPECT_TRUE(envoy_dynamic_module_callback_config_snapshot_serialize(
+    EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
         snapshot,
         [](envoy_dynamic_module_type_envoy_buffer buffer, void* result) {
           static_cast<std::string*>(result)->assign(buffer.ptr, buffer.length);
         },
         &json));
-    envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
+    envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
   });
   worker.join();
   EXPECT_THAT(json, testing::HasSubstr("test-node"));
@@ -1983,10 +1983,10 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHoo
   other_config->setListenerManager(listener_manager);
   auto check_unavailable = [](void* envoy, const void* module,
                               envoy_dynamic_module_type_envoy_buffer) {
-    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-                           envoy, nullptr, 0));
-    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-                           const_cast<void*>(module), nullptr, 0));
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                           envoy, nullptr, 0, {nullptr, 0}));
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                           const_cast<void*>(module), nullptr, 0, {nullptr, 0}));
   };
   config->on_bootstrap_extension_cluster_add_or_update_ = check_unavailable;
   config->on_bootstrap_extension_cluster_removal_ = check_unavailable;
@@ -1994,8 +1994,8 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHoo
   config->on_bootstrap_extension_listener_removal_ = [](void* envoy, const void*,
                                                         envoy_dynamic_module_type_envoy_buffer) {
     static_cast<DynamicModuleBootstrapExtensionConfig*>(envoy)->onClusterRemoval("nested");
-    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-                           envoy, nullptr, 0));
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                           envoy, nullptr, 0, {nullptr, 0}));
   };
   Upstream::ThreadLocalClusterCommand get_cluster = []() -> Upstream::ThreadLocalCluster& {
     PANIC("should not be called");
@@ -2012,10 +2012,10 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHoo
   Server::ConfigTrackerImpl tracker;
   EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
   EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
-  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-      config->thisAsVoidPtr(), nullptr, 0);
+  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+      config->thisAsVoidPtr(), nullptr, 0, {nullptr, 0});
   ASSERT_NE(snapshot, nullptr);
-  envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
 }
 
 TEST_F(BootstrapAbiImplTest, ConfigSnapshotRejectsReentryAndRecoversAfterProviderFailure) {
@@ -2029,8 +2029,8 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotRejectsReentryAndRecoversAfterProvide
   auto provider =
       tracker.add("bootstrap", [&](const Matchers::StringMatcher&) -> ProtobufTypes::MessagePtr {
         if (++calls == 1) {
-          EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-                                 other_config->thisAsVoidPtr(), nullptr, 0));
+          EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                                 other_config->thisAsVoidPtr(), nullptr, 0, {nullptr, 0}));
           throw EnvoyException("provider failed");
         }
         return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
@@ -2042,13 +2042,48 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotRejectsReentryAndRecoversAfterProvide
       .Times(2)
       .WillRepeatedly(testing::ReturnRef(tracker));
   const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
-  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-                         config->thisAsVoidPtr(), providers, 1));
-  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-      other_config->thisAsVoidPtr(), providers, 1);
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                         config->thisAsVoidPtr(), providers, 1, {nullptr, 0}));
+  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+      other_config->thisAsVoidPtr(), providers, 1, {nullptr, 0});
   ASSERT_NE(snapshot, nullptr);
   EXPECT_EQ(calls, 2);
-  envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotNameRegexAndLengthAwareProviders) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  const std::string provider_name("custom\0provider", 15);
+  const std::string resource_name("resource\0name", 13);
+  auto provider =
+      tracker.add(provider_name, [&resource_name](const Matchers::StringMatcher& matcher) {
+        EXPECT_TRUE(matcher.match(resource_name));
+        EXPECT_FALSE(matcher.match("resource"));
+        return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+      });
+  ON_CALL(context_, admin()).WillByDefault(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  ON_CALL(context_.admin_, getConfigTracker()).WillByDefault(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {
+      {provider_name.data(), provider_name.size()}};
+  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+      config->thisAsVoidPtr(), providers, 1, {resource_name.data(), resource_name.size()});
+  ASSERT_NE(snapshot, nullptr);
+  std::string json;
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+      snapshot,
+      [](envoy_dynamic_module_type_envoy_buffer buffer, void* output) {
+        static_cast<std::string*>(output)->assign(buffer.ptr, buffer.length);
+      },
+      &json));
+  EXPECT_THAT(json, testing::HasSubstr("BootstrapConfigDump"));
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+  EXPECT_LOG_CONTAINS("debug", "config snapshot collection failed", {
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                           config->thisAsVoidPtr(), providers, 1, {"[", 1}));
+  });
 }
 
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.
@@ -2437,10 +2472,10 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
        }},
-      {"envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot",
+      {"envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new",
        [] {
-         EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-                                nullptr, nullptr, 0));
+         EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                                nullptr, nullptr, 0, {nullptr, 0}));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {

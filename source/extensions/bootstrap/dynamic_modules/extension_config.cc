@@ -9,6 +9,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/thread.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -103,7 +104,7 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
 
 absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
 DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
-    absl::Span<const absl::string_view> providers) {
+    absl::Span<const absl::string_view> providers, std::optional<absl::string_view> name_regex) {
   if (!server_initialized_ || shutdown_started_ || extension_destroyed_) {
     return absl::FailedPreconditionError("config providers are unavailable");
   }
@@ -117,7 +118,13 @@ DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
   if (!server_admin.has_value()) {
     return absl::FailedPreconditionError("admin config tracker is unavailable");
   }
-  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers);
+  if (name_regex.has_value()) {
+    auto matcher = context_.regexEngine().matcher(std::string(*name_regex));
+    RETURN_IF_NOT_OK(matcher.status());
+    return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers, **matcher);
+  }
+  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers,
+                                 Matchers::UniversalStringMatcher{});
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(

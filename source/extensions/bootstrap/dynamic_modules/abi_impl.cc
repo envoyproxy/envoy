@@ -14,6 +14,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 
 using Envoy::Extensions::Bootstrap::DynamicModules::ConfigSnapshot;
@@ -736,21 +737,25 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
   return admin->removeHandler(prefix_str);
 }
 
-envoy_dynamic_module_type_config_snapshot_ptr
-envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
-    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count) {
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
     IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
     return nullptr;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
-  std::vector<absl::string_view> names;
+  absl::InlinedVector<absl::string_view, 4> names;
   names.reserve(providers_count);
   for (size_t i = 0; i < providers_count; ++i) {
     names.emplace_back(providers[i].ptr, providers[i].length);
   }
-  auto snapshot = config->getConfigSnapshot(names);
+  auto snapshot = config->getConfigSnapshot(
+      names, name_regex.ptr != nullptr
+                 ? std::make_optional(absl::string_view(name_regex.ptr, name_regex.length))
+                 : std::nullopt);
   if (!snapshot.ok()) {
     ENVOY_LOG_MISC(debug, "dynamic modules: config snapshot collection failed: {}",
                    snapshot.status());
@@ -759,9 +764,10 @@ envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
   return snapshot.value().release();
 }
 
-bool envoy_dynamic_module_callback_config_snapshot_serialize(
-    envoy_dynamic_module_type_config_snapshot_ptr snapshot,
-    envoy_dynamic_module_type_config_snapshot_json_fn json_fn, void* user_data) {
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn,
+    void* user_data) {
   auto json = static_cast<ConfigSnapshot*>(snapshot)->serialize();
   if (!json.ok()) {
     return false;
@@ -770,8 +776,8 @@ bool envoy_dynamic_module_callback_config_snapshot_serialize(
   return true;
 }
 
-void envoy_dynamic_module_callback_config_snapshot_delete(
-    envoy_dynamic_module_type_config_snapshot_ptr snapshot) {
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot) {
   delete static_cast<ConfigSnapshot*>(snapshot);
 }
 

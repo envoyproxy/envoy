@@ -2,10 +2,9 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 
-#include "source/common/common/matchers.h"
 #include "source/common/protobuf/utility.h"
 
-#include "absl/container/flat_hash_set.h"
+#include "absl/algorithm/container.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -15,24 +14,19 @@ namespace DynamicModules {
 
 absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
 ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
-                        absl::Span<const absl::string_view> providers) {
+                        absl::Span<const absl::string_view> providers,
+                        const Matchers::StringMatcher& name_matcher) {
   auto snapshot = std::make_unique<ConfigSnapshot>();
-  Matchers::UniversalStringMatcher matcher;
-  absl::flat_hash_set<absl::string_view> seen;
   TRY_ASSERT_MAIN_THREAD {
     // keep callbacks alive if a provider unregisters during collection
     const auto callbacks = tracker.getCallbacksMap();
-    for (absl::string_view provider : providers) {
-      if (!seen.insert(provider).second) {
+    for (const auto& [name, callback] : callbacks) {
+      if (!absl::c_linear_search(providers, name)) {
         continue;
       }
-      auto it = callbacks.find(std::string(provider));
-      if (it == callbacks.end()) {
-        continue;
-      }
-      auto message = it->second(matcher);
+      auto message = callback(name_matcher);
       if (message == nullptr) {
-        return absl::InternalError(absl::StrCat("config provider returned no message: ", provider));
+        return absl::InternalError(absl::StrCat("config provider returned no message: ", name));
       }
       MessageUtil::redact(*message);
       snapshot->messages_.push_back(std::move(message));

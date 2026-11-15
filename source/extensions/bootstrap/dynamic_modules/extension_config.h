@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -161,7 +162,8 @@ public:
    * Collects and redacts the selected configuration providers on the main thread.
    */
   absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
-  getConfigSnapshot(absl::Span<const absl::string_view> providers);
+  getConfigSnapshot(absl::Span<const absl::string_view> providers,
+                    std::optional<absl::string_view> name_regex);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,

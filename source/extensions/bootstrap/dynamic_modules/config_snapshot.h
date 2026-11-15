@@ -24,7 +24,8 @@ public:
    * Collects and redacts the selected providers. Must run on the server's main thread.
    */
   static absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
-  collect(const Server::ConfigTracker& tracker, absl::Span<const absl::string_view> providers);
+  collect(const Server::ConfigTracker& tracker, absl::Span<const absl::string_view> providers,
+          const Matchers::StringMatcher& name_matcher);
 
   /**
    * Encodes the snapshot as ConfigDump JSON. Can run on any thread.

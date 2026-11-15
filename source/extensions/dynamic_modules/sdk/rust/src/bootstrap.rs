@@ -79,20 +79,27 @@ impl ConfigSnapshotProvider<'_> {
   }
 }
 
-/// A snapshot of the selected configuration providers.
-/// Can move between threads. Drop it before unloading the module.
+/// A configuration snapshot that can outlive the server and move between threads.
+/// Drop it before unloading the module.
+#[cfg_attr(any(test, feature = "mock"), automock)]
+pub trait EnvoyBootstrapExtensionConfigSnapshot: Send {
+  /// Encodes the snapshot as ConfigDump JSON.
+  /// Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+  /// configuration may still contain sensitive data. Encoding fails for unknown or unlinked Any
+  /// types.
+  fn into_json(self: Box<Self>) -> Result<Vec<u8>, ConfigSnapshotError>;
+}
+
 #[derive(Debug)]
-pub struct ConfigSnapshot {
+struct EnvoyBootstrapExtensionConfigSnapshotImpl {
   raw: NonNull<std::ffi::c_void>,
 }
 
 // snapshot messages contain no server references or thread-local state
-unsafe impl Send for ConfigSnapshot {}
+unsafe impl Send for EnvoyBootstrapExtensionConfigSnapshotImpl {}
 
-impl ConfigSnapshot {
-  /// Encodes the redacted snapshot as ConfigDump JSON.
-  /// Sensitive application metadata requires additional caller redaction.
-  pub fn into_json(self) -> Result<Vec<u8>, ConfigSnapshotError> {
+impl EnvoyBootstrapExtensionConfigSnapshot for EnvoyBootstrapExtensionConfigSnapshotImpl {
+  fn into_json(self: Box<Self>) -> Result<Vec<u8>, ConfigSnapshotError> {
     extern "C" fn receive_json(
       json: abi::envoy_dynamic_module_type_envoy_buffer,
       user_data: *mut std::ffi::c_void,
@@ -105,7 +112,7 @@ impl ConfigSnapshot {
 
     let mut output = Vec::new();
     let success = unsafe {
-      abi::envoy_dynamic_module_callback_config_snapshot_serialize(
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
         self.raw.as_ptr(),
         Some(receive_json),
         std::ptr::from_mut(&mut output).cast(),
@@ -119,16 +126,20 @@ impl ConfigSnapshot {
   }
 }
 
-impl Drop for ConfigSnapshot {
+impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
   fn drop(&mut self) {
-    unsafe { abi::envoy_dynamic_module_callback_config_snapshot_delete(self.raw.as_ptr()) }
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+        self.raw.as_ptr(),
+      )
+    }
   }
 }
 
 /// A collection or encoding failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSnapshotError {
-  /// The server or a selected config provider is unavailable.
+  /// The selected configuration could not be collected.
   Unavailable,
   /// The collected messages could not be encoded as JSON.
   EncodingFailed,
@@ -403,13 +414,21 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
 
-  /// Collects and redacts the selected providers on the main thread after initialization.
-  /// Missing providers are omitted; an empty selection collects nothing.
-  /// Must not run during an xDS callback.
+  /// Collects and redacts selected providers synchronously on the main thread after initialization
+  /// and before shutdown. Missing providers are omitted; an empty selection collects nothing.
+  /// `name_regex` applies a full-match resource name filter where supported; `None` selects all
+  /// names. Cost grows with the selected resources, so combine frequent notifications into one
+  /// collection.
+  ///
+  /// Collection is refused in cluster and listener lifecycle hooks. Use [`Self::new_scheduler`]
+  /// to defer calls from these hooks and other callbacks during xDS updates; providers may contain
+  /// partial updates with previous versions.
+  /// No admin listener is needed and admin `allow_paths` does not restrict access.
   fn get_config_snapshot<'a>(
     &self,
     providers: &[ConfigSnapshotProvider<'a>],
-  ) -> Result<ConfigSnapshot, ConfigSnapshotError>;
+    name_regex: Option<&'a str>,
+  ) -> Result<Box<dyn EnvoyBootstrapExtensionConfigSnapshot>, ConfigSnapshotError>;
 
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
@@ -1581,21 +1600,27 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn get_config_snapshot(
     &self,
     providers: &[ConfigSnapshotProvider<'_>],
-  ) -> Result<ConfigSnapshot, ConfigSnapshotError> {
+    name_regex: Option<&str>,
+  ) -> Result<Box<dyn EnvoyBootstrapExtensionConfigSnapshot>, ConfigSnapshotError> {
     let providers: smallvec::SmallVec<[_; 4]> = providers
       .iter()
       .map(|provider| str_to_module_buffer(provider.as_str()))
       .collect();
     let raw = unsafe {
-      abi::envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
         self.raw,
         providers.as_ptr(),
         providers.len(),
+        name_regex.map(str_to_module_buffer).unwrap_or(
+          abi::envoy_dynamic_module_type_module_buffer {
+            ptr: std::ptr::null(),
+            length: 0,
+          },
+        ),
       )
     };
-    NonNull::new(raw)
-      .map(|raw| ConfigSnapshot { raw })
-      .ok_or(ConfigSnapshotError::Unavailable)
+    let raw = NonNull::new(raw).ok_or(ConfigSnapshotError::Unavailable)?;
+    Ok(Box::new(EnvoyBootstrapExtensionConfigSnapshotImpl { raw }))
   }
 
   fn enable_listener_lifecycle(&self) -> bool {
@@ -2386,80 +2411,18 @@ ffi_export! {
 #[cfg(test)]
 mod snapshot_tests {
   use super::*;
-  use std::cell::RefCell;
+  use crate::mod_test::config_snapshot_stubs::{TestHost, TestSnapshot};
   use std::sync::atomic::{AtomicUsize, Ordering};
   use std::sync::Arc;
 
-  #[derive(Default)]
-  struct TestHost {
-    providers: RefCell<Vec<String>>,
-  }
-
-  struct TestSnapshot {
+  fn snapshot(
     json: Option<Vec<u8>>,
     drops: Arc<AtomicUsize>,
-  }
-
-  impl Drop for TestSnapshot {
-    fn drop(&mut self) {
-      self.drops.fetch_add(1, Ordering::Relaxed);
-    }
-  }
-
-  #[no_mangle]
-  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
-    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-    providers: *const abi::envoy_dynamic_module_type_module_buffer,
-    count: usize,
-  ) -> abi::envoy_dynamic_module_type_config_snapshot_ptr {
-    let host = unsafe { &*host.cast::<TestHost>() };
-    let providers = unsafe { crate::ffi_helpers::slice_from_raw_or_empty(providers, count) };
-    *host.providers.borrow_mut() = providers
-      .iter()
-      .map(|provider| {
-        let bytes = unsafe {
-          crate::ffi_helpers::slice_from_raw_or_empty(provider.ptr.cast::<u8>(), provider.length)
-        };
-        std::str::from_utf8(bytes).unwrap().to_owned()
-      })
-      .collect();
-    std::ptr::null_mut()
-  }
-
-  #[no_mangle]
-  extern "C" fn envoy_dynamic_module_callback_config_snapshot_serialize(
-    raw: abi::envoy_dynamic_module_type_config_snapshot_ptr,
-    callback: abi::envoy_dynamic_module_type_config_snapshot_json_fn,
-    user_data: *mut std::ffi::c_void,
-  ) -> bool {
-    let snapshot = unsafe { &*raw.cast::<TestSnapshot>() };
-    let Some(json) = &snapshot.json else {
-      return false;
-    };
-    unsafe {
-      callback.unwrap()(
-        abi::envoy_dynamic_module_type_envoy_buffer {
-          ptr: json.as_ptr().cast(),
-          length: json.len(),
-        },
-        user_data,
-      );
-    }
-    true
-  }
-
-  #[no_mangle]
-  extern "C" fn envoy_dynamic_module_callback_config_snapshot_delete(
-    raw: abi::envoy_dynamic_module_type_config_snapshot_ptr,
-  ) {
-    drop(unsafe { Box::from_raw(raw.cast::<TestSnapshot>()) });
-  }
-
-  fn snapshot(json: Option<Vec<u8>>, drops: Arc<AtomicUsize>) -> ConfigSnapshot {
+  ) -> Box<dyn EnvoyBootstrapExtensionConfigSnapshot> {
     let raw = Box::into_raw(Box::new(TestSnapshot { json, drops })).cast();
-    ConfigSnapshot {
+    Box::new(EnvoyBootstrapExtensionConfigSnapshotImpl {
       raw: NonNull::new(raw).unwrap(),
-    }
+    })
   }
 
   #[test]
@@ -2525,25 +2488,71 @@ mod snapshot_tests {
         "ecds_filter_quic_listener",
       ),
       (
-        ConfigSnapshotProvider::Custom("extension-provider"),
-        "extension-provider",
+        ConfigSnapshotProvider::Custom("extension-provider\0suffix"),
+        "extension-provider\0suffix",
       ),
     ];
     let providers: Vec<_> = cases.iter().map(|(provider, _)| *provider).collect();
     assert!(matches!(
-      envoy.get_config_snapshot(&providers),
+      envoy.get_config_snapshot(&providers, Some("cluster.*\0suffix")),
       Err(ConfigSnapshotError::Unavailable)
     ));
     assert!(host
       .providers
-      .borrow()
       .iter()
       .map(String::as_str)
       .eq(cases.iter().map(|(_, name)| *name)));
+    assert_eq!(host.name_regex.as_deref(), Some("cluster.*\0suffix"));
     assert!(matches!(
-      envoy.get_config_snapshot(&[]),
+      envoy.get_config_snapshot(&[], Some("")),
       Err(ConfigSnapshotError::Unavailable)
     ));
-    assert!(host.providers.borrow().is_empty());
+    assert_eq!(host.name_regex.as_deref(), Some(""));
+    assert!(matches!(
+      envoy.get_config_snapshot(&[], None),
+      Err(ConfigSnapshotError::Unavailable)
+    ));
+    assert!(host.providers.is_empty());
+    assert!(host.name_regex.is_none());
+  }
+
+  #[test]
+  fn config_snapshot_collection_returns_an_encodable_handle() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let mut host = TestHost {
+      snapshot: Some(TestSnapshot {
+        json: Some(b"{\"configs\":[]}".to_vec()),
+        drops: Arc::clone(&drops),
+      }),
+      ..TestHost::default()
+    };
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let snapshot = envoy
+      .get_config_snapshot(&[ConfigSnapshotProvider::Clusters], None)
+      .unwrap();
+    assert_eq!(snapshot.into_json().unwrap(), b"{\"configs\":[]}");
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
+  }
+
+  #[test]
+  fn config_snapshot_can_be_mocked() {
+    let mut snapshot = MockEnvoyBootstrapExtensionConfigSnapshot::new();
+    snapshot
+      .expect_into_json()
+      .once()
+      .return_once(|| Ok(b"{}".to_vec()));
+    let mut envoy = MockEnvoyBootstrapExtensionConfig::new();
+    envoy
+      .expect_get_config_snapshot()
+      .once()
+      .return_once(move |_, _| Ok(Box::new(snapshot)));
+    assert_eq!(
+      envoy
+        .get_config_snapshot(&[], None)
+        .unwrap()
+        .into_json()
+        .unwrap(),
+      b"{}"
+    );
   }
 }

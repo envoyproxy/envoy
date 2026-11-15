@@ -667,12 +667,15 @@ WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
                                                                                    {nullptr, 0}, 0))
 WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
-WEAK_STUB(BootstrapExtensionGetConfigSnapshot,
-          envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(nullptr, nullptr,
-                                                                                0))
-WEAK_STUB(ConfigSnapshotSerialize,
-          envoy_dynamic_module_callback_config_snapshot_serialize(nullptr, nullptr, nullptr))
-WEAK_STUB(ConfigSnapshotDelete, envoy_dynamic_module_callback_config_snapshot_delete(nullptr))
+WEAK_STUB(BootstrapExtensionConfigSnapshotNew,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(nullptr, nullptr, 0,
+                                                                                {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionConfigSnapshotSerialize,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(nullptr,
+                                                                                      nullptr,
+                                                                                      nullptr))
+WEAK_STUB(BootstrapExtensionConfigSnapshotDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(nullptr))
 WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
 WEAK_STUB(BootstrapExtensionRunOnAllWorkers,
