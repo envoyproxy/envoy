@@ -1205,8 +1205,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, PerRouteGrpcServiceConfigurationParsing) {
 
   // Verify the configuration was parsed correctly
   ASSERT_TRUE(config_per_route.grpcService().has_value());
-  EXPECT_TRUE(config_per_route.grpcService().value().has_envoy_grpc());
-  EXPECT_EQ(config_per_route.grpcService().value().envoy_grpc().cluster_name(),
+  EXPECT_TRUE(config_per_route.grpcService()->config().has_envoy_grpc());
+  EXPECT_EQ(config_per_route.grpcService()->config().envoy_grpc().cluster_name(),
             "per_route_cluster");
 
   // Verify context extensions are present
