@@ -6,6 +6,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,10 +17,11 @@ absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
 ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
                         absl::Span<const absl::string_view> providers) {
   auto snapshot = std::make_unique<ConfigSnapshot>();
-  const auto& callbacks = tracker.getCallbacksMap();
   Matchers::UniversalStringMatcher matcher;
   absl::flat_hash_set<absl::string_view> seen;
   TRY_ASSERT_MAIN_THREAD {
+    // keep callbacks alive if a provider unregisters during collection
+    const auto callbacks = tracker.getCallbacksMap();
     for (absl::string_view provider : providers) {
       if (!seen.insert(provider).second) {
         continue;
@@ -30,14 +32,13 @@ ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
       }
       auto message = it->second(matcher);
       if (message == nullptr) {
-        return absl::InternalError("config provider returned no message");
+        return absl::InternalError(absl::StrCat("config provider returned no message: ", provider));
       }
       MessageUtil::redact(*message);
       snapshot->messages_.push_back(std::move(message));
     }
   }
-  END_TRY CATCH(const EnvoyException&,
-                { return absl::InternalError("config provider collection failed"); });
+  END_TRY CATCH(const EnvoyException& e, { return absl::InternalError(e.what()); });
   return snapshot;
 }
 

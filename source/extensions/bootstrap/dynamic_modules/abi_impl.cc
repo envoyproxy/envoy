@@ -751,7 +751,12 @@ envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
     names.emplace_back(providers[i].ptr, providers[i].length);
   }
   auto snapshot = config->getConfigSnapshot(names);
-  return snapshot.ok() ? snapshot.value().release() : nullptr;
+  if (!snapshot.ok()) {
+    ENVOY_LOG_MISC(debug, "dynamic modules: config snapshot collection failed: {}",
+                   snapshot.status());
+    return nullptr;
+  }
+  return snapshot.value().release();
 }
 
 bool envoy_dynamic_module_callback_config_snapshot_serialize(

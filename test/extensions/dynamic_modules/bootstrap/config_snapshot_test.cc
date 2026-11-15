@@ -81,6 +81,22 @@ TEST(ConfigSnapshotTest, ReportsProviderFailure) {
   EXPECT_FALSE(ConfigSnapshot::collect(tracker, providers).ok());
 }
 
+TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
+  Server::ConfigTrackerImpl tracker;
+  Server::ConfigTracker::EntryOwnerPtr owner;
+  owner = tracker.add("bootstrap", [&owner](const Matchers::StringMatcher&) {
+    owner.reset();
+    return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+  });
+  const std::vector<absl::string_view> providers{"bootstrap"};
+  auto snapshot = ConfigSnapshot::collect(tracker, providers);
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("BootstrapConfigDump"));
+  EXPECT_TRUE(tracker.getCallbacksMap().empty());
+}
+
 TEST(ConfigSnapshotTest, ContainsProviderExceptions) {
   Server::ConfigTrackerImpl tracker;
   auto owner =
@@ -88,7 +104,8 @@ TEST(ConfigSnapshotTest, ContainsProviderExceptions) {
         throw EnvoyException("provider failed");
       });
   const std::vector<absl::string_view> providers{"failed"};
-  EXPECT_FALSE(ConfigSnapshot::collect(tracker, providers).ok());
+  EXPECT_THAT(ConfigSnapshot::collect(tracker, providers).status().message(),
+              testing::HasSubstr("provider failed"));
 }
 
 TEST(ConfigSnapshotTest, ReportsJsonEncodingFailure) {

@@ -1958,6 +1958,8 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   ASSERT_NE(snapshot, nullptr);
   config->onShutdown();
   EXPECT_EQ(collect(), nullptr);
+  config->onExtensionDestroyed();
+  EXPECT_EQ(collect(), nullptr);
   config.reset();
   std::string json;
   std::thread worker([&]() {
@@ -1971,6 +1973,82 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
   });
   worker.join();
   EXPECT_THAT(json, testing::HasSubstr("test-node"));
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHooks) {
+  auto config = newOptionalHooksConfig();
+  auto other_config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  other_config->setListenerManager(listener_manager);
+  auto check_unavailable = [](void* envoy, const void* module,
+                              envoy_dynamic_module_type_envoy_buffer) {
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+                           envoy, nullptr, 0));
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+                           const_cast<void*>(module), nullptr, 0));
+  };
+  config->on_bootstrap_extension_cluster_add_or_update_ = check_unavailable;
+  config->on_bootstrap_extension_cluster_removal_ = check_unavailable;
+  config->on_bootstrap_extension_listener_add_or_update_ = check_unavailable;
+  config->on_bootstrap_extension_listener_removal_ = [](void* envoy, const void*,
+                                                        envoy_dynamic_module_type_envoy_buffer) {
+    static_cast<DynamicModuleBootstrapExtensionConfig*>(envoy)->onClusterRemoval("nested");
+    EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+                           envoy, nullptr, 0));
+  };
+  Upstream::ThreadLocalClusterCommand get_cluster = []() -> Upstream::ThreadLocalCluster& {
+    PANIC("should not be called");
+  };
+  auto original_module_config = config->in_module_config_;
+  config->in_module_config_ = other_config->thisAsVoidPtr();
+  config->onClusterAddOrUpdate("cluster", get_cluster);
+  config->onClusterRemoval("cluster");
+  testing::NiceMock<Network::MockListenerConfig> listener;
+  config->onListenerAddOrUpdate("listener", listener);
+  config->onListenerRemoval("listener");
+  config->in_module_config_ = original_module_config;
+
+  Server::ConfigTrackerImpl tracker;
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+      config->thisAsVoidPtr(), nullptr, 0);
+  ASSERT_NE(snapshot, nullptr);
+  envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotRejectsReentryAndRecoversAfterProviderFailure) {
+  auto config = newOptionalHooksConfig();
+  auto other_config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  other_config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  int calls = 0;
+  auto provider =
+      tracker.add("bootstrap", [&](const Matchers::StringMatcher&) -> ProtobufTypes::MessagePtr {
+        if (++calls == 1) {
+          EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+                                 other_config->thisAsVoidPtr(), nullptr, 0));
+          throw EnvoyException("provider failed");
+        }
+        return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+      });
+  EXPECT_CALL(context_, admin())
+      .Times(2)
+      .WillRepeatedly(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker())
+      .Times(2)
+      .WillRepeatedly(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+                         config->thisAsVoidPtr(), providers, 1));
+  auto snapshot = envoy_dynamic_module_callback_bootstrap_extension_get_config_snapshot(
+      other_config->thisAsVoidPtr(), providers, 1);
+  ASSERT_NE(snapshot, nullptr);
+  EXPECT_EQ(calls, 2);
+  envoy_dynamic_module_callback_config_snapshot_delete(snapshot);
 }
 
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.

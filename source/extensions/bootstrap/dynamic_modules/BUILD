@@ -129,6 +129,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:message_lib",
