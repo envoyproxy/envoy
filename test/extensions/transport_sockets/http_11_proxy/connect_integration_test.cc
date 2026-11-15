@@ -339,6 +339,9 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
   // Make sure the upgrade headers were swallowed and the second were received.
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("bar")).empty());
 
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
   // Now send a second request, and make sure it goes to upstream 2.
   absl::string_view third_upstream_address(fake_upstreams_[2]->localAddress()->asStringView());
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
