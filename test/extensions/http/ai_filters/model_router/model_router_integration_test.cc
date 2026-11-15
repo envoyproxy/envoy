@@ -310,8 +310,11 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
                 {"messages", {{{"role", "user"}, {"content", Question}}}},
             }));
 
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
+  // Leave the response open so the router resets the HTTP/1 stream and closes the connection.
+  // Completing the response and closing from the upstream side races the retry: the retry can be
+  // dispatched on the stale pooled connection, get reset, and consume the third attempt, for
+  // which there is no target.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
