@@ -50,6 +50,11 @@ struct TestAddresses {
 
 class HotRestartImplTest : public testing::Test {
 public:
+  HotRestartImplTest() {
+    // Send/receive timeouts are set on each domain socket at bind time.
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, _, _, _)).Times(AnyNumber());
+  }
+
   void setup() {
     EXPECT_CALL(hot_restart_os_sys_calls_, shmUnlink(_)).Times(AnyNumber());
     EXPECT_CALL(hot_restart_os_sys_calls_, shmOpen(_, _, _));
@@ -245,6 +250,15 @@ TEST_F(HotRestartUdpForwardingContextTest,
   EXPECT_FALSE(result.has_value());
   result = helper_->getListenerForDestination(*test_addresses_.ipv6_test_addr_different_port_);
   EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerDoesNotOwnConfig) {
+  auto config = std::make_shared<Network::MockUdpListenerConfig>();
+  std::weak_ptr<Network::UdpListenerConfig> weak_config = config;
+  helper_->registerUdpForwardingListener(test_addresses_.ipv4_test_addr_, config);
+  config.reset();
+  EXPECT_TRUE(weak_config.expired());
+  EXPECT_FALSE(helper_->getListenerForDestination(*test_addresses_.ipv4_test_addr_).has_value());
 }
 
 TEST_F(HotRestartImplTest, IsInitializingReflectsLifecyclePhases) {

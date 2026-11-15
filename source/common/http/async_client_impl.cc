@@ -353,6 +353,7 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                const AsyncClient::RequestOptions& options,
                                                absl::Status& creation_status)
     : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks),
+      context_(options.context_),
       response_buffer_limit_(parent.config_->runtime_.snapshot().getInteger(
           AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
   if (!creation_status.ok()) {

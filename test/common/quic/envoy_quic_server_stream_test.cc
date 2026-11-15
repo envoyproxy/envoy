@@ -114,7 +114,7 @@ public:
       settings.values[quic::SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07] = 1;
     }
 #endif
-    EXPECT_TRUE(quic_session_.OnSettingsFrame(settings));
+    EXPECT_TRUE(quic_session_.OnSettingsFrame(settings, /*wire_order=*/{}));
   }
 
   // Overridden by the WebTransport fixture to negotiate WebTransport during SetUp().
@@ -376,8 +376,8 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
   // messed up.
   std::string response2(1024, 'a');
   Buffer::OwnedImpl buffer2(response2);
-  EXPECT_ENVOY_BUG(quic_stream_->encodeData(buffer2, true),
-                   "encodeData is called on write-closed stream");
+  quic_stream_->encodeData(buffer2, true);
+  EXPECT_EQ(0u, buffer2.length());
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 

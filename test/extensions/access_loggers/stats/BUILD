@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "scope_provider_singleton_test",
     srcs = ["scope_provider_singleton_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/access_loggers/stats:scope_provider_singleton_lib",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     name = "stats_test",
     srcs = ["stats_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/stats:allocator_lib",
@@ -56,7 +58,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/access_loggers/stats:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -75,7 +80,7 @@ envoy_extension_cc_benchmark_binary(
         "stats_speed_test.cc",
     ],
     extension_names = ["envoy.access_loggers.stats"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/stats:stats_lib",

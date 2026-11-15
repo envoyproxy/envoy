@@ -1,5 +1,8 @@
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -204,6 +207,38 @@ direct_response:
       cluster->MergeFrom(bootstrap.static_resources().clusters(0));
       cluster->set_name("canary");
     });
+  }
+
+  // Configures the virtual host to count requests for /rides in its rides virtual cluster, and the
+  // specifier to declare rides, bikes and the catch all virtual cluster for the virtual host with
+  // no sampled comparison.
+  void setupVirtualClusterTest(bool prefer_selection) {
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          TestUtility::loadFromYaml(
+              R"EOF(
+name: rides
+headers:
+- name: ":path"
+  string_match: {prefix: "/rides"}
+)EOF",
+              *hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_virtual_clusters());
+        });
+    // The two IP versions run the server in the two stats modes, which it reads before the runtime
+    // loader exists.
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  useExplicitStatsTags());
+    setupTest(absl::StrCat(R"EOF(
+virtual_cluster_override:
+  virtual_host_name: integration
+  names: [rides, bikes, other]
+  verify_one_in: 0
+  prefer_selection: )EOF",
+                           prefer_selection ? "true" : "false", "\n"));
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(nullptr, store);
+    EXPECT_EQ(useExplicitStatsTags(), store->useExplicitTags());
   }
 
   // Configures the virtual host to run the shadow example module, which routes to intended_cluster
@@ -579,6 +614,86 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, SetRouteNameSurfacesInAccessL
 
   const std::string log = waitForAccessLog(access_log_name_);
   EXPECT_NE(std::string::npos, log.find("module_route"));
+}
+
+// A preferred selection is the virtual cluster the router counts the request in, with the
+// statistics of the virtual cluster of that name on the virtual host, and the
+// %VIRTUAL_CLUSTER_NAME% access log command operator reports it. A declared virtual cluster the
+// virtual host does not configure names and tags its statistics like one it configures, a direct
+// response is counted in no virtual cluster, a name the specifier does not declare or a selection
+// of none leaves the request to the virtual host, and other counts it in the catch all virtual
+// cluster.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PreferredVirtualClusterSelection) {
+  useAccessLog("%VIRTUAL_CLUSTER_NAME%");
+  setupVirtualClusterTest(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(1));
+  EXPECT_EQ(1, counterValue("vhost.integration.vcluster.rides.upstream_rq_total"));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_).find("rides"));
+
+  response = sendRequest({{"x-virtual-cluster", "bikes"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.bikes.upstream_rq_200", testing::Eq(1));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_, 1).find("bikes"));
+  EXPECT_EQ(1, counterValue("vhost.integration.vcluster.bikes.upstream_rq_total"));
+  for (const std::string name : {"bikes", "rides"}) {
+    expectStatTags(absl::StrCat("vhost.integration.vcluster.", name, ".upstream_rq_total"),
+                   "vhost.vcluster.upstream_rq_total",
+                   {{"envoy.virtual_host", "integration"}, {"envoy.virtual_cluster", name}});
+  }
+  EXPECT_EQ(2, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_selected"));
+
+  response = sendRequest({{"x-template", "direct"}, {"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("204", response->headers().getStatusValue());
+  EXPECT_EQ(std::string::npos, waitForAccessLog(access_log_name_, 2).find("rides"));
+  EXPECT_EQ(2, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_selected"));
+
+  response = sendRequest({{"x-virtual-cluster", "unknown"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(1));
+  EXPECT_EQ(1, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_unknown"));
+
+  response = sendRequest({{"x-virtual-cluster", ""}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(2));
+  EXPECT_EQ(1, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_none"));
+
+  response = sendRequest({{":path", "/rides"}, {"x-virtual-cluster", "other"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(3));
+  EXPECT_EQ(std::string::npos, waitForAccessLog(access_log_name_, 5).find("other"));
+  EXPECT_EQ(3, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_selected"));
+}
+
+// Without prefer_selection the router counts the request in the virtual cluster the virtual host
+// matches, which the access log reports, and counts whether the selection agrees with it.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ComparedVirtualClusterSelection) {
+  useAccessLog("%VIRTUAL_CLUSTER_NAME%");
+  setupVirtualClusterTest(false);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/rides"}, {"x-virtual-cluster", "bikes"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.virtual_cluster_disagree",
+                               testing::Eq(1));
+  EXPECT_EQ(0, counterValue("vhost.integration.vcluster.bikes.upstream_rq_total"));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_).find("rides"));
+
+  response = sendRequest({{":path", "/rides"}, {"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(2));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.virtual_cluster_agree",
+                               testing::Eq(1));
+
+  response = sendRequest({{"x-virtual-cluster", "other"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.virtual_cluster_agree",
+                               testing::Eq(2));
 }
 
 // A recorded prefix rewrite replaces the matched prefix of the path sent upstream, keeping the

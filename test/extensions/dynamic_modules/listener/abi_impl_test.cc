@@ -19,10 +19,12 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
@@ -1550,6 +1552,72 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatch
       static_cast<void*>(filter.get()), ns_buf, entries.data(), entries.size());
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStruct) {
+  const std::string ns = "test_ns";
+  const auto& metadata = callbacks_.stream_info_.metadata_;
+  // Only the two non-empty structs that parse reach the stream info.
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(ns, testing::_)).Times(2);
+
+  // A nested struct round trips into the namespace.
+  Protobuf::Struct nested;
+  (*(*nested.mutable_fields())["outer"].mutable_struct_value()->mutable_fields())["inner"]
+      .set_string_value("value");
+  (*nested.mutable_fields())["key"].set_string_value("old");
+  std::string serialized;
+  ASSERT_TRUE(nested.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {serialized.data(), serialized.size()}));
+  EXPECT_EQ("value", metadata.filter_metadata()
+                         .at(ns)
+                         .fields()
+                         .at("outer")
+                         .struct_value()
+                         .fields()
+                         .at("inner")
+                         .string_value());
+
+  // A later struct overwrites the keys it sets and keeps the others.
+  Protobuf::Struct update;
+  (*update.mutable_fields())["key"].set_string_value("new");
+  ASSERT_TRUE(update.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {serialized.data(), serialized.size()}));
+  EXPECT_EQ("new", metadata.filter_metadata().at(ns).fields().at("key").string_value());
+  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+
+  // An empty struct does not create the namespace, and a buffer that does not parse as a
+  // google.protobuf.Struct is rejected.
+  const std::string invalid = serialized + '\x0f';
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {"empty_ns", 8}, {nullptr, 0}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
+  EXPECT_FALSE(metadata.filter_metadata().contains("empty_ns"));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      static_cast<void*>(filter.get()), {"test_ns", 7}, {"", 0}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullNamespace) {
+  Protobuf::Struct value;
+  (*value.mutable_fields())["key"].set_string_value("value");
+  std::string serialized;
+  ASSERT_TRUE(value.SerializeToString(&serialized));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {nullptr, 7}, {serialized.data(), serialized.size()}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullValue) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {"test_ns", 7}, {nullptr, 8}));
+}
+
 // =============================================================================
 // Tests for set_filter_state.
 // =============================================================================
@@ -1944,18 +2012,42 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNullCallbac
   EXPECT_EQ(0, value_out.length);
 }
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSuccess) {
-  char ns[] = "test_ns";
-  char key[] = "key1";
-  char value[] = "value1";
-  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
-  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
-  envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadata) {
+  const std::string ns = "test_ns";
+  const auto& typed_metadata = callbacks_.stream_info_.metadata_.typed_filter_metadata();
+  Protobuf::StringValue payload;
+  Protobuf::Any any;
 
-  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_));
+  // A packed Any round trips into the typed metadata with its type URL preserved.
+  payload.set_value("hello");
+  ASSERT_TRUE(any.PackFrom(payload));
+  std::string hello;
+  ASSERT_TRUE(any.SerializeToString(&hello));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {hello.data(), hello.size()}));
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(typed_metadata.at(ns).UnpackTo(&unpacked));
+  EXPECT_EQ("hello", unpacked.value());
 
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
-                                                                            key_buf, value_buf);
+  // A later Any replaces the entry even when its value is empty.
+  ASSERT_TRUE(any.PackFrom(Protobuf::StringValue()));
+  std::string empty_value;
+  ASSERT_TRUE(any.SerializeToString(&empty_value));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {empty_value.data(), empty_value.size()}));
+  EXPECT_TRUE(typed_metadata.at(ns).value().empty());
+
+  // An empty buffer has no type URL, so it is rejected with the same warning as a buffer that
+  // does not parse as a google.protobuf.Any.
+  EXPECT_LOG_CONTAINS("warn", "with a buffer of 0 bytes that is not a google.protobuf.Any", {
+    EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+        filterPtr(), {ns.data(), ns.size()}, {nullptr, 0}));
+  });
+  const std::string invalid = hello + '\x0f';
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
+  EXPECT_TRUE(typed_metadata.at(ns).Is<Protobuf::StringValue>());
+  EXPECT_TRUE(typed_metadata.at(ns).value().empty());
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCallbacks) {
@@ -1963,16 +2055,22 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
   filter->onAccept(callbacks_);
   filter->setCallbacksForTest(nullptr);
 
-  char ns[] = "test_ns";
-  char key[] = "key1";
-  char value[] = "value1";
-  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
-  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
-  envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      static_cast<void*>(filter.get()), {"test_ns", 7}, {"", 0}));
+}
 
-  // TODO(wbpcode): this should never happen in practice, but ensure it doesn't crash.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
-      static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullNamespace) {
+  Protobuf::Any any;
+  ASSERT_TRUE(any.PackFrom(Protobuf::StringValue()));
+  std::string serialized;
+  ASSERT_TRUE(any.SerializeToString(&serialized));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {nullptr, 7}, {serialized.data(), serialized.size()}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullValue) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {"test_ns", 7}, {nullptr, 8}));
 }
 
 // =============================================================================
@@ -2232,6 +2330,34 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterConfigScheduler
 
   // Clean up.
   envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLoadShedPointWithoutProvider) {
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+                         filter_config_.get(), {name.data(), name.size()}));
+}
+
+TEST(DynamicModuleListenerFilterConfigTest, GetLoadShedPoint) {
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("listener_no_op", "c"), /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  Stats::IsolatedStoreImpl stats;
+  testing::StrictMock<Upstream::MockClusterManager> cluster_manager;
+  testing::StrictMock<Event::MockDispatcher> main_thread_dispatcher;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher, overload_manager);
+  ASSERT_OK(filter_config);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point,
+            envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+                filter_config.value().get(), {name.data(), name.size()}));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
@@ -2887,6 +3013,77 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutFailureReset) 
       ->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 
   filter_.reset();
+}
+
+namespace {
+
+size_t g_http_callout_done_calls = 0;
+uint64_t g_last_http_callout_id = 0;
+envoy_dynamic_module_type_http_callout_result g_last_http_callout_result{};
+
+void testOnHttpCalloutDone(envoy_dynamic_module_type_listener_filter_envoy_ptr,
+                           envoy_dynamic_module_type_listener_filter_module_ptr,
+                           uint64_t callout_id,
+                           envoy_dynamic_module_type_http_callout_result result,
+                           envoy_dynamic_module_type_envoy_http_header*, size_t,
+                           envoy_dynamic_module_type_envoy_buffer*, size_t) {
+  g_http_callout_done_calls++;
+  g_last_http_callout_id = callout_id;
+  g_last_http_callout_result = result;
+}
+
+} // namespace
+
+// A callout failure reaches the module from a posted callback, which does nothing once the filter
+// is gone.
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutFailureIsPosted) {
+  filter_config_->on_listener_filter_http_callout_done_ = testOnHttpCalloutDone;
+  g_http_callout_done_calls = 0;
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillRepeatedly(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillRepeatedly(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillRepeatedly(
+          testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                           captured_callback = &cb;
+                         }),
+                         testing::Return(&request)));
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+  for (const bool destroy_filter : {false, true}) {
+    uint64_t callout_id = 0;
+    EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+              envoy_dynamic_module_callback_listener_filter_http_callout(
+                  filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(),
+                  {nullptr, 0}, 5000));
+    ASSERT_NE(nullptr, captured_callback);
+
+    Event::PostCb posted_cb;
+    EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+      posted_cb = std::move(cb);
+    });
+    const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+        ->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    ASSERT_NE(nullptr, posted_cb);
+    if (destroy_filter) {
+      filter_.reset();
+    }
+    EXPECT_EQ(0, g_http_callout_done_calls);
+    posted_cb();
+    EXPECT_EQ(destroy_filter ? 0 : 1, g_http_callout_done_calls);
+    if (!destroy_filter) {
+      EXPECT_EQ(callout_id, g_last_http_callout_id);
+      EXPECT_EQ(envoy_dynamic_module_type_http_callout_result_Reset, g_last_http_callout_result);
+    }
+    g_http_callout_done_calls = 0;
+  }
 }
 
 TEST_F(DynamicModuleListenerFilterHttpCalloutTest,
