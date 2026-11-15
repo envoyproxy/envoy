@@ -196,7 +196,9 @@ void Filter::log(const Formatter::Context& log_context, const StreamInfo::Stream
   case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
-    if (initRequest()) {
+    initRequest();
+    // decodeHeaders() is also skipped when an earlier filter sends a local reply.
+    if (request_headers_ == nullptr) {
       request_headers_ = const_cast<Http::RequestHeaderMap*>(log_context.requestHeaders().ptr());
     }
 

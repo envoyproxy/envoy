@@ -96,19 +96,17 @@ void HttpFilterTest::initialize(std::string&& yaml, bool is_upstream_filter) {
   test_time_ = new Envoy::Event::SimulatedTimeSystem();
   dispatcher_.time_system_.reset(test_time_);
 
-  EXPECT_CALL(dispatcher_, createTimer_(_))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Unused) {
-        // Create a mock timer that we can check at destruction time to see if
-        // all timers were disabled no matter what. MockTimer has default
-        // actions that we just have to enable properly here.
-        auto* timer = new Event::MockTimer();
-        EXPECT_CALL(*timer, enableTimer(_, _)).Times(AnyNumber());
-        EXPECT_CALL(*timer, disableTimer()).Times(AnyNumber());
-        EXPECT_CALL(*timer, enabled()).Times(AnyNumber());
-        timers_.push_back(timer);
-        return timer;
-      }));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber()).WillRepeatedly([this](Unused) {
+    // Create a mock timer that we can check at destruction time to see if
+    // all timers were disabled no matter what. MockTimer has default
+    // actions that we just have to enable properly here.
+    auto* timer = new Event::MockTimer();
+    EXPECT_CALL(*timer, enableTimer(_, _)).Times(AnyNumber());
+    EXPECT_CALL(*timer, disableTimer()).Times(AnyNumber());
+    EXPECT_CALL(*timer, enabled()).Times(AnyNumber());
+    timers_.push_back(timer);
+    return timer;
+  });
   EXPECT_CALL(decoder_callbacks_, filterConfigName()).WillRepeatedly(Return(filter_config_name));
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
@@ -195,49 +193,47 @@ HttpFilterTest::doStart(ExternalProcessorCallbacks& callbacks,
 void HttpFilterTest::setUpDecodingBuffering(Buffer::Instance& buf, bool expect_modification) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillRepeatedly(Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
+      .WillRepeatedly([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); });
   if (expect_modification) {
     EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-        .WillOnce(
-            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+        .WillOnce([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); });
   }
 }
 
 void HttpFilterTest::setUpEncodingBuffering(Buffer::Instance& buf, bool expect_modification) {
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buf));
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillRepeatedly(Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
+      .WillRepeatedly([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); });
   if (expect_modification) {
     EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-        .WillOnce(
-            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+        .WillOnce([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); });
   }
 }
 
 void HttpFilterTest::setUpDecodingWatermarking(bool& watermarked) {
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
-      .WillRepeatedly(Invoke([&watermarked]() {
+      .WillRepeatedly([&watermarked]() {
         EXPECT_FALSE(watermarked);
         watermarked = true;
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark())
-      .WillRepeatedly(Invoke([&watermarked]() {
+      .WillRepeatedly([&watermarked]() {
         EXPECT_TRUE(watermarked);
         watermarked = false;
-      }));
+      });
 }
 
 void HttpFilterTest::setUpEncodingWatermarking(bool& watermarked) {
   EXPECT_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
-      .WillRepeatedly(Invoke([&watermarked]() {
+      .WillRepeatedly([&watermarked]() {
         EXPECT_FALSE(watermarked);
         watermarked = true;
-      }));
+      });
   EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
-      .WillRepeatedly(Invoke([&watermarked]() {
+      .WillRepeatedly([&watermarked]() {
         EXPECT_TRUE(watermarked);
         watermarked = false;
-      }));
+      });
 }
 
 void HttpFilterTest::processRequestHeaders(
@@ -545,8 +541,8 @@ void HttpFilterTest::streamingSmallChunksWithBodyMutation(bool empty_last_chunk,
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+      .WillRepeatedly(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); });
   uint32_t chunk_number = 3;
   for (uint32_t i = 0; i < chunk_number; i++) {
     Buffer::OwnedImpl resp_data(std::to_string(i));

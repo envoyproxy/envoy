@@ -66,7 +66,7 @@ public:
 protected:
   void routeNameTest(std::string yaml, bool omit_empty);
 
-  NiceMock<MockTimeSystem> time_source_;
+  Event::SimulatedTimeSystem time_source_;
   Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
@@ -719,7 +719,7 @@ duration_filter:
   TestUtility::loadFromYaml(filter_yaml, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  NiceMock<MockTimeSystem> time_source;
+  Event::SimulatedTimeSystem time_source;
   TestStreamInfo stream_info(time_source);
 
   const Formatter::Context log_context{&request_headers};
@@ -788,7 +788,7 @@ status_code_filter:
   TestUtility::loadFromYaml(filter_yaml, config);
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 
-  NiceMock<MockTimeSystem> time_source;
+  Event::SimulatedTimeSystem time_source;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestStreamInfo info(time_source);
 

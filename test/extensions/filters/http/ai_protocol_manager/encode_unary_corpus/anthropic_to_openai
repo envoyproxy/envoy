@@ -1,0 +1,5 @@
+body: "{\"id\":\"msg_02AbCdEfGhIjKlMnOpQrStUv\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-5\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"Let me check the token budget first.\"},{\"type\":\"text\",\"text\":\"Partial summary before hitting max_tokens.\"}],\"stop_reason\":\"max_tokens\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"cache_read_input_tokens\":20,\"output_tokens\":100}}"
+fragmentation_seed: 2623536865635441631
+request_protocol: OPENAI_CHAT_COMPLETIONS
+response_protocol: ANTHROPIC_MESSAGES
+max_json_body_size: 4095

@@ -177,8 +177,8 @@ class Http2Harness {
 public:
   Http2Harness() : server_settings_(http2Settings()) {
     ON_CALL(mock_server_callbacks_, newStream(_, _))
-        .WillByDefault(Invoke(
-            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
+        .WillByDefault(
+            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; });
   }
 
   void fuzzRequest(std::vector<Http2Frame>& frames, bool use_oghttp2) {

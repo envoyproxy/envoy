@@ -25,11 +25,21 @@ impl Default for EnvoyBuffer<'_> {
   }
 }
 
-impl EnvoyBuffer<'_> {
+impl<'a> EnvoyBuffer<'a> {
   /// This is a helper function to create an [`EnvoyBuffer`] from a byte slice.
   ///
   /// This is meant for use by the end users in unit tests.
-  pub fn new(s: &[u8]) -> Self {
+  /// The returned buffer cannot outlive the slice.
+  ///
+  /// ```compile_fail,E0515
+  /// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyBuffer;
+  ///
+  /// fn dangling_buffer() -> EnvoyBuffer<'static> {
+  ///   let bytes = vec![1, 2, 3];
+  ///   EnvoyBuffer::new(&bytes)
+  /// }
+  /// ```
+  pub fn new(s: &'a [u8]) -> Self {
     Self {
       raw_ptr: s.as_ptr(),
       length: s.len(),
@@ -66,14 +76,73 @@ impl EnvoyBuffer<'_> {
   }
 }
 
+impl std::ops::Deref for EnvoyBuffer<'_> {
+  type Target = [u8];
+  fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl PartialEq for EnvoyBuffer<'_> {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for EnvoyBuffer<'_> {}
+
+impl PartialEq<[u8]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &[u8]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl PartialEq<EnvoyBuffer<'_>> for [u8] {
+  fn eq(&self, other: &EnvoyBuffer<'_>) -> bool {
+    self == other.as_slice()
+  }
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &[u8; N]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &&[u8; N]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
+impl PartialEq<&[u8]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &&[u8]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
 /// This is exactly the same as [`EnvoyBuffer`] except that it is mutable and data can be written
 /// in-place. See [`EnvoyBuffer`] for more details.
+///
+/// Mutable buffers cannot be cloned because the underlying memory must be borrowed exclusively.
+///
+/// ```compile_fail,E0599
+/// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer;
+///
+/// fn alias(mut buffer: EnvoyMutBuffer<'_>) {
+///   let mut other = buffer.clone();
+///   let first = buffer.as_mut_slice();
+///   let second = other.as_mut_slice();
+///   first[0] = 1;
+///   second[0] = 2;
+/// }
+/// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct EnvoyMutBuffer<'a> {
   raw_ptr: *mut u8,
   length: usize,
-  _marker: std::marker::PhantomData<&'a ()>,
+  _marker: std::marker::PhantomData<&'a mut [u8]>,
 }
 
 impl EnvoyMutBuffer<'_> {
@@ -143,6 +212,57 @@ impl Default for EnvoyMutBuffer<'_> {
       length: 0,
       _marker: std::marker::PhantomData,
     }
+  }
+}
+
+impl std::ops::Deref for EnvoyMutBuffer<'_> {
+  type Target = [u8];
+  fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl std::ops::DerefMut for EnvoyMutBuffer<'_> {
+  fn deref_mut(&mut self) -> &mut [u8] {
+    self.as_mut_slice()
+  }
+}
+
+impl PartialEq for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for EnvoyMutBuffer<'_> {}
+
+impl PartialEq<[u8]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &[u8]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl PartialEq<EnvoyMutBuffer<'_>> for [u8] {
+  fn eq(&self, other: &EnvoyMutBuffer<'_>) -> bool {
+    self == other.as_slice()
+  }
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &[u8; N]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &&[u8; N]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
+impl PartialEq<&[u8]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &&[u8]) -> bool {
+    self.as_slice() == *other
   }
 }
 
@@ -253,6 +373,37 @@ mod tests {
   }
 
   #[test]
+  fn test_envoy_buffer_deref_returns_underlying_bytes() {
+    let buf = EnvoyBuffer::new(b"hello");
+    assert_eq!(&*buf, b"hello");
+    assert_eq!(buf.len(), 5);
+  }
+
+  #[test]
+  fn test_envoy_buffer_deref_treats_null_as_empty() {
+    let buf = EnvoyBuffer::default();
+    assert_eq!(&*buf, b"");
+    assert!(buf.is_empty());
+  }
+
+  #[test]
+  fn test_option_envoy_buffer_as_deref() {
+    let some: Option<EnvoyBuffer> = Some(EnvoyBuffer::new(b"val"));
+    let none: Option<EnvoyBuffer> = None;
+    assert_eq!(some.as_deref(), Some(b"val".as_slice()));
+    assert_eq!(none.as_deref(), None);
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_deref_and_deref_mut() {
+    let mut data = *b"hello";
+    let mut buffer = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(&*buffer, b"hello");
+    buffer[0] = b'j';
+    assert_eq!(&*buffer, b"jello");
+  }
+
+  #[test]
   fn test_envoy_mut_buffer_round_trips_through_slices() {
     let mut data = *b"hello";
     let mut buffer = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
@@ -266,6 +417,36 @@ mod tests {
     let mut buffer = EnvoyMutBuffer::default();
     assert_eq!(buffer.as_slice(), b"");
     assert_eq!(buffer.as_mut_slice(), b"");
+  }
+
+  #[test]
+  fn test_envoy_buffer_partial_eq() {
+    let x = Vec::from(*b"same");
+    let y = Vec::from(*b"same");
+    let cases: &[(&str, EnvoyBuffer, &[u8], bool)] = &[
+      ("same content", EnvoyBuffer::new(b"hello"), b"hello", true),
+      (
+        "different content",
+        EnvoyBuffer::new(b"hello"),
+        b"world",
+        false,
+      ),
+      ("both empty", EnvoyBuffer::new(b""), b"", true),
+      ("empty vs non-empty", EnvoyBuffer::new(b""), b"a", false),
+      ("content not pointers", EnvoyBuffer::new(&x), &y, true),
+      ("null default", EnvoyBuffer::default(), b"", true),
+    ];
+    for (name, buf, expected, eq) in cases {
+      assert_eq!((*buf == *expected), *eq, "{name}");
+    }
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_partial_eq() {
+    let mut data = *b"hello";
+    let buf = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(buf, b"hello");
+    assert_ne!(buf, b"world");
   }
 
   #[test]
@@ -287,8 +468,8 @@ mod tests {
     });
     assert_eq!(total, 5);
     assert_eq!(chunks.len(), 2);
-    assert_eq!(chunks[0].as_slice(), b"ab");
-    assert_eq!(chunks[1].as_slice(), b"cde");
+    assert_eq!(chunks[0], b"ab");
+    assert_eq!(chunks[1], b"cde");
   }
 
   #[test]

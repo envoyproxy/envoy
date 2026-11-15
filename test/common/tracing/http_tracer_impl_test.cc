@@ -61,13 +61,13 @@ protected:
       }
     }
 
-    EXPECT_CALL(config, modifySpan).WillOnce(Invoke([this](Span& span, bool) {
+    EXPECT_CALL(config, modifySpan).WillOnce([this](Span& span, bool) {
       HttpTraceContext trace_context{request_headers_};
       const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
       for (const auto& [_, custom_tag] : custom_tags_) {
         custom_tag->applySpan(span, ctx);
       }
-    }));
+    });
   }
 
   NiceMock<MockSpan> span;

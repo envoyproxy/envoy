@@ -8,6 +8,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/status_utility.h"
 
 namespace Envoy {
@@ -414,13 +415,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramWithExplicitAd
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
   // Expect send to be called with the right data.
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ("response data", send_data.buffer_.toString());
-        EXPECT_EQ("192.168.1.1", send_data.peer_address_.ip()->addressAsString());
-        EXPECT_EQ(7777, send_data.peer_address_.ip()->port());
-        return Api::IoCallUint64Result(13, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ("response data", send_data.buffer_.toString());
+    EXPECT_EQ("192.168.1.1", send_data.peer_address_.ip()->addressAsString());
+    EXPECT_EQ(7777, send_data.peer_address_.ip()->port());
+    return Api::IoCallUint64Result(13, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -444,13 +444,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramToOriginalPeer
   auto mock_listener = std::make_shared<NiceMock<Network::MockUdpListener>>();
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ("echo back", send_data.buffer_.toString());
-        EXPECT_EQ("9.8.7.6", send_data.peer_address_.ip()->addressAsString());
-        EXPECT_EQ(4321, send_data.peer_address_.ip()->port());
-        return Api::IoCallUint64Result(9, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ("echo back", send_data.buffer_.toString());
+    EXPECT_EQ("9.8.7.6", send_data.peer_address_.ip()->addressAsString());
+    EXPECT_EQ(4321, send_data.peer_address_.ip()->port());
+    return Api::IoCallUint64Result(9, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -473,11 +472,10 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramEmptyData) {
   auto mock_listener = std::make_shared<NiceMock<Network::MockUdpListener>>();
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ(0, send_data.buffer_.length());
-        return Api::IoCallUint64Result(0, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ(0, send_data.buffer_.length());
+    return Api::IoCallUint64Result(0, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -560,13 +558,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramIpv6) {
   auto mock_listener = std::make_shared<NiceMock<Network::MockUdpListener>>();
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ("ipv6 data", send_data.buffer_.toString());
-        EXPECT_EQ("2001:db8::1", send_data.peer_address_.ip()->addressAsString());
-        EXPECT_EQ(9999, send_data.peer_address_.ip()->port());
-        return Api::IoCallUint64Result(9, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ("ipv6 data", send_data.buffer_.toString());
+    EXPECT_EQ("2001:db8::1", send_data.peer_address_.ip()->addressAsString());
+    EXPECT_EQ(9999, send_data.peer_address_.ip()->port());
+    return Api::IoCallUint64Result(9, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -669,6 +666,33 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, ConfigStatsOperate) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
                 config, invalid_id, 1));
+}
+
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetLoadShedPointWithoutProvider) {
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+                         filter_config_.get(), {name.data(), name.size()}));
+}
+
+TEST(DynamicModuleUdpListenerFilterConfigTest, GetLoadShedPoint) {
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  proto_config.set_filter_name("test_filter");
+  proto_config.mutable_filter_config()->set_value("some_config");
+  Stats::IsolatedStoreImpl stats;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      proto_config, std::move(dynamic_module.value()), *stats.rootScope(), overload_manager);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point,
+            envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+                filter_config.get(), {name.data(), name.size()}));
 }
 
 } // namespace DynamicModules

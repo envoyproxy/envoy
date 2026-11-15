@@ -87,7 +87,7 @@ Http::RequestTrailerMapPtr buildRequestTrailerMapFromPairs(const Pairs& pairs) {
     // the lack of an interface to add an entry with an empty value and return
     // the entry, there is no efficient way to prevent either a double copy
     // of the value or a double lookup of the entry.
-    map->addCopy(Http::LowerCaseString(std::string(p.first)), std::string(p.second));
+    map->addCopy(Http::LowerCaseString(p.first), p.second);
   }
   return map;
 }
@@ -99,7 +99,7 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
     // the lack of an interface to add an entry with an empty value and return
     // the entry, there is no efficient way to prevent either a double copy
     // of the value or a double lookup of the entry.
-    map->addCopy(Http::LowerCaseString(std::string(p.first)), std::string(p.second));
+    map->addCopy(Http::LowerCaseString(p.first), p.second);
   }
   return map;
 }
@@ -697,8 +697,8 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   if (!map) {
     return WasmResult::BadArgument;
   }
-  const Http::LowerCaseString lower_key{std::string(key)};
-  map->addCopy(lower_key, std::string(value));
+  const Http::LowerCaseString lower_key{key};
+  map->addCopy(lower_key, value);
   onHeadersModified(type);
   return WasmResult::Ok;
 }
@@ -719,7 +719,7 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, std::string_view k
     // Requested map type is not currently available.
     return WasmResult::BadArgument;
   }
-  const Http::LowerCaseString lower_key{std::string(key)};
+  const Http::LowerCaseString lower_key{key};
   const auto entry = map->get(lower_key);
   if (entry.empty()) {
     if (envoyWasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
@@ -769,8 +769,8 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     map->remove(lower_key);
   }
   for (auto& p : pairs) {
-    const Http::LowerCaseString lower_key{std::string(p.first)};
-    map->addCopy(lower_key, std::string(p.second));
+    const Http::LowerCaseString lower_key{p.first};
+    map->addCopy(lower_key, p.second);
   }
   onHeadersModified(type);
   return WasmResult::Ok;
@@ -781,7 +781,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   if (!map) {
     return WasmResult::BadArgument;
   }
-  const Http::LowerCaseString lower_key{std::string(key)};
+  const Http::LowerCaseString lower_key{key};
   map->remove(lower_key);
   onHeadersModified(type);
   return WasmResult::Ok;
@@ -793,7 +793,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   if (!map) {
     return WasmResult::BadArgument;
   }
-  const Http::LowerCaseString lower_key{std::string(key)};
+  const Http::LowerCaseString lower_key{key};
   map->setCopy(lower_key, toAbslStringView(value));
   onHeadersModified(type);
   return WasmResult::Ok;
@@ -1624,7 +1624,7 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
   // make copies of all the headers.
   std::vector<std::pair<Http::LowerCaseString, std::string>> additional_headers_copy;
   for (auto& p : additional_headers) {
-    const Http::LowerCaseString lower_key{std::string(p.first)};
+    const Http::LowerCaseString lower_key{p.first};
     additional_headers_copy.emplace_back(lower_key, std::string(p.second));
   }
 

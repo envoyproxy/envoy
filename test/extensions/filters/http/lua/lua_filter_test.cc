@@ -36,7 +36,6 @@ using testing::Eq;
 using testing::Field;
 using testing::HasSubstr;
 using testing::InSequence;
-using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::Return;
 using testing::ReturnRef;
@@ -57,12 +56,12 @@ public:
     // Avoid strict mock failures for the following calls. We want strict for other calls.
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly([this](Buffer::Instance& data, bool) {
           if (decoder_callbacks_.buffer_ == nullptr) {
             decoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }
           decoder_callbacks_.buffer_->move(data);
-        }));
+        });
 
     EXPECT_CALL(decoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
@@ -77,12 +76,12 @@ public:
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly([this](Buffer::Instance& data, bool) {
           if (encoder_callbacks_.buffer_ == nullptr) {
             encoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }
           encoder_callbacks_.buffer_->move(data);
-        }));
+        });
     EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
@@ -1209,7 +1208,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             const Http::TestRequestHeaderMapImpl expected_headers{
@@ -1226,7 +1225,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 
             callbacks = &cb;
             return &request;
-          }));
+          });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1285,12 +1284,11 @@ TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1350,12 +1348,11 @@ TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1410,20 +1407,19 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"},
+            {":method", "POST"},
+            {":authority", "foo"},
+            {"set-cookie", "flavor=chocolate; Path=/"},
+            {"set-cookie", "variant=chewy; Path=/"},
+            {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1474,20 +1470,19 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"},
+            {":method", "POST"},
+            {":authority", "foo"},
+            {"set-cookie", "flavor=chocolate; Path=/"},
+            {"set-cookie", "variant=chewy; Path=/"},
+            {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
@@ -1528,20 +1523,19 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronousInOptions) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"},
+            {":method", "POST"},
+            {":authority", "foo"},
+            {"set-cookie", "flavor=chocolate; Path=/"},
+            {"set-cookie", "variant=chewy; Path=/"},
+            {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
@@ -1600,17 +1594,14 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{{":path", "/"},
-                                                                  {":method", "POST"},
-                                                                  {":authority", "foo"},
-                                                                  {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"}, {":method", "POST"}, {":authority", "foo"}, {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1621,15 +1612,14 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster2")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", ":status 200"},
                                  {"trace", "response"},
@@ -1689,7 +1679,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             // We are actively deferring to the parent span's sampled state.
@@ -1699,7 +1689,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
             EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
             callbacks = &cb;
             return &request;
-          }));
+          });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1786,12 +1776,11 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1836,12 +1825,11 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1883,12 +1871,11 @@ TEST_F(LuaHttpFilterTest, HttpCallReset) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1928,14 +1915,13 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
-            // Intentionally return nullptr (instead of request handle) to trigger a particular
-            // code path.
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
+        // Intentionally return nullptr (instead of request handle) to trigger a particular
+        // code path.
+        return nullptr;
+      });
 
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", ":status 503"},
@@ -2052,7 +2038,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_EQ(options.timeout->count(), 5000);
@@ -2060,7 +2046,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
             EXPECT_EQ(options.send_xff, false);
             callbacks = &cb;
             return &request;
-          }));
+          });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -2208,17 +2194,17 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     Http::TestResponseHeaderMapImpl immediate_response_headers;
     EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
-        .WillOnce(Invoke([&immediate_response_headers](
-                             Http::Code code, absl::string_view body,
-                             std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                             const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                             absl::string_view details) {
+        .WillOnce([&immediate_response_headers](
+                      Http::Code code, absl::string_view body,
+                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) {
           EXPECT_EQ(Http::Code::ServiceUnavailable, code);
           EXPECT_EQ("nope", body);
           EXPECT_EQ(grpc_status, std::nullopt);
           EXPECT_EQ(details, "lua_response");
           modify_headers(immediate_response_headers);
-        }));
+        });
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, false));
     filter_->onDestroy();
@@ -2257,17 +2243,17 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&immediate_response_headers](
+                    Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::ServiceUnavailable, code);
         EXPECT_EQ("nope", body);
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "lua_response");
         modify_headers(immediate_response_headers);
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_TRUE(immediate_response_headers.has("fake"));

@@ -174,12 +174,12 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
   Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
+  });
 
   for (int i = 0; i <= 65; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -195,12 +195,12 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
+  });
   for (int i = 66; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr).host;
@@ -217,12 +217,12 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   // Cluster 2:
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
+  });
 
   for (int i = 0; i <= 57; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -230,12 +230,12 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
+  });
   for (int i = 58; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr).host;
@@ -260,12 +260,12 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   // Cluster 2:
   //     Priority 0: 0%
   //     Priority 1: 0%
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
+  });
 
   // Choose the first cluster as the second one is unavailable.
   for (int i = 0; i < 50; ++i) {
@@ -274,12 +274,12 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
+  });
 
   // Choose the second cluster as the first one is unavailable.
   for (int i = 50; i < 100; ++i) {
@@ -304,12 +304,12 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   //     Priority 0: 20%
   //     Priority 1: 20%
   // All priorities are in panic mode. Traffic will be distributed evenly among four priorities.
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
+  });
 
   for (int i = 0; i < 50; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -317,12 +317,12 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
+  });
 
   for (int i = 50; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -341,12 +341,12 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   // Cluster 2:
   //     Priority 0: 10%
   //     Priority 0: 50%
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
+  });
 
   for (int i = 0; i <= 25; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -354,12 +354,12 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([] {
     return Upstream::HostSelectionResponse{nullptr};
-  }));
-  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  });
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
+  });
 
   for (int i = 26; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -400,9 +400,9 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
   // Validate that lb_context->determinePriorityLoad() is called and that the mapping function
   // passed in works correctly.
   EXPECT_CALL(lb_context, determinePriorityLoad(_, _, _))
-      .WillOnce(Invoke([&](const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
-                           const Upstream::RetryPriority::PriorityMappingFunc& mapping_func)
-                           -> const Upstream::HealthyAndDegradedLoad& {
+      .WillOnce([&](const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
+                    const Upstream::RetryPriority::PriorityMappingFunc& mapping_func)
+                    -> const Upstream::HealthyAndDegradedLoad& {
         // This one isn't part of the mapping due to an invalid priority.
         EXPECT_FALSE(mapping_func(*host).has_value());
 
@@ -418,13 +418,13 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
         EXPECT_EQ(mapping_func(host_from_priority(secondary_ps_, 1)), std::optional<uint32_t>(3));
 
         return secondary_priority_1;
-      }));
+      });
 
   // Validate that the AggregateLoadBalancerContext is initialized with the weights from
   // lb_context->determinePriorityLoad().
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_))
-      .WillOnce(Invoke([this, &host](
-                           Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+      .WillOnce([this,
+                 &host](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         const Upstream::HealthyAndDegradedLoad& adjusted_load = context->determinePriorityLoad(
             secondary_ps_, {Upstream::HealthyLoad({100, 0}), Upstream::DegradedLoad()}, nullptr);
 
@@ -433,7 +433,7 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
         EXPECT_EQ(adjusted_load.healthy_priority_load_.get().at(1), 100);
 
         return host;
-      }));
+      });
 
   lb_->chooseHost(&lb_context);
 }
@@ -450,9 +450,9 @@ TEST_F(AggregateClusterTest, LoadBalancerFactoryOutlivesCluster) {
   ASSERT_NE(nullptr, lb_);
 
   Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
-  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Invoke([host] {
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly([host] {
     return Upstream::HostSelectionResponse{host};
-  }));
+  });
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
   EXPECT_EQ(host.get(), lb_->chooseHost(nullptr).host.get());
 }

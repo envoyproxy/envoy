@@ -17,7 +17,6 @@ using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::_;
 using testing::DoAll;
 using testing::Eq;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -119,9 +118,9 @@ public:
         {":method", "GET"},
         {"Accept", "application/json"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, document = std::move(document)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!document.empty()) {
               receiver.onMetadataSuccess(std::move(document));
@@ -138,7 +137,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -660,12 +659,12 @@ TEST_F(WebIdentityCredentialsProviderTest, TokenFileWatcherRefresh) {
   Filesystem::Watcher::OnChangedCb watcher_callback;
   EXPECT_CALL(context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
-  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([&] {
     Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
     EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
         .WillOnce(DoAll(SaveArg<2>(&watcher_callback), Return(absl::OkStatus())));
     return mock_watcher;
-  }));
+  });
 
   Http::TestRequestHeaderMapImpl headers{
       {":path", "/?Action=AssumeRoleWithWebIdentity&Version=2011-06-15&RoleSessionName=role-"
@@ -685,7 +684,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TokenFileWatcherRefresh) {
       {"Accept", "application/json"}};
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(R"EOF(
 {
@@ -701,10 +700,10 @@ TEST_F(WebIdentityCredentialsProviderTest, TokenFileWatcherRefresh) {
   }
 }
 )EOF"));
-          }));
+          });
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(new_headers), _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(R"EOF(
 {
@@ -720,7 +719,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TokenFileWatcherRefresh) {
   }
 }
 )EOF"));
-          }));
+          });
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
       context_, mock_manager_, "credentials_provider_cluster",

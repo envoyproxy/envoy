@@ -1,9 +1,16 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <tuple>
+
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/header_validator.h"
 
 #include "source/extensions/http/header_validators/envoy_default/config_overrides.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {

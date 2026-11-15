@@ -42,14 +42,13 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "http_callouts" => Some(Box::new(HttpCalloutsFilterConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
+    "load_shed_point" => Some(Box::new(LoadShedPointFilterConfig {
+      load_shed_point: envoy_filter_config
+        .get_load_shed_point(std::str::from_utf8(config).unwrap()),
+    })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "span_across_callbacks" => Some(Box::new(SpanAcrossCallbacksConfig {})),
-    "early_response_during_upload" => Some(Box::new(EarlyResponseDuringUploadConfig {
-      response_pause_total: envoy_filter_config
-        .define_counter("response_pause_total")
-        .unwrap(),
-    })),
     "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
     "stats_callbacks" => {
       let config = String::from_utf8(config.to_owned()).unwrap();
@@ -1118,6 +1117,50 @@ impl Drop for BodyCallbacksFilter {
   }
 }
 
+/// Creates filters that send a local reply when the load shed point named in the filter config
+/// sheds the request. Otherwise the filters tell the upstream in a request header whether they got
+/// the load shed point.
+struct LoadShedPointFilterConfig {
+  load_shed_point: Option<Box<dyn EnvoyLoadShedPoint>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LoadShedPointFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LoadShedPointFilter {
+      has_load_shed_point: self.load_shed_point.is_some(),
+      shed_load: self
+        .load_shed_point
+        .as_ref()
+        .is_some_and(|load_shed_point| load_shed_point.should_shed_load()),
+    })
+  }
+}
+
+struct LoadShedPointFilter {
+  has_load_shed_point: bool,
+  shed_load: bool,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LoadShedPointFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if !self.shed_load {
+      let presence: &[u8] = if self.has_load_shed_point {
+        b"present"
+      } else {
+        b"absent"
+      };
+      envoy_filter.set_request_header("x-load-shed-point", presence);
+      return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
+    }
+    envoy_filter.send_response(503, &[], Some(b"shed"), None);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
 struct SendResponseHttpFilterConfig {
   f: SendResponseHttpFilter,
 }
@@ -1403,65 +1446,6 @@ impl Drop for SpanAcrossCallbacksFilter {
   fn drop(&mut self) {
     if let Some(thread) = self.thread_handle.borrow_mut().take() {
       thread.join().expect("Failed to join thread");
-    }
-  }
-}
-
-const EVENT_RESUME_ENCODING: u64 = 1;
-
-struct EarlyResponseDuringUploadConfig {
-  response_pause_total: EnvoyCounterId,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for EarlyResponseDuringUploadConfig {
-  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(EarlyResponseDuringUploadFilter {
-      response_pause_total: self.response_pause_total,
-      resume_scheduled: Cell::new(false),
-    })
-  }
-}
-
-/// Reproduces the early-response-during-upload wedge. The upstream response is held at
-/// on_response_headers while the client keeps uploading. A request body chunk then continues the
-/// decode direction, after which the held response is resumed from on_scheduled via
-/// continue_encoding. A single shared continue flag let the decode-side continue suppress that
-/// resume and wedge the held response.
-struct EarlyResponseDuringUploadFilter {
-  response_pause_total: EnvoyCounterId,
-  resume_scheduled: Cell<bool>,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for EarlyResponseDuringUploadFilter {
-  fn on_request_body(
-    &self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
-    // Post the resume instead of calling it inline so it runs after this body returns Continue and
-    // the decode direction is marked continued. An inline resume would not reproduce the wedge.
-    if !self.resume_scheduled.get() {
-      self.resume_scheduled.set(true);
-      envoy_filter.new_scheduler().commit(EVENT_RESUME_ENCODING);
-    }
-    envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
-  }
-
-  fn on_response_headers(
-    &self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    // Hold the response so the test can interleave a request body continue before it is resumed.
-    envoy_filter
-      .increment_counter(self.response_pause_total, 1)
-      .unwrap();
-    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
-  }
-
-  fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
-    if event_id == EVENT_RESUME_ENCODING {
-      envoy_filter.continue_encoding();
     }
   }
 }

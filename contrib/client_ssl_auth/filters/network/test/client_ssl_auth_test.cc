@@ -23,7 +23,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -97,12 +96,11 @@ ip_white_list:
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              callbacks_ = &callbacks;
-              return &request_;
-            }));
+        .WillOnce([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                         const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callbacks_ = &callbacks;
+          return &request_;
+        });
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -261,17 +259,16 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(
-                request_,
-                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-            // Intentionally return nullptr (instead of request handle) to trigger a particular
-            // code path.
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onSuccess(
+            request_,
+            Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+        // Intentionally return nullptr (instead of request handle) to trigger a particular
+        // code path.
+        return nullptr;
+      });
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   interval_timer_->invokeCallback();
 

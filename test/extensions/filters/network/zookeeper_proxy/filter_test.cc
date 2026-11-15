@@ -587,10 +587,10 @@ public:
     auto& call = EXPECT_CALL(stream_info_, setDynamicMetadata(_, _));
 
     for (const auto& value : values) {
-      call.WillOnce(Invoke([value](const std::string& key, const Protobuf::Struct& obj) -> void {
+      call.WillOnce([value](const std::string& key, const Protobuf::Struct& obj) -> void {
         EXPECT_STREQ(key.c_str(), "envoy.filters.network.zookeeper_proxy");
         protoMapEq(obj, value);
-      }));
+      });
     }
   }
 

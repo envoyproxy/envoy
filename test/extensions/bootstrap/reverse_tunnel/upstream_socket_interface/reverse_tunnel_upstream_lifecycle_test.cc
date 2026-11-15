@@ -26,7 +26,6 @@
 
 using testing::_;
 using testing::Contains;
-using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
@@ -64,8 +63,7 @@ protected:
     ASSERT_NE(registered_acceptor, nullptr);
     registered_acceptor->extension_ = extension_.get();
 
-    thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
     socket_manager_ = thread_local_registry_->socketManager();
     ASSERT_NE(socket_manager_, nullptr);
 
@@ -79,8 +77,14 @@ protected:
     EXPECT_CALL(callbacks_.connection_, streamInfo())
         .WillRepeatedly(ReturnRef(callbacks_.connection_.stream_info_));
     EXPECT_CALL(callbacks_.connection_, localCloseReason())
-        .WillRepeatedly(Invoke(
-            [this]() -> absl::string_view { return callbacks_.connection_.local_close_reason_; }));
+        .WillRepeatedly(
+            [this]() -> absl::string_view { return callbacks_.connection_.local_close_reason_; });
+  }
+
+  void TearDown() override {
+    thread_local_.shutdownThread();
+    thread_local_registry_.reset();
+    extension_.reset();
   }
 
   Network::ConnectionSocketPtr createMockSocket(int fd = 123,
@@ -169,9 +173,9 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
       std::string(StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo&) {
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo&) {
         EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-      }));
+      });
 
   filter.onEvent(Network::ConnectionEvent::LocalClose);
   filter.onEvent(Network::ConnectionEvent::LocalClose);
@@ -182,6 +186,37 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
 
   // Clear access logs before teardown so the destructor-emitted tunnel_closed
   // close log does not trigger an unexpected extra mock call.
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
+       ConnectionLifecycleLogSkippedWhenThreadLocalShutdown) {
+  const int fd = 321;
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket("node-c", "cluster-c", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-c",
+                                       /*initiator_worker_id=*/"worker_5",
+                                       /*initiator_connection_id=*/"42");
+  handed_off_socket_ = socket_manager_->getConnectionSocket("node-c");
+  ASSERT_NE(handed_off_socket_, nullptr);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket()).WillRepeatedly(ReturnRef(handed_off_socket_));
+  EXPECT_CALL(callbacks_.connection_, addConnectionCallbacks(_));
+
+  ReverseTunnelUpstreamLifecycleFilter filter;
+  filter.initializeReadFilterCallbacks(callbacks_);
+  EXPECT_EQ(filter.onNewConnection(), Network::FilterStatus::Continue);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+  callbacks_.connection_.local_close_reason_ =
+      std::string(StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+
+  thread_local_.shutdownGlobalThreading();
+
+  EXPECT_CALL(*access_log, log(_, _)).Times(0);
+  filter.onEvent(Network::ConnectionEvent::LocalClose);
+
   extension_->setTestOnlyAccessLogs({});
 }
 
@@ -208,21 +243,19 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
 
   testing::InSequence sequence;
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-            ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
-            EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
-                      StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
-          }));
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+        ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+        EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
+                  StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+      });
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-            ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
-            EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
-                      StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
-          }));
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+        ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+        EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
+                  StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+      });
 
   socket_manager_->markSocketDead(fd);
   filter.onEvent(Network::ConnectionEvent::LocalClose);
@@ -250,8 +283,7 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   extension_->setTestOnlyAccessLogs({access_log});
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context& context,
-                           const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = stream_info.dynamicMetadata().filter_metadata().at(
             std::string(kAccessLogMetadataNamespace));
         EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
@@ -263,7 +295,7 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
         ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
         EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
                   std::string(kLifecycleCloseReasonRemoteClose));
-      }));
+      });
 
   socket_manager_->markSocketDead(fd);
   filter.onEvent(Network::ConnectionEvent::RemoteClose);
@@ -292,20 +324,19 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   callbacks_.connection_.local_close_reason_.clear();
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = stream_info.dynamicMetadata().filter_metadata().at(
-                std::string(kAccessLogMetadataNamespace));
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-            EXPECT_THAT(
-                metadata.fields(),
-                IsSupersetOf(StructMatchers(
-                    IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
-                    IsStructString("close_reason", std::string(kLifecycleCloseReasonLocalClose)))));
-            ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
-            EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
-                      std::string(kLifecycleCloseReasonLocalClose));
-          }));
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = stream_info.dynamicMetadata().filter_metadata().at(
+            std::string(kAccessLogMetadataNamespace));
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+        EXPECT_THAT(
+            metadata.fields(),
+            IsSupersetOf(StructMatchers(
+                IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                IsStructString("close_reason", std::string(kLifecycleCloseReasonLocalClose)))));
+        ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+        EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
+                  std::string(kLifecycleCloseReasonLocalClose));
+      });
 
   socket_manager_->markSocketDead(fd);
   filter.onEvent(Network::ConnectionEvent::LocalClose);

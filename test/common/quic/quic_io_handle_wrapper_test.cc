@@ -67,35 +67,34 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   wrapper_->domain();
 
   EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
-      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+      .WillOnce([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
         addr->sa_family = AF_INET6;
         *addrlen = sizeof(sockaddr_in6);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   addr = *wrapper_->localAddress();
 
   EXPECT_CALL(os_sys_calls_, getpeername(_, _, _))
-      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+      .WillOnce([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
         addr->sa_family = AF_INET6;
         *addrlen = sizeof(sockaddr_in6);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   addr = *wrapper_->peerAddress();
 
   Network::IoHandle::RecvMsgOutput output(1, nullptr);
-  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, MSG_TRUNC))
-      .WillOnce(Invoke([](os_fd_t, msghdr* msg, int) {
-        sockaddr_storage ss;
-        auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
-        memset(ipv6_addr, 0, sizeof(sockaddr_in6));
-        ipv6_addr->sin6_family = AF_INET6;
-        ipv6_addr->sin6_addr = in6addr_loopback;
-        ipv6_addr->sin6_port = htons(54321);
-        *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
-        msg->msg_namelen = sizeof(sockaddr_in6);
-        msg->msg_controllen = 0;
-        return Api::SysCallSizeResult{5u, 0};
-      }));
+  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, MSG_TRUNC)).WillOnce([](os_fd_t, msghdr* msg, int) {
+    sockaddr_storage ss;
+    auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+    memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+    ipv6_addr->sin6_family = AF_INET6;
+    ipv6_addr->sin6_addr = in6addr_loopback;
+    ipv6_addr->sin6_port = htons(54321);
+    *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
+    msg->msg_namelen = sizeof(sockaddr_in6);
+    msg->msg_controllen = 0;
+    return Api::SysCallSizeResult{5u, 0};
+  });
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, {}, output);
 
   size_t num_packet_per_call = 1u;
@@ -103,9 +102,9 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   RawSliceArrays slices(num_packet_per_call,
                         absl::FixedArray<Buffer::RawSlice>({Buffer::RawSlice{data, 5}}));
   EXPECT_CALL(os_sys_calls_, recvmmsg(fd, _, num_packet_per_call, _, nullptr))
-      .WillOnce(Invoke([](os_fd_t, struct mmsghdr*, unsigned int, int, struct timespec*) {
+      .WillOnce([](os_fd_t, struct mmsghdr*, unsigned int, int, struct timespec*) {
         return Api::SysCallIntResult{-1, SOCKET_ERROR_AGAIN};
-      }));
+      });
   wrapper_->recvmmsg(slices, /*self_port=*/12345, {}, output2);
 
   EXPECT_TRUE(wrapper_->close().ok());

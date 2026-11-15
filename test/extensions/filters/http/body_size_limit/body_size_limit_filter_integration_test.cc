@@ -76,6 +76,10 @@ TEST_P(BodySizeLimitIntegrationTest, RouterRequestSizeLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  if (testing_downstream_filter_) {
+    test_server_->waitForCounter("http.config_test.body_size_limit.rq_body_too_large",
+                                 testing::Eq(1));
+  }
   cleanupUpstreamAndDownstream();
 }
 
@@ -106,6 +110,10 @@ TEST_P(BodySizeLimitIntegrationTest, RouterHeaderRequestSizeLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  if (testing_downstream_filter_) {
+    test_server_->waitForCounter("http.config_test.body_size_limit.rq_content_length_too_large",
+                                 testing::Eq(1));
+  }
   cleanupUpstreamAndDownstream();
 }
 

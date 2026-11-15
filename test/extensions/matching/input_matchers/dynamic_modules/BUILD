@@ -26,6 +26,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     extension_names = ["envoy.matching.matchers.dynamic_modules"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/registry",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -70,6 +71,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
     ],
     extension_names = ["envoy.matching.matchers.dynamic_modules"],
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/matching/http/dynamic_modules:data_input_lib",
         "//source/extensions/matching/input_matchers/dynamic_modules:config",

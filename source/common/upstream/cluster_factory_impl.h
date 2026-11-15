@@ -16,6 +16,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/dns_resolver.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/options.h"
@@ -39,6 +40,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/cluster_dns_resolver_cache.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
@@ -54,8 +56,10 @@ public:
 
   ClusterFactoryContextImpl(Server::Configuration::ServerFactoryContext& server_context,
                             LazyCreateDnsResolver dns_resolver_fn,
-                            Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api)
+                            Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+                            OptRef<ClusterDnsResolverCache> dns_resolver_cache = {})
       : server_context_(server_context), dns_resolver_fn_(dns_resolver_fn),
+        dns_resolver_cache_(dns_resolver_cache),
         outlier_event_logger_(std::move(outlier_event_logger)),
         validation_visitor_(
             added_via_api ? server_context.messageValidationContext().dynamicValidationVisitor()
@@ -75,6 +79,24 @@ public:
     }
     return dns_resolver_;
   }
+  // Sharing is limited to the c-ares resolver, where the query cache is the reason for sharing
+  // among clusters; see ClusterDnsResolverCache. Clusters that end up on the same c-ares resolver
+  // share more than its query cache: anything scoped to the channel rather than to a single query
+  // is common to all of them, including the ``udp_max_queries`` budget and channel reinitialization
+  // triggered by a query timeout.
+  absl::StatusOr<Network::DnsResolverSharedPtr> sharedDnsResolver(
+      Network::DnsResolverFactory& dns_resolver_factory,
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
+    // The cache is absent when a cluster is created outside the cluster manager, e.g. in tests.
+    // In that case each cluster simply gets its own resolver.
+    if (!dns_resolver_cache_.has_value()) {
+      return dns_resolver_factory.createDnsResolver(
+          server_context_.mainThreadDispatcher(), server_context_.api(), typed_dns_resolver_config);
+    }
+    return dns_resolver_cache_->getOrCreate(dns_resolver_factory,
+                                            server_context_.mainThreadDispatcher(),
+                                            server_context_.api(), typed_dns_resolver_config);
+  }
   Outlier::EventLoggerSharedPtr outlierEventLogger() override { return outlier_event_logger_; }
   bool addedViaApi() override { return added_via_api_; }
 
@@ -82,6 +104,7 @@ private:
   Server::Configuration::ServerFactoryContext& server_context_;
   Network::DnsResolverSharedPtr dns_resolver_;
   LazyCreateDnsResolver dns_resolver_fn_;
+  OptRef<ClusterDnsResolverCache> dns_resolver_cache_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool added_via_api_;
@@ -102,7 +125,7 @@ public:
   create(const envoy::config::cluster::v3::Cluster& cluster,
          Server::Configuration::ServerFactoryContext& server_context,
          LazyCreateDnsResolver dns_resolver_fn, Outlier::EventLoggerSharedPtr outlier_event_logger,
-         bool added_via_api);
+         bool added_via_api, OptRef<ClusterDnsResolverCache> dns_resolver_cache = {});
 
   /**
    * Create a dns resolver to be used by the cluster.
