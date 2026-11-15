@@ -1250,6 +1250,43 @@ TEST_P(StatsThreadLocalStoreTagExtractionTest, MatcherRejectsBeforeAllocatorLook
   EXPECT_EQ(3, producer_->calls_);
 }
 
+TEST_P(StatsThreadLocalStoreTagExtractionTest, CounterLimitRejectsExistingAllocatorName) {
+  auto first = store_->createScope("scope.");
+  Counter& existing = first->counterFromString("existing");
+  existing.add(7);
+  auto limited = store_->createScope("scope.", true, {1, {}, {}});
+  Counter& admitted = limited->counterFromString("admitted");
+  admitted.inc();
+  ASSERT_EQ("scope.existing", existing.name());
+  ASSERT_EQ("scope.admitted", admitted.name());
+  ASSERT_EQ(2, producer_->calls_);
+  const auto overflow = TestUtility::findCounter(*store_, "server.stats_overflow.counter");
+  ASSERT_NE(nullptr, overflow.get());
+  const uint64_t initial_overflow = overflow->value();
+  const size_t initial_counters = store_->counters().size();
+
+  for (uint64_t i = 1; i <= 2; ++i) {
+    Counter& rejected = limited->counterFromString("existing");
+    EXPECT_EQ(&store_->nullCounter(), &rejected);
+    EXPECT_TRUE(rejected.name().empty());
+    EXPECT_EQ(initial_overflow + i, overflow->value());
+    EXPECT_FALSE(limited->findCounter(existing.statName()));
+    EXPECT_EQ(initial_counters, store_->counters().size());
+    size_t scope_counters = 0;
+    limited->iterate(IterateFn<Counter>([&](const CounterSharedPtr& counter) {
+      EXPECT_EQ(&admitted, counter.get());
+      ++scope_counters;
+      return true;
+    }));
+    EXPECT_EQ(1, scope_counters);
+    EXPECT_EQ(&admitted, &limited->counterFromString("admitted"));
+    EXPECT_EQ(1, admitted.value());
+    EXPECT_EQ(&existing, &first->counterFromString("existing"));
+    EXPECT_EQ(7, existing.value());
+    EXPECT_EQ(2, producer_->calls_);
+  }
+}
+
 TEST_F(StatsThreadLocalStoreTest, DeletedStatsExtractTagsAgain) {
   auto producer = std::make_unique<CountingTagProducer>();
   const auto& counting = *producer;

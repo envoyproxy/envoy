@@ -24,6 +24,13 @@ public:
   Allocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   virtual ~Allocator();
 
+  /**
+   * Finds an existing stat by its full name without creating one. Stats marked for deletion are
+   * skipped. These take the allocator's lock, so never call them from a forEach functor or a sink
+   * predicate.
+   * @param name the full name of the stat.
+   * @return a shared pointer to the stat, or nullptr when no stat of that type has this name.
+   */
   CounterSharedPtr findCounter(StatName name) const;
   GaugeSharedPtr findGauge(StatName name) const;
   TextReadoutSharedPtr findTextReadout(StatName name) const;

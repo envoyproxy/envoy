@@ -648,22 +648,29 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
         parent_.counters_overflow_->inc();
         return null_stat;
       }
-      stat = parent_.alloc_.findCounter(full_stat_name);
+      if (!stat_name_tags.has_value()) {
+        stat = parent_.alloc_.findCounter(full_stat_name);
+      }
     } else if constexpr (std::is_same_v<StatType, Gauge>) {
       if (limits_.max_gauges.has_value() &&
           central_cache_map.size() >= limits_.max_gauges.value()) {
         parent_.gauges_overflow_->inc();
         return null_stat;
       }
-      stat = parent_.alloc_.findGauge(full_stat_name);
+      if (!stat_name_tags.has_value()) {
+        stat = parent_.alloc_.findGauge(full_stat_name);
+      }
     } else {
       // TextReadouts are currently not limited, but we must ensure they are the only
       // other type being handled. This static_assert will trigger a compilation error
       // if a new StatType is introduced in the future, forcing the developer to
       // explicitly decide how to handle its limits.
       static_assert(std::is_same_v<StatType, TextReadout>, "Unexpected StatType");
-      stat = parent_.alloc_.findTextReadout(full_stat_name);
+      if (!stat_name_tags.has_value()) {
+        stat = parent_.alloc_.findTextReadout(full_stat_name);
+      }
     }
+    // The allocator keeps the tags a stat was created with, so extract only for a name it lacks.
     if (stat == nullptr) {
       StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
       stat = make_stat(parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(),
