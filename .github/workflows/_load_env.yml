@@ -59,18 +59,18 @@ jobs:
       request: ${{ steps.env.outputs.data }}
       trusted: true
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
+    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
+    - uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: checkout
       name: Checkout Envoy repository
     - name: Generate environment variables
-      uses: envoyproxy/toolshed/actions/envoy/ci/env@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
+      uses: envoyproxy/toolshed/actions/envoy/ci/env@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: env
       with:
         branch-name: ${{ inputs.branch-name }}
@@ -82,7 +82,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
+      uses: envoyproxy/toolshed/actions/github/env/summary@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
