@@ -8,6 +8,10 @@ on:
     secrets:
       dockerhub-token:
     inputs:
+      # The run the verified artifacts are downloaded from, when it is not this one.
+      downloads-run-id:
+        type: string
+        default:
       request:
         type: string
         required: true
@@ -42,6 +46,7 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
+      downloads-run-id: ${{ inputs.downloads-run-id }}
       request: ${{ inputs.request }}
       steps-pre: ${{ matrix.steps-pre }}
       source: ${{ matrix.source }}
@@ -94,6 +99,7 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
+      downloads-run-id: ${{ inputs.downloads-run-id }}
       request: ${{ inputs.request }}
       steps-pre: ${{ matrix.steps-pre }}
       source: ${{ matrix.source }}
@@ -112,7 +118,7 @@ jobs:
             export NO_BUILD_SETUP=1
           steps-pre: |
             - id: version-support
-              uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+              uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
               with:
                 input: |
                   version_major: ${{ fromJSON(inputs.request).request.version.major }}
@@ -156,6 +162,7 @@ jobs:
       downloads: |
         release.signed: container/release.signed
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
+      downloads-run-id: ${{ inputs.downloads-run-id }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on }}
       source: |

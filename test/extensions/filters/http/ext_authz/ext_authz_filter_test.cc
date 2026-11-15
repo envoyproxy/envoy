@@ -46,6 +46,7 @@ using testing::Contains;
 using testing::InSequence;
 using testing::Key;
 using testing::Not;
+using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -4153,10 +4154,12 @@ TEST_F(HttpFilterTest, CreatePerRouteGrpcClientWithServerContext) {
   auto test_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
   test_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
-  // Mock cluster manager to return a client.
+  // Mock cluster manager to return a client. The filter looks the client up with the key that the
+  // per-route config built.
   auto mock_async_client = std::make_shared<Grpc::MockAsyncClient>();
-  EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-              getOrCreateRawAsyncClientWithHashKey(_, _, _))
+  EXPECT_CALL(
+      factory_context_.cluster_manager_.async_client_manager_,
+      getOrCreateRawAsyncClientWithHashKey(Ref(*per_route_filter_config.grpcService()), _, true))
       .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_async_client)));
 
   // Expect the check call on the newly created gRPC client.

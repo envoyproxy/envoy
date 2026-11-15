@@ -1207,6 +1207,7 @@ envoy_cc_test(
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_encode_metadata_filter_lib",
         "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:assert_non_reentrant_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
@@ -2391,7 +2392,6 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "sds_dynamic_integration_test",
-    size = "large",
     srcs = [
         "sds_dynamic_integration_test.cc",
     ],
@@ -3154,6 +3154,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

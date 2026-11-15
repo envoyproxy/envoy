@@ -94,6 +94,11 @@ on:
         type: boolean
       downloads:
         type: string
+      # Fetch `downloads` from this run (eg the run that triggered this one) rather than the
+      # current one.
+      downloads-run-id:
+        type: string
+        default:
       entrypoint:
         type: string
         default:
@@ -153,7 +158,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/actions/envoy/run/summary@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+          - uses: envoyproxy/toolshed/actions/envoy/run/summary@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -220,7 +225,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: started
       name: Create timestamp
       with:
@@ -228,7 +233,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       name: Context
       id: context
       with:
@@ -261,14 +266,14 @@ jobs:
         fi
         echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
-    - uses: envoyproxy/toolshed/actions/github/remnt@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/github/remnt@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/actions/bind-mounts@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/bind-mounts@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/diskspace@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -276,7 +281,7 @@ jobs:
         mount
         df -h
 
-    - uses: envoyproxy/toolshed/actions/bson@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/bson@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       name: Configure Docker
       if: runner.os == 'Linux'
       with:
@@ -291,7 +296,7 @@ jobs:
             else . end
           | "${{ inputs.template-docker-configure }}"
 
-    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -302,7 +307,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -345,7 +350,7 @@ jobs:
               || 'origin' }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -356,7 +361,7 @@ jobs:
     - name: Stage signing key material
       id: signing
       if: ${{ inputs.signing }}
-      uses: envoyproxy/toolshed/actions/gpg/write@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/gpg/write@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
@@ -392,7 +397,7 @@ jobs:
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/github/run@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -403,6 +408,7 @@ jobs:
         container-output: ${{ inputs.container-output }}
         context: ${{ steps.context.outputs.value }}
         downloads: ${{ inputs.downloads }}
+        downloads-run-id: ${{ inputs.downloads-run-id }}
         entrypoint: ${{ inputs.entrypoint }}
         error-match: ${{ inputs.error-match }}
         fail-match: ${{ inputs.fail-match }}

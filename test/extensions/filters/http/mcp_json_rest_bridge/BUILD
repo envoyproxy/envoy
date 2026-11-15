@@ -78,6 +78,7 @@ envoy_extension_cc_test(
         "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
     },
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/integration:fake_access_log_lib",

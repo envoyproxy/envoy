@@ -55,11 +55,11 @@ jobs:
       contents: read
       packages: read
     steps:
-    - uses: envoyproxy/toolshed/actions/diskspace@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/diskspace@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: inputs.dev && inputs.target-branch == 'main'
-      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         input-format: yaml
         filter: >-
@@ -130,7 +130,7 @@ jobs:
             - tools-dev-${{ github.sha }}
 
     - name: Generate manifest configuration (release)
-      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: release-config
       if: >-
         ! inputs.dev
@@ -214,7 +214,7 @@ jobs:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
 
     - name: Collect and push OCI artifacts
-      uses: envoyproxy/toolshed/actions/oci/collector@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/oci/collector@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         artifacts-pattern: oci.*
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}
