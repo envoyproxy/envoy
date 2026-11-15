@@ -940,33 +940,43 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
                                                effectiveMatcher())) {
     return parent_.null_histogram_;
   } else {
-    StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), joiner.effectiveTags());
-
-    ConstSupportedBuckets* buckets = nullptr;
-    const auto string_stat_name = symbolTable().toString(final_stat_name);
-    buckets = &parent_.histogram_settings_->buckets(string_stat_name);
-    const auto bins = parent_.histogram_settings_->bins(string_stat_name);
-
     RefcountPtr<ParentHistogramImpl> stat;
-    {
+    if (!joiner.effectiveTags().has_value()) {
       Thread::LockGuard lock(parent_.hist_mutex_);
       auto iter = parent_.histogram_set_.find(final_stat_name);
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
-      } else {
-        if (limits_.max_histograms.has_value() &&
-            central_cache->histograms_.size() >= limits_.max_histograms.value()) {
-          parent_.histograms_overflow_->inc();
-          return parent_.null_histogram_;
-        }
-        stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
-                                       tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-                                       *buckets, bins, parent_.next_histogram_id_++);
-        if (!parent_.shutting_down_) {
-          parent_.histogram_set_.insert(stat.get());
-          if (parent_.sink_predicates_.has_value() &&
-              parent_.sink_predicates_->includeHistogram(*stat)) {
-            parent_.sinked_histograms_.insert(stat.get());
+      }
+    }
+    if (stat == nullptr) {
+      StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), joiner.effectiveTags());
+
+      ConstSupportedBuckets* buckets = nullptr;
+      const auto string_stat_name = symbolTable().toString(final_stat_name);
+      buckets = &parent_.histogram_settings_->buckets(string_stat_name);
+      const auto bins = parent_.histogram_settings_->bins(string_stat_name);
+
+      {
+        Thread::LockGuard lock(parent_.hist_mutex_);
+        // Supplied tags bypass the earlier probe, so check the registry here too.
+        auto iter = parent_.histogram_set_.find(final_stat_name);
+        if (iter != parent_.histogram_set_.end()) {
+          stat = RefcountPtr<ParentHistogramImpl>(*iter);
+        } else {
+          if (limits_.max_histograms.has_value() &&
+              central_cache->histograms_.size() >= limits_.max_histograms.value()) {
+            parent_.histograms_overflow_->inc();
+            return parent_.null_histogram_;
+          }
+          stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
+                                         tag_helper.tagExtractedName(), tag_helper.statNameTags(),
+                                         *buckets, bins, parent_.next_histogram_id_++);
+          if (!parent_.shutting_down_) {
+            parent_.histogram_set_.insert(stat.get());
+            if (parent_.sink_predicates_.has_value() &&
+                parent_.sink_predicates_->includeHistogram(*stat)) {
+              parent_.sinked_histograms_.insert(stat.get());
+            }
           }
         }
       }
@@ -1086,11 +1096,15 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
     }
   }
 
-  StatNameTagHelper tag_helper(*this, parent.statName(), std::nullopt);
+  StatNameTagVec tags;
+  parent.iterateTagStatNames([&tags](StatName name, StatName value) {
+    tags.emplace_back(name, value);
+    return true;
+  });
 
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
-                                   tag_helper.statNameTags(), symbolTable(), parent.bins()));
+      new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), parent.tagExtractedStatName(),
+                                   tags, symbolTable(), parent.bins()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
