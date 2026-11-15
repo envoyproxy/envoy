@@ -178,6 +178,42 @@ prefix, tagged with ``config_name`` set to the extension name, or ``default`` if
   listeners_owned, Gauge, Listeners that the module owns
   updates_pending, Gauge, Writes that are queued or warming or that wait for the workers to start
 
+.. _config_bootstrap_extensions_dynamic_modules_config_snapshots:
+
+Configuration Snapshots
+-----------------------
+
+Bootstrap modules can collect selected configuration providers with
+``envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new``. The Rust SDK exposes
+this as ``get_config_snapshot``.
+
+Provider keys include ``bootstrap``, ``clusters``, ``listeners``,
+``routes``, ``route_scopes``, ``secrets`` and the registered ``ecds_filter_*`` providers. Missing keys
+are omitted, duplicates are collected once, and an empty selection collects nothing. Providers
+appear in key order, as in :ref:`/config_dump <operations_admin_interface_config_dump>`.
+Endpoint dumps are not included. An optional full-match regular expression filters resource names
+for providers that support it.
+
+Collection and sensitive-field redaction run synchronously on the main thread after server
+initialization and before shutdown begins. Their cost grows with the selected resources. Combine
+frequent notifications into one collection.
+
+Collection is refused inside cluster and listener lifecycle hooks. Schedule it after returning with
+the bootstrap config scheduler. Other callbacks during an xDS update, including callouts failed
+during cluster removal, must also defer collection: providers can contain partially applied changes
+with an old version until the update finishes.
+
+The snapshot is independent of the server and bootstrap configuration lifetime. JSON encoding and
+deletion can run on another thread, including after shutdown. A snapshot must not be used
+concurrently and must be released before the module is unloaded.
+
+Redaction covers only protobuf fields annotated as sensitive, as with ``/config_dump``. Metadata,
+opaque strings and module configuration can still contain sensitive data. JSON encoding can fail
+when an ``Any`` contains an unknown or unlinked protobuf type.
+
+This API needs admin support compiled in, but does not need an admin listener and is not restricted
+by admin ``allow_paths``.
+
 Use Cases
 ---------
 
