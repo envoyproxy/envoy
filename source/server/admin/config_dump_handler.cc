@@ -94,18 +94,17 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     const Protobuf::FieldDescriptor* any_field = descriptor->FindFieldByName(any_field_name);
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
-      // Unpack to a DynamicMessage.
+      // unpack the Any resource
       Protobuf::Any any_message;
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
-      Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
           TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
       const Protobuf::Descriptor* inner_descriptor =
           Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
               static_cast<std::string>(inner_type_name));
       ASSERT(inner_descriptor != nullptr);
-      std::unique_ptr<Protobuf::Message> inner_message;
-      inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
+      std::unique_ptr<Protobuf::Message> inner_message(
+          Protobuf::MessageFactory::generated_factory()->GetPrototype(inner_descriptor)->New());
       if (!MessageUtil::unpackTo(any_message, *inner_message).ok()) {
         return false;
       }
