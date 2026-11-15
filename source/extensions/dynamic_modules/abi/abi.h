@@ -2236,10 +2236,9 @@ bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
- * envoy_dynamic_module_callback_http_add_header is called by the module to add
- * the value of the header with the given key. If the header does not exist, it will be
- * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * envoy_dynamic_module_callback_http_add_header is called by the module to add a value to the
+ * header with the given key, keeping any existing values. If the header does not exist, it will be
+ * created. Use envoy_dynamic_module_callback_http_set_header to replace or remove a header.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -2247,8 +2246,8 @@ bool envoy_dynamic_module_callback_http_get_headers(
  * headers/trailers).
  * @param key is the key of the header. A key that is not a valid header name, such as an empty
  * one, is rejected.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header. A
- * value that is not a valid header value, such as one holding a CR, LF or NUL, is rejected.
+ * @param value is the pointer to the buffer of the value. A null or empty value is rejected, as is
+ * a value that is not a valid header value, such as one holding a CR, LF or NUL.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
