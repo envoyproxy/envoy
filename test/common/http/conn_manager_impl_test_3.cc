@@ -3016,13 +3016,13 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamTimingsRecordWhenRequestHeaderPr
   conn_manager_->createCodec(fake_input);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance&) -> Http::Status {
-    // Set time to 5ms before creating the stream
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(5)));
+    // Advance 5ms before creating the stream.
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    // Advanced time to 20ms before decoding headers.
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(20)));
+    // Advance another 15ms before decoding headers.
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(15));
     decoder_->decodeHeaders(std::move(headers), /*end_stream=*/false);
     return Http::okStatus();
   });
@@ -3033,7 +3033,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamTimingsRecordWhenRequestHeaderPr
       decoder_->streamInfo().downstreamTiming().lastDownstreamHeaderRxByteReceived();
   auto request_headers_done_millis = std::chrono::duration_cast<std::chrono::milliseconds>(
       request_headers_done.value() - decoder_->streamInfo().startTimeMonotonic());
-  // Expect time to be 20ms-5ms = 15ms.
+  // Header processing completes 15ms after stream creation.
   EXPECT_EQ(request_headers_done_millis, std::chrono::milliseconds(15));
 
   // Clean up.
@@ -3048,8 +3048,9 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   access_logs_ = {handler};
   setup();
 
-  // The downstream connection begins at 5ms, before the stream is created.
-  const MonotonicTime connection_begin(std::chrono::milliseconds(5));
+  // Record the downstream connection begin before creating the stream.
+  test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
+  const MonotonicTime connection_begin = test_time_.timeSystem().monotonicTime();
   filter_callbacks_.connection_.stream_info_.start_time_monotonic_ = connection_begin;
 
   std::optional<MonotonicTime> logged_connection_begin;
@@ -3066,8 +3067,8 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   conn_manager_->createCodec(fake_input);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance&) -> Http::Status {
-    // Create the stream at 20ms, later than the downstream connection begin.
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(20)));
+    // Create the stream 15ms after the downstream connection begin.
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(15));
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -3082,14 +3083,14 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   ASSERT_TRUE(begin.has_value());
   EXPECT_EQ(connection_begin, begin.value());
 
-  // Close the connection at 30ms while the stream is active.
-  test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(30)));
+  // Close the connection 10ms later while the stream is active.
+  test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   ASSERT_TRUE(logged_connection_begin.has_value());
   EXPECT_EQ(connection_begin, logged_connection_begin.value());
   ASSERT_TRUE(logged_connection_end.has_value());
-  EXPECT_EQ(MonotonicTime(std::chrono::milliseconds(30)), logged_connection_end.value());
+  EXPECT_EQ(test_time_.timeSystem().monotonicTime(), logged_connection_end.value());
 }
 
 // The COMMON_DURATION downstream TLS handshake time points (DS_HS_BEG/DS_HS_END) are recorded at
@@ -3155,8 +3156,9 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   access_logs_ = {handler};
   setup();
 
-  // The downstream connection begins at 5ms, before any stream is created.
-  const MonotonicTime connection_begin(std::chrono::milliseconds(5));
+  // Record the downstream connection begin before creating any streams.
+  test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
+  const MonotonicTime connection_begin = test_time_.timeSystem().monotonicTime();
   filter_callbacks_.connection_.stream_info_.start_time_monotonic_ = connection_begin;
 
   std::vector<std::optional<MonotonicTime>> logged_connection_ends;
@@ -3178,8 +3180,8 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   conn_manager_->createCodec(fake_input);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance&) -> Http::Status {
-    // Create both streams at 20ms, later than the downstream connection begin.
-    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(20)));
+    // Create both streams 15ms after the downstream connection begin.
+    test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(15));
     for (auto& encoder : response_encoders) {
       RequestDecoder* decoder = &conn_manager_->newStream(encoder);
       RequestHeaderMapPtr headers{
@@ -3199,15 +3201,15 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
     EXPECT_EQ(connection_begin, begin.value());
   }
 
-  // Close the connection at 30ms while both streams are active.
-  test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(30)));
+  // Close the connection 10ms later while both streams are active.
+  test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   // Both active streams record DS_CX_END at the connection close.
   ASSERT_EQ(2, logged_connection_ends.size());
   for (const auto& end : logged_connection_ends) {
     ASSERT_TRUE(end.has_value());
-    EXPECT_EQ(MonotonicTime(std::chrono::milliseconds(30)), end.value());
+    EXPECT_EQ(test_time_.timeSystem().monotonicTime(), end.value());
   }
 }
 

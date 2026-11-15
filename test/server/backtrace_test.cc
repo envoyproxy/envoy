@@ -1,9 +1,11 @@
 #include <sstream>
+#include <string>
 
 #include "source/server/backtrace.h"
 
 #include "test/test_common/logging.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -52,13 +54,13 @@ TEST(Backward, FaultToStderr) {
   const bool save_log_to_stderr = BackwardsTrace::logToStderr();
   BackwardsTrace::setLogToStderr(true);
   BackwardsTrace tracer;
-  std::ostringstream expected;
-  expected << "[backtrace] Caught Segmentation fault, suspect faulting address " << &tracer << "\n";
+  const std::string expected = fmt::format(
+      "[backtrace] Caught Segmentation fault, suspect faulting address {}\n", fmt::ptr(&tracer));
   {
     StartStopRecording recording(GetLogSink());
     testing::internal::CaptureStderr();
     tracer.logFault("Segmentation fault", &tracer);
-    EXPECT_EQ(expected.str(), testing::internal::GetCapturedStderr());
+    EXPECT_EQ(expected, testing::internal::GetCapturedStderr());
     EXPECT_THAT(recording.messages(), testing::IsEmpty());
   }
   BackwardsTrace::setLogToStderr(save_log_to_stderr);

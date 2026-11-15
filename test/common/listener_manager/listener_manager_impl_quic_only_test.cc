@@ -52,10 +52,15 @@ public:
 class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
 public:
   size_t expectedNumSocketOptions() {
-    // SO_REUSEPORT, IP_PKTINFO and IP_MTU_DISCOVER/IP_DONTFRAG.
-    const size_t num_platform_independent_socket_options =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment") ? 3 : 2;
+    // SO_REUSEPORT and IP_PKTINFO.
+    const size_t num_platform_independent_socket_options = 2;
     size_t num_platform_dependent_socket_options = 0;
+#if defined(ENVOY_IP_DONTFRAG) || defined(ENVOY_IP_MTU_DISCOVER)
+    // IP_DONTFRAG or IP_MTU_DISCOVER.
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+      ++num_platform_dependent_socket_options;
+    }
+#endif
 #ifdef SO_RXQ_OVFL
     ++num_platform_dependent_socket_options;
 #endif
@@ -183,7 +188,7 @@ filter_chain_matcher:
                    /* expected_sockopt_name */ IP_DONTFRAG,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ IP_MTU_DISCOVER,
                    /* expected_value */ IP_PMTUDISC_DO,
@@ -279,7 +284,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
                    /* expected_sockopt_name */ IP_DONTFRAG,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ IP_MTU_DISCOVER,
                    /* expected_value */ IP_PMTUDISC_DO,
@@ -351,7 +356,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicPacketWriterFactoryFromConfig) {
                    /* expected_sockopt_name */ IP_DONTFRAG,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ IP_MTU_DISCOVER,
                    /* expected_value */ IP_PMTUDISC_DO,
@@ -452,7 +457,7 @@ udp_listener_config:
                    /* expected_sockopt_name */ IP_DONTFRAG,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ IP_MTU_DISCOVER,
                    /* expected_value */ IP_PMTUDISC_DO,
@@ -514,7 +519,7 @@ listener_filters:
                    /* expected_sockopt_name */ IP_DONTFRAG,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ IP_MTU_DISCOVER,
                    /* expected_value */ IP_PMTUDISC_DO,

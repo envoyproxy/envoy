@@ -112,7 +112,7 @@ absl::Status decodePath(absl::string_view path, std::string* resource_type, std:
   const std::vector<absl::string_view> path_components = absl::StrSplit(path.substr(1), '/');
   auto id_it = path_components.cbegin();
   if (resource_type != nullptr) {
-    *resource_type = std::string(path_components[0]);
+    resource_type->assign(path_components[0]);
     if (resource_type->empty()) {
       return absl::InvalidArgumentError(fmt::format("Resource type missing from {}", path));
     }

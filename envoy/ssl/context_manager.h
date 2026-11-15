@@ -66,6 +66,13 @@ public:
   virtual std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
 
   /**
+   * Add an ssl context that is built outside of the manager. The manager holds it and includes it
+   * in iterateContexts() and the expiration queries until removeContext() removes it. Must be
+   * called on the main thread, once for each context. A null context is ignored.
+   */
+  virtual void addContext(const Envoy::Ssl::ContextSharedPtr& context) PURE;
+
+  /**
    * Remove an existing ssl context.
    */
   virtual void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) PURE;

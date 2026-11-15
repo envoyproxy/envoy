@@ -42,6 +42,7 @@ services:
       EXPECTED_GCC: gcc-libstdc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
+      TEST_HOST_GCC: "true"
     command:
     - bash
     - -c
@@ -59,7 +60,7 @@ services:
     environment:
       <<: *common-env
       EXPECTED_NO_ARGS: clang-libc++
-      EXPECTED_GCC: fail
+      EXPECTED_GCC: gcc-libstdc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
     command:
@@ -83,6 +84,7 @@ services:
       EXPECTED_GCC: gcc-libstdc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
+      TEST_HOST_GCC: "true"
     command:
     - bash
     - -c
@@ -98,7 +100,7 @@ services:
     environment:
       <<: *common-env
       EXPECTED_NO_ARGS: clang-libc++
-      EXPECTED_GCC: fail
+      EXPECTED_GCC: gcc-libstdc++
       EXPECTED_GCC_ENV: clang-libc++
       EXPECTED_CLANG_ENV: clang-libc++
     command:

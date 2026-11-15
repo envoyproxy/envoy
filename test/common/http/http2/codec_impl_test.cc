@@ -2399,6 +2399,57 @@ TEST_P(Http2CodecImplFlowControlTest, PendingRecvBufferBoundedWhenDeferProcessin
   }
 }
 
+// Verify that DATA the client receives on a stream it already reset is returned to the
+// connection flow-control window. If it is not, the window drains and every later stream on the
+// connection stalls after its response headers.
+// See https://github.com/envoyproxy/envoy/issues/36188 and
+// https://github.com/envoyproxy/envoy/issues/40085.
+TEST_P(Http2CodecImplFlowControlTest, DataAfterClientResetReturnsConnectionWindow) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(AnyNumber());
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false)).Times(AnyNumber());
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(AnyNumber());
+
+  // Send twice the connection window on streams that the client resets while the server's
+  // response body is in flight.
+  const uint32_t initial_connection_window = getSendWindowSize(server_);
+  ASSERT_EQ(65535, initial_connection_window);
+  const uint32_t body_size = 16 * 1024;
+  for (uint32_t sent = 0; sent < 2 * initial_connection_window; sent += body_size) {
+    EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+    driveToCompletion();
+    response_encoder_->encodeHeaders(response_headers, false);
+    driveToCompletion();
+
+    // The client's RST_STREAM is still in flight when the server sends the body.
+    request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+    Buffer::OwnedImpl body(std::string(body_size, 'a'));
+    response_encoder_->encodeData(body, false);
+    driveToCompletion();
+
+    request_encoder_ = &client_->newStream(response_decoder_);
+  }
+  EXPECT_GT(getSendWindowSize(server_), 0);
+
+  // A new stream on the same connection still gets its body and trailers.
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+  response_encoder_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl body("hello");
+  response_encoder_->encodeData(body, false);
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"grpc-status", "0"}});
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+  EXPECT_OK(server_wrapper_->status_);
+}
+
 // Verify that we create and disable the stream flush timer when trailers follow a stream that
 // does not have enough window.
 TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
@@ -2444,6 +2495,41 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   driveToCompletion();
   EXPECT_OK(server_wrapper_->status_);
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
+// Verify that trailers are sent when the body exactly exhausts the stream window, leaving
+// nothing pending in the codec when the trailers are encoded.
+// See https://github.com/envoyproxy/envoy/issues/40821.
+TEST_P(Http2CodecImplFlowControlTest, TrailersAfterBodyFillingStreamWindow) {
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  // The client does not read the body yet, so it sends no WINDOW_UPDATE.
+  const uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
+  ASSERT_EQ(65535, initial_stream_window);
+  Buffer::OwnedImpl body(std::string(initial_stream_window, 'a'));
+  response_encoder_->encodeData(body, false);
+  EXPECT_EQ(0, getStreamSendWindowSize(server_, 1));
+  EXPECT_EQ(0, server_->getStream(1)->pending_send_data_->length());
+
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
+
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  driveToCompletion();
+  EXPECT_OK(server_wrapper_->status_);
+  EXPECT_OK(client_wrapper_->status_);
 }
 
 // Verify that we create and handle the stream flush timeout when trailers follow a stream that

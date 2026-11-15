@@ -18,6 +18,7 @@ load(
     "tcmalloc_external_deps",
 )
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":envoy_rbe.bzl", _envoy_exec_properties = "envoy_exec_properties")
 load(":envoy_select.bzl", "deprecate_repository")
 
 _APPLE = Label("//bazel:apple")
@@ -27,11 +28,12 @@ _MSAN_BUILD = Label("//bazel:msan_build")
 _BENCHMARK_MAIN_LIB = Label("//test/benchmark:main_lib")
 _BENCHMARK_MAIN_SRC = Label("//test/benchmark:main.cc")
 _ENABLE_EXPORTED_SYMBOLS = Label("//bazel:enable_exported_symbols")
-_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
 _EXPORTED_SYMBOLS = Label("//bazel:exported_symbols.txt")
 _EXPORTED_SYMBOLS_APPLE = Label("//bazel:exported_symbols_apple.txt")
 _EXPORTED_SYMBOLS_WINDOWS = Label("//bazel:exported_symbols_windows.def")
 _FUZZING_ENGINE = Label("//bazel:fuzzing_engine")
+
+envoy_exec_properties = _envoy_exec_properties
 _LIBFUZZER = Label("//bazel:libfuzzer")
 _LIBFUZZER_COVERAGE = Label("//bazel:libfuzzer_coverage")
 _LINUX = Label("//bazel:linux")
@@ -130,6 +132,7 @@ def envoy_cc_fuzz_test(
         deps = [],
         tags = [],
         **kwargs):
+    lib_exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
     exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus_files"
@@ -143,7 +146,7 @@ def envoy_cc_fuzz_test(
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        exec_properties = exec_properties,
+        exec_properties = lib_exec_properties,
         deps = deps + envoy_stdlib_deps() + [
             Label("//test/fuzz:fuzz_runner_lib"),
             _TEST_VERSION_LINKSTAMP,
@@ -196,12 +199,6 @@ def envoy_test_env(env = {}):
         _ASAN_BUILD: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
         _TSAN_BUILD: {"TSAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
         _MSAN_BUILD: {"MSAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
-        "//conditions:default": {},
-    })
-
-def envoy_exec_properties(rbe_pool = None, exec_properties = {}):
-    return exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
 
@@ -289,7 +286,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
     disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,

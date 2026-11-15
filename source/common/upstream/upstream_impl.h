@@ -435,6 +435,13 @@ public:
     return status == 0 ? std::nullopt : std::make_optional(status);
   }
 
+  void setHealthCheckMetadata(absl::flat_hash_map<std::string, std::string>&& metadata) override {
+    hc_metadata_ = std::move(metadata);
+  }
+  const absl::flat_hash_map<std::string, std::string>& healthCheckMetadata() const override {
+    return hc_metadata_;
+  }
+
   Host::HealthStatus healthStatus() const override {
     // Evaluate active health status first.
 
@@ -542,6 +549,8 @@ private:
       envoy::config::core::v3::HealthStatus::UNKNOWN};
   // 0 indicates no status has been set.
   std::atomic<uint64_t> last_hc_http_status_{0};
+  // Main thread only.
+  absl::flat_hash_map<std::string, std::string> hc_metadata_;
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {

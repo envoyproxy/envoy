@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "set_filter_state_test",
     srcs = ["set_filter_state_test.cc"],
     extension_names = ["envoy.filters.listener.set_filter_state"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/set_filter_state:config",
@@ -31,7 +32,10 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     extension_names = ["envoy.filters.listener.set_filter_state"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/listener/set_filter_state:config",

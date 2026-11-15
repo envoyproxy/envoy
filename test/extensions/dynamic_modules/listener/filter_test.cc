@@ -499,6 +499,50 @@ TEST_F(DynamicModuleListenerFilterTest, HttpCalloutInlineSuccessDoesNotReenterMo
       }));
 }
 
+class DynamicModuleListenerFilterLanguageTest : public DynamicModuleListenerFilterTest,
+                                                public testing::WithParamInterface<std::string> {};
+
+#ifndef __SANITIZE_ADDRESS__
+auto DynamicModuleListenerFilterLanguageTestValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModuleListenerFilterLanguageTestValues = testing::Values("rust", "go");
+#endif
+
+INSTANTIATE_TEST_SUITE_P(Languages, DynamicModuleListenerFilterLanguageTest,
+                         DynamicModuleListenerFilterLanguageTestValues,
+                         DynamicModuleTestLanguages::languageParamToTestName);
+
+// Each SDK sets a namespace from a serialized google.protobuf.Struct and a typed namespace from a
+// serialized google.protobuf.Any on accept.
+TEST_P(DynamicModuleListenerFilterLanguageTest, DynamicMetadata) {
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("listener_integration_test", GetParam()), false);
+  EXPECT_OK(dynamic_module);
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "dynamic_metadata", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
+  EXPECT_OK(filter_config_or_status);
+
+  // The filter reads metadata through the callbacks and writes it through both the callbacks and
+  // the stream info, so both share one metadata object.
+  auto& metadata = callbacks_.stream_info_.metadata_;
+  ON_CALL(callbacks_, dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata));
+  ON_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_))
+      .WillByDefault([&metadata](const std::string& name, const Protobuf::Struct& value) {
+        (*metadata.mutable_filter_metadata())[name].MergeFrom(value);
+      });
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_or_status.value());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks_));
+
+  ASSERT_TRUE(metadata.filter_metadata().contains("dynamic_modules.struct"));
+  EXPECT_EQ(
+      "v", metadata.filter_metadata().at("dynamic_modules.struct").fields().at("k").string_value());
+  ASSERT_TRUE(metadata.typed_filter_metadata().contains("dynamic_modules.typed"));
+  const auto& typed_metadata = metadata.typed_filter_metadata().at("dynamic_modules.typed");
+  EXPECT_EQ("t/x", typed_metadata.type_url());
+  EXPECT_EQ(std::string("\x01\x02", 2), typed_metadata.value());
+}
+
 } // namespace ListenerFilters
 } // namespace DynamicModules
 } // namespace Extensions

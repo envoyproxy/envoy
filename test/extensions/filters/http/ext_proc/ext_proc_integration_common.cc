@@ -104,6 +104,14 @@ void ExtProcIntegrationTest::initializeConfig(
       }
     }
 
+    // The filter's default message timeout (200ms) is shorter than a round trip through the
+    // fake ext_proc server can take under the sanitizers. A timeout fails the request with a 504
+    // (or passes it through unprocessed with failure_mode_allow), and the test then fails on
+    // whatever it expected next. Tests of the timeout itself set their own.
+    if (!proto_config_.has_message_timeout()) {
+      proto_config_.mutable_message_timeout()->set_seconds(5);
+    }
+
     const std::string valid_grpc_cluster_name = "ext_proc_server_0";
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
     if (!two_ext_proc_filters_) {
@@ -536,6 +544,24 @@ void ExtProcIntegrationTest::processResponseBodyMessage(
   const bool sendReply = !cb || (*cb)(request.response_body(), *body);
   if (sendReply) {
     processor_stream_->sendGrpcMessage(response);
+  }
+}
+
+void ExtProcIntegrationTest::processStreamedResponseBodyAs(absl::string_view body) {
+  bool end_stream = false;
+  bool first_chunk = true;
+  while (!end_stream) {
+    processResponseBodyMessage(*grpc_upstreams_[0], false,
+                               [&](const HttpBody& chunk, BodyResponse& body_resp) {
+                                 end_stream = chunk.end_of_stream();
+                                 body_resp.mutable_response()->mutable_body_mutation()->set_body(
+                                     first_chunk ? std::string(body) : "");
+                                 first_chunk = false;
+                                 return true;
+                               });
+    if (testing::Test::HasFatalFailure()) {
+      return;
+    }
   }
 }
 

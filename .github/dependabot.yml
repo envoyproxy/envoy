@@ -11,6 +11,7 @@ updates:
 
 - package-ecosystem: "pip"
   directory: "/tools/base"
+  assignees: ["phlax"]
   open-pull-requests-limit: 20
   schedule:
     interval: "daily"
@@ -18,6 +19,7 @@ updates:
 
 - package-ecosystem: "pip"
   directory: "/docs/tools/python"
+  assignees: ["phlax"]
   open-pull-requests-limit: 20
   schedule:
     interval: "daily"
@@ -25,6 +27,7 @@ updates:
 
 - package-ecosystem: "pip"
   directory: "/mobile/tools/python"
+  assignees: ["phlax"]
   open-pull-requests-limit: 20
   schedule:
     interval: "daily"
@@ -32,42 +35,49 @@ updates:
 
 - package-ecosystem: "docker"
   directory: "/.devcontainer"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/ci"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/ci/matrix"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/distribution/docker"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "github-actions"
   directory: "/"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data"
+  assignees: ["phlax"]
   groups:
     contrib-golang:
       patterns:
@@ -78,6 +88,7 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/dummy"
+  assignees: ["phlax"]
   groups:
     contrib-golang:
       patterns:
@@ -88,6 +99,7 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/network/test/test_data"
+  assignees: ["phlax"]
   groups:
     contrib-golang:
       patterns:
@@ -98,6 +110,7 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/router/cluster_specifier/test/test_data/simple"
+  assignees: ["phlax"]
   groups:
     contrib-golang:
       patterns:
@@ -108,6 +121,7 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/upstreams/http/tcp/test/test_data"
+  assignees: ["phlax"]
   groups:
     contrib-golang:
       patterns:
@@ -118,12 +132,14 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/source/extensions/dynamic_modules"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
 
 - package-ecosystem: "gomod"
   directory: "/test/extensions/dynamic_modules/test_data/go"
+  assignees: ["phlax"]
   schedule:
     interval: daily
     time: "06:00"
