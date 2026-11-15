@@ -206,5 +206,17 @@ TEST_P(DynamicModuleResourceMonitorIntegrationTest, ReportsMemoryRetainedByFilte
   test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Lt(10));
 }
 
+TEST_P(DynamicModuleResourceMonitorIntegrationTest, RefusesMemoryBeyondHardLimit) {
+  initializeMemoryMonitor("memory_tracking_integration_test", "1048576 2097152");
+
+  // The budget does not refuse allocations, so the module can retain more than it.
+  expectReply("x-retain-bytes", "1572864", "200");
+  test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Eq(100));
+
+  expectReply("x-retain-bytes", "1048576", "507");
+  expectReply("x-release", "true", "200");
+  test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Lt(10));
+}
+
 } // namespace
 } // namespace Envoy
