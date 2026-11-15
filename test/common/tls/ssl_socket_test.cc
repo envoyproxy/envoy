@@ -10064,7 +10064,7 @@ TEST_P(SslSocketTest, CertificateCompressionEnabled) {
   testUtilV2(test_options);
 }
 
-// Test that TLS handshakes succeed with certificate compression disabled (default behavior).
+// Test that TLS handshakes succeed with certificate compression disabled.
 // This verifies backward compatibility when the runtime flag is disabled.
 TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   TestScopedRuntime scoped_runtime;

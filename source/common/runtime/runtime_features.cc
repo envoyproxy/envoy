@@ -198,6 +198,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_web
 RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunnel_allow_upstream_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 RUNTIME_GUARD(envoy_reloadable_features_tls_ecdsa_selection_check_supported_versions);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
 RUNTIME_GUARD(envoy_reloadable_features_udp_hot_restart_session_handoff);
@@ -361,11 +362,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 
 // Enable histograms of HTTP/2 header sizes, including cookie size.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
-
-// TODO: Flip back to true once TLS certificate compression with brotli (RFC 8879) has been
-// validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
-// no certificate compression.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 
 // When an on-demand cluster discovery asks for a cluster its config source has already answered
 // as missing, answer the request immediately from that remembered answer instead of starting
