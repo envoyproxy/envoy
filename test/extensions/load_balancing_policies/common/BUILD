@@ -30,6 +30,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "locality_wrr_test",
     srcs = ["locality_wrr_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:upstream_includes",
@@ -44,7 +45,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
@@ -58,7 +59,6 @@ envoy_cc_test_library(
     name = "load_balancer_fuzz_lib",
     srcs = ["load_balancer_fuzz_base.cc"],
     hdrs = ["load_balancer_fuzz_base.h"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":load_balancer_fuzz_proto_cc_proto",
         "//source/common/upstream:load_balancer_context_base_lib",
@@ -109,6 +109,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "orca_weight_manager_test",
     srcs = ["orca_weight_manager_test.cc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//test/mocks:common_lib",
@@ -126,6 +127,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "orca_oob_manager_test",
     srcs = ["orca_oob_manager_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:common_lib",
@@ -177,7 +179,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "load_balancer_base_test",
     srcs = ["load_balancer_impl_base_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":load_balancer_base_test_lib",
     ],

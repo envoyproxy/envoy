@@ -5,8 +5,6 @@
 //
 // Tests fo SimpleLRUCache
 
-#include <unistd.h>
-
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -17,6 +15,8 @@
 #include "source/common/jwt/simple_lru_cache.h"
 #include "source/common/jwt/simple_lru_cache_inl.h"
 
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -39,8 +39,7 @@ void tickClock() {
   const int kMaxAttempts = 10;
   int num_attempts = 0;
   do {
-    // sleep one microsecond.
-    usleep(1);
+    absl::SleepFor(absl::Microseconds(1));
   } while (++num_attempts < kMaxAttempts && SimpleCycleTimer::now() == start);
   // Unable to tick the clock
   assert(num_attempts < kMaxAttempts);
@@ -570,7 +569,7 @@ void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
     ASSERT_TRUE(in_cache[i]);
   }
 
-  usleep(110 * 1000);
+  absl::SleepFor(absl::Microseconds(110 * 1000));
 
   TestValue* v1 = cache_->lookup(0);
   ASSERT_TRUE(v1 != nullptr);
@@ -584,7 +583,7 @@ void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
 
   // Sleep more: should cause expiration of everything we
   // haven't touched, and the one we touched if age-based.
-  usleep(110 * 1000);
+  absl::SleepFor(absl::Microseconds(110 * 1000));
 
   // Nothing gets expired until we call one of the cache methods.
   for (int i = 0; i < kCacheSize; i++) {

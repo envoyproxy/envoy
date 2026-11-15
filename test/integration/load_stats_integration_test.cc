@@ -195,6 +195,11 @@ public:
     EXPECT_EQ("/healthcheck", health_check_request_->headers().getPathValue());
     health_check_request_->encodeHeaders(
         Http::TestResponseHeaderMapImpl{{":status", std::to_string(response_code)}}, true);
+    // encodeHeaders() only posts to the upstream connection thread. Wait for that to run before
+    // returning, as the next call replaces health_check_request_ and the posted callback would
+    // otherwise use the deleted stream.
+    result = connection->waitForNoPost();
+    RELEASE_ASSERT(result, result.message());
   }
 
   void mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,

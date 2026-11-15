@@ -97,7 +97,7 @@ private:
       : public Grpc::AsyncRequestCallbacks<
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>,
         public Event::DeferredDeletable,
-        public LinkedObject<AsyncRequestCallbacks> {
+        public IntrusiveListNode<AsyncRequestCallbacks> {
   public:
     AsyncRequestCallbacks(GrpcClientImpl& parent) : parent_(parent) {}
 
@@ -116,10 +116,10 @@ private:
     }
 
     void cleanup() {
-      if (LinkedObject<AsyncRequestCallbacks>::inserted()) {
+      if (IntrusiveListNode<AsyncRequestCallbacks>::inserted()) {
         ASSERT(parent_.dispatcher_.isThreadSafe());
         parent_.dispatcher_.deferredDelete(
-            LinkedObject<AsyncRequestCallbacks>::removeFromList(parent_.request_callbacks_));
+            IntrusiveListNode<AsyncRequestCallbacks>::removeFromList());
       }
     }
 
@@ -131,7 +131,7 @@ private:
       : public Grpc::AsyncStreamCallbacks<
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>,
         public Event::DeferredDeletable,
-        public LinkedObject<AsyncStreamCallbacks> {
+        public IntrusiveListNode<AsyncStreamCallbacks> {
   public:
     AsyncStreamCallbacks(GrpcClientImpl& parent) : parent_(parent) {}
 
@@ -154,10 +154,10 @@ private:
     };
 
     void cleanup() {
-      if (LinkedObject<AsyncStreamCallbacks>::inserted()) {
+      if (IntrusiveListNode<AsyncStreamCallbacks>::inserted()) {
         ASSERT(parent_.dispatcher_.isThreadSafe());
         parent_.dispatcher_.deferredDelete(
-            LinkedObject<AsyncStreamCallbacks>::removeFromList(parent_.stream_callbacks_));
+            IntrusiveListNode<AsyncStreamCallbacks>::removeFromList());
       }
     }
 
@@ -175,8 +175,8 @@ private:
   Event::Dispatcher& dispatcher_;
   std::optional<std::chrono::milliseconds> timeout_;
 
-  std::list<std::unique_ptr<AsyncRequestCallbacks>> request_callbacks_;
-  std::list<std::unique_ptr<AsyncStreamCallbacks>> stream_callbacks_;
+  IntrusiveList<AsyncRequestCallbacks> request_callbacks_;
+  IntrusiveList<AsyncStreamCallbacks> stream_callbacks_;
 };
 
 /**

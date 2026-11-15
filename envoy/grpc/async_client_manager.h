@@ -4,6 +4,9 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/hash.h"
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -32,12 +35,16 @@ private:
 
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
+// The key of the raw gRPC client cache. Two keys are equal when their configs serialize to the same
+// bytes.
 class GrpcServiceConfigWithHashKey {
 public:
-  GrpcServiceConfigWithHashKey() = default;
+  GrpcServiceConfigWithHashKey() { updateKey(); }
 
-  explicit GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
-      : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)) {};
+  explicit GrpcServiceConfigWithHashKey(envoy::config::core::v3::GrpcService config)
+      : config_(std::move(config)) {
+    updateKey();
+  }
 
   template <typename H> friend H AbslHashValue(H h, const GrpcServiceConfigWithHashKey& wrapper) {
     return H::combine(std::move(h), wrapper.pre_computed_hash_);
@@ -47,21 +54,28 @@ public:
 
   friend bool operator==(const GrpcServiceConfigWithHashKey& lhs,
                          const GrpcServiceConfigWithHashKey& rhs) {
-    if (lhs.pre_computed_hash_ == rhs.pre_computed_hash_) {
-      return Protobuf::util::MessageDifferencer::Equivalent(lhs.config_, rhs.config_);
-    }
-    return false;
+    return lhs.pre_computed_hash_ == rhs.pre_computed_hash_ &&
+           lhs.serialized_config_ == rhs.serialized_config_;
   }
 
   const envoy::config::core::v3::GrpcService& config() const { return config_; }
 
   void setConfig(const envoy::config::core::v3::GrpcService& g) {
     config_ = g;
-    pre_computed_hash_ = Envoy::MessageUtil::hash(g);
+    updateKey();
   }
 
 private:
+  friend class GrpcServiceConfigWithHashKeyPeer;
+
+  // Serializes the config deterministically and hashes the bytes. Equal bytes mean equal configs.
+  void updateKey() {
+    serialized_config_ = MessageUtil::serializeDeterministically(config_);
+    pre_computed_hash_ = HashUtil::xxHash64(serialized_config_);
+  }
+
   envoy::config::core::v3::GrpcService config_;
+  std::string serialized_config_;
   std::size_t pre_computed_hash_;
 };
 

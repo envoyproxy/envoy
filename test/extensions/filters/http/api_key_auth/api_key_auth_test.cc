@@ -32,8 +32,9 @@ public:
 
     filter_ = std::make_shared<ApiKeyAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
-    ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
-        .WillByDefault(Invoke([this]() { return route_config_.get(); }));
+    ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig()).WillByDefault([this]() {
+      return route_config_.get();
+    });
   }
 
   Stats::IsolatedStoreImpl stats_;

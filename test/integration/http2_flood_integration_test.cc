@@ -87,6 +87,7 @@ protected:
   // Avoid hiding the other form of beginSession.
   using Http2RawFrameIntegrationTest::beginSession;
   void beginSession() override;
+  void sendPrefillRequest(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
   void triggerListenerDrain();
@@ -217,8 +218,10 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
-void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count,
-                                                              uint32_t data_frame_size) {
+// Starts a session and sends the request that pre-fills the downstream outbound frame queue,
+// without waiting for the queue to fill.
+void Http2FloodMitigationTest::sendPrefillRequest(uint32_t data_frame_count,
+                                                  uint32_t data_frame_size) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
@@ -238,6 +241,11 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
        Http2Frame::Header("response_size_bytes", absl::StrCat(data_frame_size)),
        Http2Frame::Header("no_trailers", "0")});
   sendFrame(request);
+}
+
+void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_frame_count,
+                                                              uint32_t data_frame_size) {
+  sendPrefillRequest(data_frame_count, data_frame_size);
 
   // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
   // that the first request has completed.
@@ -650,12 +658,13 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
 // Verify detection of flood by the RST_STREAM frame sent on pending flush timeout
 TEST_P(Http2FloodMitigationTest, RstStreamOverflowOnPendingFlushTimeout) {
+  // Shorten only the pending flush timer. A short stream_idle_timeout would also apply to the
+  // pre-fill stream and fire if its upstream response is slow to start.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
-        hcm.mutable_stream_idle_timeout()->set_seconds(0);
-        constexpr uint64_t IdleTimeoutMs = 400;
-        hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+        constexpr uint64_t FlushTimeoutMs = 400;
+        hcm.mutable_stream_flush_timeout()->set_nanos(FlushTimeoutMs * 1000 * 1000);
       });
 
   // Pending flush timer is started when upstream response has completed but there is no window to
@@ -746,7 +755,11 @@ TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloo
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
         max_connection_duration->set_seconds(seconds.count());
       });
-  prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
+  // The duration timer runs from when the connection is made, so it also covers the pre-fill.
+  // Do not wait to see the queue full: if the timer fires before the test thread has seen it, the
+  // connection is already closed and the queue is empty again. The response and the GOAWAY are
+  // one frame over the limit together, whichever is queued first.
+  sendPrefillRequest(AllFrameFloodLimit - 1);
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
@@ -1226,9 +1239,10 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers.responseStatus());
   EXPECT_FALSE(headers.endStream());
 
-  // Wait until the whole response has arrived from upstream, i.e. the full 1 MiB body is sitting
-  // in the downstream codec's send buffer waiting for the client's window to open.
-  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_completed", Ge(1));
+  // Wait until the full 1 MiB body is sitting in the downstream codec's send buffer waiting for the
+  // client's window to open. upstream_rq_completed is charged when the response headers arrive, so
+  // it says nothing about how much of the body has been proxied.
+  test_server_->waitForGauge("http2.pending_send_bytes", Eq(kResponseSize));
 
   // The client is ready to read: grow the connection window (65,535 bytes initially per RFC 9113)
   // and open the stream window to 1 MiB.

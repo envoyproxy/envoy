@@ -1,0 +1,7 @@
+path: "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:rawPredict"
+body: "{\"anthropic_version\":\"vertex-2023-10-16\",\"max_tokens\":256,\"system\":\"Preserve my Vertex binding, path variables, and written_fields across same-protocol transcoding while exercising ExternalRef offloading and buffer watermarks.\",\"messages\":[{\"role\":\"user\",\"content\":\"Verify that same_binding in TranscoderFilter and writeRequest restores anthropic_version and re-renders the exact Vertex rawPredict URI.\"}]}"
+fragmentation_seed: 1311768467463790321
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: ANTHROPIC_MESSAGES
+inline_string_threshold_bytes: 0
+decoder_buffer_limit: 128

@@ -2846,10 +2846,8 @@ public:
       auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
           tls_context, factory_context_, {}, false);
 
-      // upstream_stats_store_ was initialized by AdsIntegrationTest::createXdsUpstream().
-      ASSERT(upstream_stats_store_ != nullptr);
       auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
+          std::move(cfg), context_manager_, upstreamStatsScope());
       addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     }
     second_xds_upstream_ = fake_upstreams_.back().get();

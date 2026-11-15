@@ -429,12 +429,12 @@ TEST_P(QuicHttpIntegrationTest, MimicNatRebinding) {
   auto option = std::make_shared<Network::MockSocketOption>();
   EXPECT_CALL(*option, setOption(_, _))
       .WillRepeatedly(
-          Invoke([](Network::Socket&, envoy::config::core::v3::SocketOption::SocketState state) {
+          [](Network::Socket&, envoy::config::core::v3::SocketOption::SocketState state) {
             if (state == envoy::config::core::v3::SocketOption::STATE_LISTENING) {
               return false;
             }
             return true;
-          }));
+          });
   auto options = std::make_shared<Network::Socket::Options>();
   options->push_back(option);
   quic_connection_->switchConnectionSocket(

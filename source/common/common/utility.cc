@@ -680,7 +680,6 @@ uint64_t StringUtil::CaseInsensitiveHash::operator()(absl::string_view key) cons
 
 std::string StringUtil::removeCharacters(const absl::string_view& str,
                                          const IntervalSet<size_t>& remove_characters) {
-  std::string ret;
   size_t pos = 0;
   const auto intervals = remove_characters.toVector();
   std::vector<absl::string_view> pieces;

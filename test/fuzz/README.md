@@ -164,8 +164,15 @@ understand the scope and efficacy of the Envoy fuzzers. You can generate fuzz co
 
 To generate fuzz coverage reports locally (see [Coverage builds](bazel/README.md), run
 ```
-FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh
+bazel run @envoy_toolshed//coverage:run -- \
+  --fuzz \
+  --config=fuzz-coverage \
+  --validate-config=fuzz-coverage-config \
+  --validate-target=//tools/coverage:report.validate
 ```
+`test/run_envoy_bazel_coverage.sh` remains available as a compatibility wrapper and honours the
+`FUZZ_COVERAGE` and `VALIDATE_COVERAGE` environment variables.
+
 This generates a coverage report after running the fuzz targets for one minute against the fuzzing engine libfuzzer and using the checked-in corpus as an initial seed.
 
 Otherwise, you can generate reports from the

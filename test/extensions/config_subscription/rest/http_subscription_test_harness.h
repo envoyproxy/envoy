@@ -28,7 +28,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -47,10 +46,10 @@ public:
                 envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
-    }));
+    });
     cm_.initializeThreadLocalClusters({"eds_cluster"});
     EXPECT_CALL(cm_, getThreadLocalCluster("eds_cluster")).Times(AtLeast(0));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
@@ -72,9 +71,9 @@ public:
     UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this, cluster_names, version](Http::RequestMessagePtr& request,
-                                                        Http::AsyncClient::Callbacks& callbacks,
-                                                        const Http::AsyncClient::RequestOptions&) {
+        .WillOnce([this, cluster_names, version](Http::RequestMessagePtr& request,
+                                                 Http::AsyncClient::Callbacks& callbacks,
+                                                 const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
           EXPECT_EQ("POST", request->headers().getMethodValue());
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
@@ -106,7 +105,7 @@ public:
                     request->headers().getContentLengthValue());
           request_in_progress_ = true;
           return &http_request_;
-        }));
+        });
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {

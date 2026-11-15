@@ -505,19 +505,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
-SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
-
 std::shared_ptr<FcdsSharedFilterChainManager>
 ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
   if (config.has_fcds_config()) {
-    return parent_.server_.serverFactoryContext()
-        .singletonManager()
-        .getTyped<FcdsSharedFilterChainManager>(
-            SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
-            [this]() -> Singleton::InstanceSharedPtr {
-              return std::make_shared<FcdsSharedFilterChainManager>(
-                  parent_.server_.serverFactoryContext(), *parent_.factory_);
-            });
+    return parent_.fcdsSharedFilterChainManager();
   }
   return nullptr;
 }
@@ -931,11 +922,11 @@ void ListenerImpl::buildListenSocketOptions(
       // Needed to return receive buffer overflown indicator.
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-      // TODO(yugant) : Add a config option for UDP_GRO
       if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-        // Needed to receive gso_size option
+        const bool prefer_gro = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+            config.udp_listener_config().downstream_socket_config(), prefer_gro, false);
         addListenSocketOptions(listen_socket_options_list_[i],
-                               Network::SocketOptionFactory::buildUdpGroOptions());
+                               Network::SocketOptionFactory::buildUdpGroOptions(prefer_gro));
       }
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
         addListenSocketOptions(
@@ -1623,7 +1614,11 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
       (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, freebind, false) !=
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, freebind, false)) ||
       (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, tcp_fast_open_queue_length, 0) !=
-       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, tcp_fast_open_queue_length, 0))) {
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, tcp_fast_open_queue_length, 0)) ||
+      (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs.udp_listener_config().downstream_socket_config(),
+                                       prefer_gro, false) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs.udp_listener_config().downstream_socket_config(),
+                                       prefer_gro, false))) {
     return false;
   }
 

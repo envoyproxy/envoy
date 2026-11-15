@@ -70,6 +70,13 @@ covered by the security policy.
 Issues that can only be hit by enabling a :ref:`runtime flag <arch_overview_runtime>` which defaults to
 false are not covered by the security policy.
 
+Envoy admin interface
+---------------------
+
+Issues that can only be exploited via Envoy's admin interface are not covered by the threat model
+and will not be considered security issues. It is responsibility of the operator to secure Envoy admin
+endpoint such that it is not accessible by untrusted actors.
+
 Data and control plane
 ----------------------
 

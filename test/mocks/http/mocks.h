@@ -236,6 +236,7 @@ public:
   MOCK_METHOD(void, refreshRouteConfigSnapshot, ());
   MOCK_METHOD(void, refreshRouteCluster, ());
   MOCK_METHOD(void, recreateClusterInfo, ());
+  MOCK_METHOD(void, enableHalfClose, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -571,6 +572,7 @@ public:
   ~MockAsyncClientRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(OptRef<AsyncClient::RequestContext>, context, (), (const));
 
   MockAsyncClient* client_;
 };

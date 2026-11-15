@@ -1489,6 +1489,134 @@ TEST_F(McpJsonParserTest, EmptyKeyIgnored) {
   EXPECT_EQ(empty, nullptr);
 }
 
+// An empty-key object must not pop its parent's path segment. Before the fix,
+// `{"":{}}` inside params made every following sibling resolve at the root.
+TEST_F(McpJsonParserTest, EmptyKeyObjectDoesNotDesyncSiblingPaths) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "": {},
+      "name": "test_tool"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+
+  const auto* name = parser_->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "test_tool");
+  // Nothing leaked to the root.
+  EXPECT_EQ(parser_->getNestedValue("name"), nullptr);
+}
+
+// Fields inside an empty-key object are not attributed to the parent.
+TEST_F(McpJsonParserTest, EmptyKeyObjectContentsNotAttributedToParent) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "": {"name": "smuggled"},
+      "name": "real_tool"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  const auto* name = parser_->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "real_tool");
+}
+
+// Empty-key object at the root.
+TEST_F(McpJsonParserTest, EmptyKeyObjectAtRootDoesNotDesyncPaths) {
+  std::string json = R"({
+    "": {"a": {"b": {}}},
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test_tool"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+
+  const auto* name = parser_->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "test_tool");
+}
+
+// Empty-key objects inside an extracted object (params.ref) still resolve.
+TEST_F(McpJsonParserTest, NestedEmptyKeyObjectsInsideExtractedObject) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "params": {
+      "ref": {
+        "": {"": {}},
+        "type": "ref/resource",
+        "uri": "file:///document.md"
+      },
+      "argument": {
+        "": {},
+        "name": "prefix",
+        "value": "def "
+      }
+    },
+    "id": 1001
+  })";
+
+  parseJson(json);
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
+
+  const auto* ref = parser_->getNestedValue("params.ref");
+  ASSERT_NE(ref, nullptr);
+  ASSERT_TRUE(ref->has_struct_value());
+  EXPECT_THAT(ref, Pointee(IsStructValueStruct(
+                       UnorderedElementsAre(IsStructString("type", "ref/resource"),
+                                            IsStructString("uri", "file:///document.md")))));
+}
+
+// Drive the extractor directly: StartObject("") + EndObject must leave the path unchanged.
+TEST(McpFieldExtractorTest, EmptyKeyStartEndObjectIsBalanced) {
+  McpParserConfig config;
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name")};
+  config.addMethodConfig("test_method", rules);
+
+  Protobuf::Struct metadata;
+  McpFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "test_method");
+  extractor.StartObject("params");
+  extractor.StartObject("");
+  extractor.StartObject("");
+  extractor.EndObject();
+  extractor.EndObject();
+  extractor.RenderString("name", "tool");
+  extractor.EndObject();
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidMcp());
+  const auto& fields = metadata.fields();
+  ASSERT_TRUE(fields.contains("params"));
+  EXPECT_THAT(fields.at("params").struct_value().fields(),
+              Contains(IsStructString("name", "tool")));
+  EXPECT_FALSE(fields.contains("name"));
+}
+
 TEST_F(McpJsonParserTest, GetNestedValueEmptyPath) {
   // Test getNestedValue with empty path
   EXPECT_EQ(parser_->getNestedValue(""), nullptr);

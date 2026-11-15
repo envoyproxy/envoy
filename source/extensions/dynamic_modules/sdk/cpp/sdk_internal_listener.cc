@@ -277,6 +277,19 @@ public:
     return value;
   }
 
+  bool setDynamicMetadataStruct(std::string_view ns, std::string_view serialized_struct) override {
+    return envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{serialized_struct.data(),
+                                                serialized_struct.size()});
+  }
+
+  bool setDynamicTypedMetadata(std::string_view ns, std::string_view serialized_any) override {
+    return envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{serialized_any.data(), serialized_any.size()});
+  }
+
   bool setFilterState(std::string_view key, std::string_view value) override {
     return envoy_dynamic_module_callback_listener_filter_set_filter_state(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
@@ -462,6 +475,12 @@ public:
       scheduler_ = std::make_shared<ListenerConfigSchedulerImpl>(host_config_ptr_);
     }
     return scheduler_;
+  }
+
+  std::unique_ptr<LoadShedPoint> getLoadShedPoint(std::string_view name) override {
+    return newLoadShedPoint(
+        envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+            host_config_ptr_, envoy_dynamic_module_type_module_buffer{name.data(), name.size()}));
   }
 
   bool logEnabled(LogLevel level) override {

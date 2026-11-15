@@ -26,7 +26,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_terminal_response",
     ],
     extension_names = ["envoy.upstreams.http.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -52,7 +52,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:upstream_http_tcp_bridge",
     ],
     extension_names = ["envoy.upstreams.http.dynamic_modules"],
-    rbe_pool = "linux_x64_medium",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     shard_count = 4,
     tags = [
         "cpu:3",

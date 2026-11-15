@@ -1225,14 +1225,22 @@ TEST(TranscodingEngineTest, AnthropicRequestToIrReadsVertexAiPaths) {
   EXPECT_FALSE(named.contains("stream"));
   EXPECT_TRUE(ctx.read->written_fields.empty());
 
-  // The Anthropic API's own path names nothing.
+  // The Anthropic API's own path is a binding too -- its version header rides beside the body --
+  // but it names no model and no path variables.
   nlohmann::json own = nlohmann::json::parse(R"({
     "model": "claude-sonnet-4-5", "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
   })");
   ctx.request_path = "/v1/messages";
   ASSERT_THAT(engine.transcode(to_ir, ctx, own), IsOk());
-  EXPECT_FALSE(ctx.read.has_value());
+  ASSERT_TRUE(ctx.read.has_value());
+  EXPECT_TRUE(ctx.read->model.empty());
+  EXPECT_TRUE(ctx.read->path_variables.empty());
   EXPECT_EQ(own["model"], "claude-sonnet-4-5");
+
+  // A path of neither layout reads nothing.
+  ctx.request_path = "/anthropic/messages";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, own), IsOk());
+  EXPECT_FALSE(ctx.read.has_value());
 }
 
 // Only Gemini's model methods name anything, and a dialect that names nothing in the path reads
@@ -1342,8 +1350,9 @@ TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) 
   EXPECT_FALSE(unary.contains("model"));
   EXPECT_FALSE(unary.contains("stream"));
 
-  // Anthropic names its model in the body, so there is no path to rewrite, and none survives from
-  // an earlier leg. It rejects `stream_options` too, and reports usage in every stream anyway.
+  // Anthropic names its model in the body, so it stays there; its binding renders the API's fixed
+  // path and asks for the API version header, and nothing survives from an earlier leg. It
+  // rejects `stream_options` too, and reports usage in every stream anyway.
   nlohmann::json anthropic = nlohmann::json::parse(R"({
     "model": "claude-sonnet-4-5", "stream": true, "stream_options": {"include_usage": true},
     "max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
@@ -1352,10 +1361,20 @@ TEST(TranscodingEngineTest, IrRequestToGeminiMovesTheModelAndStreamIntoThePath) 
                                 LLMProtocol::AnthropicMessages},
                                ctx, anthropic),
               IsOk());
-  EXPECT_FALSE(ctx.rewritten_path.has_value());
+  EXPECT_THAT(ctx.rewritten_path, testing::Optional(std::string("/v1/messages")));
+  ASSERT_EQ(ctx.header_mutations.size(), 1);
+  EXPECT_EQ(ctx.header_mutations[0].name, "anthropic-version");
+  EXPECT_THAT(ctx.header_mutations[0].value, testing::Optional(std::string("2023-06-01")));
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
   EXPECT_EQ(anthropic["stream"], true);
   EXPECT_FALSE(anthropic.contains("stream_options"));
+
+  // Gemini's binding writes no header, and a leg clears what an earlier one asked for.
+  nlohmann::json again = nlohmann::json::parse(R"({
+    "model": "gemini-2.5-flash", "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, again), IsOk());
+  EXPECT_TRUE(ctx.header_mutations.empty());
 }
 
 // The model becomes a path segment, so one that could escape it is refused, and no path is
@@ -1392,7 +1411,7 @@ TEST(TranscodingEngineTest, RequestBindingIsDataInThePack) {
                   .protocol = LLMProtocol::OpenAiResponses,
                   .binding = parseBinding(
                       R"({"uri_pattern": "/v2/engines/{model}:{predict|streamPredict?stream=1}",)"
-                      R"( "mutations": [{"body_field": "model"}, {"body_field": "stream"}]})"),
+                      R"( "body_mutations": [{"remove": "model"}, {"remove": "stream"}]})"),
               }),
               IsOk());
   const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
@@ -1567,6 +1586,64 @@ TEST(TranscodingEngineTest, ResponseBindingRendersTheUpstreamPath) {
   EXPECT_FALSE(gemini.contains("stream"));
 }
 
+// A header the client's binding writes is the provider's, like a body field it writes: a `ToIr`
+// leg asks the caller to take it out, and a `FromIr` leg gives it back only when the request
+// leaves in the same binding. The engine reads the headers through the caller's lookup.
+TEST(TranscodingEngineTest, BindingHeadersFollowTheBinding) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  // An Anthropic client, with its own API version.
+  nlohmann::json request = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext to_ir;
+  to_ir.request_path = "/v1/messages";
+  to_ir.request_header = [](absl::string_view name) -> std::optional<std::string> {
+    return name == "anthropic-version" ? std::make_optional<std::string>("2024-01-01")
+                                       : std::nullopt;
+  };
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, to_ir, request), IsOk());
+  ASSERT_TRUE(to_ir.read.has_value());
+  EXPECT_THAT(to_ir.read->written_headers,
+              testing::ElementsAre(testing::Pair("anthropic-version", "2024-01-01")));
+  ASSERT_EQ(to_ir.header_mutations.size(), 1);
+  EXPECT_EQ(to_ir.header_mutations[0].name, "anthropic-version");
+  EXPECT_FALSE(to_ir.header_mutations[0].value.has_value());
+
+  // Back out to Anthropic in the binding it arrived in: the client's version, not the default.
+  nlohmann::json same = request;
+  TranscodeContext from_ir;
+  from_ir.arrived = &*to_ir.read;
+  from_ir.response_binding = to_ir.read->binding.get();
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, from_ir, same), IsOk());
+  EXPECT_THAT(from_ir.rewritten_path, testing::Optional(std::string("/v1/messages")));
+  ASSERT_EQ(from_ir.header_mutations.size(), 1);
+  EXPECT_THAT(from_ir.header_mutations[0].value, testing::Optional(std::string("2024-01-01")));
+
+  // Out to Gemini: its binding writes no header, so the client's stays taken out.
+  nlohmann::json gemini = request;
+  from_ir.response_binding = nullptr;
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, from_ir, gemini), IsOk());
+  EXPECT_TRUE(from_ir.header_mutations.empty());
+
+  // A client without the header has nothing taken out, and a request to Anthropic that already
+  // carries one keeps it.
+  nlohmann::json bare = request;
+  TranscodeContext silent;
+  silent.request_path = "/v1/messages";
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, silent, bare), IsOk());
+  EXPECT_TRUE(silent.header_mutations.empty());
+  TranscodeContext kept;
+  kept.request_header = [](absl::string_view name) -> std::optional<std::string> {
+    return name == "anthropic-version" ? std::make_optional<std::string>("2025-01-01")
+                                       : std::nullopt;
+  };
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, kept, bare), IsOk());
+  EXPECT_TRUE(kept.header_mutations.empty());
+}
+
 // The resolved model replaces the one the request named, wherever the dialect carries it: the
 // body, the path, or both. The leg still reports the model the client asked for, which is what
 // the response echoes.
@@ -1675,9 +1752,9 @@ TEST(TranscodingEngineTest, ResponseBindingEditsTheBodyAfterValidation) {
 
   const LlmBindingConstSharedPtr vertex_claude = parseBinding(R"({
     "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
-    "mutations": [
-      {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    "body_mutations": [
+      {"remove": "model"},
+      {"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "ADD_IF_ABSENT"}}
     ]
   })");
   nlohmann::json doc = nlohmann::json::parse(R"({

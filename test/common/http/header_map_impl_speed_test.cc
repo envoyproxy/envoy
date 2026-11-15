@@ -19,6 +19,27 @@ static void addDummyHeaders(HeaderMap& headers, size_t num_headers,
   }
 }
 
+/**
+ * Measure populating a request header map and then looking up a header that has no inline slot,
+ * which builds the map's lookup index. The HCM does this on every request, since it looks up
+ * referer unconditionally.
+ */
+static void headerMapImplBuildLookupIndex(benchmark::State& state) {
+  std::vector<LowerCaseString> keys;
+  for (int64_t i = 0; i < state.range(0); i++) {
+    keys.emplace_back("dummy-key-" + std::to_string(i));
+  }
+  const LowerCaseString missing("missing-key");
+  for (auto _ : state) { // NOLINT
+    auto headers = Http::RequestHeaderMapImpl::create();
+    for (const auto& key : keys) {
+      headers->addReference(key, "abcd");
+    }
+    benchmark::DoNotOptimize(headers->get(missing).empty());
+  }
+}
+BENCHMARK(headerMapImplBuildLookupIndex)->Arg(3)->Arg(5)->Arg(10)->Arg(20)->Arg(50);
+
 /** Measure the construction/destruction speed of RequestHeaderMapImpl.*/
 static void headerMapImplCreate(benchmark::State& state) {
   // Make sure first time construction is not counted.
