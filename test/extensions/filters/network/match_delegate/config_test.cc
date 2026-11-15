@@ -123,17 +123,16 @@ xds_matcher:
 
   // The delegate filter should be created
   EXPECT_CALL(filter_manager, addReadFilter(_))
-      .WillOnce(Invoke([](Envoy::Network::ReadFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Network::ReadFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingNetworkFilter*>(filter.get()));
-      }));
+      });
   EXPECT_CALL(filter_manager, addWriteFilter(_))
-      .WillOnce(Invoke([](Envoy::Network::WriteFilterSharedPtr filter) {
+      .WillOnce([](Envoy::Network::WriteFilterSharedPtr filter) {
         EXPECT_NE(nullptr, dynamic_cast<DelegatingNetworkFilter*>(filter.get()));
-      }));
-  EXPECT_CALL(filter_manager, addFilter(_))
-      .WillOnce(Invoke([](Envoy::Network::FilterSharedPtr filter) {
-        EXPECT_NE(nullptr, dynamic_cast<DelegatingNetworkFilter*>(filter.get()));
-      }));
+      });
+  EXPECT_CALL(filter_manager, addFilter(_)).WillOnce([](Envoy::Network::FilterSharedPtr filter) {
+    EXPECT_NE(nullptr, dynamic_cast<DelegatingNetworkFilter*>(filter.get()));
+  });
 
   cb(filter_manager);
 }
@@ -283,12 +282,11 @@ TEST(DelegatingNetworkFilter, MatchTreeSkipAction) {
 
   // Setup callbacks - this should set up the match state
   EXPECT_CALL(read_callbacks, socket()).WillRepeatedly(ReturnRef(socket));
-  EXPECT_CALL(read_callbacks, connection())
-      .WillRepeatedly(testing::Invoke([&]() -> Envoy::Network::Connection& {
-        static NiceMock<Envoy::Network::MockConnection> connection;
-        ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
-        return connection;
-      }));
+  EXPECT_CALL(read_callbacks, connection()).WillRepeatedly([&]() -> Envoy::Network::Connection& {
+    static NiceMock<Envoy::Network::MockConnection> connection;
+    ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
+    return connection;
+  });
 
   delegating_filter->initializeReadFilterCallbacks(read_callbacks);
   delegating_filter->initializeWriteFilterCallbacks(write_callbacks);
@@ -330,12 +328,11 @@ TEST(DelegatingNetworkFilter, DelegateToFilters) {
       std::make_shared<DelegatingNetworkFilter>(match_tree, read_filter, write_filter);
 
   EXPECT_CALL(read_callbacks, socket()).WillRepeatedly(ReturnRef(socket));
-  EXPECT_CALL(read_callbacks, connection())
-      .WillRepeatedly(testing::Invoke([&]() -> Envoy::Network::Connection& {
-        static NiceMock<Envoy::Network::MockConnection> connection;
-        ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
-        return connection;
-      }));
+  EXPECT_CALL(read_callbacks, connection()).WillRepeatedly([&]() -> Envoy::Network::Connection& {
+    static NiceMock<Envoy::Network::MockConnection> connection;
+    ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
+    return connection;
+  });
 
   delegating_filter->initializeReadFilterCallbacks(read_callbacks);
   delegating_filter->initializeWriteFilterCallbacks(write_callbacks);
@@ -424,12 +421,11 @@ TEST(DelegatingNetworkFilter, NonSkipActionResult) {
 
   // Setup callbacks - this should set up the match state
   EXPECT_CALL(read_callbacks, socket()).WillRepeatedly(ReturnRef(socket));
-  EXPECT_CALL(read_callbacks, connection())
-      .WillRepeatedly(testing::Invoke([&]() -> Envoy::Network::Connection& {
-        static NiceMock<Envoy::Network::MockConnection> connection;
-        ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
-        return connection;
-      }));
+  EXPECT_CALL(read_callbacks, connection()).WillRepeatedly([&]() -> Envoy::Network::Connection& {
+    static NiceMock<Envoy::Network::MockConnection> connection;
+    ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
+    return connection;
+  });
 
   delegating_filter->initializeReadFilterCallbacks(read_callbacks);
   delegating_filter->initializeWriteFilterCallbacks(write_callbacks);

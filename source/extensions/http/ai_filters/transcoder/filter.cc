@@ -28,6 +28,7 @@ using HttpFilters::AiProtocolManager::AiResponseStreamReceiver;
 using HttpFilters::AiProtocolManager::BindingUse;
 using HttpFilters::AiProtocolManager::FieldPathSegment;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
+using HttpFilters::AiProtocolManager::HeaderMutation;
 using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
 using HttpFilters::AiProtocolManager::LlmBindingRead;
@@ -35,6 +36,7 @@ using HttpFilters::AiProtocolManager::LlmBindingReadObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::PayloadKind;
+using HttpFilters::AiProtocolManager::RequestLlmProtocol;
 using HttpFilters::AiProtocolManager::ResponseLlmProtocol;
 using HttpFilters::AiProtocolManager::SseEventPtr;
 using HttpFilters::AiProtocolManager::SseStreamPropagator;
@@ -276,6 +278,15 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
   const StreamInfo::FilterState& filter_state = *filter_state_;
   const LLMProtocol route_target_protocol = target_protocol_;
   target_protocol_ = ResponseLlmProtocol::resolve(filter_state, target_protocol_);
+  // If the client's schema is configured but the backend's is not, default the backend schema to
+  // the client's.
+  const bool backend_defaulted = target_protocol_ == LLMProtocol::Unspecified;
+  if (backend_defaulted) {
+    target_protocol_ = source_protocol_;
+    config_->stats().backend_defaulted_.inc();
+    ENVOY_LOG(debug, "transcoder: no backend API declared, assuming the client's {}",
+              RequestLlmProtocol(source_protocol_).serializeAsString().value_or("?"));
+  }
 
   Instructions instructions;
   // The two bindings, each read from its key into its slot.
@@ -292,11 +303,13 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
     *into = *std::move(binding);
   }
   // The route's bindings stand in for keys left unset. The response one is how the route's backend
-  // carries its API, so it lapses when filter state names another.
+  // carries its API, so it lapses when filter state names another; a defaulted backend is still
+  // the route's.
   if (instructions.request_binding == nullptr) {
     instructions.request_binding = route_request_binding_;
   }
-  if (instructions.response_binding == nullptr && target_protocol_ == route_target_protocol) {
+  if (instructions.response_binding == nullptr &&
+      (backend_defaulted || target_protocol_ == route_target_protocol)) {
     instructions.response_binding = route_response_binding_;
   }
   if (const std::optional<absl::string_view> model =
@@ -328,6 +341,14 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
   // upstream would reject fails here rather than over the network.
   TranscodeContext ctx;
   ctx.request_path = request_headers_.getPathValue();
+  // The engine reads no headers itself; the first value of a header is the one a binding sees.
+  ctx.request_header = [this](absl::string_view name) -> std::optional<std::string> {
+    const Http::HeaderMap::GetResult values = request_headers_.get(Http::LowerCaseString(name));
+    if (values.empty()) {
+      return std::nullopt;
+    }
+    return std::string(values[0]->value().getStringView());
+  };
   ctx.request_binding = instructions.request_binding;
   ctx.arrived = LlmBindingReadObject::fromFilterState(*filter_state_);
   if (instructions.response_binding != nullptr) {
@@ -360,6 +381,16 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
       !ctx.ir_model.empty() ? std::move(ctx.ir_model) : modelFromPath(instructions.request_binding);
   if (ctx.rewritten_path.has_value()) {
     request_headers_.setPath(*ctx.rewritten_path);
+  }
+  // The binding's header edits, applied here because the engine owns no headers: the headers
+  // themselves are held back until the AI filters finish, so these reach the upstream.
+  for (const HeaderMutation& mutation : ctx.header_mutations) {
+    const Http::LowerCaseString name(mutation.name);
+    if (mutation.value.has_value()) {
+      request_headers_.setCopy(name, *mutation.value);
+    } else {
+      request_headers_.remove(name);
+    }
   }
   return absl::OkStatus();
 }

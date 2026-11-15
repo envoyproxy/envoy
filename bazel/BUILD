@@ -183,10 +183,15 @@ selects.config_setting_group(
 # unwinders and broken Rust dynamic-module panics.
 # The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
 # See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
+# With -unwindlib=none clang has nothing to apply the toolchain's -static-libgcc to and warns
+# "argument unused during compilation" on every link, so that warning is silenced here.
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        ":linux_x86_64_shared_unwind": ["-unwindlib=none"],
+        ":linux_x86_64_shared_unwind": [
+            "-unwindlib=none",
+            "-Wno-unused-command-line-argument",
+        ],
         ":linux": ["-static-libgcc"],
         "//conditions:default": [],
     }),
@@ -326,6 +331,16 @@ config_setting(
 config_setting(
     name = "clang_pch_build",
     values = {"define": "ENVOY_CLANG_PCH=1"},
+)
+
+config_setting(
+    name = "gcc_requested",
+    flag_values = {":use_gcc": "true"},
+)
+
+bool_flag(
+    name = "use_gcc",
+    build_setting_default = False,
 )
 
 config_setting(
@@ -684,14 +699,37 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
-# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
-# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+# Use prebuilt artifacts for dependencies that offer them (currently wee8). Set to False to
+# build every such dependency from source, e.g. in environments that disallow prebuilt
+# artifacts: --//bazel:use_prebuilt_libs=False
+# Toolchain components (compiler, sysroot, libc++/libunwind runtimes) are not covered.
+bool_flag(
+    name = "use_prebuilt_libs",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "prebuilt_libs_disabled",
+    flag_values = {":use_prebuilt_libs": "False"},
+)
+
+selects.config_setting_group(
+    name = "wee8_source_build",
+    match_any = [
+        ":prebuilt_libs_disabled",
+        ":asan_build",
+        ":msan_build",
+        ":tsan_build",
+    ],
+)
+
+# wee8 engine: envoy_toolshed prebuilt by default, source when :use_prebuilt_libs is False
+# or for configs the prebuilt is incompatible with (sanitizers need instrumented deps).
+# envoy_toolshed itself falls back to source on unsupported platforms.
 alias(
     name = "wee8_engine",
     actual = select({
-        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":wee8_source_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         "//conditions:default": "@envoy_toolshed//v8:wee8",
     }),
     visibility = ["//visibility:public"],
@@ -1003,6 +1041,46 @@ selects.config_setting_group(
     match_all = [
         ":engflow_rbe",
         ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_asan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":asan_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_coverage",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":coverage_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_gcc",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":gcc_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_msan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":msan_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_tsan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":tsan_build",
     ],
 )
 

@@ -30,7 +30,6 @@
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -59,12 +58,12 @@ public:
     // Avoid strict mock failures for the following calls. We want strict for other calls.
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly([this](Buffer::Instance& data, bool) {
           if (decoder_callbacks_.buffer_ == nullptr) {
             decoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }
           decoder_callbacks_.buffer_->move(data);
-        }));
+        });
 
     EXPECT_CALL(decoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
@@ -72,12 +71,12 @@ public:
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly([this](Buffer::Instance& data, bool) {
           if (encoder_callbacks_.buffer_ == nullptr) {
             encoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }
           encoder_callbacks_.buffer_->move(data);
-        }));
+        });
     EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
@@ -220,15 +219,15 @@ TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
   bool destroyed = false;
   bool data_called_after_destroy = false;
   ON_CALL(*dso_lib, envoyGoFilterOnHttpData(_, _, _, _))
-      .WillByDefault(Invoke(
+      .WillByDefault(
           [&destroyed, &data_called_after_destroy](processState*, GoUint64, GoUint64, GoUint64) {
             if (destroyed) {
               data_called_after_destroy = true;
             }
             return static_cast<uint64_t>(GolangStatus::Continue);
-          }));
+          });
   ON_CALL(*dso_lib, envoyGoFilterOnHttpDestroy(_, _))
-      .WillByDefault(Invoke([&destroyed](httpRequest*, int) { destroyed = true; }));
+      .WillByDefault([&destroyed](httpRequest*, int) { destroyed = true; });
 
   const auto yaml = R"EOF(
     library_id: test
@@ -263,9 +262,7 @@ TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
   Buffer::OwnedImpl body("request body");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter->decodeData(body, false));
 
-  EXPECT_CALL(mock_callbacks, continueDecoding()).WillOnce(Invoke([&filter]() {
-    filter->onDestroy();
-  }));
+  EXPECT_CALL(mock_callbacks, continueDecoding()).WillOnce([&filter]() { filter->onDestroy(); });
 
   filter->continueStatusInternal(filter->testDecodingState(), GolangStatus::Continue);
 
@@ -320,11 +317,11 @@ TEST_F(GolangHttpFilterTest, ContinueStatusFromInsideHeaderCgoCallbackPostsToDis
   filter->setEncoderFilterCallbacks(mock_enc_callbacks);
 
   EXPECT_CALL(*dso_lib, envoyGoFilterOnHttpHeader(_, _, _, _))
-      .WillOnce(Invoke([&filter](processState*, int, int, uint64_t) -> uint64_t {
+      .WillOnce([&filter](processState*, int, int, uint64_t) -> uint64_t {
         auto status = filter->continueStatus(filter->testDecodingState(), GolangStatus::Continue);
         EXPECT_EQ(CAPIStatus::CAPIOK, status);
         return static_cast<uint64_t>(GolangStatus::Running);
-      }));
+      });
 
   // No inline continueDecoding while the cgo frame is on the stack: state must still
   // be ProcessingHeader when handleHeaderGolangStatus runs.

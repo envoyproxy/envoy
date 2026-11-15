@@ -564,8 +564,8 @@ public:
     startTokenFlowForTest(request_headers);
     Http::TestResponseHeaderMapImpl response;
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-        .WillOnce(Invoke(
-            [&response](Http::ResponseHeaderMap& headers, bool) { response.copyFrom(headers); }));
+        .WillOnce(
+            [&response](Http::ResponseHeaderMap& headers, bool) { response.copyFrom(headers); });
     filter_->onGetAccessTokenSuccess(access_token, id_token, "", std::chrono::seconds(600));
     return response;
   }
@@ -711,10 +711,9 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
-  EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
-        init_handle = target.createHandle("test");
-      }));
+  EXPECT_CALL(init_manager, add(_)).WillRepeatedly([&init_handle](const Init::Target& target) {
+    init_handle = target.createHandle("test");
+  });
 
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "client", secret_context.server_context_, init_manager, true);
@@ -1331,7 +1330,7 @@ TEST_F(OAuth2Test, RequestSignout) {
   };
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(headers.Status()->value(), "302");
         EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 11);
         EXPECT_EQ(headers.get(Http::Headers::get().Location)[0]->value().getStringView(),
@@ -1347,7 +1346,7 @@ TEST_F(OAuth2Test, RequestSignout) {
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier.1"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce.2"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier.2"), "deleted");
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -6237,7 +6236,7 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
     init(makeFilterConfig(p, secret_reader).value());
 
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-        .WillOnce(Invoke([&](Http::ResponseHeaderMap& passed_headers, bool) {
+        .WillOnce([&](Http::ResponseHeaderMap& passed_headers, bool) {
           EXPECT_EQ(passed_headers.get(Http::Headers::get().SetCookie).size(), 5);
           const auto& cookie_str =
               passed_headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView();
@@ -6246,7 +6245,7 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
           } else {
             EXPECT_THAT(cookie_str, testing::Not(testing::HasSubstr("; Secure")));
           }
-        }));
+        });
     auto request_headers = Http::TestRequestHeaderMapImpl{
         {Http::Headers::get().Host.get(), "traffic.example.com"},
         {Http::Headers::get().Path.get(), "/_signout"},
@@ -6322,9 +6321,9 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
 
     Http::TestResponseHeaderMapImpl response_headers;
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+        .WillOnce([&response_headers](Http::ResponseHeaderMap& headers, bool) {
           response_headers = Http::TestResponseHeaderMapImpl(headers);
-        }));
+        });
 
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, false));
@@ -6389,9 +6388,9 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
 
     Http::TestResponseHeaderMapImpl response_headers;
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+        .WillOnce([&response_headers](Http::ResponseHeaderMap& headers, bool) {
           response_headers = Http::TestResponseHeaderMapImpl(headers);
-        }));
+        });
 
     filter_->onGetAccessTokenSuccess("access_token", "id_token", "refresh_token",
                                      std::chrono::seconds(10));
@@ -6454,9 +6453,9 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
 
     Http::TestResponseHeaderMapImpl response_headers;
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+        .WillOnce([&response_headers](Http::ResponseHeaderMap& headers, bool) {
           response_headers = Http::TestResponseHeaderMapImpl(headers);
-        }));
+        });
 
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(signout_headers, false));
@@ -7348,10 +7347,10 @@ TEST_F(OAuth2Test, OversizedTokenIsRefused) {
 
     // The local reply is the only response, and it sets no cookies.
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
-        .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool) {
+        .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
           EXPECT_EQ(headers.getStatusValue(), "503");
           EXPECT_THAT(setCookies(headers), testing::IsEmpty());
-        }));
+        });
     EXPECT_CALL(decoder_callbacks_,
                 sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
                                "OAuth token exceeds the cookie chunk limit"));
@@ -7491,9 +7490,9 @@ TEST_F(OAuth2Test, SignOutDeletesChunkedTokenCookies) {
   };
   std::vector<std::string> set_cookies;
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&set_cookies](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&set_cookies](Http::ResponseHeaderMap& headers, bool) {
         set_cookies = setCookies(headers);
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));

@@ -516,6 +516,34 @@ func (h *dymListenerFilterHandle) GetDynamicMetadataNumber(
 	return float64(value), true
 }
 
+func (h *dymListenerFilterHandle) SetDynamicMetadataStruct(
+	metadataNamespace string,
+	serializedStruct []byte,
+) bool {
+	ret := C.envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedStruct),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedStruct)
+	return bool(ret)
+}
+
+func (h *dymListenerFilterHandle) SetDynamicTypedMetadata(
+	metadataNamespace string,
+	serializedAny []byte,
+) bool {
+	ret := C.envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedAny),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedAny)
+	return bool(ret)
+}
+
 func (h *dymListenerFilterHandle) SetFilterState(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_listener_filter_set_filter_state(
 		h.hostPluginPtr,
@@ -796,6 +824,15 @@ func (h *dymListenerConfigHandle) RecordHistogramValue(
 		C.uint64_t(value),
 	)
 	return shared.MetricsResult(result)
+}
+
+func (h *dymListenerConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	loadShedPoint := C.envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+	)
+	runtime.KeepAlive(name)
+	return newLoadShedPoint(loadShedPoint)
 }
 
 func (h *dymListenerConfigHandle) GetScheduler() shared.Scheduler {

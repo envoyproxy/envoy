@@ -269,7 +269,7 @@ private:
 class WorkloadDiscoveryFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
   // Server::Configuration::BootstrapExtensionFactory
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override {
     const auto& message =

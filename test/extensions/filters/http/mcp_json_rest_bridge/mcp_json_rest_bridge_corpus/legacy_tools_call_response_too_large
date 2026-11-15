@@ -1,0 +1,30 @@
+config {
+  max_response_body_size { value: 16 }
+  tool_config {
+    tools {
+      name: "create_note"
+      http_rule { post: "/v1/notes" body: "*" }
+    }
+  }
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "mcp-protocol-version" value: "2025-11-25" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"create_note","arguments":{"text":"hi"}}}'
+  }
+}
+upstream_response {
+  headers {
+    headers { key: ":status" value: "200" }
+    headers { key: "content-type" value: "application/json" }
+  }
+  http_body {
+    data: '{"id":"note-1",'
+    data: '"text":"a response that is larger than sixteen bytes"}'
+  }
+}

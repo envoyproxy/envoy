@@ -13,7 +13,7 @@ envoy_cc_mock(
     name = "connection_mocks",
     srcs = ["connection.cc"],
     hdrs = ["connection.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
@@ -54,7 +54,10 @@ envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "asan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         ":connection_mocks",
         ":io_handle_mocks",

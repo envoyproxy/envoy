@@ -22,8 +22,9 @@ namespace Tls {
 namespace CertificateSelectors {
 
 class AsyncContext;
+using AsyncContextSharedPtr = std::shared_ptr<AsyncContext>;
 using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
-using AsyncContextFactory = absl::AnyInvocable<AsyncContextConstSharedPtr(
+using AsyncContextFactory = absl::AnyInvocable<AsyncContextSharedPtr(
     Stats::Scope&, Server::Configuration::ServerFactoryContext&, const Ssl::TlsCertificateConfig&,
     absl::Status&)>;
 

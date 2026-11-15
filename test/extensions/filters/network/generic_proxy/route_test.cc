@@ -14,7 +14,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -129,19 +128,18 @@ TEST_F(RouteEntryImplTest, RouteTypedMetadata) {
  * verifies that the proto per filter config can be loaded correctly.
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
-  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
+  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault([]() {
     return std::make_unique<Protobuf::Struct>();
-  }));
+  });
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
   ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
-      .WillByDefault(
-          Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
-                        ProtobufMessage::ValidationVisitor&) {
-            auto route_config = std::make_shared<RouteConfig>();
-            route_config_map_.emplace(filter_config_.name(), route_config);
-            return route_config;
-          }));
+      .WillByDefault([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                            ProtobufMessage::ValidationVisitor&) {
+        auto route_config = std::make_shared<RouteConfig>();
+        route_config_map_.emplace(filter_config_.name(), route_config);
+        return route_config;
+      });
 
   const std::string yaml_config = R"EOF(
     cluster: cluster_0
@@ -174,9 +172,9 @@ TEST_F(RouteEntryImplTest, RouteTimeout) {
  * unexpected type is used to find the filter factory and finally an exception is thrown.
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
-  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
+  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault([]() {
     return std::make_unique<Protobuf::Struct>();
-  }));
+  });
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
   const std::string yaml_config = R"EOF(
@@ -206,9 +204,7 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
  * Test the case where there is no route level proto available for the filter.
  */
 TEST_F(RouteEntryImplTest, NullRouteEmptyProto) {
-  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return nullptr;
-  }));
+  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault([]() { return nullptr; });
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
   const std::string yaml_config = R"EOF(
@@ -228,9 +224,9 @@ TEST_F(RouteEntryImplTest, NullRouteEmptyProto) {
  */
 TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
-  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
+  ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault([]() {
     return std::make_unique<Protobuf::Struct>();
-  }));
+  });
 
   const std::string yaml_config = R"EOF(
     cluster: cluster_0

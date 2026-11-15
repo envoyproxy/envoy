@@ -92,6 +92,14 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
   }
 }
 
+void ContextManagerImpl::addContext(const Envoy::Ssl::ContextSharedPtr& context) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (context != nullptr) {
+    const bool inserted = contexts_.insert(context).second;
+    ASSERT(inserted);
+  }
+}
+
 void ContextManagerImpl::removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) {
   if (old_context != nullptr) {
     auto erased = contexts_.erase(old_context);
