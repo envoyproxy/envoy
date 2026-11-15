@@ -41,9 +41,12 @@ bool allowedInternalListener(const Network::Address::Instance& address) {
   if (!name) {
     return false;
   }
+  // The readiness-gated adapter listeners retain the same peer-metadata exchange.
+  // Their preamble must also be consumed before reaching the application codec.
   // internal_outbound is a listener name used in proxy e2e tests, so we allow it here as well.
   return *name == "connect_originate" || *name == "inner_connect_originate" ||
-         *name == "internal_outbound";
+         *name == "connect_originate_hbone_adapter" ||
+         *name == "inner_connect_originate_hbone_adapter" || *name == "internal_outbound";
 }
 
 bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
@@ -308,18 +311,18 @@ void UpstreamFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
 
 // We want to enable baggage based peer metadata discovery if all of the following is true
 // - the upstream host is an internal listener, and specifically connect_originate or
-//   inner_connect_originate internal listener - those are the only listeners that
-//   support baggage-based peer metadata discovery
+//   inner_connect_originate internal listener (including their adapter variants) - those
+//   are the only production listeners that support baggage-based peer metadata discovery
 // - communication with upstream happens in plain text, e.g., there is no TLS upstream
 //   transport socket or PROXY transport socket there - we need it in the current
-//   implemetation of the baggage-based peer metadata discovery because we inject peer
+//   implementation of the baggage-based peer metadata discovery because we inject peer
 //   metadata into the data stream and transport sockets that modify the data stream
 //   interfere with that (NOTE: in the future release we are planning to lift this
 //   limitation by communicating over shared memory instead).
 //
 // We can easily check if the upstream host is an internal listener, so checking the first
 // condition is easy. We can't easily check the second condition in the filter itself, so
-// instead we rely on istiod providing that information in form of the host metadata on the
+// instead we rely on the Istio control plane providing that information as host metadata on the
 // endpoint or cluster level.
 bool UpstreamFilter::disableDiscovery() const {
   ASSERT(callbacks_);
@@ -337,9 +340,7 @@ bool UpstreamFilter::disableDiscovery() const {
   }
 
   if (!allowedInternalListener(*host->address())) {
-    ENVOY_LOG(
-        trace,
-        "Upstream host is not connect_originate or inner_connect_originate internal listener");
+    ENVOY_LOG(trace, "Upstream host is not a supported HBONE origination internal listener");
     return true;
   }
 

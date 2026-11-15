@@ -144,7 +144,7 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                                          absl::string_view substr, absl::string_view negative_match)
-    : TagExtractorImplBase(name, regex, substr), regex_(std::string(regex)),
+    : TagExtractorImplBase(name, regex, substr), regex_(regex),
       negative_match_(std::string(negative_match)) {}
 
 bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
@@ -174,7 +174,7 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
     }
 
     if (negative_match_.empty() || negative_match_ != value_subexpr) {
-      addTagReturningValueRef(tags) = std::string(value_subexpr);
+      addTagReturningValueRef(tags).assign(value_subexpr);
 
       // Determines which characters to remove from stat_name to elide remove_subexpr.
       std::string::size_type start = remove_subexpr.data() - stat_name.data();
@@ -247,7 +247,7 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   } else if (start > 0) {
     --start; // Remove the dot prior to the lat token, e.g. ".ef"
   }
-  addTagReturningValueRef(tags) = std::string(tag_value);
+  addTagReturningValueRef(tags).assign(tag_value);
   remove_characters.insert(start, end);
 
   PERF_RECORD(perf, "tokens-match", name_);

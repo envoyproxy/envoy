@@ -2,8 +2,11 @@
 #include <vector>
 
 #include "envoy/common/logger.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/config/decoded_resource_impl.h"
 #include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/config_validation/server.h"
@@ -14,16 +17,18 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_time.h"
 
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -224,6 +229,38 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   listener_component_factory.getTcpListenerConfigProviderManager();
 }
 
+// The LDS of the validation listener component factory names a nameless listener with the random
+// generator of the server.
+TEST(ValidationListenerComponentFactoryTest, LdsNamesListenersWithTheServerRandomGenerator) {
+  testing::NiceMock<MockInstance> server;
+  ValidationListenerComponentFactory listener_component_factory(server);
+  envoy::config::core::v3::ConfigSource lds_config;
+  lds_config.mutable_ads();
+  LdsApiPtr lds_api = listener_component_factory.createLdsApi(lds_config, nullptr);
+  ASSERT_NE(nullptr, lds_api);
+
+  EXPECT_CALL(server.api_.random_, uuid()).WillOnce(Return("generated_name"));
+  Protobuf::RepeatedPtrField<Protobuf::Any> resources;
+  std::ignore = resources.Add()->PackFrom(envoy::config::listener::v3::Listener());
+  absl::StatusOr<std::unique_ptr<Config::DecodedResourcesWrapper>> decoded_resources =
+      Config::DecodedResourcesWrapper::create(
+          *server.cluster_manager_.subscription_factory_.resource_decoder_, resources, "");
+  ASSERT_OK(decoded_resources);
+  EXPECT_EQ("generated_name", Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(
+                                  (*decoded_resources)->refvec_[0].get().resource())
+                                  .name());
+}
+
+TEST(ValidationListenerComponentFactoryTest, CreatesQuicListenerFilters) {
+  testing::NiceMock<MockInstance> server;
+  ValidationListenerComponentFactory listener_component_factory(server);
+  testing::NiceMock<Configuration::MockListenerFactoryContext> context;
+  absl::StatusOr<Filter::QuicListenerFilterFactoriesList> filter_factories =
+      listener_component_factory.createQuicListenerFilterFactoryList({}, context);
+  ASSERT_OK(filter_factories);
+  EXPECT_TRUE(filter_factories->empty());
+}
+
 class TestObject : public ProcessObject {
 public:
   void setFlag(bool value) { boolean_flag_ = value; }
@@ -366,10 +403,10 @@ TEST_P(JsonApplicationLogsValidationServerTest, JsonApplicationLogs) {
 
   Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "hello");
   server.shutdown();
@@ -426,10 +463,10 @@ TEST_P(TextApplicationLogsValidationServerTest, TextApplicationLogs) {
 
   Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "hello");
   server.shutdown();
@@ -458,9 +495,9 @@ public:
 // Verify that bootstrap extensions are created during validation mode.
 TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringValidation) {
   testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
-  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<test::common::config::DummyConfig>();
-  }));
+  });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
 
   auto mock_extension = std::make_unique<MockBootstrapExtension>();
@@ -469,13 +506,13 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringV
   EXPECT_CALL(*mock_extension, onWorkerThreadInitialized()).Times(0);
 
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([&](const Protobuf::Message& config,
-                           Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+      .WillOnce([&](const Protobuf::Message& config,
+                    Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
         const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
         EXPECT_NE(nullptr, proto);
         EXPECT_EQ(proto->a(), "foo");
-        return std::move(mock_extension);
-      }));
+        return BootstrapExtensionPtr{std::move(mock_extension)};
+      });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -493,15 +530,15 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringV
 // Verify that a bootstrap extension factory throwing an error causes validation to fail.
 TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionThrowingFailsValidation) {
   testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
-  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<test::common::config::DummyConfig>();
-  }));
+  });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message&,
-                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
-        throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
-      }));
+      .WillOnce([](const Protobuf::Message&,
+                   Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
+        return absl::InvalidArgumentError("Unable to initiate mock_bootstrap_extension.");
+      });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -542,15 +579,15 @@ TEST_P(BootstrapExtensionValidationServerTest, ValidateConfigReturnsFalseForBadE
 // Verify that validateConfig returns true when bootstrap extensions are valid.
 TEST_P(BootstrapExtensionValidationServerTest, ValidateConfigReturnsTrueForValidExtension) {
   testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
-  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<test::common::config::DummyConfig>();
-  }));
+  });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message&,
-                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
-        return std::make_unique<MockBootstrapExtension>();
-      }));
+      .WillOnce([](const Protobuf::Message&,
+                   Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
+        return BootstrapExtensionPtr{std::make_unique<MockBootstrapExtension>()};
+      });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);

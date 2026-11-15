@@ -627,6 +627,34 @@ func (mr *MockListenerFilterHandleMockRecorder) SetDynamicMetadataString(metadat
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDynamicMetadataString", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetDynamicMetadataString), metadataNamespace, key, value)
 }
 
+// SetDynamicMetadataStruct mocks base method.
+func (m *MockListenerFilterHandle) SetDynamicMetadataStruct(metadataNamespace string, serializedStruct []byte) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDynamicMetadataStruct", metadataNamespace, serializedStruct)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetDynamicMetadataStruct indicates an expected call of SetDynamicMetadataStruct.
+func (mr *MockListenerFilterHandleMockRecorder) SetDynamicMetadataStruct(metadataNamespace, serializedStruct any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDynamicMetadataStruct", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetDynamicMetadataStruct), metadataNamespace, serializedStruct)
+}
+
+// SetDynamicTypedMetadata mocks base method.
+func (m *MockListenerFilterHandle) SetDynamicTypedMetadata(metadataNamespace string, serializedAny []byte) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDynamicTypedMetadata", metadataNamespace, serializedAny)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetDynamicTypedMetadata indicates an expected call of SetDynamicTypedMetadata.
+func (mr *MockListenerFilterHandleMockRecorder) SetDynamicTypedMetadata(metadataNamespace, serializedAny any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDynamicTypedMetadata", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetDynamicTypedMetadata), metadataNamespace, serializedAny)
+}
+
 // SetFilterState mocks base method.
 func (m *MockListenerFilterHandle) SetFilterState(key string, value []byte) bool {
 	m.ctrl.T.Helper()
@@ -852,6 +880,20 @@ func (m *MockListenerFilterConfigHandle) DefineHistogram(name string) (shared.Me
 func (mr *MockListenerFilterConfigHandleMockRecorder) DefineHistogram(name any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockListenerFilterConfigHandle)(nil).DefineHistogram), name)
+}
+
+// GetLoadShedPoint mocks base method.
+func (m *MockListenerFilterConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLoadShedPoint", name)
+	ret0, _ := ret[0].(shared.LoadShedPoint)
+	return ret0
+}
+
+// GetLoadShedPoint indicates an expected call of GetLoadShedPoint.
+func (mr *MockListenerFilterConfigHandleMockRecorder) GetLoadShedPoint(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLoadShedPoint", reflect.TypeOf((*MockListenerFilterConfigHandle)(nil).GetLoadShedPoint), name)
 }
 
 // GetRuntimeBool mocks base method.

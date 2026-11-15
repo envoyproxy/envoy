@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.cgroup_memory"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
     name = "cgroup_memory_monitor_test",
     srcs = ["cgroup_memory_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.cgroup_memory"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
         "//test/mocks/server:server_mocks",

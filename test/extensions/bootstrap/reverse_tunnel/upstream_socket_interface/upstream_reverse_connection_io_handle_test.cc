@@ -40,7 +40,7 @@ protected:
     socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(server_context_);
     extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_,
                                                                   server_context_, config_);
-    tls_registry_ = std::make_unique<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    tls_registry_ = std::make_unique<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
   }
 
   void TearDown() override {

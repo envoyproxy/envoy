@@ -1,0 +1,17 @@
+config {
+  attribute_source: HEADERS
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "accept" value: "*/*" }
+    headers { key: "mcp-protocol-version" value: "2025-06-18" }
+    headers { key: "mcp-method" value: "tools/call" }
+    headers { key: "mcp-name" value: "header_tool" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"body_tool"}}'
+  }
+}

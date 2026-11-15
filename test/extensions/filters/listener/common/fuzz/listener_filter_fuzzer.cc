@@ -57,26 +57,26 @@ ListenerFilterWithDataFuzzer::ListenerFilterWithDataFuzzer()
 
 void ListenerFilterWithDataFuzzer::connect() {
   EXPECT_CALL(factory_, createListenerFilterChain(_))
-      .WillOnce(Invoke([this](Network::ListenerFilterManager& filter_manager) -> bool {
+      .WillOnce([this](Network::ListenerFilterManager& filter_manager) -> bool {
         ASSERT(filter_ != nullptr);
         filter_manager.addAcceptFilter(nullptr, std::move(filter_));
         dispatcher_->exit();
         return true;
-      }));
+      });
   conn_->connect();
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+      .WillOnce([&](Network::ConnectionEvent) -> void {
         connection_established_ = true;
         dispatcher_->exit();
-      }));
+      });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 void ListenerFilterWithDataFuzzer::disconnect() {
   if (connection_established_) {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     conn_->close(Network::ConnectionCloseType::NoFlush);
     dispatcher_->run(Event::Dispatcher::RunType::Block);

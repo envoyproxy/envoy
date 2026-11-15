@@ -13,6 +13,7 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/config/well_known_names.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
@@ -21,6 +22,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/tagged_stats_test_util.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/status_utility.h"
@@ -61,6 +63,8 @@ struct GrpcInitializeConfigOpts {
   bool enforce_response_header_limits = false;
   uint32_t status_on_error_code = 0;
   bool shadow_mode = false;
+  // When set, the filter's stats carry it as an extra name segment and tag.
+  std::string stat_prefix;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -103,16 +107,20 @@ public:
   ExtAuthzGrpcIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ExtAuthzGrpcIntegrationTest::ipVersion()) {}
 
-  // The stat names asserted below must be the same whether or not the HTTP filters are created
-  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
-  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  // The stat names, tag-extracted names and tags asserted below must be the same whether or not
+  // the HTTP filters are created with the connection manager's prefixed scope, and whether tags
+  // are derived with the explicit-tags logic or extracted from the flat names with the legacy
+  // regexes. Exercise both modes of the two guards without doubling the test matrix: the v4 tests
+  // run the server with the new behavior and the v6 tests with the legacy one.
   bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
 
   void initialize() override {
     config_helper_.addRuntimeOverride(
         "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
         prefixedScope() ? "true" : "false");
+    Stats::TestUtil::setExplicitStatsTags(prefixedScope());
     HttpIntegrationTest::initialize();
+    Stats::TestUtil::verifyExplicitStatsTags(*test_server_, prefixedScope());
   }
 
   static std::string testParamsToString(
@@ -151,6 +159,9 @@ public:
       ConfigHelper::setHttp2(*ext_authz_cluster);
 
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
+      if (!opts.stat_prefix.empty()) {
+        proto_config_.set_stat_prefix(opts.stat_prefix);
+      }
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
 
@@ -868,16 +879,20 @@ public:
   ExtAuthzHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
-  // The stat names asserted below must be the same whether or not the HTTP filters are created
-  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
-  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  // The stat names, tag-extracted names and tags asserted below must be the same whether or not
+  // the HTTP filters are created with the connection manager's prefixed scope, and whether tags
+  // are derived with the explicit-tags logic or extracted from the flat names with the legacy
+  // regexes. Exercise both modes of the two guards without doubling the test matrix: the v4 tests
+  // run the server with the new behavior and the v6 tests with the legacy one.
   bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
 
   void initialize() override {
     config_helper_.addRuntimeOverride(
         "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
         prefixedScope() ? "true" : "false");
+    Stats::TestUtil::setExplicitStatsTags(prefixedScope());
     HttpIntegrationTest::initialize();
+    Stats::TestUtil::verifyExplicitStatsTags(*test_server_, prefixedScope());
   }
 
   static std::string testParamsToString(
@@ -1678,6 +1693,55 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
                                                  {"downstream2", "downstream-should-see-me"},
                                                  {"replaceable", "by-ext-authz"}},
                  expected_body);
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, FilterStatsAreTagged) {
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {});
+  waitForSuccessfulUpstreamResponse("200");
+  test_server_->waitForCounter("http.config_test.ext_authz.ok", Eq(1));
+
+  // The filter's own stats live in the connection manager's scope and carry its prefix as a tag;
+  // the stats charged to the upstream cluster carry the cluster's name instead.
+  Stats::TestUtil::expectStatTags(
+      *test_server_, "http.config_test.ext_authz.ok", "http.ext_authz.ok",
+      {{Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, "config_test"}});
+  Stats::TestUtil::expectStatTags(*test_server_, "cluster.cluster_0.ext_authz.ok",
+                                  "cluster.ext_authz.ok",
+                                  {{Config::TagNames::get().CLUSTER_NAME, "cluster_0"}});
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, FilterStatsWithStatPrefixAreTagged) {
+  GrpcInitializeConfigOpts opts;
+  opts.stat_prefix = "waf";
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {});
+  waitForSuccessfulUpstreamResponse("200");
+  test_server_->waitForCounter("http.config_test.ext_authz.waf.ok", Eq(1));
+
+  // The filter's optional stat prefix stays a segment of the flat names and is a tag of its own.
+  Stats::TestUtil::expectStatTags(
+      *test_server_, "http.config_test.ext_authz.waf.ok", "http.ext_authz.ok",
+      {{Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, "config_test"},
+       {Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf"}});
+  Stats::TestUtil::expectStatTags(*test_server_, "cluster.cluster_0.ext_authz.waf.ok",
+                                  "cluster.ext_authz.ok",
+                                  {{Config::TagNames::get().CLUSTER_NAME, "cluster_0"},
+                                   {Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf"}});
+
   cleanup();
 }
 

@@ -230,7 +230,7 @@ void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
                                                DnsEndpointConfig& endpoint_config) {
 
   DnsVirtualDomainConfigSharedPtr virtual_domains = std::make_shared<DnsVirtualDomainConfig>();
-  virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
+  virtual_domains->emplace(domain_name, std::move(endpoint_config));
 
   auto success = dns_lookup_trie_.add(suffix, std::move(virtual_domains), false);
   ASSERT(success, "Unable to overwrite existing suffix in dns_filter trie");
