@@ -1,5 +1,7 @@
 """Bazel macros for bssl-compat library."""
 
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+
 def patched_bssl_filegroup(name, srcs):
     """Copy BoringSSL files from @boringssl-source into bssl-compat, applying patches.
 
@@ -121,3 +123,42 @@ def mapping_func_filegroup(name, funcs):
         name = name,
         srcs = targets,
     )
+
+def _openssl_include_dir_impl(ctx):
+    out = ctx.actions.declare_directory(ctx.label.name)
+    hdrs = {}
+    for hdr in ctx.attr.lib[CcInfo].compilation_context.headers.to_list():
+        # short_path is "../<repo>/<path>" for files in external repositories,
+        # both for source and generated headers.
+        path = hdr.short_path
+        if path.startswith("../"):
+            path = path.split("/", 2)[2]
+        if not path.startswith("include/openssl/") or path.count("/") != 2:
+            continue
+        if hdr.basename in hdrs and hdrs[hdr.basename] != hdr:
+            fail("Duplicate OpenSSL header {}: {} and {}".format(hdr.basename, hdrs[hdr.basename].path, hdr.path))
+        hdrs[hdr.basename] = hdr
+    if not hdrs:
+        fail("No include/openssl/*.h headers found in {}".format(ctx.attr.lib.label))
+
+    args = ctx.actions.args()
+    args.add(out.path + "/openssl")
+    args.add_all(sorted(hdrs.values(), key = lambda f: f.basename))
+    ctx.actions.run_shell(
+        inputs = hdrs.values(),
+        outputs = [out],
+        arguments = [args],
+        command = 'dst="$1"; shift; mkdir -p "$dst" && cp "$@" "$dst/"',
+        mnemonic = "OpenSSLIncludeDir",
+        progress_message = "Collecting OpenSSL headers into %{output}",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+openssl_include_dir = rule(
+    doc = """Collects the include/openssl/*.h headers (source and generated) of
+    an OpenSSL cc_library into a single directory, laid out as openssl/*.h.""",
+    implementation = _openssl_include_dir_impl,
+    attrs = {
+        "lib": attr.label(mandatory = True, providers = [CcInfo]),
+    },
+)

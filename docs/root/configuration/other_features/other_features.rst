@@ -7,6 +7,7 @@ Other features
   bootstrap_extensions/dynamic_modules
   hyperscan
   internal_listener
+  istio_hbone
   rate_limit
   reverse_tunnel
   io_uring

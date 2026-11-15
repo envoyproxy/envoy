@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -45,6 +47,23 @@ public:
   private:
     const MonotonicTime end_time_;
   };
+
+  // Integration tests with timer-driven I/O can register their test-thread dispatcher. Other
+  // dispatchers run on background threads. Unregister before destroying the dispatcher.
+  // Real time systems do not need this registration.
+  virtual void setIoDispatcher(Dispatcher*) {}
+  virtual Dispatcher* ioDispatcher() { return nullptr; }
+
+  // Drive the registered I/O dispatcher's alarms, stopping at the next deadline. Limit progress
+  // to real time elapsed between polls so a slow worker cannot cause premature protocol timeouts.
+  // With no armed alarms or a different dispatcher, simulated time stays unchanged.
+  void advanceTimeForIo(Dispatcher& dispatcher) {
+    const auto now = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+    const auto elapsed = last_io_poll_.has_value() ? now - *last_io_poll_ : Duration::zero();
+    last_io_poll_ = now;
+    advanceTimeForIoImpl(dispatcher, elapsed);
+  }
+  virtual void advanceTimeForIoImpl(Dispatcher&, const Duration&) {}
 
   /**
    * Advances time forward by the specified duration, running any timers
@@ -126,6 +145,9 @@ public:
 
 protected:
   Thread::OnlyOneThread only_one_thread_;
+
+private:
+  std::optional<MonotonicTime> last_io_poll_;
 };
 
 // There should only be one instance of any time-system resident in a test
@@ -161,6 +183,13 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
+  void setIoDispatcher(Dispatcher* dispatcher) override {
+    timeSystem().setIoDispatcher(dispatcher);
+  }
+  Dispatcher* ioDispatcher() override { return timeSystem().ioDispatcher(); }
+  void advanceTimeForIoImpl(Dispatcher& dispatcher, const Duration& elapsed) override {
+    timeSystem().advanceTimeForIoImpl(dispatcher, elapsed);
+  }
   void advanceTimeAsyncImpl(const Duration& duration) override {
     timeSystem().advanceTimeAsyncImpl(duration);
   }

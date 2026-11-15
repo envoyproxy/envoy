@@ -52,12 +52,11 @@ public:
     setupResponseParser();
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(callbacks_.udp_listener_, send(_))
-        .WillRepeatedly(
-            Invoke([this](const Network::UdpSendData& send_data) -> Api::IoCallUint64Result {
-              udp_response_.buffer_->drain(udp_response_.buffer_->length());
-              udp_response_.buffer_->move(send_data.buffer_);
-              return makeNoError(udp_response_.buffer_->length());
-            }));
+        .WillRepeatedly([this](const Network::UdpSendData& send_data) -> Api::IoCallUint64Result {
+          udp_response_.buffer_->drain(udp_response_.buffer_->length());
+          udp_response_.buffer_->move(send_data.buffer_);
+          return makeNoError(udp_response_.buffer_->length());
+        });
     EXPECT_CALL(callbacks_.udp_listener_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   }
 

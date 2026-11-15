@@ -166,12 +166,12 @@ jobs:
     - sign
     runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/dispatch@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       with:
         ref: main
         repository: envoyproxy/envoy-website

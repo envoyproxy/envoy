@@ -179,8 +179,8 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
     const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   ASSERT(isThreadSafe());
 
-  auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
-      std::string(address->addressType()));
+  auto* factory =
+      Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(address->addressType());
 
   // The target address is usually offered by EDS and the EDS api should reject the unsupported
   // address.

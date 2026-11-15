@@ -20,6 +20,7 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/config/metadata.h"
 #include "source/common/conn_pool/pending_stream.h"
 #include "source/common/network/address_impl.h"
@@ -52,6 +53,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/mocks/upstream/transport_socket_match.h"
@@ -70,7 +72,6 @@ using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
-using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -140,11 +141,11 @@ struct ResolverData {
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
     EXPECT_CALL(dns_resolver, resolve(_, _, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                      Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           dns_callback_ = cb;
           return &active_dns_query_;
-        }))
+        })
         .RetiresOnSaturation();
   }
 
@@ -257,12 +258,12 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
                     port_value: 443
   )EOF";
   EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+      .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
-      }));
+      });
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
@@ -7844,6 +7845,64 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff
   const auto* retry_policy = cluster->info()->httpProtocolOptions().retryPolicy();
   ASSERT_NE(nullptr, retry_policy);
   EXPECT_EQ(3, retry_policy->numRetries());
+}
+
+TEST_F(StaticClusterImplTest, RingHashUsesEndpointHostnameForHashing) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: RING_HASH
+    common_lb_config:
+      consistent_hashing_lb_config:
+        use_hostname_for_hashing: true
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            hostname: foo.example.com
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.2
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(2UL, hosts.size());
+  EXPECT_EQ("foo.example.com", hosts[0]->hostname());
+  EXPECT_EQ("", hosts[1]->hostname());
+
+  ThreadAwareLoadBalancerPtr thread_aware_lb = cluster->info()->loadBalancerFactory().create(
+      cluster->info()->loadBalancerConfig(), *cluster->info(), cluster->prioritySet(), runtime_,
+      random_, api_->timeSource());
+  ASSERT_OK(thread_aware_lb->initialize());
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster->prioritySet(), nullptr});
+
+  {
+    // Ring entries of the first host are keyed by the endpoint hostname.
+    NiceMock<MockLoadBalancerContext> context;
+    EXPECT_CALL(context, computeHashKey())
+        .WillRepeatedly(Return(HashUtil::xxHash64("foo.example.com_0")));
+    EXPECT_EQ(hosts[0], lb->chooseHost(&context).host);
+  }
+  {
+    // The second host has no hostname and falls back to its resolved address.
+    NiceMock<MockLoadBalancerContext> context;
+    EXPECT_CALL(context, computeHashKey())
+        .WillRepeatedly(Return(HashUtil::xxHash64("10.0.0.2:443_0")));
+    EXPECT_EQ(hosts[1], lb->chooseHost(&context).host);
+  }
 }
 
 } // namespace

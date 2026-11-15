@@ -10,7 +10,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -58,15 +57,15 @@ void fillV4(sockaddr* name, socklen_t* namelen, const char* ip, uint16_t port) {
 
 void expectLocalAndPeer(NiceMock<Api::MockOsSysCalls>& os) {
   EXPECT_CALL(os, getsockname(_, _, _))
-      .WillRepeatedly(Invoke([](os_fd_t, sockaddr* name, socklen_t* namelen) {
+      .WillRepeatedly([](os_fd_t, sockaddr* name, socklen_t* namelen) {
         fillV4(name, namelen, "127.0.0.1", 1000);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   EXPECT_CALL(os, getpeername(_, _, _))
-      .WillRepeatedly(Invoke([](os_fd_t, sockaddr* name, socklen_t* namelen) {
+      .WillRepeatedly([](os_fd_t, sockaddr* name, socklen_t* namelen) {
         fillV4(name, namelen, "127.0.0.1", 2000);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
 }
 
 TEST(SockmapIoSocketHandle, RegistersOnFirstSuccessfulWrite) {
@@ -176,10 +175,10 @@ TEST(SockmapIoSocketHandle, DoesNotRegisterWhenLocalAddressUnresolved) {
       .WillRepeatedly(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_AGAIN}));
   // The peer resolves so the missing local address is the only reason registration is skipped.
   EXPECT_CALL(os_sys_calls, getpeername(_, _, _))
-      .WillRepeatedly(Invoke([](os_fd_t, sockaddr* name, socklen_t* namelen) {
+      .WillRepeatedly([](os_fd_t, sockaddr* name, socklen_t* namelen) {
         fillV4(name, namelen, "127.0.0.1", 2000);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
 
   char buf[4] = {'d', 'a', 't', 'a'};
   Buffer::RawSlice slice{buf, sizeof(buf)};
@@ -197,10 +196,10 @@ TEST(SockmapIoSocketHandle, DoesNotRegisterWhenPeerAddressUnresolved) {
 
   EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillRepeatedly(Return(Api::SysCallSizeResult{4, 0}));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
-      .WillRepeatedly(Invoke([](os_fd_t, sockaddr* name, socklen_t* namelen) {
+      .WillRepeatedly([](os_fd_t, sockaddr* name, socklen_t* namelen) {
         fillV4(name, namelen, "127.0.0.1", 1000);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getpeername(_, _, _))
       .WillRepeatedly(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_AGAIN}));
 
@@ -223,15 +222,15 @@ TEST(SockmapIoSocketHandle, DoesNotRetryRegistrationAfterUnresolvedAttempt) {
   // later transfers must not retry even once the address resolves.
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_AGAIN}))
-      .WillRepeatedly(Invoke([](os_fd_t, sockaddr* name, socklen_t* namelen) {
+      .WillRepeatedly([](os_fd_t, sockaddr* name, socklen_t* namelen) {
         fillV4(name, namelen, "127.0.0.1", 1000);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getpeername(_, _, _))
-      .WillRepeatedly(Invoke([](os_fd_t, sockaddr* name, socklen_t* namelen) {
+      .WillRepeatedly([](os_fd_t, sockaddr* name, socklen_t* namelen) {
         fillV4(name, namelen, "127.0.0.1", 2000);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
 
   char buf[4] = {'d', 'a', 't', 'a'};
   Buffer::RawSlice slice{buf, sizeof(buf)};

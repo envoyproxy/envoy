@@ -41,8 +41,6 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -55,13 +53,11 @@ namespace Http {
 namespace {
 
 void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
-  EXPECT_CALL(request_decoder, getRequestDecoderHandle())
-      .WillRepeatedly(Invoke([&request_decoder]() {
-        auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
-        ON_CALL(*handle, get())
-            .WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
-        return handle;
-      }));
+  EXPECT_CALL(request_decoder, getRequestDecoderHandle()).WillRepeatedly([&request_decoder]() {
+    auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+    ON_CALL(*handle, get()).WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
+    return handle;
+  });
 }
 
 constexpr absl::string_view kNullCharacter("\0", 1);
@@ -237,10 +233,10 @@ public:
     setupRequestDecoderMock(decoder);
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
     EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true));
     auto status = codec_->dispatch(buffer);
     EXPECT_OK(status);
@@ -296,10 +292,10 @@ void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
   InSequence sequence;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, _));
   auto status = codec_->dispatch(buffer);
@@ -425,10 +421,10 @@ void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string he
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
@@ -467,11 +463,11 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
   Http::ResponseEncoder* response_encoder = nullptr;
 
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         decoder.setResponseEncoder(response_encoder);
         return decoder;
-      }));
+      });
 
   TestRequestHeaderMapImpl expected_headers{
       {":authority", "foo"},
@@ -604,11 +600,11 @@ TEST_F(Http1ServerConnectionImplTest, LargeBodyOptimization) {
   original_slices.erase(original_slices.begin());
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
-  EXPECT_CALL(decoder, decodeData(_, false)).WillOnce(Invoke([&](Buffer::Instance& body, bool) {
+  EXPECT_CALL(decoder, decodeData(_, false)).WillOnce([&](Buffer::Instance& body, bool) {
     auto end_slices = body.getRawSlices();
     end_slices.erase(end_slices.begin());
     EXPECT_EQ(original_slices, end_slices);
-  }));
+  });
 
   auto status = codec_->dispatch(buffer);
   EXPECT_OK(status);
@@ -628,9 +624,9 @@ TEST_F(Http1ServerConnectionImplTest, ContentLengthAllBitsSet) {
   TestRequestHeaderMapImpl expected_headers{
       {"content-length", "3"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
-      .WillOnce(Invoke([&](Http::RequestHeaderMapSharedPtr&, bool) -> void {
+      .WillOnce([&](Http::RequestHeaderMapSharedPtr&, bool) -> void {
         connection_.state_ = Network::Connection::State::Closing;
-      }));
+      });
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 3\r\n\r\n123");
@@ -896,10 +892,10 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(response_encoder->streamErrorOnInvalidHttpMessage());
@@ -916,10 +912,10 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
@@ -932,10 +928,10 @@ TEST_F(Http1ServerConnectionImplTest, CodecHasDefaultStreamErrorIfNotSet) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   auto status = codec_->dispatch(buffer);
   EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
@@ -973,10 +969,10 @@ TEST_F(Http1ServerConnectionImplTest, ConnectWithoutAuthorityUsesHttp11WithLegac
   setupRequestDecoderMock(decoder);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
 
@@ -1053,10 +1049,10 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
         "GET /foobar HTTP/1.0\r\nHost: www.somewhere.com\r\nconnection: keep-alive\r\n\r\n");
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
 
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
     auto status = codec_->dispatch(buffer);
@@ -1297,10 +1293,10 @@ TEST_F(Http1ServerConnectionImplTest, ProtocolStreamId) {
   InSequence sequence;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   TestRequestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
@@ -1437,10 +1433,10 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
   for (int i = 0; i < 2; ++i) {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
+        .WillOnce([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
     auto status = codec_->dispatch(buffer);
@@ -1451,10 +1447,10 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
     // ignored to build up queued "end connection" sentinels.
     EXPECT_CALL(connection_, write(_, _))
 
-        .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
+        .WillOnce([&](Buffer::Instance& data, bool) -> void {
           // Move the response out of data while preserving the buffer fragment sentinels.
           local_buffer.move(data);
-        }));
+        });
 
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
@@ -1501,10 +1497,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   setupRequestDecoderMock(decoder);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n\r\n"));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
@@ -1570,11 +1566,11 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
   MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         decoder.setResponseEncoder(response_encoder);
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n");
@@ -1598,10 +1594,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
   setupRequestDecoderMock(decoder);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n");
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   auto status = codec_->dispatch(buffer);
@@ -1699,9 +1695,9 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   TestRequestHeaderMapImpl expected_headers{
       {"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
-      .WillOnce(Invoke([&](Http::RequestHeaderMapSharedPtr&, bool) -> void {
+      .WillOnce([&](Http::RequestHeaderMapSharedPtr&, bool) -> void {
         connection_.state_ = Network::Connection::State::Closing;
-      }));
+      });
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\n12345");
@@ -1769,10 +1765,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1796,10 +1792,10 @@ TEST_F(Http1ServerConnectionImplTest, LargeHeaderResponseEncode) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1823,10 +1819,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1849,10 +1845,10 @@ TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingNotAddedWhenCon
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1880,10 +1876,10 @@ TEST_F(Http1ServerConnectionImplTest,
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .Times(2)
-      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillRepeatedly([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1915,10 +1911,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1939,10 +1935,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith100Then200) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -1970,10 +1966,10 @@ TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_OK(status);
@@ -1993,10 +1989,10 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2004,13 +2000,13 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
-  ON_CALL(connection_, write(_, _)).WillByDefault(Invoke([&output](Buffer::Instance& data, bool) {
+  ON_CALL(connection_, write(_, _)).WillByDefault([&output](Buffer::Instance& data, bool) {
     // Verify that individual writes into the codec's output buffer were coalesced into a single
     // slice
     ASSERT_EQ(1, data.getRawSlices().size());
     output.append(data.toString());
     data.drain(data.length());
-  }));
+  });
 
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, false);
@@ -2065,10 +2061,10 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2098,10 +2094,10 @@ TEST_F(Http1ServerConnectionImplTest, ContentLengthResponse) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2125,10 +2121,10 @@ TEST_F(Http1ServerConnectionImplTest, HeadRequestResponse) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("HEAD / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2149,10 +2145,10 @@ TEST_F(Http1ServerConnectionImplTest, HeadChunkedRequestResponse) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("HEAD / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2174,10 +2170,10 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .Times(2)
-      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillRepeatedly([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   std::string request("GET / HTTP/1.1\r\n\r\n");
   Buffer::OwnedImpl buffer(request);
@@ -2397,10 +2393,10 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestResponseHeaders) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2473,10 +2469,10 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
   MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
   InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         decoder.setResponseEncoder(&encoder);
         return decoder;
-      }));
+      });
 
   // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 CONNECT with body has no defined
   // semantics: Envoy will reject chunked CONNECT requests.
@@ -2537,10 +2533,10 @@ TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   auto status = codec_->dispatch(buffer);
@@ -2619,10 +2615,10 @@ TEST_F(Http1ServerConnectionImplTest, LoadShedPointForAlreadyResetStream) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   Buffer::OwnedImpl request_line_buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(request_line_buffer);
@@ -3053,14 +3049,13 @@ TEST_F(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
 
   // As per Resumable Uploads for HTTP draft, the upload-draft-interop-version header
   // must be passed through with 104 responses.
-  EXPECT_CALL(response_decoder, decode1xxHeaders_(_))
-      .WillOnce(Invoke([&](ResponseHeaderMapPtr& headers) {
-        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version")).size(), 1);
-        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]
-                      ->value()
-                      .getStringView(),
-                  "4");
-      }));
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_)).WillOnce([&](ResponseHeaderMapPtr& headers) {
+    EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version")).size(), 1);
+    EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]
+                  ->value()
+                  .getStringView(),
+              "4");
+  });
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
 
   Buffer::OwnedImpl initial_response(
@@ -3414,13 +3409,12 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
 
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, true))
-      .WillOnce(Invoke([&](ResponseHeaderMapPtr&, bool) {
-        // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
-        EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
-        static_cast<ClientConnection*>(codec_.get())
-            ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
-      }));
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true)).WillOnce([&](ResponseHeaderMapPtr&, bool) {
+    // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
+    EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+    static_cast<ClientConnection*>(codec_.get())
+        ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  });
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
   auto status = codec_->dispatch(response);
   EXPECT_OK(status);
@@ -3488,10 +3482,10 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   // Default limit of 60 KiB
   std::string long_url = "/" + std::string(60 * 1024, 'q');
@@ -3533,10 +3527,10 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
 
@@ -3563,10 +3557,10 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejectedMaxConfigu
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
 
@@ -3642,10 +3636,10 @@ TEST_F(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     NiceMock<MockRequestDecoder> decoder;
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
 
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
     EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
@@ -3676,10 +3670,10 @@ TEST_F(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, decodeHeaders_(_, true));
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
@@ -3710,10 +3704,10 @@ TEST_F(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
   NiceMock<MockRequestDecoder> decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, decodeHeaders_(_, true));
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
@@ -4012,13 +4006,13 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   EXPECT_CALL(response_decoder, decodeData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) {
+      .WillOnce([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
         Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
         EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
-      }))
-      .WillOnce(Invoke([]() {}));
+      })
+      .WillOnce([]() {});
 
   // Dump the body
   // Set content length to enable us to dumpState before
@@ -4052,12 +4046,12 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
   // Expect dumpState call
   EXPECT_CALL(upstream_to_downstream, dumpState(_, _));
 
-  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce(InvokeWithoutArgs([&]() {
+  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce([&]() {
     // dumpState here before buffers are drained. No memory should be allocated.
     Memory::TestUtil::MemoryTest memory_test;
     dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 1);
     EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
-  }));
+  });
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");
   auto status = codec_->dispatch(response);
@@ -4151,10 +4145,10 @@ TEST_F(Http1ServerConnectionImplTest, ParseUrl) {
     EXPECT_CALL(decoder, decodeHeaders_(_, _)).Times(testing::AnyNumber());
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
 
     Buffer::OwnedImpl buffer(valid_first_line);
     auto status = codec_->dispatch(buffer);
@@ -4173,10 +4167,10 @@ TEST_F(Http1ServerConnectionImplTest, ParseUrl) {
     InSequence sequence;
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
     EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, _));
 
     Buffer::OwnedImpl buffer(invalid_first_line);
@@ -4359,10 +4353,10 @@ TEST_F(Http1ServerConnectionImplTest, EOFDuringHeaders) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   Buffer::OwnedImpl buffer("GET");
   auto status = codec_->dispatch(buffer);
   EXPECT_EQ(0, buffer.length());
@@ -4406,10 +4400,10 @@ TEST_F(Http1ServerConnectionImplTest, EOFDuringChunkedBody) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
@@ -4464,10 +4458,10 @@ TEST_F(Http1ServerConnectionImplTest, EOFDuringContentLengthBody) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   EXPECT_CALL(decoder, decodeData(BufferString("foo"), false));
@@ -4521,10 +4515,10 @@ TEST_F(Http1ServerConnectionImplTest, NoContentLengthRequest) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
 
   EXPECT_CALL(decoder, decodeHeaders_(_, true));
   constexpr absl::string_view kFirstLine = "POST / HTTP/1.1\r\n\r\n";
@@ -4647,10 +4641,10 @@ TEST_F(Http1ServerConnectionImplTest, EmptyFieldName) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
 
@@ -4673,11 +4667,11 @@ TEST_F(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         decoder.setResponseEncoder(&encoder);
         return decoder;
-      }));
+      });
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::NotImplemented, "Not Implemented", _, _,
                                       "http1.invalid_transfer_encoding"));
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: foo.bar\r\n"
@@ -4704,10 +4698,10 @@ TEST_F(Http1ServerConnectionImplTest, Http10Rejected) {
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
-      }));
+      });
   EXPECT_CALL(decoder, sendLocalReply(Http::Code::UpgradeRequired, _, _, _, "low_version"));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.0\r\n\r\n");
@@ -5355,10 +5349,10 @@ TEST_F(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
     MockRequestDecoder decoder;
     setupRequestDecoderMock(decoder);
     EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
           return decoder;
-        }));
+        });
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"

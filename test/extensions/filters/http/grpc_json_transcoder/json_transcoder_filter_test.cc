@@ -24,7 +24,6 @@
 
 using testing::_;
 using testing::ElementsAre;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -745,9 +744,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([](Buffer::Instance& data, bool) {
+      .WillRepeatedly([](Buffer::Instance& data, bool) {
         EXPECT_EQ(R"({"id":"20","theme":"Children"})", data.toString());
-      }));
+      });
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
@@ -813,9 +812,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([](Buffer::Instance& data, bool) {
+      .WillRepeatedly([](Buffer::Instance& data, bool) {
         EXPECT_EQ(R"({"id":"20","theme":"Children"})", data.toString());
-      }));
+      });
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
@@ -997,10 +996,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
   Buffer::OwnedImpl request_data{"{\"theme\": \"Children\""};
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
-      .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool end_stream) {
         EXPECT_EQ("400", headers.getStatusValue());
         EXPECT_FALSE(end_stream);
-      }));
+      });
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
@@ -1258,7 +1257,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBodyEndsWithTra
   // Trailers signal end-of-stream, causing the buffered HTTP body to be flushed.
   Buffer::OwnedImpl decoded_data;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(Invoke([&decoded_data](Buffer::Instance& data, bool) { decoded_data.move(data); }));
+      .WillOnce([&decoded_data](Buffer::Instance& data, bool) { decoded_data.move(data); });
 
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
@@ -1794,11 +1793,11 @@ TEST_F(GrpcJsonTranscoderFilterEchoStructTest, TranscodingOKWithNotDeepProtoMess
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([&response_message](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&response_message](Buffer::Instance& data, bool) {
         bookstore::EchoStructReqResp response_out;
         TestUtility::loadFromJson(data.toString(), response_out);
         EXPECT_TRUE(TestUtility::protoEqual(response_message, response_out));
-      }));
+      });
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
@@ -1852,9 +1851,9 @@ private:
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+      .WillOnce([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
-      }));
+      });
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"},
@@ -1872,9 +1871,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+      .WillOnce([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
-      }));
+      });
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -1894,9 +1893,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingPercentEncodedTextHeadersInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+      .WillOnce([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
-      }));
+      });
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"},
@@ -1917,9 +1916,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
       "{\"code\":5,\"message\":\"Error\",\"details\":"
       "[{\"@type\":\"type.googleapis.com/helloworld.HelloReply\",\"message\":\"details\"}]}");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+      .WillOnce([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
-      }));
+      });
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -1942,9 +1941,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
   std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+      .WillOnce([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
-      }));
+      });
   Http::TestResponseTrailerMapImpl response_trailers{
       {"grpc-status", "5"},
       {"grpc-message", "unused"},
@@ -1992,9 +1991,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBod
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([](Buffer::Instance& data, bool) {
+      .WillRepeatedly([](Buffer::Instance& data, bool) {
         EXPECT_EQ(R"({"id":"20","theme":"Children"})", data.toString());
-      }));
+      });
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
@@ -2029,9 +2028,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipStatusConversionWhenBo
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([](Buffer::Instance& data, bool) {
+      .WillRepeatedly([](Buffer::Instance& data, bool) {
         EXPECT_EQ(R"({"id":"20","theme":"Children"})", data.toString());
-      }));
+      });
 
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "5"},
                                                      {"grpc-message", "not found"}};
@@ -2097,9 +2096,9 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([](Buffer::Instance& data, bool) {
+      .WillRepeatedly([](Buffer::Instance& data, bool) {
         EXPECT_EQ(GetParam().expected_response_, data.toString());
-      }));
+      });
 
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));

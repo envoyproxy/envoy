@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "sse_event_codec_test",
     srcs = ["sse_event_codec_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/coroutine:dispatcher_executor_lib",

@@ -11,11 +11,11 @@ load(
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
+load(":envoy_rbe.bzl", "envoy_exec_properties")
 load(":envoy_select.bzl", "deprecate_repository")
 
 _APPLE = Label("//bazel:apple")
 _COVERAGE_BUILD = Label("//bazel:coverage_build")
-_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
 _FIPS_BUILD = Label("//bazel:fips_build")
 _GNU_BUILD_ID = Label("//bazel:gnu_build_id.ldscript")
 _RAW_BUILD_ID = Label("//bazel:raw_build_id.ldscript")
@@ -40,10 +40,7 @@ def envoy_cc_binary(
         tags = [],
         features = [],
         linkstatic = True):
-    exec_properties = exec_properties | select({
-        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
-        "//conditions:default": {},
-    })
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
     linker_inputs = envoy_exported_symbols_input()
 
     if not linkopts:

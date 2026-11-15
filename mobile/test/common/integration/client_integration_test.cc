@@ -487,11 +487,11 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
 
   // A new connection will be created on the new default network to serve new requests.
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))
-      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
+      .WillOnce([&](Network::ConnectionSocket& socket, int64_t) {
         // Mock binding to the new cellular network with a new address.
         socket.ioHandle().bind(
             std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
-      }));
+      });
   default_request_headers_.setCopy(
       Envoy::Http::LowerCaseString(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES), "0");
   memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
@@ -545,12 +545,12 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
 
   absl::Notification probing_socket_created;
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))
-      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
+      .WillOnce([&](Network::ConnectionSocket& socket, int64_t) {
         // Mock binding to the new cellular network with a new address.
         socket.ioHandle().bind(
             std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
         probing_socket_created.Notify();
-      }));
+      });
   // A new cellular network appears and becomes the default network. The connection should migrate
   // to it.
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_4G, 123);
@@ -646,12 +646,12 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAnd
 
   absl::Notification new_socket_created;
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 2))
-      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
+      .WillOnce([&](Network::ConnectionSocket& socket, int64_t) {
         // Mock binding to the unknown network with a new address.
         socket.ioHandle().bind(
             std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
         new_socket_created.Notify();
-      }));
+      });
   // The current WIFI network is disconnected, and the connection should migrate to the unknown
   // network.
   internalEngine()->onNetworkDisconnectAndroid(1);
@@ -1825,9 +1825,9 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
 
   int fd = -1;
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 1))
-      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int /* network */) {
+      .WillOnce([&](Network::ConnectionSocket& socket, int /* network */) {
         fd = socket.ioHandle().fdDoNotUse();
-      }));
+      });
   // Sending headers should be fine.
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        false);
@@ -1933,22 +1933,21 @@ TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
 class MockRecvMsgOsSysCalls : public Api::OsSysCallsImpl {
 public:
   MockRecvMsgOsSysCalls() {
-    ON_CALL(*this, recvmsg(_, _, _))
-        .WillByDefault(Invoke([this](os_fd_t sockfd, msghdr* msg, int flags) {
-          auto result = Api::OsSysCallsImpl::recvmsg(sockfd, msg, flags);
-          int16_t bandwidth = scone_bandwidth_.exchange(-1);
-          if (result.return_value_ <= 0 || bandwidth == -1) {
-            return result;
-          }
+    ON_CALL(*this, recvmsg(_, _, _)).WillByDefault([this](os_fd_t sockfd, msghdr* msg, int flags) {
+      auto result = Api::OsSysCallsImpl::recvmsg(sockfd, msg, flags);
+      int16_t bandwidth = scone_bandwidth_.exchange(-1);
+      if (result.return_value_ <= 0 || bandwidth == -1) {
+        return result;
+      }
 
-          std::vector<char> new_buffer(result.return_value_);
-          if (quic::test::MaybeUpdateSconePacket(
-                  reinterpret_cast<const char*>(msg->msg_iov[0].iov_base), new_buffer.data(),
-                  result.return_value_, static_cast<uint8_t>(bandwidth))) {
-            memcpy(msg->msg_iov[0].iov_base, new_buffer.data(), result.return_value_);
-          }
-          return result;
-        }));
+      std::vector<char> new_buffer(result.return_value_);
+      if (quic::test::MaybeUpdateSconePacket(
+              reinterpret_cast<const char*>(msg->msg_iov[0].iov_base), new_buffer.data(),
+              result.return_value_, static_cast<uint8_t>(bandwidth))) {
+        memcpy(msg->msg_iov[0].iov_base, new_buffer.data(), result.return_value_);
+      }
+      return result;
+    });
   }
 
   MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t sockfd, msghdr* msg, int flags),

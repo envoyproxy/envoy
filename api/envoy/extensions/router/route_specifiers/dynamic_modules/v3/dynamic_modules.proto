@@ -169,8 +169,47 @@ message BuiltRouteCache {
   google.protobuf.UInt32Value verify_one_in = 3;
 }
 
+// The virtual clusters the module may select for a request with ``set_virtual_cluster``.
+//
+// A virtual host matches a request against its :ref:`virtual_clusters
+// <envoy_v3_api_field_config.route.v3.VirtualHost.virtual_clusters>` in order, and the router
+// counts the request in the :ref:`statistics <config_http_filters_router_vcluster_stats>` of the
+// first one that matches. A module that knows which virtual cluster a request belongs to can select
+// it instead. Like route overrides, the virtual clusters are declared here and built when the
+// configuration loads rather than on the request path. A selected virtual cluster uses the
+// statistics of the virtual cluster of the same name on the virtual host, with the same names and
+// tags even when the virtual host does not configure that name.
+message VirtualClusterOverride {
+  // The :ref:`name <envoy_v3_api_field_config.route.v3.VirtualHost.name>` of the virtual host whose
+  // statistics the selected virtual clusters use. The statistics of every declared name are created
+  // under this virtual host when the configuration loads. A virtual cluster selected for a route of
+  // another virtual host is dropped and counted in ``virtual_cluster_vhost_mismatch``, since its
+  // statistics would be named after the wrong virtual host. This field is required.
+  string virtual_host_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The names of the virtual clusters the module may select, which must be unique and not empty.
+  // ``other`` declares the catch all virtual cluster, which counts the requests that match none of
+  // the virtual clusters of the virtual host. At least one name is required.
+  repeated string names = 2 [(validate.rules).repeated = {
+    min_items: 1
+    items {string {min_len: 1}}
+  }];
+
+  // Whether the router counts a request in the virtual cluster the module selected. Otherwise the
+  // router counts it in the virtual cluster the virtual host matches and compares the two, or in
+  // the selected one when the virtual host has no virtual clusters to compare with. A request the
+  // module selects none for is left to the virtual host and never compared. If not specified,
+  // defaults to ``false``.
+  bool prefer_selection = 3;
+
+  // When ``prefer_selection`` is ``true``, the virtual host also matches a request the module
+  // selected a virtual cluster for, with a chance of one in this many, so that the selection is
+  // still compared with it. Zero disables the comparison. If not specified, defaults to 1024.
+  google.protobuf.UInt32Value verify_one_in = 4;
+}
+
 // Configuration for the dynamic modules route specifier.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message DynamicModuleRouteSpecifier {
   // Specifies the shared object level configuration. This field is required.
   //
@@ -248,4 +287,9 @@ message DynamicModuleRouteSpecifier {
   // A per worker cache of the routes the module builds from route templates. It requires a
   // specifier configured on a virtual host or a route. If not specified, no route is cached.
   BuiltRouteCache built_route_cache = 12;
+
+  // The virtual clusters the module may select for a request. If not specified,
+  // ``set_virtual_cluster`` rejects every name and the router counts every request in the virtual
+  // cluster the virtual host matches.
+  VirtualClusterOverride virtual_cluster_override = 13;
 }

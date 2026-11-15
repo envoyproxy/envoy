@@ -1,3 +1,4 @@
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
@@ -64,6 +65,65 @@ shadow_matcher:
                       createShadowEngine(config, factory_context,
                                          ProtobufMessage::getStrictValidationVisitor(),
                                          validation_visitor));
+}
+
+void expectCounter(const Stats::Counter& counter, const std::string& name,
+                   const std::string& tag_extracted_name,
+                   const std::vector<std::pair<std::string, std::string>>& expected_tags) {
+  EXPECT_EQ(name, counter.name());
+  EXPECT_EQ(tag_extracted_name, counter.tagExtractedName());
+  std::vector<std::pair<std::string, std::string>> tags;
+  for (const Stats::Tag& tag : counter.tags()) {
+    tags.emplace_back(tag.name_, tag.value_);
+  }
+  EXPECT_EQ(expected_tags, tags);
+}
+
+TEST(GenerateStats, NetworkFilterPrefixIsTagged) {
+  Stats::IsolatedStoreImpl store;
+  auto stats = generateStats("tcp.", "rules_", "", false, *store.rootScope());
+
+  expectCounter(stats.allowed_, "tcp.rbac.rules_.allowed", "rbac.allowed",
+                {{"envoy.rbac_prefix", "tcp"}, {"envoy.rbac_rules_prefix", "rules_"}});
+  expectCounter(stats.shadow_allowed_, "tcp.rbac.shadow_allowed", "rbac.shadow_allowed",
+                {{"envoy.rbac_prefix", "tcp"}});
+
+  stats.incPolicyAllowed("foo");
+  expectCounter(*TestUtility::findCounter(store, "tcp.rbac.rules_.policy.foo.allowed"),
+                "tcp.rbac.rules_.policy.foo.allowed", "rbac.policy.allowed",
+                {{"envoy.rbac_prefix", "tcp"},
+                 {"envoy.rbac_rules_prefix", "rules_"},
+                 {"envoy.rbac_policy_name", "foo"}});
+}
+
+TEST(GenerateStats, HttpFilterEmptyPrefix) {
+  Stats::IsolatedStoreImpl store;
+  auto stats = generateStats("", "", "shadow_", true, *store.rootScope());
+
+  expectCounter(stats.allowed_, "rbac.allowed", "rbac.allowed", {});
+  expectCounter(stats.shadow_allowed_, "rbac.shadow_.shadow_allowed", "rbac.shadow_allowed",
+                {{"envoy.rbac_http_prefix", "shadow_"}});
+
+  stats.incPolicyShadowAllowed("foo");
+  expectCounter(*TestUtility::findCounter(store, "rbac.shadow_.policy.foo.shadow_allowed"),
+                "rbac.shadow_.policy.foo.shadow_allowed", "rbac.policy.shadow_allowed",
+                {{"envoy.rbac_http_prefix", "shadow_"}, {"envoy.rbac_policy_name", "foo"}});
+}
+
+TEST(GenerateStats, HttpFilterFlatPrefixIsPartOfBaseName) {
+  Stats::IsolatedStoreImpl store;
+  auto stats = generateStats("http.foo.", "rules_", "", true, *store.rootScope());
+
+  // The flat parent prefix is not tagged but kept in the tag-extracted name.
+  expectCounter(stats.denied_, "http.foo.rbac.rules_.denied", "http.foo.rbac.denied",
+                {{"envoy.rbac_http_prefix", "rules_"}});
+  expectCounter(stats.shadow_denied_, "http.foo.rbac.shadow_denied", "http.foo.rbac.shadow_denied",
+                {});
+
+  stats.incPolicyDenied("bar");
+  expectCounter(*TestUtility::findCounter(store, "http.foo.rbac.rules_.policy.bar.denied"),
+                "http.foo.rbac.rules_.policy.bar.denied", "http.foo.rbac.policy.denied",
+                {{"envoy.rbac_http_prefix", "rules_"}, {"envoy.rbac_policy_name", "bar"}});
 }
 
 } // namespace

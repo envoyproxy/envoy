@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.access_loggers.extension_filters.cel"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/extensions/access_loggers/filters/cel:config",
         "//test/mocks/server:factory_context_mocks",
