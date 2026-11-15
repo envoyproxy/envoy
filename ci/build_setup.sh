@@ -123,12 +123,23 @@ BAZEL_BUILD_OPTIONS=(
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
+# This is the first bazel command to reach the remote server. Bazel's own
+# `--remote_retries` cover transport errors but not a server that answers
+# GetCapabilities with remote execution disabled, so retry the whole command.
+REMOTE_DETECTION_ATTEMPTS="${REMOTE_DETECTION_ATTEMPTS:-3}"
+REMOTE_DETECTION_RETRY_INTERVAL="${REMOTE_DETECTION_RETRY_INTERVAL:-30}"
+
 if [[ -z "$SKIP_REMOTE_DETECTION" ]]; then
-    rc_output=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info --announce_rc "${BAZEL_BUILD_OPTIONS[@]}" 2>&1) || {
-        echo "bazel info failed:" >&2
+    remote_detection_attempt=1
+    until rc_output=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info --announce_rc "${BAZEL_BUILD_OPTIONS[@]}" 2>&1); do
+        echo "bazel info failed (attempt ${remote_detection_attempt}/${REMOTE_DETECTION_ATTEMPTS}):" >&2
         echo "$rc_output" >&2
-        exit 1
-    }
+        if (( remote_detection_attempt >= REMOTE_DETECTION_ATTEMPTS )); then
+            exit 1
+        fi
+        sleep "$(( REMOTE_DETECTION_RETRY_INTERVAL * remote_detection_attempt ))"
+        remote_detection_attempt=$(( remote_detection_attempt + 1 ))
+    done
     if grep -q "remote_executor" <<<"$rc_output"; then
         echo "Remote execution detected, not setting test_tmpdir."
     else
