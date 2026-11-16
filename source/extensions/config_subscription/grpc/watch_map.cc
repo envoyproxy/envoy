@@ -566,7 +566,8 @@ void WatchMap::replayCachedResources() {
           Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, cached->second.resource_->New());
       copy->CopyFrom(*cached->second.resource_);
       decoded.push_back(std::make_unique<DecodedResourceImpl>(
-          std::move(copy), name, cached->second.aliases_, cached->second.version_));
+          std::move(copy), name, cached->second.aliases_, cached->second.version_,
+          /*from_cache=*/true));
       refs.emplace_back(*decoded.back());
       version = cached->second.version_;
     }
@@ -575,7 +576,8 @@ void WatchMap::replayCachedResources() {
     }
     ENVOY_LOG(debug, "Replaying {} cached {} resource(s) to a late watch", refs.size(), type_url_);
     // The resource was accepted when it arrived, and there is no response to NACK, so a failure
-    // here is only logged. The watch keeps waiting for the server as it would without replay.
+    // here is only logged and the watch keeps waiting. The resources are marked fromCache(), so
+    // GrpcSubscriptionImpl keeps its initial fetch timeout running until a replay is accepted.
     watch->notified_ = true;
     TRY_ASSERT_MAIN_THREAD {
       absl::Status status;

@@ -1004,7 +1004,11 @@ protected:
       EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, version));
       doSecretDeltaUpdate(resources_, {}, version);
     } else {
-      EXPECT_CALL(callbacks1_, onConfigUpdate(_, version));
+      EXPECT_CALL(callbacks1_, onConfigUpdate(_, version))
+          .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+            EXPECT_FALSE(resources[0].get().fromCache());
+            return absl::OkStatus();
+          });
       watch_map_.onConfigUpdate(resources_, version);
     }
     EXPECT_TRUE(watch_map_.hasCachedResourceForTest("alice"));
@@ -1074,6 +1078,7 @@ TEST_F(WatchMapReplayTest, LateWatchReceivesCachedSotwResource) {
         EXPECT_EQ("v1", resources[0].get().version());
         EXPECT_TRUE(TestUtility::protoEqual(resources[0].get().resource(), alice_));
         EXPECT_EQ(nullptr, resources[0].get().resource().GetArena());
+        EXPECT_TRUE(resources[0].get().fromCache());
         return absl::OkStatus();
       });
   EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(0);
@@ -1098,6 +1103,7 @@ TEST_F(WatchMapDeltaReplayTest, LateWatchReceivesCachedDeltaResource) {
                        const Protobuf::RepeatedPtrField<std::string>& removed, const std::string&) {
         EXPECT_EQ(1, added.size());
         EXPECT_TRUE(TestUtility::protoEqual(added[0].get().resource(), alice_));
+        EXPECT_TRUE(added[0].get().fromCache());
         EXPECT_TRUE(removed.empty());
         return absl::OkStatus();
       });

@@ -91,6 +91,7 @@ envoy_extension_cc_test(
         ":delta_subscription_test_harness",
         "//envoy/config:xds_config_tracker_interface",
         "//source/common/config:api_version_lib",
+        "//source/common/config:decoded_resource_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//test/mocks:common_lib",
