@@ -12,6 +12,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 using absl::Status;
@@ -50,6 +51,34 @@ typed_config:
     return fmt::format(baseFilter(),
                        TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"));
   }
+
+  // Diagnostics for a rare CI flake where the fake upstream never sees a new connection: shows
+  // whether the request was answered locally or upstream (e.g. on a stale pooled connection), or
+  // never left Envoy.
+  void dumpMissingUpstreamConnection(IntegrationStreamDecoder& response) {
+    std::string dump = "downstream response: ";
+    if (response.waitForEndStream(std::chrono::milliseconds(500))) {
+      absl::StrAppend(&dump, "status=", response.headers().getStatusValue(),
+                      " body=", response.body());
+    } else if (response.reset()) {
+      absl::StrAppend(&dump, "reset reason=", static_cast<int>(response.resetReason()));
+    } else {
+      absl::StrAppend(&dump, "none");
+    }
+    for (const auto& counter : test_server_->counters()) {
+      if (counter->value() != 0 && (absl::StartsWith(counter->name(), "cluster.cluster_0.") ||
+                                    absl::StartsWith(counter->name(), "http."))) {
+        absl::StrAppend(&dump, "\n  ", counter->name(), ": ", counter->value());
+      }
+    }
+    for (const auto& gauge : test_server_->gauges()) {
+      if (gauge->value() != 0 && absl::StartsWith(gauge->name(), "cluster.cluster_0.")) {
+        absl::StrAppend(&dump, "\n  ", gauge->name(), ": ", gauge->value());
+      }
+    }
+    ADD_FAILURE() << dump;
+  }
+
   template <class RequestType, class ResponseType>
   void testTranscoding(Http::RequestHeaderMap&& request_headers, const std::string& request_body,
                        const std::vector<std::string>& expected_grpc_request_messages,
@@ -74,8 +103,12 @@ typed_config:
     }
 
     if (expect_connection_to_upstream) {
-      ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      testing::AssertionResult connected =
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+      if (!connected) {
+        dumpMissingUpstreamConnection(*response);
+      }
+      ASSERT_TRUE(connected);
     }
 
     if (!expected_grpc_request_messages.empty() || !expected_upstream_request_body.empty()) {
