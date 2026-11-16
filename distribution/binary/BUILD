@@ -1,5 +1,6 @@
+load("@envoy_toolshed//tarball:compressed_tar.bzl", "compressed_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
-load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("//distribution:packages.bzl", "PUBLISH_PACKAGING_TAGS")
 load("//distribution/binary:compiler.bzl", "bundled")
 
 licenses(["notice"])  # Apache 2
@@ -31,12 +32,14 @@ pkg_files(
     prefix = "debug",
 )
 
-pkg_tar(
+# Written by bsdtar (several GB with the debug info), and compressed with all the cores.
+compressed_tar(
     name = "release",
     srcs = [
         ":release_files",
     ],
-    compressor = "@zstd//:zstd_cli",
-    compressor_args = "-T0",
-    extension = "tar.zst",
+    out = "release.tar.zst",
+    compression = "zstd",
+    tags = PUBLISH_PACKAGING_TAGS,
+    visibility = ["//distribution/publish:__pkg__"],
 )

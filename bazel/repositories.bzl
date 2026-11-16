@@ -203,6 +203,7 @@ def envoy_dependencies(skip_targets = []):
     _hessian2_codec()
     _nlohmann_json()
     _su_exec()
+    _ubuntu_packages()
     _abseil_cpp()
     _googletest()
     _com_google_protobuf()
@@ -250,6 +251,7 @@ def envoy_dependencies(skip_targets = []):
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
+    external_http_archive("rules_oci")
     external_http_archive("shellcheck")
 
     external_http_archive(
@@ -708,6 +710,14 @@ def _su_exec():
         location_name = "su_exec",
         build_file = "@envoy//bazel/external:su-exec.BUILD",
     )
+
+# The package archives (`.deb`), as their control and data archives.
+def _ubuntu_packages():
+    for package in ["ca_certificates", "openssl_amd64", "openssl_arm64", "tzdata"]:
+        external_http_archive(
+            name = "ubuntu_jammy_%s" % package,
+            build_file_content = """exports_files(["control.tar.zst", "data.tar.zst"])""",
+        )
 
 def _googletest():
     external_http_archive(

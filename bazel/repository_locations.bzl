@@ -415,6 +415,28 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "su-exec-{version}",
         urls = ["https://github.com/ncopa/su-exec/archive/v{version}.tar.gz"],
     ),
+    # Packages for the ubuntu container images (`//distribution/docker`), from an Ubuntu snapshot.
+    # Only these packages are installed: their dependencies are in the base image.
+    ubuntu_jammy_ca_certificates = dict(
+        version = "20260816ubuntu0.22.04.2",
+        sha256 = "f99e8375d35bdde4800d4842df777be3dafe38bca4d178429fa929de200bf821",
+        urls = ["https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/c/ca-certificates/ca-certificates_{version}_all.deb"],
+    ),
+    ubuntu_jammy_openssl_amd64 = dict(
+        version = "3.0.2-0ubuntu1.30",
+        sha256 = "a5b9484a287aba47096fa9ea9821c5c98cf95b8dd726786e7c3a3311fb8eb3b4",
+        urls = ["https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/o/openssl/openssl_{version}_amd64.deb"],
+    ),
+    ubuntu_jammy_openssl_arm64 = dict(
+        version = "3.0.2-0ubuntu1.30",
+        sha256 = "6a4d2300bc6a40d8948a1cdc31a45fc1b4ff4d526bca606be4f40c5162b4a2ca",
+        urls = ["https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/o/openssl/openssl_{version}_arm64.deb"],
+    ),
+    ubuntu_jammy_tzdata = dict(
+        version = "2026e-0ubuntu0.22.04.1",
+        sha256 = "9d57d34f323fdb52cdf458b80f5705026ae599497f59bde8e9d7ca514ec73540",
+        urls = ["https://snapshot.ubuntu.com/ubuntu/20261113T000000Z/pool/main/t/tzdata/tzdata_{version}_all.deb"],
+    ),
     googletest = dict(
         version = "1.17.0",
         sha256 = "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
@@ -495,6 +517,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "24ed42b7e06907be993b21be603c130076c7d7e49d4f4d5bd228c5656a257f5e",
         strip_prefix = "rules_ruby-{version}",
         urls = ["https://github.com/protocolbuffers/rules_ruby/archive/{version}.tar.gz"],
+    ),
+    rules_oci = dict(
+        version = "2.2.6",
+        sha256 = "5994ec0e8df92c319ef5da5e1f9b514628ceb8fc5824b4234f2fe635abb8cc2e",
+        strip_prefix = "rules_oci-{version}",
+        urls = ["https://github.com/bazel-contrib/rules_oci/releases/download/v{version}/rules_oci-v{version}.tar.gz"],
     ),
     rules_pkg = dict(
         version = "1.2.0",

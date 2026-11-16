@@ -7,6 +7,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 exports_files([
+    "envoyproxy_io_proxy.yaml",
     "google-vrp/envoy-edge.yaml",
 ])
 
