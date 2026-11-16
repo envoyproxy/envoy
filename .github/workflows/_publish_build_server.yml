@@ -42,19 +42,33 @@ jobs:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
         --config=rbe
-      target: release.server_only
+      target: >-
+        ${{ fromJSON(inputs.request).config.release-publish
+            && 'release.publish'
+            || 'release.server_only' }}
       target-suffix: ${{ inputs.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
       rbe: true
       request: ${{ inputs.request }}
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
+      bazel-rbe-jobs: ${{ fromJSON(inputs.request).config.ci.publish-jobs || 200 }}
+      bazel-rbe-priority: ${{ fromJSON(inputs.request).config.ci.publish-priority || '' }}
+      runs-on: >-
+        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
+            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
       uploads: |
-        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
+        release.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/bin/, compression-level: 0}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && format('oci.{0}: {{path: container/envoy/{0}/build_images, compression-level: 0}}', inputs.arch)
+            || '' }}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && format('packages.{0}: {{path: container/envoy/{0}/packages, compression-level: 0}}', inputs.arch)
+            || '' }}
 
+  # Branches whose binary jobs do not build the container images and packages (`release-publish`).
   docker:
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
@@ -63,6 +77,8 @@ jobs:
       contents: read
       packages: read
     name: Docker OCI
+    if: >-
+      !fromJSON(inputs.request).config.release-publish
     needs:
     - binary
     uses: ./.github/workflows/_run.yml
@@ -83,8 +99,10 @@ jobs:
         export ENVOY_OCI_DIR=build_images
       trusted: ${{ inputs.trusted }}
       uploads: |
-        oci.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/build_images
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
+        oci.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/build_images, compression-level: 0}
+      runs-on: >-
+        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
+            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
 
   distribution:
     secrets:
@@ -94,6 +112,8 @@ jobs:
       contents: read
       packages: read
     name: Packages
+    if: >-
+      !fromJSON(inputs.request).config.release-publish
     needs:
     - binary
     uses: ./.github/workflows/_run.yml
@@ -111,7 +131,9 @@ jobs:
       docker-ci: false
       rbe: false
       request: ${{ inputs.request }}
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
+      runs-on: >-
+        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
+            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       trusted: ${{ inputs.trusted }}
       uploads: |
-        packages.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}
+        packages.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}, compression-level: 0}

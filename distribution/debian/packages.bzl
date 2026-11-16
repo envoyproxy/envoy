@@ -49,7 +49,7 @@ def envoy_pkg_deb(
         output_group = "deb",
     )
 
-def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contrib_bin_files, config = ":envoy-config"):
+def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contrib_bin_files, config = ":envoy-config", tags = []):
     """Package the Envoy .debs with their .changes files.
 
     Packages are created for the version *and* the release version, eg
@@ -70,6 +70,7 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
             bin_files,
         ],
         remap_paths = {"/copyright": "/usr/share/doc/envoy/copyright"},
+        tags = tags,
     )
 
     # generate deb data for all contrib packages
@@ -81,6 +82,7 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
             contrib_bin_files,
         ],
         remap_paths = {"/copyright": "/usr/share/doc/envoy/copyright"},
+        tags = tags,
     )
 
     # generate package for this patch version
@@ -89,6 +91,7 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
         data = ":deb-data",
         version = version,
         maintainer = maintainer,
+        tags = tags,
     )
 
     # generate package for this minor version
@@ -99,6 +102,7 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
         conflicts = ["envoy"],
         provides = ["envoy"],
         maintainer = maintainer,
+        tags = tags,
     )
 
     # generate contrib package for this patch version
@@ -107,6 +111,7 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
         data = ":contrib-deb-data",
         version = version,
         maintainer = maintainer,
+        tags = tags,
     )
 
     # generate contrib package for this minor version
@@ -117,6 +122,7 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
         conflicts = ["envoy"],
         provides = ["envoy"],
         maintainer = maintainer,
+        tags = tags,
     )
 
     pkg_tar(
@@ -133,4 +139,5 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
         ],
         extension = "tar",
         package_dir = "deb",
+        tags = tags,
     )
