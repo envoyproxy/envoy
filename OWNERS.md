@@ -152,5 +152,4 @@ now have left Envoy community or become inactive because of various reasons. Whe
 section, some of code owners have left for a while. So, feel free to ping the maintainers if
 you find any emeritus code owners missing and would like to be added to this list.
 
-* Derek Argueta ([derekargueta](https://github.com/derekargueta))
 * marc-barry ([marc-barry](https://github.com/marc-barry))

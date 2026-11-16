@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_test(
     name = "stdout_config_test",
     srcs = ["stdout_config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":stream_test_base",
         "//source/common/formatter:formatter_extension_lib",
@@ -23,7 +26,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stderr_config_test",
     srcs = ["stderr_config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":stream_test_base",
         "//source/common/formatter:formatter_extension_lib",

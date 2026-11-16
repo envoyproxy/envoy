@@ -1956,6 +1956,20 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) GetGenericSecret(id any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGenericSecret", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetGenericSecret), id)
 }
 
+// GetLoadShedPoint mocks base method.
+func (m *MockHttpFilterConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLoadShedPoint", name)
+	ret0, _ := ret[0].(shared.LoadShedPoint)
+	return ret0
+}
+
+// GetLoadShedPoint indicates an expected call of GetLoadShedPoint.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetLoadShedPoint(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLoadShedPoint", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetLoadShedPoint), name)
+}
+
 // GetLogLevel mocks base method.
 func (m *MockHttpFilterConfigHandle) GetLogLevel() shared.LogLevel {
 	m.ctrl.T.Helper()

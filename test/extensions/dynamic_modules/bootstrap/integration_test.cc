@@ -55,9 +55,10 @@ public:
     return TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/" + subdir);
   }
 
-  // Starts Envoy with the bootstrap_cluster_writer_test module, which writes startup_cluster at
-  // startup when it is not empty.
-  void initializeWithClusterWriter(const std::string& startup_cluster) {
+  // Starts Envoy with a Rust writer test module, which gets the serialized startup resource as its
+  // configuration.
+  void initializeWithWriterModule(absl::string_view module_name,
+                                  const std::string& startup_resource) {
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir("rust"), 1);
     config_helper_.addBootstrapExtension(
         fmt::format(R"EOF(
@@ -65,23 +66,96 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
         dynamic_module_config:
-          name: bootstrap_cluster_writer_test
+          name: {}
         extension_name: writer
         extension_config:
           "@type": type.googleapis.com/google.protobuf.BytesValue
           value: "{}"
     )EOF",
-                    Base64::encode(startup_cluster.data(), startup_cluster.size())));
+                    module_name, Base64::encode(startup_resource.data(), startup_resource.size())));
     HttpIntegrationTest::initialize();
+  }
+
+  // Sends an action to an admin endpoint of a writer test module.
+  std::string writerModuleRequest(absl::string_view path, absl::string_view action,
+                                  const std::string& body) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "POST", absl::StrCat(path, "?", action), body, Http::CodecType::HTTP1,
+        version_);
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return response->body();
+  }
+
+  // Starts Envoy with the bootstrap_cluster_writer_test module, which writes startup_cluster at
+  // startup when it is not empty.
+  void initializeWithClusterWriter(const std::string& startup_cluster) {
+    initializeWithWriterModule("bootstrap_cluster_writer_test", startup_cluster);
   }
 
   // Sends an action to the admin endpoint of the bootstrap_cluster_writer_test module.
   std::string clusterWriterRequest(absl::string_view action, const std::string& body) {
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        lookupPort("admin"), "POST", absl::StrCat("/cluster_writer?", action), body,
-        Http::CodecType::HTTP1, version_);
+    return writerModuleRequest("/cluster_writer", action, body);
+  }
+
+  // Starts Envoy with the bootstrap_writer_test module, which writes startup_listener
+  // before it signals that its initialization is complete when it is not empty.
+  void initializeWithWriter(const std::string& startup_listener) {
+    initializeWithWriterModule("bootstrap_writer_test", startup_listener);
+  }
+
+  // Sends an action to the admin endpoint of the bootstrap_writer_test module.
+  std::string writerRequest(absl::string_view action, const std::string& body) {
+    return writerModuleRequest("/writer", action, body);
+  }
+
+  // Builds a listener that responds to every request with a 200.
+  envoy::config::listener::v3::Listener directResponseListener(const std::string& name) {
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name(name);
+    envoy::config::core::v3::SocketAddress* socket_address =
+        listener.mutable_address()->mutable_socket_address();
+    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    socket_address->set_port_value(0);
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+filters:
+- name: envoy.filters.network.http_connection_manager
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    stat_prefix: {}
+    route_config:
+      virtual_hosts:
+      - name: direct_response
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          direct_response: {{ status: 200 }}
+    http_filters:
+    - name: envoy.filters.http.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                                          name, name),
+                              *listener.add_filter_chains());
+    return listener;
+  }
+
+  // Runs a worker event of the bootstrap_writer_test module. The admin request runs in a
+  // later loop iteration than the writes it follows, so every worker runs the event after it
+  // applied them.
+  void runOnAllWorkers(uint64_t event_id) {
+    EXPECT_EQ("true", writerRequest(absl::StrCat("run_on_all_workers=", event_id), ""));
+    test_server_->waitForGauge("dynamicmodulescustom.last_done_event_id", testing::Eq(event_id));
+  }
+
+  // Sends a request to the listener that was registered as the port and checks that it succeeds.
+  void expectDirectResponse(const std::string& port_name) {
+    codec_client_ = makeHttpConnection(lookupPort(port_name));
+    IntegrationStreamDecoderPtr response =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    return response->body();
+    codec_client_->close();
   }
 };
 
@@ -884,6 +958,114 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterStartupRust) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/clusters", "", Http::CodecType::HTTP1, version_);
   EXPECT_THAT(response->body(), testing::HasSubstr("writer.startup::"));
+}
+
+// Verifies that a module adds, fails and removes listeners through the listener writer, and that
+// a written listener serves once a later worker event completed.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerWriterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  concurrency_ = 2;
+  initializeWithWriter("");
+
+  std::string serialized_listener;
+  ASSERT_TRUE(directResponseListener("writer.a").SerializeToString(&serialized_listener));
+  EXPECT_EQ("Success 1", writerRequest("add=writer.a", serialized_listener));
+  test_server_->waitForCounter("dynamic_modules.listener_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+  EXPECT_EQ(
+      1, test_server_->gauge("dynamic_modules.listener_writer.listeners_owned.config_name.writer")
+             ->value());
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(1));
+  EXPECT_THAT(writerRequest("outcomes", ""), testing::HasSubstr("1 writer.a Active"));
+
+  // The written listener serves once the worker event completed.
+  runOnAllWorkers(7);
+  registerTestServerPorts({"http", "writer"});
+  expectDirectResponse("writer");
+
+  // A listener whose configuration has another name fails.
+  EXPECT_EQ("Success 2", writerRequest("add=writer.b", serialized_listener));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
+  EXPECT_THAT(writerRequest("outcomes", ""),
+              testing::HasSubstr("2 writer.b Failed listener writer.b is named writer.a"));
+
+  // A listener that fails to listen once it warmed is removed.
+  envoy::config::listener::v3::Listener bad_listener = directResponseListener("writer.bad");
+  auto* socket_option = bad_listener.add_socket_options();
+  socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  socket_option->set_level(10000);     // Invalid level.
+  socket_option->set_int_value(10000); // Invalid value.
+  ASSERT_TRUE(bad_listener.SerializeToString(&serialized_listener));
+  EXPECT_EQ("Success 3", writerRequest("add=writer.bad", serialized_listener));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(3));
+  EXPECT_THAT(writerRequest("outcomes", ""),
+              testing::HasSubstr(
+                  "3 writer.bad Failed listener writer.bad failed to listen and was removed"));
+  EXPECT_EQ("NotFound", writerRequest("remove=writer.bad", ""));
+
+  EXPECT_EQ("Success", writerRequest("remove=writer.a", ""));
+  test_server_->waitForGauge("dynamic_modules.listener_writer.listeners_owned.config_name.writer",
+                             testing::Eq(0));
+  test_server_->waitForCounter("listener_manager.listener_removed", testing::Eq(2));
+}
+
+// Verifies that a listener that the module writes before it signals that its initialization is
+// complete serves once Envoy started, and that its write completes as Active.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerWriterStartupRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  std::string serialized_listener;
+  ASSERT_TRUE(directResponseListener("writer.startup").SerializeToString(&serialized_listener));
+  initializeWithWriter(serialized_listener);
+  EXPECT_EQ(2, test_server_->gauge("listener_manager.total_listeners_active")->value());
+  registerTestServerPorts({"http", "writer"});
+  expectDirectResponse("writer");
+
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(1));
+  EXPECT_THAT(writerRequest("outcomes", ""), testing::HasSubstr("1 writer.startup Active"));
+}
+
+// Verifies that a State-of-the-World LDS update keeps a written listener that it leaves out, and
+// that the writer gives up a listener that LDS replaces. The test framework delivers the http
+// listener through LDS.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerWriterWithLdsRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  initializeWithWriter("");
+
+  std::string serialized_listener;
+  ASSERT_TRUE(directResponseListener("writer.a").SerializeToString(&serialized_listener));
+  EXPECT_EQ("Success 1", writerRequest("add=writer.a", serialized_listener));
+  test_server_->waitForCounter("dynamic_modules.listener_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+
+  // An LDS update without the written listener keeps it.
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+  new_config_helper.setLds("1");
+  test_server_->waitForCounter("listener_manager.lds.update_success", testing::Eq(2));
+  EXPECT_EQ(2, test_server_->gauge("listener_manager.total_listeners_active")->value());
+  EXPECT_EQ(
+      1, test_server_->gauge("dynamic_modules.listener_writer.listeners_owned.config_name.writer")
+             ->value());
+
+  // An LDS update that replaces the written listener takes it over, so later writes of it fail.
+  new_config_helper.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::config::listener::v3::Listener* listener =
+        bootstrap.mutable_static_resources()->add_listeners();
+    *listener = directResponseListener("writer.a");
+    // The configuration differs from the one that the module writes.
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(32768);
+  });
+  new_config_helper.setLds("2");
+  test_server_->waitForCounter("dynamic_modules.listener_writer.ownership_lost.config_name.writer",
+                               testing::Eq(1));
+  test_server_->waitForGauge("dynamic_modules.listener_writer.listeners_owned.config_name.writer",
+                             testing::Eq(0));
+  EXPECT_EQ("Success 2", writerRequest("add=writer.a", serialized_listener));
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
+  EXPECT_THAT(
+      writerRequest("outcomes", ""),
+      testing::HasSubstr("2 writer.a Failed listener writer.a exists and is not owned by this "
+                         "extension"));
+  EXPECT_EQ("NotFound", writerRequest("remove=writer.a", ""));
 }
 
 } // namespace DynamicModules

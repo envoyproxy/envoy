@@ -22,5 +22,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ReverseTunnelUpstreamCodecOptions {
   // When true, the upstream HTTP/2 client codec emits a GOAWAY when the reverse tunnel begins
   // draining. Defaults to false, in which case the stock HTTP/2 client codec is used unchanged.
+  // When true, a connection-level METADATA frame carrying ``envoy.reverse_tunnel.drain: true``
+  // also notifies the reverse tunnel reporter; this requires the cluster's
+  // ``http2_protocol_options.allow_metadata``.
   bool enable_drain_with_goaway = 1;
 }

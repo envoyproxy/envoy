@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.upstream_rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/upstream_rbac:config",
@@ -30,7 +33,10 @@ envoy_extension_cc_test(
     name = "upstream_rbac_filter_test",
     srcs = ["upstream_rbac_filter_test.cc"],
     extension_names = ["envoy.filters.http.upstream_rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:utility_lib",
@@ -41,6 +47,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg_cc_proto",
@@ -52,7 +59,13 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["upstream_rbac_integration_test.cc"],
     extension_names = ["envoy.filters.http.upstream_rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_small"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/router:upstream_codec_filter_lib",

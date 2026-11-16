@@ -42,6 +42,10 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "http_callouts" => Some(Box::new(HttpCalloutsFilterConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
+    "load_shed_point" => Some(Box::new(LoadShedPointFilterConfig {
+      load_shed_point: envoy_filter_config
+        .get_load_shed_point(std::str::from_utf8(config).unwrap()),
+    })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "span_across_callbacks" => Some(Box::new(SpanAcrossCallbacksConfig {})),
@@ -1110,6 +1114,50 @@ impl Drop for BodyCallbacksFilter {
   fn drop(&mut self) {
     assert!(self.seen_request_body.get());
     assert!(self.seen_response_body.get());
+  }
+}
+
+/// Creates filters that send a local reply when the load shed point named in the filter config
+/// sheds the request. Otherwise the filters tell the upstream in a request header whether they got
+/// the load shed point.
+struct LoadShedPointFilterConfig {
+  load_shed_point: Option<Box<dyn EnvoyLoadShedPoint>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LoadShedPointFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LoadShedPointFilter {
+      has_load_shed_point: self.load_shed_point.is_some(),
+      shed_load: self
+        .load_shed_point
+        .as_ref()
+        .is_some_and(|load_shed_point| load_shed_point.should_shed_load()),
+    })
+  }
+}
+
+struct LoadShedPointFilter {
+  has_load_shed_point: bool,
+  shed_load: bool,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LoadShedPointFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if !self.shed_load {
+      let presence: &[u8] = if self.has_load_shed_point {
+        b"present"
+      } else {
+        b"absent"
+      };
+      envoy_filter.set_request_header("x-load-shed-point", presence);
+      return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
+    }
+    envoy_filter.send_response(503, &[], Some(b"shed"), None);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 }
 

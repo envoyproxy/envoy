@@ -21,7 +21,8 @@ absl::StatusOr<Http::FilterFactoryCb>
 buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                            const FilterConfig& proto_config,
                            Server::Configuration::ServerFactoryContext& context,
-                           Stats::Scope& scope, OptRef<Init::Manager> init_manager) {
+                           Stats::Scope& scope, OptRef<Init::Manager> init_manager,
+                           OptRef<Server::LoadShedPointProvider> load_shed_point_provider) {
 
   std::string config;
   if (proto_config.has_filter_config()) {
@@ -45,7 +46,7 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
               proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
-              std::move(dynamic_module), scope, context, init_manager);
+              std::move(dynamic_module), scope, context, init_manager, load_shed_point_provider);
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
@@ -82,7 +83,8 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
 absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactory(
     const FilterConfig& proto_config, const std::string&,
     Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-    OptRef<Init::Manager> init_manager) {
+    OptRef<Init::Manager> init_manager,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider) {
 
   const auto& module_config = proto_config.dynamic_module_config();
 
@@ -101,8 +103,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   std::weak_ptr<AsyncState> weak_state = async_state;
 
   // Invoked on the main thread once an asynchronously fetched module finishes loading.
-  auto on_loaded = [weak_state, proto_config, &context,
-                    &scope](Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
+  auto on_loaded = [weak_state, proto_config, &context, &scope, load_shed_point_provider](
+                       Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
     auto state = weak_state.lock();
     if (!state) {
       return;
@@ -112,7 +114,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     // therefore starts immediately instead of gating initialization, which matches the fail-open
     // nature of the remote fetch path.
     auto cb_or_error = buildFilterFactoryCallback(std::move(dynamic_module), proto_config, context,
-                                                  scope, std::nullopt);
+                                                  scope, std::nullopt, load_shed_point_provider);
     if (!cb_or_error.ok()) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
                           error, "Failed to create filter config from remote module: {}",
@@ -132,7 +134,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   // Synchronous load (local file, by name, or remote cache hit): build the factory now.
   if (load_result->loaded != nullptr) {
     return buildFilterFactoryCallback(std::move(load_result->loaded), proto_config, context, scope,
-                                      init_manager);
+                                      init_manager, load_shed_point_provider);
   }
 
   ASSERT(load_result->async != nullptr, "Async loading state must be populated for async loads");
@@ -153,8 +155,15 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb>
 DynamicModuleConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix, context,
-                             extra_context.scopeOr(context), extra_context.init_manager);
+  // The hooks of upstream filters can run after the overload manager is destroyed, so they get no
+  // load shed point.
+  const bool has_load_shed_points =
+      !extra_context.is_upstream && !extra_context.bypass_overload_manager;
+  return createFilterFactory(
+      proto_config, extra_context.stats_prefix, context, extra_context.scopeOr(context),
+      extra_context.init_manager,
+      has_load_shed_points ? makeOptRef<Server::LoadShedPointProvider>(context.overloadManager())
+                           : OptRef<Server::LoadShedPointProvider>());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

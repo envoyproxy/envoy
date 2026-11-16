@@ -35,5 +35,5 @@ if [[ -n "${BAZEL_GRPC_LOG:-}" ]]; then
     ARGS+=(--grpc-log="$BAZEL_GRPC_LOG")
 fi
 
-exec bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only \
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only \
     @envoy_toolshed//coverage:run -- "${ARGS[@]}" -- "$@"

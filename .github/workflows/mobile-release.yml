@@ -46,7 +46,7 @@ jobs:
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
       args: ${{ matrix.args }}
-      container: ${{ fromJSON(needs.env.outputs.build-image).mobile }}
+      container: ${{ fromJSON(needs.env.outputs.build-image).default }}
       container-output: |
         "bazel-bin/library/kotlin/io/envoyproxy/envoymobile/${{ matrix.output }}.aar": build/
         "bazel-bin/library/kotlin/io/envoyproxy/envoymobile/${{ matrix.output }}-pom.xml": build/

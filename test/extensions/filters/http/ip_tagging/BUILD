@@ -18,7 +18,10 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/ip_tagging/test_data:ip_tagging_files",
     ],
     extension_names = ["envoy.filters.http.ip_tagging"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -48,7 +51,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/ip_tagging/test_data:ip_tagging_files",
     ],
     extension_names = ["envoy.filters.http.ip_tagging"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/ip_tagging:config",
         "//test/integration:http_integration_lib",

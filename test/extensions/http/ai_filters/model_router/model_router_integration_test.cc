@@ -341,8 +341,8 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
   // Attempt 1 goes to the Anthropic cluster (`fake_upstreams_[0]`) with the primary model and fails
   // with 503.
   waitForAnthropicUpstreamRequest("claude-haiku-5-5");
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
