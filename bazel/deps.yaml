@@ -1036,6 +1036,16 @@ rules_cc:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_cc/blob/{version}/LICENSE"
 
+rules_distroless:
+  project_name: "Bazel rules for distroless images"
+  project_desc: "Bazel rules for building container images from Debian packages"
+  project_url: "https://github.com/GoogleContainerTools/rules_distroless"
+  release_date: "2026-08-21"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/GoogleContainerTools/rules_distroless/blob/v{version}/LICENSE"
+
 rules_foreign_cc:
   project_name: "Rules for using foreign build systems in Bazel"
   project_desc: "Rules for using foreign build systems in Bazel"
@@ -1104,6 +1114,16 @@ rules_license:
   - controlplane
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE"
+
+rules_oci:
+  project_name: "Bazel rules for OCI containers"
+  project_desc: "Bazel rules for building OCI container images"
+  project_url: "https://github.com/bazel-contrib/rules_oci"
+  release_date: "2026-11-13"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/rules_oci/blob/v{version}/LICENSE"
 
 rules_pkg:
   project_name: "Packaging rules for Bazel"
@@ -1252,6 +1272,16 @@ su_exec:
   - other
   license: "MIT"
   license_url: "https://github.com/ncopa/su-exec/blob/v{version}/LICENSE"
+
+tar.bzl:
+  project_name: "tar.bzl"
+  project_desc: "Hermetic tar (bsdtar) rules for Bazel, used for the release container image tarballs"
+  project_url: "https://github.com/bazel-contrib/tar.bzl"
+  release_date: "2025-11-15"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/tar.bzl/blob/v{version}/LICENSE"
 
 tclap:
   project_name: "tclap"
