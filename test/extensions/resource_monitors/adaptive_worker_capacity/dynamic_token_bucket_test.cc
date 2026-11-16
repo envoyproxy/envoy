@@ -1,5 +1,4 @@
 #include <chrono>
-#include <cmath>
 #include <limits>
 #include <optional>
 
@@ -45,13 +44,14 @@ TEST(DynamicTokenBucketTest, UninitializedInitialState) {
 
 TEST(DynamicTokenBucketTest, InitialStateIsFull) {
   Event::SimulatedTimeSystem time_system;
-  DynamicTokenBucket bucket(time_system, absl::Seconds(1));
+  DynamicTokenBucket bucket(time_system, absl::Seconds(2));
   bucket.setRefillRate(100.0);
 
+  EXPECT_EQ(absl::Seconds(2), bucket.bucketSize());
   EXPECT_DOUBLE_EQ(100.0, bucket.refillRate());
   ASSERT_TRUE(bucket.maxTokens().has_value());
-  EXPECT_DOUBLE_EQ(100.0, *bucket.maxTokens());
-  EXPECT_DOUBLE_EQ(100.0, bucket.tokenCount());
+  EXPECT_DOUBLE_EQ(200.0, *bucket.maxTokens());
+  EXPECT_DOUBLE_EQ(200.0, bucket.tokenCount());
   EXPECT_DOUBLE_EQ(0.0, bucket.getResourceUsage().resource_pressure_);
 }
 
@@ -219,20 +219,29 @@ TEST(DynamicTokenBucketTest, SetRefillRateDirectlyUpdatesRateAndCapacity) {
   Event::SimulatedTimeSystem time_system;
   DynamicTokenBucket bucket(time_system, absl::Seconds(1));
 
-  // Directly set rate to 50.0.
+  // Directly set rate to 50.0, then update in place to 80.0.
   bucket.setRefillRate(50.0);
   EXPECT_DOUBLE_EQ(50.0, bucket.refillRate());
   ASSERT_TRUE(bucket.maxTokens().has_value());
   EXPECT_DOUBLE_EQ(50.0, *bucket.maxTokens());
   EXPECT_DOUBLE_EQ(50.0, bucket.tokenCount());
 
+  bucket.setRefillRate(80.0);
+  EXPECT_DOUBLE_EQ(80.0, bucket.refillRate());
+  EXPECT_DOUBLE_EQ(80.0, *bucket.maxTokens());
+  EXPECT_DOUBLE_EQ(80.0, bucket.tokenCount());
+
   // Non-positive or non-finite rates do nothing.
   bucket.setRefillRate(0.0);
-  EXPECT_DOUBLE_EQ(50.0, bucket.refillRate());
+  EXPECT_DOUBLE_EQ(80.0, bucket.refillRate());
   bucket.setRefillRate(-10.0);
-  EXPECT_DOUBLE_EQ(50.0, bucket.refillRate());
+  EXPECT_DOUBLE_EQ(80.0, bucket.refillRate());
   bucket.setRefillRate(std::numeric_limits<double>::quiet_NaN());
-  EXPECT_DOUBLE_EQ(50.0, bucket.refillRate());
+  EXPECT_DOUBLE_EQ(80.0, bucket.refillRate());
+  bucket.setRefillRate(std::numeric_limits<double>::infinity());
+  EXPECT_DOUBLE_EQ(80.0, bucket.refillRate());
+  bucket.setRefillRate(-std::numeric_limits<double>::infinity());
+  EXPECT_DOUBLE_EQ(80.0, bucket.refillRate());
 }
 
 TEST(DynamicTokenBucketTest, PopTokenConsumptionRateComputesRateAndResets) {
@@ -295,25 +304,25 @@ TEST(DynamicTokenBucketTest, MidIntervalRefillRateChangePreservesTimeWeightedUti
     bucket.onLoadAccepted();
   }
 
-  // Interval 1: 100ms at 100 tokens/s.
-  // 10 tokens refill (50 -> 60). Average tokens = 55. Missing = 45.
-  // Area = 0.1s * 45 = 4.5 token-seconds.
-  // Utilization of interval 1 = 4.5 / (0.1 * 100) = 0.45.
+  // Interval 1: 100ms at 100 tokens/s -> 10 tokens refill (50 -> 60, utilization = 0.45).
   time_system.advanceTimeWait(std::chrono::milliseconds(100));
 
-  // Change refill rate mid-interval to 200 tokens/s (scale factor 2.0).
+  // Change refill rate mid-interval to 200 tokens/s: refills first, then scales 60 -> 120.
   bucket.setRefillRate(200.0);
+  EXPECT_DOUBLE_EQ(120.0, bucket.tokenCount());
 
-  // Interval 2: 100ms at 200 tokens/s.
-  // Tokens scaled to 120 out of 200.
-  // In 100ms, 20 tokens refill (120 -> 140). Average tokens = 130. Missing
-  // = 70. Area = 0.1s * 70 = 7.0 token-seconds. Utilization of interval 2 = 7.0
-  // / (0.1 * 200) = 0.35.
-  time_system.advanceTimeWait(std::chrono::milliseconds(100));
+  // Interval 2: 300ms at 200 tokens/s -> 60 tokens refill (120 -> 180, average 150, missing 50,
+  // utilization = 0.25). Time-weighted average over 100ms + 300ms = (0.1 * 0.45 + 0.3 * 0.25) /
+  // 0.4 = 0.30.
+  time_system.advanceTimeWait(std::chrono::milliseconds(300));
+  EXPECT_NEAR(0.30, bucket.popBucketUtilization(), 1e-4);
 
-  // Total interval = 200ms (0.1s @ 0.45 + 0.1s @ 0.35).
-  // Time-weighted average utilization = (0.45 + 0.35) / 2 = 0.40.
-  EXPECT_NEAR(0.40, bucket.popBucketUtilization(), 1e-4);
+  // Mid-window getResourceUsage() (+50ms: 180 -> 190, area 0.75) followed by refilling past full
+  // (+250ms: 190 -> 200 in 50ms, area +0.25 = 1.0) accumulates across both refill segments.
+  time_system.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_DOUBLE_EQ(0.05, bucket.getResourceUsage().resource_pressure_);
+  time_system.advanceTimeWait(std::chrono::milliseconds(250));
+  EXPECT_NEAR(1.0 / 60.0, bucket.popBucketUtilization(), 1e-5);
 }
 
 TEST(DynamicTokenBucketTest, SetRefillRateAfterUninitializedTimeDoesNotDiluteUtilization) {
@@ -382,8 +391,7 @@ TEST(DynamicTokenBucketTest, ZeroElapsedDurationPreservesUtilizationAndConsumpti
   }
 
   // Without advancing time, popBucketUtilization() and
-  // popTokenConsumptionRate() return 0.0 without clearing accumulated area or
-  // consumed tokens.
+  // popTokenConsumptionRate() return 0.0 without clearing consumed tokens.
   EXPECT_DOUBLE_EQ(0.0, bucket.popBucketUtilization());
   EXPECT_DOUBLE_EQ(0.0, bucket.popTokenConsumptionRate());
 
@@ -404,59 +412,65 @@ TEST(DynamicTokenBucketTest, ZeroElapsedDurationPreservesUtilizationAndConsumpti
 
 TEST(DynamicTokenBucketTest, LargeRefillRateAndScalingClampedWithoutOverflowOrNaN) {
   Event::SimulatedTimeSystem time_system;
-  DynamicTokenBucket bucket(time_system, absl::Milliseconds(10));
-  bucket.setRefillRate(1e-3);
+  DynamicTokenBucket bucket(time_system, absl::Seconds(10));
+  bucket.setRefillRate(100.0);
 
-  // Deplete the bucket to 0 tokens at t=0 (accumulated_area = 0.0).
-  bucket.onLoadAccepted();
-  EXPECT_DOUBLE_EQ(0.0, bucket.tokenCount());
+  for (int i = 0; i < 500; ++i) {
+    bucket.onLoadAccepted();
+  }
+  EXPECT_DOUBLE_EQ(500.0, bucket.tokenCount());
 
-  // Scaling or setting an extreme finite rate clamps cleanly without producing
-  // inf or NaN.
-  bucket.setRefillRate(1e308);
-  EXPECT_DOUBLE_EQ(1e12, bucket.refillRate());
-  ASSERT_TRUE(bucket.maxTokens().has_value());
-  EXPECT_TRUE(std::isfinite(*bucket.maxTokens()));
-  EXPECT_FALSE(std::isnan(bucket.tokenCount()));
-  EXPECT_FALSE(std::isnan(bucket.getResourceUsage().resource_pressure_));
-
+  // Overflowing scaleRefillRate from a sub-max rate clamps refill_rate_ to 1e12,
+  // and 10s * 1e12 = 1e13 clamps max_tokens_ to kMaxTokens (1e12).
   bucket.scaleRefillRate(1e308);
   EXPECT_DOUBLE_EQ(1e12, bucket.refillRate());
-  EXPECT_TRUE(std::isfinite(*bucket.maxTokens()));
+  ASSERT_TRUE(bucket.maxTokens().has_value());
+  EXPECT_DOUBLE_EQ(1e12, *bucket.maxTokens());
+  EXPECT_DOUBLE_EQ(5e11, bucket.tokenCount());
+  EXPECT_DOUBLE_EQ(0.5, bucket.getResourceUsage().resource_pressure_);
+
+  // Direct setRefillRate above kMaxRefillRate when empty (0 tokens, 0 area) clamps cleanly.
+  DynamicTokenBucket zero_bucket(time_system, absl::Milliseconds(10));
+  zero_bucket.setRefillRate(1e-3);
+  zero_bucket.onLoadAccepted();
+  zero_bucket.setRefillRate(1e308);
+  EXPECT_DOUBLE_EQ(1e12, zero_bucket.refillRate());
+  ASSERT_TRUE(zero_bucket.maxTokens().has_value());
+  EXPECT_DOUBLE_EQ(1e10, *zero_bucket.maxTokens());
+  EXPECT_DOUBLE_EQ(0.0, zero_bucket.tokenCount());
+  EXPECT_DOUBLE_EQ(1.0, zero_bucket.getResourceUsage().resource_pressure_);
 
   time_system.advanceTimeWait(std::chrono::milliseconds(10));
-  EXPECT_FALSE(std::isnan(bucket.popBucketUtilization()));
+  EXPECT_DOUBLE_EQ(0.5, zero_bucket.popBucketUtilization());
 }
 
 TEST(DynamicTokenBucketTest, DownscalingPreservesExactFullAndSingleTokenBoundaries) {
   {
     Event::SimulatedTimeSystem time_system;
     DynamicTokenBucket bucket(time_system, absl::Seconds(1));
-    bucket.setRefillRate(49.0);
-    bucket.setRefillRate(0.5);
+    bucket.setRefillRate(3.0);
+    bucket.setRefillRate(1.4);
 
     ASSERT_TRUE(bucket.maxTokens().has_value());
-    EXPECT_DOUBLE_EQ(1.0, *bucket.maxTokens());
-    EXPECT_DOUBLE_EQ(1.0, bucket.tokenCount());
+    EXPECT_EQ(1.4, *bucket.maxTokens());
+    EXPECT_EQ(1.4, bucket.tokenCount());
     EXPECT_DOUBLE_EQ(0.0, bucket.getResourceUsage().resource_pressure_);
   }
 
   {
     Event::SimulatedTimeSystem time_system;
     DynamicTokenBucket bucket(time_system, absl::Seconds(1));
-    bucket.setRefillRate(49.0);
-    for (int i = 0; i < 42; ++i) {
+    bucket.setRefillRate(98.0);
+    for (int i = 0; i < 49; ++i) {
       bucket.onLoadAccepted();
     }
-    ASSERT_DOUBLE_EQ(7.0, bucket.tokenCount());
+    ASSERT_DOUBLE_EQ(49.0, bucket.tokenCount());
 
-    bucket.setRefillRate(7.0);
+    bucket.setRefillRate(2.0);
     ASSERT_TRUE(bucket.maxTokens().has_value());
-    EXPECT_DOUBLE_EQ(7.0, *bucket.maxTokens());
-    EXPECT_DOUBLE_EQ(1.0, bucket.tokenCount());
-    const double pressure = bucket.getResourceUsage().resource_pressure_;
-    EXPECT_LT(pressure, 1.0);
-    EXPECT_DOUBLE_EQ(6.0 / 7.0, pressure);
+    EXPECT_DOUBLE_EQ(2.0, *bucket.maxTokens());
+    EXPECT_EQ(1.0, bucket.tokenCount());
+    EXPECT_DOUBLE_EQ(0.5, bucket.getResourceUsage().resource_pressure_);
   }
 }
 
