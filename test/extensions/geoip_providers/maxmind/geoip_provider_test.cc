@@ -1270,7 +1270,7 @@ TEST_F(GeoipProviderTest, LoadsDatabaseCreatedDuringWatcherRegistration) {
 
 TEST_F(GeoipProviderTest, AllowMissingDatabaseRejectsNonMissingFileOpenError) {
   const std::string regular_file_path = TestEnvironment::temporaryPath("not-a-directory");
-  TestEnvironment::writeStringToFileForTest(regular_file_path, "not a directory");
+  TestEnvironment::writeStringToFileForTest(regular_file_path, "not a directory", true);
   const std::string db_path = absl::StrCat(regular_file_path, "/city.mmdb");
   const std::string config_yaml = absl::StrFormat(R"EOF(
     common_provider_config:
