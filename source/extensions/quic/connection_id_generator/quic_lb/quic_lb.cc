@@ -120,10 +120,10 @@ QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_v
     // The encoder refuses a config with the active config ID, so the active one is deleted first.
     // Nothing runs on this thread in between, so no connection ID is generated without a config.
     encoder_.DeleteConfig();
+    version_.reset();
   }
   bool success = encoder_.UpdateConfig(lb_config.value(), server_id_);
   if (!success) {
-    version_.reset();
     return absl::InvalidArgumentError("Error setting configuration of quic-lb CID encoder");
   }
   version_ = version;
