@@ -27,7 +27,7 @@ bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.3-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.20.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.22.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -227,7 +227,7 @@ use_repo(grcov_ext, "grcov")
 
 # Prebuilt lcov merger for the coverage report (toolshed bins release).
 lcov_merge_ext = use_extension("@envoy_toolshed//coverage/lcov:extensions.bzl", "lcov_merge_extension")
-lcov_merge_ext.setup(bins_release_version = "0.2.32")
+lcov_merge_ext.setup(bins_release_version = "0.2.34")
 use_repo(lcov_merge_ext, "lcov_merge")
 
 # Hermetic (prebuilt) git toolchain.
