@@ -219,11 +219,11 @@ function cp_binary_for_image_build() {
 
   # Tools for the tools image. Strip to save size.
   hermetic_strip
-  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  "${STRIP_BIN}" bazel-bin/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -286,11 +286,11 @@ function bazel_binary_build() {
 
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
+    //tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
+    //tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
+    //tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
@@ -372,9 +372,9 @@ function build_openssl() {
     if [[ "$CI_TARGET" != "openssl.test" ]]; then
         build_targets=(
             "${ENVOY_BUILD_TARGET}"
-            //test/tools/schema_validator:schema_validator_tool
-            //test/tools/router_check:router_check_tool
-            //test/tools/config_load_check:config_load_check_tool
+            //tools/schema_validator:schema_validator_tool
+            //tools/router_check:router_check_tool
+            //tools/config_load_check:config_load_check_tool
             @su-exec)
     fi
     if [[ "$CI_TARGET" != "openssl.build" ]]; then
@@ -984,9 +984,9 @@ case $CI_TARGET in
         if [[ "$CI_TARGET" != "gcc.test" ]]; then
             GCC_BUILD_TARGETS=(
                 "${ENVOY_BUILD_TARGET}"
-                //test/tools/schema_validator:schema_validator_tool
-                //test/tools/router_check:router_check_tool
-                //test/tools/config_load_check:config_load_check_tool
+                //tools/schema_validator:schema_validator_tool
+                //tools/router_check:router_check_tool
+                //tools/config_load_check:config_load_check_tool
                 @su-exec)
         fi
         if [[ "$CI_TARGET" == "gcc.build" ]]; then
@@ -1140,22 +1140,22 @@ case $CI_TARGET in
         # TODO(phlax): bundle this with the release when #26390 is resolved
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_toplevel \
-              //test/tools/schema_validator:schema_validator_tool.stripped
+              //tools/schema_validator:schema_validator_tool.stripped
         # Copy schema_validator_tool to binary export directory
         cp -a \
-           bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
+           bazel-bin/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_toplevel \
-              //test/tools/router_check:router_check_tool.stripped
+              //tools/router_check:router_check_tool.stripped
         cp -a \
-           bazel-bin/test/tools/router_check/router_check_tool.stripped \
+           bazel-bin/tools/router_check/router_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/router_check_tool"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_toplevel \
-              //test/tools/config_load_check:config_load_check_tool.stripped
+              //tools/config_load_check:config_load_check_tool.stripped
         cp -a \
-           bazel-bin/test/tools/config_load_check/config_load_check_tool.stripped \
+           bazel-bin/tools/config_load_check/config_load_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/config_load_check_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
