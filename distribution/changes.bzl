@@ -59,11 +59,19 @@ def envoy_signed_changes(name, arch_packages, version, release_version, distros 
                 package = pkg,
                 prefix = "deb",
                 out = "%s/%s/%s.changes" % (name, arch, changes_basename),
+                # Reads the release packages (new with every commit, and large), locally.
+                tags = ["no-remote"],
             )
             for label, distro in pgp_sign_changes_split(
                 name = "%s-%s-%s" % (name, arch, pkg),
                 changes = ":%s" % extract_name,
                 distros = distros,
+                # The `.changes` change with every commit and splitting them is trivial, so locally:
+                # remotely each split waits in the RBE queue (for minutes when it is busy).
+                tags = [
+                    "manual",
+                    "no-remote",
+                ],
             ):
                 signed.append((label, "%s.%s.changes" % (changes_basename, distro)))
     return signed
