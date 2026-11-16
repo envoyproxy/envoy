@@ -45,7 +45,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
@@ -127,7 +130,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "orca_oob_manager_test",
     srcs = ["orca_oob_manager_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:common_lib",

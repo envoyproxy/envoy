@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     name = "xfcc_value_test",
     srcs = ["xfcc_value_test.cc"],
     extension_names = ["envoy.built_in_formatters.xfcc_value"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/extensions/formatter/xfcc_value:config",

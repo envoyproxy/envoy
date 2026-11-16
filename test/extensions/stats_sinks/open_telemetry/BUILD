@@ -17,7 +17,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -30,7 +33,10 @@ envoy_extension_cc_test(
     name = "open_telemetry_impl_test",
     srcs = ["open_telemetry_impl_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/stats:histogram_lib",
         "//source/extensions/stat_sinks/open_telemetry:config",
@@ -48,7 +54,10 @@ envoy_extension_cc_test(
     name = "open_telemetry_http_impl_test",
     srcs = ["open_telemetry_http_impl_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_http_lib",
         "//test/mocks/server:server_factory_context_mocks",
@@ -63,7 +72,10 @@ envoy_extension_cc_test(
     srcs = ["open_telemetry_integration_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -83,7 +95,10 @@ envoy_extension_cc_test(
         "envoy.stat_sinks.open_telemetry",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

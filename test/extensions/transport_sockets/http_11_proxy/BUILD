@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "connect_test",
     srcs = ["connect_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
         "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
@@ -39,7 +42,10 @@ envoy_extension_cc_test(
     srcs = ["connect_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

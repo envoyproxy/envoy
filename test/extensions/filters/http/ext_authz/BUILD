@@ -6,6 +6,8 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
@@ -52,7 +54,10 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":http_filter_test_base_lib",
         "//envoy/http:codes_interface",
@@ -87,7 +92,10 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_filter_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -123,7 +131,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/network:address_lib",
@@ -144,7 +155,10 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_integration_test.cc"],
     data = ["ext_authz.yaml"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     shard_count = 8,
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
@@ -195,7 +209,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["ext_authz_grpc_fuzz_test.cc"],
     corpus = "ext_authz_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -214,7 +231,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["ext_authz_http_fuzz_test.cc"],
     corpus = "ext_authz_http_corpus",
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -268,4 +288,31 @@ envoy_extension_cc_test_library(
         "//source/extensions/filters/http/ext_authz",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_extension_cc_benchmark_binary(
+    name = "filter_speed_test",
+    srcs = ["filter_speed_test.cc"],
+    extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/http/ext_authz",
+        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_benchmark_test(
+    name = "filter_speed_test_benchmark_test",
+    benchmark_binary = "filter_speed_test",
+    extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "linux_x64_small",
 )

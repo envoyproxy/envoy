@@ -13,7 +13,10 @@ envoy_cc_test(
     name = "conn_pool_test",
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = envoy_select_enable_http3([

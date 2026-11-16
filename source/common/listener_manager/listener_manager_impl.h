@@ -96,7 +96,8 @@ public:
     return std::make_unique<LdsApiImpl>(
         lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
         *server_.stats().rootScope(), server_.listenerManager(),
-        server_.messageValidationContext().dynamicValidationVisitor());
+        server_.messageValidationContext().dynamicValidationVisitor(),
+        server_.api().randomGenerator());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
@@ -267,7 +268,9 @@ private:
 /**
  * Implementation of ListenerManager.
  */
-class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
+class ListenerManagerImpl : public ListenerManager,
+                            public FcdsListenerManagerCallbacks,
+                            Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats,
@@ -303,9 +306,15 @@ public:
   ApiListenerOptRef apiListener() override;
   ListenerUpdateCallbacksHandlePtr
   addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
+  absl::StatusOr<bool>
+  addOrUpdateFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain) override;
+  bool removeFilterChain(absl::string_view name) override;
   void
   drainFilterChains(ListenerImpl& listener,
                     std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
+
+  // Returns the manager of the filter chains that the listeners with fcds_config find by name.
+  std::shared_ptr<FcdsSharedFilterChainManager> fcdsSharedFilterChainManager();
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
@@ -440,6 +449,8 @@ private:
                                      Network::ListenerConfig& listener_config);
   void notifyListenerRemovalCallbacks(const std::string& listener_name);
   void notifyListenerListenFailureCallbacks(absl::string_view listener_name, bool removed);
+  // FcdsListenerManagerCallbacks
+  void notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name) override;
 
   absl::Status validateNoDuplicatedAddress(const std::string& name,
                                            const ListenerImpl& listener) const;
@@ -504,6 +515,8 @@ private:
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
   std::list<ListenerUpdateCallbacks*> update_callbacks_;
+  // The subscriptions through which addOrUpdateFilterChain() provides filter chains, by name.
+  absl::flat_hash_map<std::string, FcdsLocalSubscriptionHandleSharedPtr> local_filter_chains_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {

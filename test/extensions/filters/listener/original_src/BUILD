@@ -27,7 +27,10 @@ envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
     extension_names = ["envoy.filters.listener.original_src"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",

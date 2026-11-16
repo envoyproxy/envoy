@@ -13,6 +13,7 @@
 #include "source/common/api/api_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/header_map_impl.h"
@@ -71,7 +72,40 @@ RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data)
   };
 }
 
+testing::AssertionResult runDispatcherUntilImpl(Event::Dispatcher& dispatcher,
+                                                const std::function<bool()>& condition,
+                                                absl::string_view description,
+                                                std::chrono::milliseconds timeout,
+                                                bool advance_time) {
+  Event::GlobalTimeSystem time_system;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (!condition()) {
+    if (!bound.withinBound()) {
+      return testing::AssertionFailure() << "Timed out after " << timeout.count()
+                                         << "ms of real time waiting for " << description;
+    }
+    if (advance_time) {
+      time_system.advanceTimeForIo(dispatcher);
+    }
+    dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    std::this_thread::yield();
+  }
+  return testing::AssertionSuccess();
+}
 } // namespace
+
+testing::AssertionResult IntegrationUtil::runDispatcherUntil(Event::Dispatcher& dispatcher,
+                                                             const std::function<bool()>& condition,
+                                                             absl::string_view description,
+                                                             std::chrono::milliseconds timeout) {
+  return runDispatcherUntilImpl(dispatcher, condition, description, timeout, false);
+}
+
+testing::AssertionResult IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+    Event::Dispatcher& dispatcher, const std::function<bool()>& condition,
+    absl::string_view description, std::chrono::milliseconds timeout) {
+  return runDispatcherUntilImpl(dispatcher, condition, description, timeout, true);
+}
 
 void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
@@ -120,9 +154,11 @@ public:
       connected_ = true;
       dispatcher_.exit();
     } else if (event == Network::ConnectionEvent::RemoteClose) {
+      closed_ = true;
       // If the peer closes the connection, no need to wait anymore.
       dispatcher_.exit();
     } else {
+      closed_ = true;
       if (!connected_) {
         // Before handshake gets established, any connection failure should exit the loop. I.e. a
         // QUIC connection may fail of INVALID_VERSION if both this client doesn't support any of
@@ -135,10 +171,13 @@ public:
 
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  bool connected() const { return connected_; }
+  bool closed() const { return closed_; }
 
 private:
   Event::Dispatcher& dispatcher_;
   bool connected_{false};
+  bool closed_{false};
 };
 
 Network::UpstreamTransportSocketFactoryPtr
@@ -210,7 +249,13 @@ sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& 
     encoder.encodeData(body_buffer, true);
   }
 
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  Event::GlobalTimeSystem time_system;
+  if (time_system.ioDispatcher() != nullptr) {
+    EXPECT_TRUE(IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+        dispatcher, [&response] { return response->complete(); }, "HTTP response completion"));
+  } else {
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
   return response;
 }
 
@@ -251,6 +296,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   }
 
 #ifdef ENVOY_ENABLE_QUIC
+  Event::Dispatcher* previous_dispatcher = time_system.ioDispatcher();
+  time_system.setIoDispatcher(nullptr);
+  time_system.setIoDispatcher(dispatcher.get());
+  Cleanup unregister_dispatcher([&] {
+    time_system.setIoDispatcher(nullptr);
+    time_system.setIoDispatcher(previous_dispatcher);
+  });
   testing::NiceMock<ThreadLocal::MockInstance> threadlocal;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   Extensions::TransportSockets::Tls::ContextManagerImpl manager(server_factory_context);
@@ -281,7 +333,16 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
                                options);
   // Quic connection needs to finish handshake.
-  dispatcher->run(Event::Dispatcher::RunType::Block);
+  if (time_system.ioDispatcher() != nullptr) {
+    EXPECT_TRUE(runDispatcherUntilWithTimeAdvance(
+        *dispatcher,
+        [&connection_callbacks] {
+          return connection_callbacks.connected() || connection_callbacks.closed();
+        },
+        "QUIC connection establishment"));
+  } else {
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  }
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");

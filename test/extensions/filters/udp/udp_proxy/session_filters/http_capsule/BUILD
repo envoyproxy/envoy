@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "http_capsule_filter_test",
     srcs = ["http_capsule_filter_test.cc"],
     extension_names = ["envoy.filters.udp.session.http_capsule"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//test/extensions/filters/udp/udp_proxy:mocks",
@@ -29,7 +32,10 @@ envoy_extension_cc_test(
     srcs = ["http_capsule_integration_test.cc"],
     extension_names = ["envoy.filters.udp.session.http_capsule"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

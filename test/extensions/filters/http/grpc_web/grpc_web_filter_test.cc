@@ -230,10 +230,9 @@ TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithLargeEncod
 
 TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithNullEncodingBuffer) {
   Buffer::OwnedImpl last_data(std::string(2 * MAX_BUFFERED_PLAINTEXT_LENGTH, 'a'));
-  // If we don't have buffered data in encoding buffer, the merged data will be the same as last
-  // data.
+  // Without buffered data, the last data alone is limited too.
   expectMergedAndLimitedResponseData(nullptr, &last_data,
-                                     /*expected_merged_length=*/last_data.length());
+                                     /*expected_merged_length=*/MAX_BUFFERED_PLAINTEXT_LENGTH);
 }
 
 TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithNoEncodingBufferAndLastData) {
@@ -377,13 +376,11 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeLastData) {
             filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data;
   // The last data length is set to be bigger than "MAX_BUFFERED_PLAINTEXT_LENGTH".
-  const std::string expected_grpc_message = std::string(MAX_BUFFERED_PLAINTEXT_LENGTH + 1, 'a');
-  data.add(expected_grpc_message);
+  data.add(std::string(MAX_BUFFERED_PLAINTEXT_LENGTH + 1, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
-  // The grpc-message value length is the same as the last sent buffer.
-  EXPECT_EQ(MAX_BUFFERED_PLAINTEXT_LENGTH + 1,
-            response_headers.get_(Http::Headers::get().GrpcMessage).length());
-  EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
+  // The grpc-message value is limited to MAX_BUFFERED_PLAINTEXT_LENGTH.
+  EXPECT_EQ(std::string(MAX_BUFFERED_PLAINTEXT_LENGTH, 'a'),
+            response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 
 TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {

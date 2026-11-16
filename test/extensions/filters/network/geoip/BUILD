@@ -39,7 +39,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.geoip"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/geoip:config",
@@ -66,7 +69,10 @@ envoy_extension_cc_test(
         "envoy.geoip_providers.maxmind",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     tags = ["skip_on_windows"],

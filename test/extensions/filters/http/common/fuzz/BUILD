@@ -71,7 +71,10 @@ envoy_cc_fuzz_test(
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     # All Envoy extensions must be linked to the test in order for the fuzzer to pick

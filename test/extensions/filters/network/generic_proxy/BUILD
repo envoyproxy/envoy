@@ -32,7 +32,10 @@ envoy_extension_cc_test(
         "route_test.cc",
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
@@ -53,7 +56,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -79,7 +85,10 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
@@ -108,7 +117,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     tags = [
@@ -143,7 +155,10 @@ envoy_extension_cc_test(
         "match_test.cc",
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":fake_codec_lib",
         "//source/extensions/filters/network/generic_proxy:match_lib",
@@ -195,7 +210,10 @@ envoy_extension_cc_test(
         "stats_test.cc",
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/network/generic_proxy:stats_lib",
         "//test/mocks/server:server_factory_context_mocks",

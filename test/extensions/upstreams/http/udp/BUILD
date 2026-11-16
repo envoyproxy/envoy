@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     extension_names = ["envoy.upstreams.http.udp"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/http:protocol_interface",
         "//envoy/router:router_interface",

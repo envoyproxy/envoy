@@ -38,7 +38,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_tcp_client_impl_test",
     srcs = ["async_tcp_client_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/tcp:async_tcp_client_lib",

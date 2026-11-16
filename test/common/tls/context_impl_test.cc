@@ -1,3 +1,4 @@
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,10 +40,13 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/bytestring.h"
 #include "openssl/crypto.h"
+#include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
@@ -183,6 +187,120 @@ require_client_certificate: true
   EXPECT_EQ(id, session_context_id("ca_cert.pem"));
 }
 
+#ifndef ENVOY_SSL_OPENSSL
+// Uses BoringSSL-only ClientHello building and parsing APIs.
+namespace {
+
+// Builds a ClientHello body (starting at legacy_version) that lists ecdsa_secp256r1_sha256 first in
+// signature_algorithms, like Java clients. `supported_versions` is the raw extension body, if any.
+std::vector<uint8_t>
+buildClientHello(const std::vector<uint16_t>& cipher_suites,
+                 const std::optional<std::vector<uint8_t>>& supported_versions) {
+  bssl::ScopedCBB cbb;
+  CBB ciphers, compression, extensions, ext, list;
+  EXPECT_TRUE(CBB_init(cbb.get(), 128));
+  EXPECT_TRUE(CBB_add_u16(cbb.get(), TLS1_2_VERSION));
+  EXPECT_TRUE(CBB_add_zeros(cbb.get(), SSL3_RANDOM_SIZE));
+  EXPECT_TRUE(CBB_add_u8(cbb.get(), 0)); // session_id
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(cbb.get(), &ciphers));
+  for (const uint16_t cipher : cipher_suites) {
+    EXPECT_TRUE(CBB_add_u16(&ciphers, cipher));
+  }
+  EXPECT_TRUE(CBB_add_u8_length_prefixed(cbb.get(), &compression));
+  EXPECT_TRUE(CBB_add_u8(&compression, 0));
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(cbb.get(), &extensions));
+
+  EXPECT_TRUE(CBB_add_u16(&extensions, TLSEXT_TYPE_supported_groups));
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(&extensions, &ext));
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(&ext, &list));
+  EXPECT_TRUE(CBB_add_u16(&list, SSL_GROUP_X25519));
+  EXPECT_TRUE(CBB_add_u16(&list, SSL_GROUP_SECP256R1));
+
+  EXPECT_TRUE(CBB_add_u16(&extensions, TLSEXT_TYPE_ec_point_formats));
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(&extensions, &ext));
+  EXPECT_TRUE(CBB_add_u8_length_prefixed(&ext, &list));
+  EXPECT_TRUE(CBB_add_u8(&list, TLSEXT_ECPOINTFORMAT_uncompressed));
+
+  EXPECT_TRUE(CBB_add_u16(&extensions, TLSEXT_TYPE_signature_algorithms));
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(&extensions, &ext));
+  EXPECT_TRUE(CBB_add_u16_length_prefixed(&ext, &list));
+  EXPECT_TRUE(CBB_add_u16(&list, SSL_SIGN_ECDSA_SECP256R1_SHA256));
+  EXPECT_TRUE(CBB_add_u16(&list, SSL_SIGN_RSA_PSS_RSAE_SHA256));
+  EXPECT_TRUE(CBB_add_u16(&list, SSL_SIGN_RSA_PKCS1_SHA256));
+
+  if (supported_versions.has_value()) {
+    EXPECT_TRUE(CBB_add_u16(&extensions, TLSEXT_TYPE_supported_versions));
+    EXPECT_TRUE(CBB_add_u16_length_prefixed(&extensions, &ext));
+    EXPECT_TRUE(CBB_add_bytes(&ext, supported_versions->data(), supported_versions->size()));
+  }
+
+  uint8_t* data;
+  size_t len;
+  EXPECT_TRUE(CBB_finish(cbb.get(), &data, &len));
+  std::vector<uint8_t> hello(data, data + len);
+  OPENSSL_free(data);
+  return hello;
+}
+
+} // namespace
+
+// A TLS 1.2 client may send supported_versions without TLS 1.3 (RFC 8446 section 4.2.1). Such a
+// client must only get the ECDSA certificate if it offers an ECDSA cipher suite.
+TEST_F(SslContextImplTest, EcdsaCapabilitiesHonorSupportedVersionsContent) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_1_key.pem"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto config = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  Ssl::ServerContextSharedPtr context =
+      *manager_.createSslServerContext(*store_.rootScope(), *config, nullptr);
+  auto cleanup = cleanUpHelper(context);
+  const auto& server_context = dynamic_cast<ServerContextImpl&>(*context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+  const auto ecdsa_capable = [&](const std::vector<uint16_t>& cipher_suites,
+                                 const std::optional<std::vector<uint8_t>>& supported_versions) {
+    const std::vector<uint8_t> hello = buildClientHello(cipher_suites, supported_versions);
+    SSL_CLIENT_HELLO client_hello;
+    EXPECT_TRUE(SSL_parse_client_hello(ssl.get(), &client_hello, hello.data(), hello.size()));
+    return !server_context.getClientEcdsaCapabilities(client_hello).empty();
+  };
+
+  constexpr uint16_t ecdhe_rsa = 0xc02f;   // ECDHE-RSA-AES128-GCM-SHA256
+  constexpr uint16_t ecdhe_ecdsa = 0xc02b; // ECDHE-ECDSA-AES128-GCM-SHA256
+  constexpr uint16_t tls13_aes = 0x1301;   // TLS_AES_128_GCM_SHA256
+  const std::vector<uint8_t> tls12_only = {0x02, 0x03, 0x03};
+  const std::vector<uint8_t> tls13_and_tls12 = {0x04, 0x03, 0x04, 0x03, 0x03};
+
+  // TLS 1.2-only client: the TLS 1.2 checks apply.
+  EXPECT_FALSE(ecdsa_capable({ecdhe_rsa}, tls12_only));
+  EXPECT_TRUE(ecdsa_capable({ecdhe_ecdsa, ecdhe_rsa}, tls12_only));
+  // TLS 1.3-capable client: signature_algorithms is enough.
+  EXPECT_TRUE(ecdsa_capable({tls13_aes, ecdhe_rsa}, tls13_and_tls12));
+  // No supported_versions extension.
+  EXPECT_FALSE(ecdsa_capable({ecdhe_rsa}, std::nullopt));
+  // Malformed supported_versions: wrong length prefix, then an odd number of version bytes.
+  EXPECT_FALSE(ecdsa_capable({ecdhe_rsa}, std::vector<uint8_t>{0x04, 0x03, 0x03}));
+  EXPECT_FALSE(ecdsa_capable({ecdhe_rsa}, std::vector<uint8_t>{0x03, 0x03, 0x03, 0x04}));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_ecdsa_selection_check_supported_versions", "false"}});
+  EXPECT_TRUE(ecdsa_capable({ecdhe_rsa}, tls12_only));
+}
+#endif // ENVOY_SSL_OPENSSL
+
 TEST_F(SslContextImplTest, TestCipherSuites) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -250,11 +368,13 @@ TEST_F(SslContextImplTest, TestCrlSharedAcrossContexts) {
   ASSERT_NE(ctx1, nullptr);
   ASSERT_NE(ctx2, nullptr);
 
-  // Both contexts reference the same CRL content, so it is parsed and held once.
+  // Both contexts reference the same CA and CRL content, so each is parsed and held once.
   auto crl_cache = getCrlCache(server_factory_context_.singletonManager());
   EXPECT_EQ(crl_cache->size(), 1);
+  auto ca_cert_cache = getCaCertCache(server_factory_context_.singletonManager());
+  EXPECT_EQ(ca_cert_cache->size(), 1);
 
-  // A context with a different CRL adds a second cache entry.
+  // A context with a different CA and CRL adds a second cache entry to each.
   const std::string other_yaml = R"EOF(
   common_tls_context:
     validation_context:
@@ -270,6 +390,7 @@ TEST_F(SslContextImplTest, TestCrlSharedAcrossContexts) {
   auto cleanup3 = cleanUpHelper(ctx3);
   ASSERT_NE(ctx3, nullptr);
   EXPECT_EQ(crl_cache->size(), 2);
+  EXPECT_EQ(ca_cert_cache->size(), 2);
 }
 
 // Validates the lifetime of a CRL shared between two TLS contexts: deleting one
@@ -332,6 +453,231 @@ TEST_F(SslContextImplTest, TestCrlSharedContextLifetime) {
   // Delete the second context; the cache entry is released with no crash.
   factory_b.reset();
   EXPECT_EQ(crl_cache->size(), 0);
+}
+
+// Validates that TLS contexts referencing identical certificate and key content
+// share a single parsed certificate chain and a single parsed private key, rather
+// than each re-parsing the PEM, when the cache is enabled.
+TEST_F(SslContextImplTest, TestClientCertAndKeySharedAcrossContexts) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context1);
+  auto cfg1 = *ClientContextConfigImpl::create(tls_context1, factory_context_);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context2);
+  auto cfg2 = *ClientContextConfigImpl::create(tls_context2, factory_context_);
+
+  auto ctx1 = *manager_.createSslClientContext(*store_.rootScope(), *cfg1);
+  auto cleanup1 = cleanUpHelper(ctx1);
+  auto ctx2 = *manager_.createSslClientContext(*store_.rootScope(), *cfg2);
+  auto cleanup2 = cleanUpHelper(ctx2);
+  ASSERT_NE(ctx1, nullptr);
+  ASSERT_NE(ctx2, nullptr);
+
+  auto cert_chain_cache = getCertChainCache(server_factory_context_.singletonManager());
+  auto private_key_cache = getPrivateKeyCache(server_factory_context_.singletonManager());
+  EXPECT_EQ(cert_chain_cache->size(), 1);
+  EXPECT_EQ(private_key_cache->size(), 1);
+
+  // A context with a different certificate and key adds a second entry to each.
+  const std::string other_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context3;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(other_yaml), tls_context3);
+  auto cfg3 = *ClientContextConfigImpl::create(tls_context3, factory_context_);
+  auto ctx3 = *manager_.createSslClientContext(*store_.rootScope(), *cfg3);
+  auto cleanup3 = cleanUpHelper(ctx3);
+  ASSERT_NE(ctx3, nullptr);
+  EXPECT_EQ(cert_chain_cache->size(), 2);
+  EXPECT_EQ(private_key_cache->size(), 2);
+}
+
+// With the runtime guard disabled, the certificate chain and private key are parsed per context
+// while the CA and CRL caches are still used.
+TEST_F(SslContextImplTest, TestClientCertAndKeyNotSharedWhenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.cache_parsed_tls_certificates", "false"}});
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context1);
+  auto cfg1 = *ClientContextConfigImpl::create(tls_context1, factory_context_);
+  auto ctx1 = *manager_.createSslClientContext(*store_.rootScope(), *cfg1);
+  auto cleanup1 = cleanUpHelper(ctx1);
+  ASSERT_NE(ctx1, nullptr);
+
+  EXPECT_EQ(getCertChainCache(server_factory_context_.singletonManager())->size(), 0);
+  EXPECT_EQ(getPrivateKeyCache(server_factory_context_.singletonManager())->size(), 0);
+  EXPECT_EQ(getCaCertCache(server_factory_context_.singletonManager())->size(), 1);
+  EXPECT_EQ(getCrlCache(server_factory_context_.singletonManager())->size(), 1);
+}
+
+// Validates the lifetime of certificate and key material shared between two TLS
+// contexts: tearing down one context leaves the shared material valid for the
+// other, and destroying both releases the cache entries. Primarily intended to
+// run under ASAN/TSAN.
+TEST_F(SslContextImplTest, TestClientCertAndKeySharedContextLifetime) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context1);
+  auto cfg1 = *ClientContextConfigImpl::create(tls_context1, factory_context_);
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context2);
+  auto cfg2 = *ClientContextConfigImpl::create(tls_context2, factory_context_);
+
+  auto ctx1 = *manager_.createSslClientContext(*store_.rootScope(), *cfg1);
+  auto ctx2 = *manager_.createSslClientContext(*store_.rootScope(), *cfg2);
+  ASSERT_NE(ctx1, nullptr);
+  ASSERT_NE(ctx2, nullptr);
+
+  auto cert_chain_cache = getCertChainCache(server_factory_context_.singletonManager());
+  auto private_key_cache = getPrivateKeyCache(server_factory_context_.singletonManager());
+  EXPECT_EQ(cert_chain_cache->size(), 1);
+  EXPECT_EQ(private_key_cache->size(), 1);
+
+  // Destroying one context must leave the shared material valid for the other.
+  manager_.removeContext(ctx1);
+  ctx1.reset();
+  EXPECT_EQ(cert_chain_cache->size(), 1);
+  EXPECT_EQ(private_key_cache->size(), 1);
+
+  // Destroying the second releases the cache entries with no crash.
+  manager_.removeContext(ctx2);
+  ctx2.reset();
+  EXPECT_EQ(cert_chain_cache->size(), 0);
+  EXPECT_EQ(private_key_cache->size(), 0);
+}
+
+// A certificate chain that carries an intermediate is parsed once and shared through the cache: the
+// leaf is installed and each intermediate is added to the context. Covers the cached
+// multi-certificate chain path.
+TEST_F(SslContextImplTest, TestClientCertChainWithIntermediateShared) {
+  // Build a leaf-plus-intermediate chain from two existing single certificates.
+  const std::string leaf = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"));
+  const std::string intermediate = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  const std::string chain_path =
+      TestEnvironment::writeStringToFileForTest("chain_with_intermediate.pem", leaf + intermediate);
+
+  const std::string yaml = fmt::format(R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{}"
+      private_key:
+        filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/unittest_key.pem"
+  )EOF",
+                                       chain_path);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  auto ctx = *manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  auto cleanup = cleanUpHelper(ctx);
+  ASSERT_NE(ctx, nullptr);
+
+  // The leaf plus its intermediate is held as a single shared cache entry.
+  EXPECT_EQ(getCertChainCache(server_factory_context_.singletonManager())->size(), 1);
+}
+
+// A certificate chain that fails to parse surfaces an error through the cached path and is not
+// cached. Covers the cert chain cache getOrCreate parse failure and its propagation.
+TEST_F(SslContextImplTest, TestCachedCertChainParseErrorSurfaces) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        inline_string: "not a valid certificate"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_FALSE(context_or_error.ok());
+  EXPECT_NE(context_or_error.status().message().find("Failed to load certificate chain"),
+            std::string::npos);
+  EXPECT_EQ(getCertChainCache(server_factory_context_.singletonManager())->size(), 0);
+}
+
+// A private key that fails to parse surfaces an error through the cached path and is not cached.
+// Covers the private key cache getOrCreate parse failure and its propagation.
+TEST_F(SslContextImplTest, TestCachedPrivateKeyParseErrorSurfaces) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        inline_string: "not a valid private key"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_FALSE(context_or_error.ok());
+  EXPECT_NE(context_or_error.status().message().find("Failed to load private key"),
+            std::string::npos);
+  EXPECT_EQ(getPrivateKeyCache(server_factory_context_.singletonManager())->size(), 0);
+}
+
+// A private key that parses but does not match the certificate is rejected through the cached path.
+// Covers the SSL_CTX_use_PrivateKey failure branch in the cached private key load.
+TEST_F(SslContextImplTest, TestCachedPrivateKeyMismatchSurfaces) {
+  // A valid certificate paired with a valid but unrelated private key.
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_FALSE(context_or_error.ok());
+  EXPECT_NE(context_or_error.status().message().find("Failed to load private key"),
+            std::string::npos);
 }
 
 // Envoy's default cipher preference is server's.

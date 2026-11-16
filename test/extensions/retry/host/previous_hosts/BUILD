@@ -29,7 +29,10 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.retry_host_predicates.previous_hosts"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -12,7 +12,10 @@ envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -48,7 +51,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//test/common/config:grpc_subscription_test_harness",
         "//test/common/config:subscription_test_harness",

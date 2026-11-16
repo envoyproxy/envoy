@@ -96,15 +96,18 @@ read -ra CTO_ALLOCATOR_TEST_TARGETS \
     <<< "${CTO_ALLOCATOR_TEST_TARGETS:-${CTO_ALLOCATOR_TEST_TARGETS_DEFAULT[*]}}"
 
 # Run one `cto.*` subtask. See `compile-time-options` in `.bazelrc`: the non-default build switches
-# that can all be set together. `cto.base` tests the whole tree with that config and jemalloc, the
-# allocator the rest of CI does not use. Each other subtask is the config plus one thing that cannot
-# be part of the base run because it displaces something that run exercises (the engine, the
-# allocator, the admin code, release-mode asserts, logging), run with the targets that option can
-# affect.
+# that can all be set together. Every subtask builds with that config and adds one thing of its own
+# that the others do not have, so none of them is a base for the rest: an allocator (jemalloc or
+# gperftools), a wasm engine, the admin code disabled, release-mode asserts, or logging disabled.
+# `cto.jemalloc` is the only run with jemalloc, the allocator the rest of CI does not use, and runs
+# the whole tree, as does `cto.noadmin`. The others run the targets their option can affect.
 function cto_subtask() {
     local subtask="$1"
     case "$subtask" in
-        cto.base)
+        # TODO(phlax): remove `cto.base` once the `check-build-cto-jemalloc` run flag has landed. Until
+        # then the job is still named, and so called, from the `check-build-cto-base` flag on the
+        # target branch.
+        cto.jemalloc|cto.base)
             echo "Building and testing with the compile-time-options config and jemalloc: ${TEST_TARGETS[*]}"
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" "${CTO_OPTIONS[@]}" "${CTO_TEST_OPTIONS[@]}" \
@@ -216,11 +219,11 @@ function cp_binary_for_image_build() {
 
   # Tools for the tools image. Strip to save size.
   hermetic_strip
-  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  "${STRIP_BIN}" bazel-bin/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -283,11 +286,11 @@ function bazel_binary_build() {
 
   # Validation tools for the tools image.
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
+    //tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
+    //tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
-    //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
+    //tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
@@ -361,14 +364,34 @@ function bazel_envoy_api_go_build() {
     done
 }
 
+# Build the server and tools binaries and run the tests with OpenSSL. `openssl.build` and
+# `openssl.test` do one half each.
 function build_openssl() {
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
-    # Append OpenSSL compat tests
-    TEST_TARGETS=("//compat/openssl/test/..." "${TEST_TARGETS[@]}")
-    echo "Bazel fastbuild build with OpenSSL..."
-    bazel_envoy_binary_build fastbuild
-    echo "Testing ${TEST_TARGETS[*]} with OpenSSL..."
-    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+    local -a build_targets=() test_targets=()
+    if [[ "$CI_TARGET" != "openssl.test" ]]; then
+        build_targets=(
+            "${ENVOY_BUILD_TARGET}"
+            //tools/schema_validator:schema_validator_tool
+            //tools/router_check:router_check_tool
+            //tools/config_load_check:config_load_check_tool
+            @su-exec)
+    fi
+    if [[ "$CI_TARGET" != "openssl.build" ]]; then
+        # Append OpenSSL compat tests
+        test_targets=("//compat/openssl/test/..." "${TEST_TARGETS[@]}")
+    fi
+    # Nothing built here is published, so the binaries are built in one invocation, with the tests
+    # if there are any, and are not downloaded.
+    if [[ ${#test_targets[@]} -eq 0 ]]; then
+        echo "Building ${build_targets[*]} with OpenSSL..."
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --remote_download_minimal \
+            -- "${build_targets[@]}"
+    else
+        echo "Building ${build_targets[*]} and testing ${test_targets[*]} with OpenSSL..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild --remote_download_minimal \
+            -- "${build_targets[@]}" "${test_targets[@]}"
+    fi
 }
 
 # Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
@@ -392,15 +415,17 @@ function run_bazel_cquery() {
     return "$rc"
 }
 
-function build_openssl_presubmit() {
-    # Lightweight OpenSSL pre-submit (PRs): build the binary to catch link
-    # errors, then run only the tests affected by the PR (via Bazel rdeps). The
-    # full suite still runs on post-submit via the regular "openssl" target.
+function build_openssl_test_affected() {
+    # Lightweight OpenSSL pre-submit (PRs): run only the tests affected by the PR
+    # (via Bazel rdeps). The binary is built by "openssl.build", and the full
+    # suite still runs on post-submit via "openssl.test".
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     BAZEL_QUERY_OPTIONS+=("--config=openssl")
 
-    echo "Bazel fastbuild build with OpenSSL..."
-    bazel_envoy_binary_build fastbuild
+    if [[ "$CI_TARGET" == "openssl.presubmit" ]]; then
+        echo "Bazel fastbuild build with OpenSSL..."
+        bazel_envoy_binary_build fastbuild
+    fi
 
     # Diff against the merge base to see only the PR's own changes; fall back to
     # the target branch itself when history is too shallow for a merge base.
@@ -649,7 +674,7 @@ case $CI_TARGET in
         fi
         case "$CI_TARGET" in
             compile_time_options|cto|cto.all)
-                for subtask in cto.asserts cto.base cto.gperftools cto.noadmin cto.nolog cto.wamr cto.wasmtime; do
+                for subtask in cto.asserts cto.gperftools cto.jemalloc cto.noadmin cto.nolog cto.wamr cto.wasmtime; do
                     cto_subtask "$subtask"
                 done
                 ;;
@@ -684,9 +709,12 @@ case $CI_TARGET in
         popd
         ;;
 
-    coverage|fuzz_coverage)
+    # `fuzz_coverage` is the previous name of `coverage.fuzz`, and is what CI still asks for: its
+    # workflows run from main for every branch. CI can switch to `coverage.fuzz` once all the
+    # supported release branches accept it, and `fuzz_coverage` can then be removed here.
+    coverage|coverage.fuzz|fuzz_coverage)
         echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
-        if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
+        if [[ "$CI_TARGET" != "coverage" ]]; then
             export FUZZ_COVERAGE=true
         fi
         export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
@@ -946,20 +974,33 @@ case $CI_TARGET in
             --test_arg="-runs=10"
         ;;
 
-    gcc|gcc.test_only|gcc.server_only)
-        BAZEL_BUILD_OPTIONS+=("--config=gcc")
-        echo "gcc toolchain configured: gcc"
-        if [[ "$CI_TARGET" != "gcc.test_only" ]]; then
-            echo "bazel fastbuild build with gcc..."
-            bazel_envoy_binary_build fastbuild
+    gcc|gcc.build|gcc.test)
+        # `gcc-ci`: GCC with `-c opt`, as the release build and tests are, without debug info.
+        BAZEL_BUILD_OPTIONS+=("--config=gcc-ci")
+        echo "gcc toolchain configured: gcc-ci"
+        # Nothing built here is published, so the server and tools binaries are built in one
+        # invocation, with the tests if there are any, and are not downloaded.
+        GCC_BUILD_TARGETS=()
+        if [[ "$CI_TARGET" != "gcc.test" ]]; then
+            GCC_BUILD_TARGETS=(
+                "${ENVOY_BUILD_TARGET}"
+                //tools/schema_validator:schema_validator_tool
+                //tools/router_check:router_check_tool
+                //tools/config_load_check:config_load_check_tool
+                @su-exec)
         fi
-        if [[ "$CI_TARGET" != "gcc.server_only" ]]; then
-            echo "Testing ${TEST_TARGETS[*]}"
+        if [[ "$CI_TARGET" == "gcc.build" ]]; then
+            echo "Building ${GCC_BUILD_TARGETS[*]}"
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+                --remote_download_minimal \
+                -- "${GCC_BUILD_TARGETS[@]}"
+            collect_build_profile build
+        else
+            echo "Building ${GCC_BUILD_TARGETS[*]} and testing ${TEST_TARGETS[*]}"
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
-                -c fastbuild  \
                 --remote_download_minimal \
-                -- "${TEST_TARGETS[@]}"
+                -- "${GCC_BUILD_TARGETS[@]}" "${TEST_TARGETS[@]}"
         fi
         ;;
 
@@ -990,12 +1031,14 @@ case $CI_TARGET in
                 -- "${TEST_TARGETS[@]}"
         ;;
 
-    openssl)
+    openssl|openssl.build|openssl.test)
         build_openssl
         ;;
 
-    openssl.presubmit)
-        build_openssl_presubmit
+    # `openssl.presubmit` also builds the binary. It is what a pull request is asked for until the
+    # `check-build-openssl-*` run flags are on its target branch, and can be removed once they are.
+    openssl.presubmit|openssl.test_affected)
+        build_openssl_test_affected
         ;;
 
     openssl.asan)
@@ -1071,6 +1114,14 @@ case $CI_TARGET in
             exit 0
         fi
 
+        # Compress the debug sections of the released binaries (lld, with the link's cores): the
+        # debug binaries, and the debug images built from them, are several times smaller, and
+        # quicker to package, upload and push. Only the release links change (not the tests', above).
+        # With zlib, which the debug images' gdb (12, Ubuntu 22.04) reads; it reads zstd only from 13.
+        # TODO(phlax): zstd (smaller, and ~3x faster to compress) once the images are based on
+        # Ubuntu 24.04 (gdb 15), along with the `.dwp`s (distribution/BUILD); see #49222.
+        BAZEL_RELEASE_OPTIONS+=("--linkopt=-Wl,--compress-debug-sections=zlib")
+
         ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
         if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
             echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
@@ -1097,22 +1148,22 @@ case $CI_TARGET in
         # TODO(phlax): bundle this with the release when #26390 is resolved
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_toplevel \
-              //test/tools/schema_validator:schema_validator_tool.stripped
+              //tools/schema_validator:schema_validator_tool.stripped
         # Copy schema_validator_tool to binary export directory
         cp -a \
-           bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
+           bazel-bin/tools/schema_validator/schema_validator_tool.stripped \
            "${ENVOY_BINARY_DIR}/schema_validator_tool"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_toplevel \
-              //test/tools/router_check:router_check_tool.stripped
+              //tools/router_check:router_check_tool.stripped
         cp -a \
-           bazel-bin/test/tools/router_check/router_check_tool.stripped \
+           bazel-bin/tools/router_check/router_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/router_check_tool"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_toplevel \
-              //test/tools/config_load_check:config_load_check_tool.stripped
+              //tools/config_load_check:config_load_check_tool.stripped
         cp -a \
-           bazel-bin/test/tools/config_load_check/config_load_check_tool.stripped \
+           bazel-bin/tools/config_load_check/config_load_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/config_load_check_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;

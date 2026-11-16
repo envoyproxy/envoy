@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "priority_load_shed_filter_test",
     srcs = ["priority_load_shed_filter_test.cc"],
     extension_names = ["envoy.filters.http.priority_load_shed"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/priority_load_shed:config",
@@ -35,7 +38,10 @@ envoy_extension_cc_test(
     srcs = ["priority_load_shed_integration_test.cc"],
     extension_names = ["envoy.filters.http.priority_load_shed"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

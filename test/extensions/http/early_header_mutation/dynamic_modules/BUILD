@@ -24,7 +24,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:early_header_mutation_rewrite",
     ],
     extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/http/early_header_mutation/dynamic_modules:config",
@@ -87,7 +90,10 @@ envoy_extension_cc_dyn_module_test(
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

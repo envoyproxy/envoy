@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.mcp_multicluster"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/clusters/mcp_multicluster:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -45,7 +48,10 @@ envoy_extension_cc_test(
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.mcp_multicluster"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

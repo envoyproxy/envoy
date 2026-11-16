@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     extension_names = ["envoy.formatter.metadata"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",
@@ -36,7 +39,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.formatter.metadata"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     tags = [

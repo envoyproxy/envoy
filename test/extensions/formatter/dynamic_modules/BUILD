@@ -38,7 +38,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:formatter_integration_test",
     ],
     extension_names = ["envoy.formatter.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/formatter/dynamic_modules:config",
@@ -62,7 +65,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.formatter.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

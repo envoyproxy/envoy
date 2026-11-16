@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.transport_sockets.alts"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/network:transport_socket_options_lib",
         "//source/common/singleton:manager_impl_lib",
@@ -121,7 +124,10 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = ["grpc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -157,7 +163,10 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = ["grpc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [

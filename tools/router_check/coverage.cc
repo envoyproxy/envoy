@@ -1,4 +1,4 @@
-#include "test/tools/router_check/coverage.h"
+#include "tools/router_check/coverage.h"
 
 #include <algorithm>
 

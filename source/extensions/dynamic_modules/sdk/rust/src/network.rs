@@ -542,6 +542,130 @@ pub trait EnvoyNetworkFilter {
   /// Get the upstream connection ID, or `None` if not available.
   fn get_upstream_connection_id(&self) -> Option<NonZero<u64>>;
 
+  /// Set the upstream host of the connection to `address` and `port`, as a host of the cluster
+  /// `cluster_name`.
+  ///
+  /// A terminal filter that reaches its upstream itself, rather than through an Envoy upstream
+  /// connection, reports that upstream and the outcome of the connection with the methods from this
+  /// one to [`Self::add_custom_flag`], so that access logs show them as they do for the TCP proxy.
+  /// They cannot set the upstream TLS information. A filter ahead of a TCP proxy should not report
+  /// the upstream or the wire bytes, because the TCP proxy sets those fields itself. Envoy writes
+  /// the `TcpConnectionEnd` access log when it destroys the connection soon after the close event,
+  /// so the filter reports by the time it handles that event in [`NetworkFilter::on_event`].
+  ///
+  /// Envoy sets the host that the upstream host getters read, and the upstream host, remote address
+  /// and cluster of the stream info. It also adds the host to the upstream hosts attempted, so the
+  /// filter calls this once for each attempt. A host of the cluster with the same address is reused
+  /// with its hostname and metadata. Otherwise Envoy creates a host without a hostname, which
+  /// counts toward the transport socket match statistics of the cluster. The hosts of the cluster
+  /// are not changed.
+  ///
+  /// Returns true if the upstream host was set, false if the cluster does not exist, `address` is
+  /// not an IP address written without brackets for IPv6, `port` is above 65535 or the call is made
+  /// before [`NetworkFilter::on_new_connection`].
+  fn set_upstream_host(&mut self, cluster_name: &str, address: &str, port: u32) -> bool;
+
+  /// Set the upstream cluster of the connection, for example when no host of the cluster was
+  /// available. [`Self::set_upstream_host`] sets it as well.
+  ///
+  /// Returns true if the upstream cluster was set, false if the cluster does not exist or the call
+  /// is made before [`NetworkFilter::on_new_connection`].
+  fn set_upstream_cluster(&mut self, cluster_name: &str) -> bool;
+
+  /// Set the local address of the filter's connection to the upstream.
+  ///
+  /// Returns true if the local address was set, false if `address` is not an IP address written
+  /// without brackets for IPv6, `port` is above 65535 or the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn set_upstream_local_address(&mut self, address: &str, port: u32) -> bool;
+
+  /// Set why the filter's connection to the upstream failed, such as a failed TLS handshake.
+  ///
+  /// Returns true if the reason was set, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn set_upstream_transport_failure_reason(&mut self, reason: &str) -> bool;
+
+  /// Set why the filter closed its connection to the upstream.
+  ///
+  /// Returns true if the reason was set, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn set_upstream_local_close_reason(&mut self, reason: &str) -> bool;
+
+  /// Set how the filter's connection to the upstream was closed, normally or by a local or remote
+  /// reset.
+  ///
+  /// Returns true if the close type was set, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn set_upstream_detected_close_type(
+    &mut self,
+    close_type: abi::envoy_dynamic_module_type_detected_close_type,
+  ) -> bool;
+
+  /// Set how many times the filter tried to connect to the upstream.
+  ///
+  /// Returns true if the attempt count was set, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn set_upstream_request_attempt_count(&mut self, attempt_count: u32) -> bool;
+
+  /// Record that an event of the filter's connection to the upstream happened now.
+  /// `ConnectStart`, `ConnectComplete` and `HandshakeComplete` mark when the connection started,
+  /// was established and finished its handshake, such as a TLS handshake. The other events mark the
+  /// first and last bytes sent to and received from the upstream. In their declared order, the
+  /// events set the access log time points `US_CX_BEG`, `US_CX_END`, `US_HS_END`, `US_TX_BEG`,
+  /// `US_TX_END`, `US_RX_BEG` and `US_RX_END`. A later record of an event replaces the earlier one.
+  ///
+  /// Returns true if the event was recorded, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn record_upstream_timing(
+    &mut self,
+    event: abi::envoy_dynamic_module_type_upstream_timing_event,
+  ) -> bool;
+
+  /// Add to the upstream wire bytes of the connection. Report the payload bytes without transport
+  /// overhead such as TLS, as the TCP proxy counts them, and report them as they move, so that
+  /// periodic access logs see them.
+  ///
+  /// Returns true if the bytes were added, false if the connection has no upstream bytes meter or
+  /// the call is made before [`NetworkFilter::on_new_connection`].
+  fn add_upstream_wire_bytes(&mut self, bytes_received: u64, bytes_sent: u64) -> bool;
+
+  /// Add to the downstream wire bytes of the connection, creating its downstream bytes meter if
+  /// there is none. Report the bytes the filter reads from and writes to the downstream, as the TCP
+  /// proxy counts them, and report them as they move, so that periodic access logs see them.
+  ///
+  /// Returns true if the bytes were added, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn add_downstream_wire_bytes(&mut self, bytes_received: u64, bytes_sent: u64) -> bool;
+
+  /// Set a response flag of the connection, such as `UpstreamConnectionFailure` when the filter
+  /// could not connect to the upstream.
+  ///
+  /// Returns true if the flag was set, false if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn set_response_flag(&mut self, flag: abi::envoy_dynamic_module_type_response_flag) -> bool;
+
+  /// Add a custom flag that marks a noteworthy event of the connection. Multiple flags are joined
+  /// with commas.
+  ///
+  /// Returns true if the flag was added, false if `flag` is empty, contains whitespace or is the
+  /// short name of a response flag, or if the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn add_custom_flag(&mut self, flag: &str) -> bool;
+
+  /// Flush the access logs configured on the filter, using `access_log_type` as their type, for
+  /// example `TcpUpstreamConnected` once the filter has connected to the upstream. The access
+  /// loggers run before this returns, including a dynamic module access logger configured on the
+  /// filter. A `TcpPeriodic` flush also snapshots the bytes meters, like the flushes at
+  /// `access_log_flush_interval`.
+  ///
+  /// Returns true if `access_log_type` is `TcpUpstreamConnected` or `TcpPeriodic`, even when the
+  /// filter has no access logs, false if it is another type or the call is made before
+  /// [`NetworkFilter::on_new_connection`].
+  fn flush_access_log(
+    &mut self,
+    access_log_type: abi::envoy_dynamic_module_type_access_log_type,
+  ) -> bool;
+
   /// Signal the downstream connection to enable secure transport mode.
   /// This is done when the downstream connection's transport socket is of startTLS type.
   /// Returns true if the downstream transport was successfully converted to secure mode.
@@ -1836,6 +1960,125 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(self.raw)
     })
+  }
+
+  fn set_upstream_host(&mut self, cluster_name: &str, address: &str, port: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_host(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+        str_to_module_buffer(address),
+        port,
+      )
+    }
+  }
+
+  fn set_upstream_cluster(&mut self, cluster_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_cluster(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+      )
+    }
+  }
+
+  fn set_upstream_local_address(&mut self, address: &str, port: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+        self.raw,
+        str_to_module_buffer(address),
+        port,
+      )
+    }
+  }
+
+  fn set_upstream_transport_failure_reason(&mut self, reason: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+        self.raw,
+        str_to_module_buffer(reason),
+      )
+    }
+  }
+
+  fn set_upstream_local_close_reason(&mut self, reason: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+        self.raw,
+        str_to_module_buffer(reason),
+      )
+    }
+  }
+
+  fn set_upstream_detected_close_type(
+    &mut self,
+    close_type: abi::envoy_dynamic_module_type_detected_close_type,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+        self.raw, close_type,
+      )
+    }
+  }
+
+  fn set_upstream_request_attempt_count(&mut self, attempt_count: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+        self.raw,
+        attempt_count,
+      )
+    }
+  }
+
+  fn record_upstream_timing(
+    &mut self,
+    event: abi::envoy_dynamic_module_type_upstream_timing_event,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_record_upstream_timing(self.raw, event)
+    }
+  }
+
+  fn add_upstream_wire_bytes(&mut self, bytes_received: u64, bytes_sent: u64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(
+        self.raw,
+        bytes_received,
+        bytes_sent,
+      )
+    }
+  }
+
+  fn add_downstream_wire_bytes(&mut self, bytes_received: u64, bytes_sent: u64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(
+        self.raw,
+        bytes_received,
+        bytes_sent,
+      )
+    }
+  }
+
+  fn set_response_flag(&mut self, flag: abi::envoy_dynamic_module_type_response_flag) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_set_response_flag(self.raw, flag) }
+  }
+
+  fn add_custom_flag(&mut self, flag: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_add_custom_flag(
+        self.raw,
+        str_to_module_buffer(flag),
+      )
+    }
+  }
+
+  fn flush_access_log(
+    &mut self,
+    access_log_type: abi::envoy_dynamic_module_type_access_log_type,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_flush_access_log(self.raw, access_log_type)
+    }
   }
 
   fn start_downstream_secure_transport(&mut self) -> bool {

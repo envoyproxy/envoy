@@ -33,7 +33,10 @@ envoy_extension_cc_test(
     name = "adaptive_concurrency_config_test",
     srcs = ["adaptive_concurrency_config_test.cc"],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/adaptive_concurrency:config",
         "//test/mocks/http:http_mocks",
@@ -56,7 +59,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

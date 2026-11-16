@@ -38,7 +38,10 @@ envoy_extension_cc_test(
     name = "header_forwarding_utils_test",
     srcs = ["header_forwarding_utils_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/mcp_router:header_forwarding_utils_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -50,7 +53,10 @@ envoy_extension_cc_test(
     name = "mcp_router_test",
     srcs = ["mcp_router_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/http:async_client_interface",
         "//source/common/buffer:buffer_lib",
@@ -85,7 +91,10 @@ envoy_extension_cc_test(
     srcs = ["mcp_router_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

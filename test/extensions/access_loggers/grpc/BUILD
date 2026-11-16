@@ -79,7 +79,10 @@ envoy_extension_cc_test(
     name = "http_config_test",
     srcs = ["http_config_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
         "//test/mocks/server:factory_context_mocks",
@@ -94,7 +97,10 @@ envoy_extension_cc_test(
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -116,7 +122,10 @@ envoy_extension_cc_test(
     name = "tcp_config_test",
     srcs = ["tcp_config_test.cc"],
     extension_names = ["envoy.access_loggers.tcp_grpc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/access_loggers/grpc:tcp_config",
         "//test/mocks/server:factory_context_mocks",
@@ -137,7 +146,10 @@ envoy_extension_cc_test(
     }),
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

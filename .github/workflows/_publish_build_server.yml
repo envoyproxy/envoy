@@ -49,7 +49,11 @@ jobs:
       concurrency-suffix: -${{ inputs.arch }}
       rbe: true
       request: ${{ inputs.request }}
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
+      bazel-rbe-jobs: ${{ fromJSON(inputs.request).config.ci.publish-jobs || 200 }}
+      bazel-rbe-priority: ${{ fromJSON(inputs.request).config.ci.publish-priority || '' }}
+      runs-on: >-
+        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
+            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
       uploads: |
@@ -84,7 +88,9 @@ jobs:
       trusted: ${{ inputs.trusted }}
       uploads: |
         oci.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/build_images
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
+      runs-on: >-
+        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
+            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
 
   distribution:
     secrets:
@@ -111,7 +117,9 @@ jobs:
       docker-ci: false
       rbe: false
       request: ${{ inputs.request }}
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
+      runs-on: >-
+        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
+            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       trusted: ${{ inputs.trusted }}
       uploads: |
         packages.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}

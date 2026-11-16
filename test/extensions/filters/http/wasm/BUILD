@@ -36,7 +36,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 2,
@@ -67,7 +70,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 2,
@@ -104,7 +110,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 3,
@@ -144,7 +153,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 3,
@@ -170,7 +182,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 4,
@@ -204,7 +219,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     tags = ["skip_on_windows"],

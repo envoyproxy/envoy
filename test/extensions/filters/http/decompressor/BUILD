@@ -36,7 +36,10 @@ envoy_extension_cc_test(
         "decompressor_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.decompressor"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",

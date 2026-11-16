@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "sigv4_signer_impl_test",
     srcs = ["sigv4_signer_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -29,7 +32,10 @@ envoy_cc_test(
     name = "sigv4_signer_corpus_test",
     srcs = ["sigv4_signer_corpus_test.cc"],
     data = ["@aws-c-auth-testdata//:sigv4_tests"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -46,7 +52,10 @@ envoy_cc_test(
     name = "sigv4a_signer_corpus_test",
     srcs = ["sigv4a_signer_corpus_test.cc"],
     data = ["@aws-c-auth-testdata//:sigv4a_tests"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -63,7 +72,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sigv4a_signer_impl_test",
     srcs = ["sigv4a_signer_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",

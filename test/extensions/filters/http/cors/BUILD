@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.cors"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/cors:config",
         "//test/mocks/server:factory_context_mocks",
@@ -26,7 +29,10 @@ envoy_extension_cc_test(
     name = "cors_filter_test",
     srcs = ["cors_filter_test.cc"],
     extension_names = ["envoy.filters.http.cors"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/cors:config",
@@ -45,7 +51,10 @@ envoy_extension_cc_test(
     srcs = ["cors_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.cors"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

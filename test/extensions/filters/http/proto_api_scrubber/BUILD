@@ -38,7 +38,10 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
@@ -68,7 +71,10 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -106,7 +112,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -168,7 +177,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["filter_fuzz_test.cc"],
     corpus = "fuzz_corpus",
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/common:assert_lib",
