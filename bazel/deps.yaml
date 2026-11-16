@@ -464,6 +464,46 @@ su_exec:
   license: "MIT"
   license_url: "https://github.com/ncopa/su-exec/blob/v{version}/LICENSE"
 
+ubuntu_jammy_ca_certificates:
+  project_name: "ca-certificates (Ubuntu)"
+  project_desc: "Common CA certificates for the ubuntu container images"
+  project_url: "https://packages.ubuntu.com/jammy"
+  release_date: "2026-11-13"
+  use_category:
+  - other
+  license: "MPL-2.0"
+  license_url: "https://packages.ubuntu.com/jammy"
+
+ubuntu_jammy_openssl_amd64:
+  project_name: "openssl (Ubuntu amd64)"
+  project_desc: "OpenSSL command line tool for the ubuntu container images"
+  project_url: "https://packages.ubuntu.com/jammy"
+  release_date: "2026-11-13"
+  use_category:
+  - other
+  license: "Apache-2.0"
+  license_url: "https://packages.ubuntu.com/jammy"
+
+ubuntu_jammy_openssl_arm64:
+  project_name: "openssl (Ubuntu arm64)"
+  project_desc: "OpenSSL command line tool for the ubuntu container images"
+  project_url: "https://packages.ubuntu.com/jammy"
+  release_date: "2026-11-13"
+  use_category:
+  - other
+  license: "Apache-2.0"
+  license_url: "https://packages.ubuntu.com/jammy"
+
+ubuntu_jammy_tzdata:
+  project_name: "tzdata (Ubuntu)"
+  project_desc: "Time zone data for the ubuntu container images"
+  project_url: "https://packages.ubuntu.com/jammy"
+  release_date: "2026-11-13"
+  use_category:
+  - other
+  license: "Public-Domain"
+  license_url: "https://packages.ubuntu.com/jammy"
+
 nghttp2:
   project_name: "Nghttp2"
   project_desc: "Implementation of HTTP/2 and its header compression algorithm HPACK in C"
@@ -1320,6 +1360,16 @@ rules_license:
   - controlplane
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE"
+
+rules_oci:
+  project_name: "Bazel rules for OCI containers"
+  project_desc: "Bazel rules for building OCI container images"
+  project_url: "https://github.com/bazel-contrib/rules_oci"
+  release_date: "2025-04-21"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/rules_oci/blob/v{version}/LICENSE"
 
 rules_pkg:
   project_name: "Packaging rules for Bazel"
