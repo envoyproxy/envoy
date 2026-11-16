@@ -1226,7 +1226,11 @@ Network::FilterStatus Filter::onNewConnection() {
           getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
               PerConnectionIdleTimeoutMs);
       per_connection_idle_timeout != nullptr) {
-    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
+    if (per_connection_idle_timeout->value() == 0) {
+      idle_timeout_.reset();
+    } else {
+      idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
+    }
   }
 
   if (idle_timeout_) {
