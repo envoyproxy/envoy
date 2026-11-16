@@ -1,3 +1,4 @@
+load("@envoy//bazel:envoy_rbe.bzl", "envoy_exec_properties")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
@@ -242,6 +243,13 @@ pkg_tar(
     ],
 )
 
+# Sphinx builds in parallel (`-j auto`), which needs more than the single core (and 3GiB) of an
+# action on the default pool.
+SPHINX_EXEC_PROPERTIES = envoy_exec_properties(
+    rbe_pool = "linux_x64_large",
+    test = False,
+)
+
 # TODO(phlax): Add `envoy_sphinx` rule to encapsulate these and above targets
 genrule(
     name = "html_release",
@@ -261,6 +269,7 @@ genrule(
          $(location rst) \
          $@
     """,
+    exec_properties = SPHINX_EXEC_PROPERTIES,
     stamp = 1,
     tools = [
         ":rst",
@@ -285,6 +294,7 @@ genrule(
          $(location :rst) \
          $@
     """,
+    exec_properties = SPHINX_EXEC_PROPERTIES,
     tools = [
         ":rst",
         "//tools:sphinx_runner",
