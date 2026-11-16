@@ -4,7 +4,6 @@
 #include "source/extensions/compression/zstd/decompressor/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -229,7 +228,7 @@ TEST_F(ZstdDecompressorImplTest, DetectExcessiveCompressionRatio) {
   ASSERT_EQ(stats_store.counterFromString("test.zstd_generic_error").value(), 1);
 }
 
-TEST_F(ZstdDecompressorImplTest, RatioLimitFailureAcrossInputCalls) {
+TEST_F(ZstdDecompressorImplTest, ForwardsCrossingStepAndDecodesNextCall) {
   Zstd::Compressor::ZstdCompressorImpl compressor{default_compression_level_,
                                                   default_enable_checksum_, default_strategy_,
                                                   default_cdict_manager_, 4096};
@@ -242,32 +241,18 @@ TEST_F(ZstdDecompressorImplTest, RatioLimitFailureAcrossInputCalls) {
   compressor.compress(suffix, Envoy::Compression::Compressor::State::Finish);
   ASSERT_GT(block_text.size(), 100 * block.length());
 
-  auto decode = [](ZstdDecompressorImpl& decompressor, const Buffer::Instance& input) {
-    Buffer::OwnedImpl output;
-    decompressor.decompress(input, output);
-    return output.toString();
-  };
-
   Stats::IsolatedStoreImpl stats_store;
-  ZstdDecompressorImpl strict{*stats_store.rootScope(), "strict.", default_ddict_manager_, 4096};
-  ASSERT_EQ("prefix", decode(strict, prefix));
-  EXPECT_EQ("", decode(strict, block));
-  EXPECT_EQ(1, stats_store.counterFromString("strict.zstd_generic_error").value());
-  EXPECT_EQ("", decode(strict, suffix));
-
-  ZstdDecompressorImpl other{*stats_store.rootScope(), "other.", default_ddict_manager_, 4096};
-  EXPECT_EQ("prefix", decode(other, prefix));
-
-  TestScopedStaticReloadableFeaturesRuntime runtime(
-      {{"zstd_decompressor_stop_on_ratio_limit", false}});
-  EXPECT_EQ("", decode(strict, suffix));
-  EXPECT_EQ(1, stats_store.counterFromString("strict.zstd_generic_error").value());
-
-  ZstdDecompressorImpl legacy{*stats_store.rootScope(), "legacy.", default_ddict_manager_, 4096};
-  ASSERT_EQ("prefix", decode(legacy, prefix));
-  EXPECT_EQ(block_text, decode(legacy, block));
-  EXPECT_EQ("suffix", decode(legacy, suffix));
-  EXPECT_EQ(1, stats_store.counterFromString("legacy.zstd_generic_error").value());
+  ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.", default_ddict_manager_,
+                                    4096};
+  Buffer::OwnedImpl output;
+  decompressor.decompress(prefix, output);
+  ASSERT_EQ("prefix", output.toString());
+  decompressor.decompress(block, output);
+  EXPECT_EQ("prefix" + block_text, output.toString());
+  EXPECT_EQ(1, stats_store.counterFromString("test.zstd_generic_error").value());
+  decompressor.decompress(suffix, output);
+  EXPECT_EQ("prefix" + block_text + "suffix", output.toString());
+  EXPECT_EQ(1, stats_store.counterFromString("test.zstd_generic_error").value());
 }
 
 TEST_F(ZstdDecompressorImplTest, BlockAllowanceIsSharedAcrossSlicesInOneCall) {
@@ -290,19 +275,21 @@ TEST_F(ZstdDecompressorImplTest, BlockAllowanceIsSharedAcrossSlicesInOneCall) {
 
   Buffer::OwnedImpl first_block(std::string(max_block_size, 'a'));
   Buffer::OwnedImpl second_block(std::string(max_block_size, 'b'));
+  Buffer::OwnedImpl third_block(std::string(max_block_size, 'c'));
   compressor.compress(first_block, Envoy::Compression::Compressor::State::Flush);
-  compressor.compress(second_block, Envoy::Compression::Compressor::State::Finish);
+  compressor.compress(second_block, Envoy::Compression::Compressor::State::Flush);
+  compressor.compress(third_block, Envoy::Compression::Compressor::State::Finish);
   Buffer::OwnedImpl input;
   input.appendSliceForTest(first_block.toString());
   input.appendSliceForTest(second_block.toString());
+  input.appendSliceForTest(third_block.toString());
   const uint64_t limit = input.length() * max_inflate_ratio + max_block_size;
   ASSERT_LT(limit, 2 * max_block_size);
 
   Buffer::OwnedImpl output;
   decompressor.decompress(input, output);
   EXPECT_EQ(1, stats_store.counterFromString("test.zstd_generic_error").value());
-  EXPECT_GE(output.length(), max_block_size);
-  EXPECT_LE(output.length(), limit);
+  EXPECT_EQ(std::string(max_block_size, 'a') + std::string(max_block_size, 'b'), output.toString());
 }
 
 } // namespace
