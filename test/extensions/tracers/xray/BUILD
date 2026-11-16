@@ -21,7 +21,17 @@ envoy_extension_cc_test(
         "xray_tracer_impl_test.cc",
     ],
     extension_names = ["envoy.tracers.xray"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
         "//test/mocks:common_lib",
@@ -42,7 +52,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.xray"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/tracers/xray:config",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -57,7 +77,7 @@ envoy_cc_fuzz_test(
     name = "xray_fuzz_test",
     srcs = ["fuzz_test.cc"],
     corpus = "wildcard_matcher_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
     ],

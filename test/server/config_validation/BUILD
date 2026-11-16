@@ -9,7 +9,23 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11927MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -42,7 +58,32 @@ envoy_cc_test(
         "//test/config_test:configs_test_setup.sh",
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15826MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "msan": {"build": "default"},
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -71,7 +112,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_test",
     srcs = ["dispatcher_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
@@ -91,6 +132,19 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 25697MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    # linux_x64_xlarge: the tsan link peaks at 13451MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "cto": {"link": "linux_x64_large"},
+        "openssl": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_xlarge"},
+        "asan": {"link": "linux_x64_large"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
+    },
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
@@ -134,7 +188,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xds_verifier_test",
     srcs = ["xds_verifier_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         ":xds_verifier_lib",
         "//test/config:utility_lib",
@@ -145,7 +199,7 @@ envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
@@ -166,7 +220,31 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 20148MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",

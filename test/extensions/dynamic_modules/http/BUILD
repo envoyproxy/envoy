@@ -15,6 +15,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
@@ -58,7 +69,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op_no_optional_abi",
     ],
     # factory_context_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -88,7 +109,17 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     # http_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -110,7 +141,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # http_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -150,7 +191,31 @@ envoy_cc_test(
     env = {
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 16078MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/dynamic_modules:abi_impl",

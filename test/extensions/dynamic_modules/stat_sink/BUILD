@@ -26,6 +26,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_histogram_complete",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/stat_sinks/dynamic_modules:config",
@@ -44,6 +55,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":test_util_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -59,6 +81,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":test_util_lib",
         "//source/extensions/dynamic_modules/abi",
@@ -80,6 +113,31 @@ envoy_cc_test(
     ],
     env = {
         "GODEBUG": "cgocheck=0",
+    },
+    # linux_x64_xlarge: the coverage link peaks at 15910MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/stat_sinks/dynamic_modules:config",

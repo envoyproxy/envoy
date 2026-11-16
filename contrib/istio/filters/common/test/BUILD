@@ -21,6 +21,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hashable_string_test",
     srcs = ["hashable_string_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/common/source:hashable_string_lib",
         "//envoy/common:hashable_interface",
@@ -51,6 +52,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "istio_two_proxy_integration_test",
     srcs = ["istio_two_proxy_integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":istio_two_proxy_integration_lib",
         "//contrib/istio/filters/http/istio_stats/source:istio_stats",
@@ -63,6 +65,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "istio_hbone_two_proxy_integration_test",
     srcs = ["istio_hbone_two_proxy_integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/common/source:metadata_object_lib",
         "//contrib/istio/filters/common/source:workload_discovery_lib",
@@ -93,6 +96,7 @@ envoy_cc_test(
     name = "istio_tcp_two_proxy_integration_test",
     srcs = ["istio_tcp_two_proxy_integration_test.cc"],
     data = ["//test/config/integration/certs"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/common/source:metadata_object_lib",
         "//contrib/istio/filters/common/source:workload_discovery_lib",

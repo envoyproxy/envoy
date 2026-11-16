@@ -17,7 +17,30 @@ envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
     linkstatic = envoy_select_linkstatic(),
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the tsan link peaks at 12882MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -37,7 +60,7 @@ envoy_cc_test_library(
         "router.h",
     ],
     copts = ["-DHAVE_LONG_LONG"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":validation_proto_cc_proto",
         "//source/common/common:random_generator_lib",

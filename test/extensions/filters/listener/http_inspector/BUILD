@@ -16,7 +16,19 @@ envoy_extension_cc_test(
     name = "http_inspector_test",
     srcs = ["http_inspector_test.cc"],
     extension_names = ["envoy.filters.listener.http_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+    },
     #TODO(davinci26): The test passes on Windows *but* http inspector
     # *used* to rely on Event::FileTriggerType::Edge and we got away with it
     # because we mock the dispatcher. Need to verify that the scenario is
@@ -38,7 +50,17 @@ envoy_extension_cc_test(
     name = "http_inspector_config_test",
     srcs = ["http_inspector_config_test.cc"],
     extension_names = ["envoy.filters.listener.http_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/listener/http_inspector:config",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
@@ -53,7 +75,7 @@ envoy_extension_cc_test(
     name = "http_inspector_parser_callbacks_test",
     srcs = ["http_inspector_parser_callbacks_test.cc"],
     extension_names = ["envoy.filters.listener.http_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",
@@ -65,7 +87,11 @@ envoy_cc_fuzz_test(
     name = "http_inspector_fuzz_test",
     srcs = ["http_inspector_fuzz_test.cc"],
     corpus = "http_inspector_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
+    },
     deps = [
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
@@ -79,7 +105,31 @@ envoy_extension_cc_test(
         "http_inspector_integration_test.cc",
     ],
     extension_names = ["envoy.filters.listener.http_inspector"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15333MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/http_inspector:config",

@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "cookie_test",
     srcs = ["cookie_test.cc"],
     extension_names = ["envoy.http.stateful_session.cookie"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/http/stateful_session/cookie:cookie_lib",
@@ -29,7 +32,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.stateful_session.cookie"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/http/stateful_session/cookie:config",

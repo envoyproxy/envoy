@@ -21,7 +21,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_no_op",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_stop_and_buffer",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -45,7 +55,39 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:upstream_http_tcp_bridge",
     ],
-    rbe_pool = "linux_x64_medium",
+    # linux_x64_xlarge: the coverage link peaks at 15905MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+    },
     shard_count = 4,
     tags = [
         "cpu:3",

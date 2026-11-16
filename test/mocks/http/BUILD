@@ -41,7 +41,6 @@ envoy_cc_mock(
     name = "conn_pool_mocks",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:conn_pool_interface",
         "//test/mocks:common_lib",
@@ -62,7 +61,12 @@ envoy_cc_mock(
     name = "http_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "asan": {"build": "linux_x64_small"},
+        # Fuzz coverage is also an asan build, and compiles this within the default pool.
+        "fuzz_coverage": {"build": "default"},
+    },
     deps = [
         ":conn_pool_mocks",
         ":session_idle_list_mock",
@@ -133,7 +137,11 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "http_mocks_test",
     srcs = ["mocks_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         ":http_mocks",
         "//envoy/http:header_map_interface",
