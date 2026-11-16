@@ -1,4 +1,4 @@
-#include "test/tools/schema_validator/validator.h"
+#include "tools/schema_validator/validator.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"

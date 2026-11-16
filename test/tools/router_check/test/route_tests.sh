@@ -3,7 +3,7 @@
 set -e
 
 # Router_check_tool binary path
-PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
+PATH_BIN="${TEST_SRCDIR}/envoy"/tools/router_check/router_check_tool
 
 # Config json path
 PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config

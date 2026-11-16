@@ -16,7 +16,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
-        "//test/tools/schema_validator:schema_validator_lib",
+        "//tools/schema_validator:schema_validator_lib",
     ],
 )
 
