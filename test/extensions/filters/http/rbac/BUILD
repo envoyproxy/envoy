@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/matcher:ip_range_matcher_lib",
@@ -62,7 +62,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -94,7 +94,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.rbac",
         "envoy.bootstrap.cel",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/bootstrap/cel:config",
@@ -131,7 +131,7 @@ envoy_cc_fuzz_test(
     name = "rbac_filter_fuzz_test",
     srcs = ["rbac_filter_fuzz_test.cc"],
     corpus = "rbac_filter_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":rbac_filter_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

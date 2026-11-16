@@ -26,7 +26,7 @@ envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     name = "stats_test",
     srcs = ["stats_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:stats",
         "//test/mocks/server:factory_context_mocks",
@@ -52,7 +52,7 @@ envoy_extension_cc_test(
     name = "cache_entry_utils_test",
     srcs = ["cache_entry_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:cache_entry_utils_lib",
         "//test/test_common:logging_lib",
@@ -63,7 +63,7 @@ envoy_extension_cc_test(
     name = "http_cache_test",
     srcs = ["http_cache_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:http_cache_lib",
     ],
@@ -73,7 +73,7 @@ envoy_extension_cc_test(
     name = "range_utils_test",
     srcs = ["range_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:range_utils_lib",
         "//test/test_common:utility_lib",
@@ -84,7 +84,7 @@ envoy_extension_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache_v2:upstream_request_lib",
@@ -97,7 +97,7 @@ envoy_extension_cc_test(
     name = "cache_filter_test",
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache_v2:cache_filter_lib",
@@ -115,7 +115,7 @@ envoy_extension_cc_test(
     name = "cacheability_utils_test",
     srcs = ["cacheability_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:cacheability_utils_lib",
         "//test/mocks/server:server_factory_context_mocks",
@@ -128,7 +128,7 @@ envoy_extension_cc_test(
     name = "cache_sessions_test",
     srcs = ["cache_sessions_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache_v2:cache_sessions_impl_lib",
@@ -142,7 +142,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:config",
         "//source/extensions/http/cache_v2/simple_http_cache:config",
@@ -161,7 +161,7 @@ envoy_extension_cc_test(
         "cache_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 4,
     deps = [
         "//source/extensions/filters/http/cache_v2:config",
@@ -178,7 +178,7 @@ envoy_extension_cc_test(
         "cache_custom_headers_test.cc",
     ],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cache_v2:cache_custom_headers",
     ],
@@ -189,7 +189,7 @@ envoy_extension_cc_test_library(
     srcs = ["http_cache_implementation_test_common.cc"],
     hdrs = ["http_cache_implementation_test_common.h"],
     extension_names = ["envoy.filters.http.cache_v2"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache_v2:cache_headers_utils_lib",

@@ -27,7 +27,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_unit_test_fuzz_proto_cc_proto",

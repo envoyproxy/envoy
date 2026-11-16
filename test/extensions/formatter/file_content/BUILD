@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     name = "file_content_test",
     srcs = ["file_content_test.cc"],
     extension_names = ["envoy.formatter.file_content"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/formatter/file_content:config",
@@ -31,7 +31,7 @@ envoy_cc_test(
     name = "file_content_integration_test",
     size = "large",
     srcs = ["file_content_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],

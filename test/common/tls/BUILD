@@ -30,7 +30,7 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_certs_test_lib",
         ":test_private_key_method_provider_test_lib",
@@ -90,7 +90,7 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 5,
     deps = [
         ":ssl_certs_test_lib",
@@ -146,7 +146,7 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "ssl_certs_test_lib",
         ":ssl_test_utils",
@@ -184,7 +184,7 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "ssl_certs_test_lib",
         ":ssl_test_utils",
@@ -217,7 +217,7 @@ envoy_cc_test(
     name = "io_handle_bio_test",
     srcs = ["io_handle_bio_test.cc"],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_test_utils",
         "//source/common/tls:ssl_socket_lib",
@@ -234,7 +234,7 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_test_utils",
         "//source/common/tls:utility_lib",
@@ -293,7 +293,7 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_socket_test",
         ":ssl_test_utils",
@@ -311,7 +311,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "handshaker_factory_test",
     srcs = ["handshaker_factory_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ssl_test_utils",
         "//source/common/stream_info:stream_info_lib",
@@ -353,7 +353,7 @@ envoy_cc_benchmark_binary(
     name = "cert_compression_benchmark",
     srcs = ["cert_compression_benchmark.cc"],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
@@ -375,7 +375,7 @@ envoy_cc_benchmark_binary(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # Uses raw POSIX syscalls, does not build on Windows.
     tags = ["skip_on_windows"],
     deps = [

@@ -15,7 +15,7 @@ envoy_cc_test(
         "//test/proto:extraction.proto",
         "//test/proto:extraction_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction/extraction_util",
         "//source/extensions/filters/http/proto_message_extraction/extraction_util:proto_extractor",

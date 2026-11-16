@@ -22,7 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cert_validator_not_validated",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",

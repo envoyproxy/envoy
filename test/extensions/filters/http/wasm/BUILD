@@ -188,7 +188,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:deferred_data_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = ["skip_on_windows"],
     deps = [
         ":wasm_test_filters_proto_cc_proto",

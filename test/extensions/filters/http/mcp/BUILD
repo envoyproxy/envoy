@@ -48,7 +48,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = [
         "//source/extensions/filters/http/mcp:config",
         "//test/mocks/server:factory_context_mocks",
