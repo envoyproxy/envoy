@@ -648,7 +648,7 @@ case $CI_TARGET in
         ;;
 
     docker)
-        # This is limited to linux x86/arm64 and expects `release` or `release.server_only` to have
+        # This is limited to linux x86/arm64 and expects `release` or `release.server` to have
         # been run first.
         if ! docker ps &> /dev/null; then
             echo "Unable to build with Docker. If you are running with ci/run_envoy_docker.sh" \
@@ -828,7 +828,9 @@ case $CI_TARGET in
                  "${PUBLISH_ARGS[@]}"
         ;;
 
-    release|release.server_only|release.test_only)
+    # `release.server`: the release binaries and tools (`release.server_only` is the same).
+    # `release.publish`: as `release.server`, and the container images.
+    release|release.server|release.server_only|release.publish|release.test_only)
         if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
@@ -885,36 +887,84 @@ case $CI_TARGET in
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
         echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
-        # Build release binaries
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-              "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_outputs=toplevel \
-              //distribution/binary:release
-        # Copy release binaries to binary export directory
-        cp -a \
-           "bazel-bin/distribution/binary/release.tar.zst" \
-           "${ENVOY_BINARY_DIR}/release.tar.zst"
-        # Grab the schema_validator_tool
-        # TODO(phlax): bundle this with the release when #26390 is resolved
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_toplevel \
-              //tools/schema_validator:schema_validator_tool.stripped
-        # Copy schema_validator_tool to binary export directory
-        cp -a \
-           bazel-bin/tools/schema_validator/schema_validator_tool.stripped \
-           "${ENVOY_BINARY_DIR}/schema_validator_tool"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_toplevel \
-              //tools/router_check:router_check_tool.stripped
-        cp -a \
-           bazel-bin/tools/router_check/router_check_tool.stripped \
-           "${ENVOY_BINARY_DIR}/router_check_tool"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
-              --remote_download_toplevel \
-              //tools/config_load_check:config_load_check_tool.stripped
-        cp -a \
-           bazel-bin/tools/config_load_check/config_load_check_tool.stripped \
-           "${ENVOY_BINARY_DIR}/config_load_check_tool"
+        if [[ "$CI_TARGET" == "release.publish" ]]; then
+            # Everything published for this platform, in one invocation (`//distribution/publish`):
+            # the release binaries and tools (as `release.server`), the container images (named as
+            # `docker` names them), and the distro packages (as `distribution` builds them).
+            ENVOY_OCI_DIR="${ENVOY_BUILD_DIR}/build_images"
+            ENVOY_PACKAGES_DIR="${ENVOY_BUILD_DIR}/packages"
+            for dir in "$ENVOY_OCI_DIR" "$ENVOY_PACKAGES_DIR"; do
+                if [[ -e "${dir}" ]]; then
+                    rm -rf "${dir}"
+                fi
+                mkdir -p "$dir"
+            done
+            # Strip locally: the client downloads the release binaries anyway (the release tarball
+            # and the images are built locally), while a remote strip waits on a worker fetching the
+            # freshly linked binary (~30s).
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  --remote_download_toplevel \
+                  --modify_execution_info=CcStrip=+no-remote-exec \
+                  //distribution/publish
+            # The outputs are large (several GB): hardlink them where they are on the same filesystem
+            # (bazel replaces its outputs rather than writing to them), else copy them.
+            publish_file () {
+                ln -fL "$1" "$2" 2> /dev/null || cp -a "$1" "$2"
+            }
+            publish_file \
+               bazel-bin/distribution/binary/release.tar.zst \
+               "${ENVOY_BINARY_DIR}/release.tar.zst"
+            for tool in config_load_check router_check schema_validator; do
+                publish_file \
+                   "bazel-bin/tools/${tool}/${tool}_tool.stripped" \
+                   "${ENVOY_BINARY_DIR}/${tool}_tool"
+            done
+            OCI_ARCH="$(echo "${ENVOY_BUILD_ARCH}" | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+            for image in \
+                    envoy envoy-contrib envoy-contrib-debug envoy-contrib-distroless \
+                    envoy-debug envoy-distroless envoy-tools; do
+                publish_file \
+                   "bazel-bin/distribution/docker/${image}.tar" \
+                   "${ENVOY_OCI_DIR}/${image}.${OCI_ARCH}.tar"
+            done
+            PACKAGES_ARCH="$(echo "${ENVOY_BUILD_ARCH}" | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')"
+            publish_file \
+               bazel-bin/distribution/publish/packages.tar.gz \
+               "${ENVOY_PACKAGES_DIR}/packages.${PACKAGES_ARCH}.tar.gz"
+            echo "Container images created in ${ENVOY_OCI_DIR}"
+            echo "Packages created in ${ENVOY_PACKAGES_DIR}"
+        else
+            # Build release binaries
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+                  "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  --remote_download_outputs=toplevel \
+                  //distribution/binary:release
+            # Copy release binaries to binary export directory
+            cp -a \
+               "bazel-bin/distribution/binary/release.tar.zst" \
+               "${ENVOY_BINARY_DIR}/release.tar.zst"
+            # Grab the schema_validator_tool
+            # TODO(phlax): bundle this with the release when #26390 is resolved
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  --remote_download_toplevel \
+                  //tools/schema_validator:schema_validator_tool.stripped
+            # Copy schema_validator_tool to binary export directory
+            cp -a \
+               bazel-bin/tools/schema_validator/schema_validator_tool.stripped \
+               "${ENVOY_BINARY_DIR}/schema_validator_tool"
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  --remote_download_toplevel \
+                  //tools/router_check:router_check_tool.stripped
+            cp -a \
+               bazel-bin/tools/router_check/router_check_tool.stripped \
+               "${ENVOY_BINARY_DIR}/router_check_tool"
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+                  --remote_download_toplevel \
+                  //tools/config_load_check:config_load_check_tool.stripped
+            cp -a \
+               bazel-bin/tools/config_load_check/config_load_check_tool.stripped \
+               "${ENVOY_BINARY_DIR}/config_load_check_tool"
+        fi
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 

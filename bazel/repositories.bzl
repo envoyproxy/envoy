@@ -177,6 +177,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_alibaba_hessian2_codec()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
+    _ubuntu_packages()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -230,6 +231,7 @@ def envoy_dependencies(skip_targets = []):
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
+    external_http_archive("rules_oci")
     external_http_archive("com_github_aignas_rules_shellcheck")
 
     external_http_archive(
@@ -632,6 +634,14 @@ def _com_github_ncopa_suexec():
         name = "com_github_ncopa_suexec",
         build_file = "@envoy//bazel/external:su-exec.BUILD",
     )
+
+# The package archives (`.deb`), as their control and data archives.
+def _ubuntu_packages():
+    for package in ["ca_certificates", "openssl_amd64", "openssl_arm64", "tzdata"]:
+        external_http_archive(
+            name = "ubuntu_jammy_%s" % package,
+            build_file_content = """exports_files(["control.tar.zst", "data.tar.zst"])""",
+        )
 
 def _com_google_googletest():
     external_http_archive(
