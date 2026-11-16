@@ -394,23 +394,31 @@ function build_openssl() {
     fi
 }
 
-# Run a bazel cquery, staying quiet on success but surfacing stderr and the exit
-# code on failure, so a broken query fails the job instead of silently selecting
-# no tests. Results go to stdout as plain labels.
-# Prints the labels matching a cquery expression, one per line, leaving out targets that are
-# incompatible with the target platform (e.g. Windows-only tests): cquery still returns those,
-# and Bazel only skips them for wildcard patterns, not when they are passed as explicit labels.
-function run_bazel_cquery() {
-    local err out rc=0
+# Run a bazel query or cquery (the first argument) on an expression (the second), staying
+# quiet on success but surfacing stderr and the exit code on failure, so a broken query fails
+# the job instead of silently selecting no tests. The expression is passed in a file, as it
+# can list many labels. Prints the matching labels, one per line. cquery leaves out targets
+# that are incompatible with the target platform (e.g. Windows-only tests): cquery still
+# returns those, and Bazel only skips them for wildcard patterns, not when they are passed
+# as explicit labels.
+function run_bazel_query() {
+    local command="$1" expr="$2" err query_file out rc=0
+    local -a output_args=(--output=label)
+    if [[ "$command" == "cquery" ]]; then
+        output_args=(
+            --output=starlark
+            --starlark:expr='target.label if "IncompatiblePlatformProvider" not in providers(target) else ""')
+    fi
     err="$(mktemp)"
-    out="$(bazel cquery "${BAZEL_QUERY_OPTIONS[@]}" --output=starlark \
-                 --starlark:expr='target.label if "IncompatiblePlatformProvider" not in providers(target) else ""' \
-                 "$1" 2>"$err")" || rc=$?
+    query_file="$(mktemp)"
+    printf '%s\n' "$expr" > "$query_file"
+    out="$(bazel "$command" "${BAZEL_QUERY_OPTIONS[@]}" "${output_args[@]}" \
+                 --query_file="$query_file" 2>"$err")" || rc=$?
     if [[ $rc -ne 0 ]]; then
-        echo "ERROR: bazel cquery failed (exit ${rc}): $1" >&2
+        echo "ERROR: bazel ${command} failed (exit ${rc}): ${expr}" >&2
         cat "$err" >&2
     fi
-    rm -f "$err"
+    rm -f "$err" "$query_file"
     printf '%s' "$out" | sed '/^$/d; s|^@@||'
     return "$rc"
 }
@@ -498,16 +506,36 @@ function build_openssl_test_affected() {
         seed="${seed:+${seed} + }//source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/..."
     fi
 
-    # `selected` is assigned after declaring so `set -e` still sees a failing
-    # query; `local x="$(false)"` would return 0. sort -u because cquery can
+    # The tests are selected with query rather than cquery: cquery analyses every
+    # target the seed patterns match, manual ones included, and some of those fail
+    # analysis outside their own jobs (the release signing targets in //distribution
+    # need a key). Query only loads packages. It follows every `select` branch, so it
+    # can select a few more tests. cquery then only drops the incompatible tests, from
+    # the selected labels.
+    # `candidates` and `selected` are assigned after declaring so `set -e` still sees
+    # a failing query; `local x="$(false)"` would return 0. sort -u because cquery can
     # emit one label under several configurations.
     local -a test_targets=()
-    local target selected
+    local target candidates selected openssl_seeds
+    # Query sees the defaults of the `//bazel:ssl`/`//bazel:crypto` label flags (BoringSSL),
+    # not the OpenSSL libraries `--config=openssl` sets them to, so it can't reach the tests
+    # through them. A seed in the OpenSSL libraries' dependencies also seeds the flags, which
+    # selects the tests that cquery reached through them.
     if [[ -n "$seed" ]]; then
-        selected="$(run_bazel_cquery "kind(test, rdeps(${universe}, ${seed})) except ${manual}")"
-        while IFS= read -r target; do
-            [[ -n "$target" ]] && test_targets+=("$target")
-        done < <(printf '%s\n' "$selected" | sort -u)
+        openssl_seeds="$(run_bazel_query query "(${seed}) intersect deps(//compat/openssl:ssl + //compat/openssl:crypto)")"
+        if [[ -n "$openssl_seeds" ]]; then
+            echo "OpenSSL library change detected; adding the tests of //bazel:ssl and //bazel:crypto."
+            seed="${seed} + //bazel:ssl + //bazel:crypto"
+        fi
+    fi
+    if [[ -n "$seed" ]]; then
+        candidates="$(run_bazel_query query "kind(test, rdeps(${universe}, ${seed})) except ${manual}")"
+        if [[ -n "$candidates" ]]; then
+            selected="$(run_bazel_query cquery "set(${candidates//$'\n'/ })")"
+            while IFS= read -r target; do
+                [[ -n "$target" ]] && test_targets+=("$target")
+            done < <(printf '%s\n' "$selected" | sort -u)
+        fi
     fi
 
     if [[ ${#test_targets[@]} -eq 0 ]]; then
