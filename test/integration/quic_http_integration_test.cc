@@ -1366,6 +1366,19 @@ public:
     QuicHttpIntegrationTest::initialize();
   }
 
+  // Waits for the workers to apply `in_place_updates` in place updates and for the filter chains
+  // they replaced to finish draining. The main thread starts the drain before it counts any worker
+  // acknowledging the update, so the drain gauge has already risen once the counter reaches the
+  // target. Waiting for the gauge itself to rise can miss its drain_time_ window.
+  void waitForInplaceUpdateDrained(uint32_t in_place_updates) {
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated",
+                                 Ge(in_place_updates));
+    const uint32_t listener_creations = 1 + in_place_updates;
+    test_server_->waitForCounter("listener_manager.listener_create_success",
+                                 Ge(listener_creations * concurrency_));
+    test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  }
+
   void makeRequestAndWaitForResponse(IntegrationCodecClient& codec_client) {
     IntegrationStreamDecoderPtr response =
         codec_client.makeHeaderOnlyRequest(default_request_headers_);
@@ -1398,9 +1411,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
       });
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  waitForInplaceUpdateDrained(1);
   makeRequestAndWaitForResponse(*codec_client_0);
   EXPECT_TRUE(codec_client_1->sawGoAway());
   codec_client_1->close();
@@ -1440,10 +1451,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
       });
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
-
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  waitForInplaceUpdateDrained(1);
   // This connection should pick up the default filter chain.
   auto codec_client_default =
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
@@ -1460,9 +1468,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   });
 
   new_config_helper1.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(2));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  waitForInplaceUpdateDrained(2);
 
   makeRequestAndWaitForResponse(*codec_client_0);
   EXPECT_TRUE(codec_client_default->sawGoAway());
@@ -1482,9 +1488,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
       });
 
   new_config_helper2.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(3));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  waitForInplaceUpdateDrained(3);
 
   makeRequestAndWaitForResponse(*codec_client_0);
   codec_client_0->close();
@@ -1508,10 +1512,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
                       &new_config_helper);
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
-
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  waitForInplaceUpdateDrained(1);
   // The 2nd connection should try to do 0-RTT but get rejected and QUICHE will transparently retry
   // the request after handshake completes.
   auto codec_client_2 = makeRawHttp3Connection(
@@ -1541,10 +1542,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableResumption) {
                       &new_config_helper);
 
   new_config_helper.setLds("1");
-  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Ge(1));
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Ge(1));
-
-  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  waitForInplaceUpdateDrained(1);
 
   auto codec_client_2 = makeRawHttp3Connection(
       makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"), std::nullopt,
