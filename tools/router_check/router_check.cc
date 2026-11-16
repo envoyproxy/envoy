@@ -8,8 +8,9 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
-#include "test/tools/router_check/router.h"
-#include "test/tools/router_check/validation.pb.h"
+
+#include "tools/router_check/router.h"
+#include "tools/router_check/validation.pb.h"
 
 bool hasFailures(
     const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>& test_results) {

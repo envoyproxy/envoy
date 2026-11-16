@@ -19,11 +19,11 @@
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-#include "test/tools/router_check/coverage.h"
-#include "test/tools/router_check/validation.pb.h"
-#include "test/tools/router_check/validation.pb.validate.h"
 
 #include "tclap/CmdLine.h"
+#include "tools/router_check/coverage.h"
+#include "tools/router_check/validation.pb.h"
+#include "tools/router_check/validation.pb.validate.h"
 
 namespace Envoy {
 /**
