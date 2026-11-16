@@ -9,6 +9,7 @@ load("@tar.bzl//tar:mtree.bzl", "mutate")
 load("@tar.bzl//tar:tar.bzl", "tar")
 load("//distribution:packages.bzl", "PUBLISH_PACKAGING_TAGS")
 load("//distribution/binary:compiler.bzl", "bundled")
+load(":ca_certificates.bzl", "ca_certificates_conf")
 
 licenses(["notice"])  # Apache 2
 
@@ -261,6 +262,36 @@ cacerts(
     package = "@ubuntu_jammy//ca-certificates:data",
 )
 
+# `/etc/ca-certificates.conf` and `/usr/local/share/ca-certificates`, as the package's `postinst`
+# creates them, so that `update-ca-certificates` in an image built on these keeps the bundled
+# certificates (with no conf it rebuilds the bundle from the local certificates alone).
+ca_certificates_conf(
+    name = "ca_certificates",
+    package = "@ubuntu_jammy//ca-certificates:data",
+)
+
+pkg_files(
+    name = "ca_certificates_conf",
+    srcs = [":ca_certificates"],
+    attributes = ROOT,
+    prefix = "etc",
+    renames = {":ca_certificates": "ca-certificates.conf"},
+)
+
+pkg_mkdirs(
+    name = "local_ca_certificates",
+    attributes = ROOT_EXECUTABLE,
+    dirs = ["usr/local/share/ca-certificates"],
+)
+
+pkg_tar(
+    name = "ca_certificates_layer",
+    srcs = [
+        ":ca_certificates_conf",
+        ":local_ca_certificates",
+    ],
+)
+
 write_file(
     name = "timezone_content",
     out = "etc_timezone",
@@ -297,6 +328,7 @@ UBUNTU_LAYERS = [
     ":envoy_version_layer",
     ":packages_layer",
     ":cacerts",
+    ":ca_certificates_layer",
     ":timezone_layer",
     ":envoy_config_layer",
     ":entrypoint_layer",
