@@ -4,9 +4,9 @@
 #include <optional>
 #include <string>
 
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
-#include "absl/strings/string_view.h"
 #include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
@@ -28,9 +28,12 @@ struct RequestAttributes {
 
 // TODO(botengyao): read one normalized schema once a transcoder produces an IR; the per-API
 // readers then go away.
-// `path` is the request :path, where Gemini names the model and the streaming operation.
-RequestAttributes extractRequestAttributes(HttpFilters::AiProtocolManager::LLMProtocol protocol,
-                                           const nlohmann::json& json, absl::string_view path);
+// `arrived` is what the request's path named under the binding it came in, when one matched:
+// the model and the streaming mode it decided take precedence over the body's.
+RequestAttributes
+extractRequestAttributes(HttpFilters::AiProtocolManager::LLMProtocol protocol,
+                         const nlohmann::json& json,
+                         const HttpFilters::AiProtocolManager::LlmBindingRead* arrived);
 
 } // namespace RequestInfo
 } // namespace AiFilters

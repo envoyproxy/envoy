@@ -6,7 +6,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 
-#include "absl/strings/match.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -15,6 +14,7 @@ namespace AiFilters {
 namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
+using HttpFilters::AiProtocolManager::LlmBindingRead;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::MaxStringValueSize;
 using HttpFilters::AiProtocolManager::NullPolicy;
@@ -71,41 +71,22 @@ void readAnthropicMessages(const nlohmann::json& json, RequestAttributes& attrs)
   attrs.tool_count = readArrayLength(json, Keys::Tools, attrs.malformed);
 }
 
-// `.../models/{model}:generateContent` or `:streamGenerateContent`, which Vertex nests too.
-void readGeminiTarget(absl::string_view path, RequestAttributes& attrs) {
-  path = path.substr(0, path.find('?'));
-  const size_t last_slash = path.rfind('/');
-  if (last_slash == absl::string_view::npos ||
-      !absl::EndsWith(path.substr(0, last_slash), "/models")) {
-    return;
+// What the path decided, over what the body says: the binding carries the model there alone, or
+// the body named none. A model too long to be one reads as absent, as from the body.
+void readArrived(const LlmBindingRead& arrived, RequestAttributes& attrs) {
+  if (arrived.model_from_path) {
+    if (arrived.model.size() > MaxStringValueSize) {
+      attrs.malformed = true;
+    } else {
+      attrs.model = arrived.model;
+    }
   }
-  const absl::string_view segment = path.substr(last_slash + 1);
-  const size_t colon = segment.find(':');
-  if (colon == absl::string_view::npos) {
-    return;
+  if (arrived.stream.has_value()) {
+    attrs.stream = arrived.stream;
   }
-  const absl::string_view model = segment.substr(0, colon);
-  const absl::string_view operation = segment.substr(colon + 1);
-  if (model.empty()) {
-    return;
-  }
-  if (operation == "generateContent") {
-    attrs.stream = false;
-  } else if (operation == "streamGenerateContent") {
-    attrs.stream = true;
-  } else {
-    return;
-  }
-  if (model.size() > MaxStringValueSize) {
-    attrs.malformed = true;
-    return;
-  }
-  attrs.model = std::string(model);
 }
 
-void readGeminiGenerateContent(const nlohmann::json& json, absl::string_view path,
-                               RequestAttributes& attrs) {
-  readGeminiTarget(path, attrs);
+void readGeminiGenerateContent(const nlohmann::json& json, RequestAttributes& attrs) {
   // Gemini's proto3 JSON accepts snake_case field names alongside camelCase.
   const nlohmann::json* config =
       readObject(json, Keys::GenerationConfig, attrs.malformed, NullPolicy::AllowNullAsAbsent);
@@ -126,7 +107,7 @@ void readGeminiGenerateContent(const nlohmann::json& json, absl::string_view pat
 } // namespace
 
 RequestAttributes extractRequestAttributes(LLMProtocol protocol, const nlohmann::json& json,
-                                           absl::string_view path) {
+                                           const LlmBindingRead* arrived) {
   RequestAttributes attrs;
   attrs.llm_protocol = protocol;
   switch (protocol) {
@@ -140,11 +121,14 @@ RequestAttributes extractRequestAttributes(LLMProtocol protocol, const nlohmann:
     readAnthropicMessages(json, attrs);
     break;
   case LLMProtocol::GeminiGenerateContent:
-    readGeminiGenerateContent(json, path, attrs);
+    readGeminiGenerateContent(json, attrs);
     break;
   case LLMProtocol::Unspecified:
     readCommon(json, attrs);
     break;
+  }
+  if (arrived != nullptr) {
+    readArrived(*arrived, attrs);
   }
   return attrs;
 }

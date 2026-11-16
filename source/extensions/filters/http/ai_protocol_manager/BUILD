@@ -139,6 +139,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "api_bindings_lib",
+    srcs = ["api_bindings.cc"],
+    hdrs = ["api_bindings.h"],
+    deps = [
+        ":llm_binding_lib",
+        ":token_usage_lib",
+        ":uri_pattern_lib",
+        "//source/common/common:macros",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "token_usage_lib",
     srcs = ["token_usage.cc"],
     hdrs = [
@@ -232,8 +246,10 @@ envoy_cc_library(
     hdrs = ["schema.h"],
     deps = [
         ":json_with_ext_buf_lib",
+        "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
         "@nlohmann_json//:json",
     ],
 )
@@ -243,6 +259,7 @@ envoy_cc_library(
     srcs = ["transcoding_engine.cc"],
     hdrs = ["transcoding_engine.h"],
     deps = [
+        ":api_bindings_lib",
         ":json_with_ext_buf_lib",
         ":llm_binding_lib",
         ":llm_protocol_adapters_lib",
