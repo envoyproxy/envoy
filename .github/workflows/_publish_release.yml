@@ -112,6 +112,7 @@ jobs:
         release.x64: container/envoy/x64/bin/
       signing: true
       request: ${{ inputs.request }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       source: |
         export NO_BUILD_SETUP=1
       trusted: ${{ inputs.trusted }}
@@ -137,6 +138,7 @@ jobs:
       dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
       dockerhub-username: ${{ inputs.dockerhub-username }}
       dev: ${{ fromJSON(inputs.request).request.version.dev }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       sha: ${{ fromJSON(inputs.request).request.sha }}
       target-branch: ${{ fromJSON(inputs.request).request.target-branch }}
       trusted: ${{ inputs.trusted }}
@@ -209,6 +211,7 @@ jobs:
         release.signed: container/release.signed
       source: ${{ matrix.source }}
       request: ${{ inputs.request }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       steps-pre: ${{ matrix.steps-pre }}
       trusted: ${{ inputs.trusted }}
     strategy:

@@ -19,6 +19,9 @@ on:
       dockerhub-username:
         required: true
         type: string
+      runs-on:
+        type: string
+        default: ubuntu-24.04
       sha:
         required: true
         type: string
@@ -50,7 +53,7 @@ concurrency:
 jobs:
   push-manifests:
     name: Create manifests (${{ (! inputs.trusted || (inputs.target-branch != 'main' && inputs.dev)) && 'dry run' || 'push' }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runs-on }}
     permissions:
       contents: read
       packages: read

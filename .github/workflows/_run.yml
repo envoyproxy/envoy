@@ -23,6 +23,10 @@ on:
       bazel-rbe-jobs:
         type: number
         default: 200
+      # The remote execution priority (within the cluster's range), rather than the default.
+      bazel-rbe-priority:
+        type: string
+        default:
       bind-mount:
         type: boolean
         default: true
@@ -440,7 +444,11 @@ jobs:
           ${{ inputs.bazel-extra }}
           ${{ inputs.rbe == true && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
           ${{ github.event_name == 'schedule' && '--nocache_test_results' || '' }}
-          ${{ inputs.rbe == true && inputs.trusted && '--remote_execution_priority=1' || '' }}
+          ${{ inputs.rbe == true
+              && (inputs.bazel-rbe-priority
+                  && format('--remote_execution_priority={0}', inputs.bazel-rbe-priority)
+                  || inputs.trusted && '--remote_execution_priority=1')
+              || '' }}
         CI_BRANCH: >-
           ${{ inputs.trusted
               && format('refs/heads/{0}', fromJSON(inputs.request).request.target-branch)

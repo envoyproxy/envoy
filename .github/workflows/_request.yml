@@ -107,6 +107,18 @@ jobs:
           title: ${{ steps.summary.outputs.title }}
           link: ${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
           summary: ${{ steps.summary.outputs.summary }}
+          publish-fast: ${{ vars.ENVOY_PUBLISH_FAST && true || false }}
+          publish-vm: ${{ vars.ENVOY_PUBLISH_VM || 'ubuntu-latest-16-cores' }}
+          publish-jobs: ${{ vars.ENVOY_PUBLISH_JOBS || 500 }}
+          # The highest remote execution priority (the cluster's `--priority_range` is 0,1).
+          # Quoted, so a priority of 0 survives the callers' `|| ''` (`'0'` is truthy, `0` is not).
+          publish-priority: "${{ vars.ENVOY_PUBLISH_PRIORITY || 1 }}"
+          # Set by GitHub (not the pull request): whether its author is a member of the repo, and
+          # whether its branch is in the repo (only members and the repo's apps can push one).
+          publish-author: ${{ github.event.pull_request.author_association || '' }}
+          publish-same-repo: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          # Only those who can triage the repo can label a pull request.
+          publish-labelled: ${{ contains(github.event.pull_request.labels.*.name, 'ci:fastpublish') }}
         input-format: yaml
         filter: |
           # `$legacy` is the jobs of a branch that predates the check's targets. Options in
@@ -128,6 +140,13 @@ jobs:
           def check_build_jobs($run; $check; $single):
             check_build_jobs($run; $check; $single.name; [$single]; []);
           .title as $title
+          | .["publish-fast"] as $publishFast
+          | .["publish-vm"] as $publishVM
+          | .["publish-jobs"] as $publishJobs
+          | .["publish-priority"] as $publishPriority
+          | ((.["publish-author"] // "" | IN("OWNER", "MEMBER", "COLLABORATOR"))
+             or .["publish-same-repo"] == true) as $publishMember
+          | (.["publish-labelled"] == true) as $publishLabelled
           | .env.config.envoy.icon as $icon
           | .link as $link
           | "\($icon) Request ([\($title)](\($link)))" as $linkedTitle
@@ -169,6 +188,23 @@ jobs:
                     end
                   | any(.[]; . == $target)
                   | not)))
+          # A release (a non-dev version: its PR, and its push), or any request with
+          # `vars.ENVOY_PUBLISH_FAST` set (eg to test it), publishes as fast as it can: every
+          # publishing job (build, docs, signing, images, publish, verify) on a larger runner
+          # (`vars.ENVOY_PUBLISH_VM`), and its remote builds with more jobs (`vars.ENVOY_PUBLISH_JOBS`)
+          # at the highest remote execution priority (`vars.ENVOY_PUBLISH_PRIORITY`). The version is
+          # the requested commit's, so only for a trusted request, or a pull request by a member of
+          # the repo, or from a branch in it (eg the publishing app's release PRs). Such a pull request
+          # labelled `ci:fastpublish` (by a maintainer) also publishes as fast as it can; on anyone
+          # else's, the label (which stays on for every later push) does nothing.
+          | ((.request.trusted or $publishMember)
+             and ((.request.version.dev | not) or $publishFast or $publishLabelled)) as $publishRelease
+          | .config.ci["agent-publish"] = (
+              if $publishRelease then $publishVM else .config.ci["agent-ubuntu"] end)
+          | .config.ci["publish-jobs"] = (
+              if $publishRelease then ($publishJobs | tonumber) else null end)
+          | .config.ci["publish-priority"] = (
+              if $publishRelease then ($publishPriority | tostring) else null end)
           | .summary = {
               $summary,
               $title,
