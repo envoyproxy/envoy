@@ -736,6 +736,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   }
 
   maybeContinueDecoding(continue_data_entry);
+  if (state_.destroyed_) {
+    return;
+  }
 
   if (end_stream) {
     disarmRequestTimeout();
@@ -861,6 +864,10 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       // a previous filter has added trailers.
       break;
     }
+  }
+
+  if (state_.destroyed_) {
+    return;
   }
 
   if (forward_held_trailers_) {
