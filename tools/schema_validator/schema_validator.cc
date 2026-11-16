@@ -4,7 +4,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "test/tools/schema_validator/validator.h"
+#include "tools/schema_validator/validator.h"
 
 int main(int argc, char** argv) {
   try {
