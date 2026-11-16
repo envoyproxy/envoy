@@ -359,8 +359,13 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
 
 // Native serializer carrying over bit representation from CEL value to the extension.
 // This implementation assumes that the value type is static and known to the consumer.
-WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* result) {
+// Numeric values use Wasm byte order when requested, otherwise host byte order.
+WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* result,
+                          bool swap_bytes) {
   using Filters::Common::Expr::CelValue;
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+  using proxy_wasm::bswap;
+#endif
   int64_t out_int64;
   uint64_t out_uint64;
   double out_double;
@@ -374,15 +379,15 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     result->assign(value.BytesOrDie().value().data(), value.BytesOrDie().value().size());
     return WasmResult::Ok;
   case CelValue::Type::kInt64:
-    out_int64 = value.Int64OrDie();
+    out_int64 = htowasm(value.Int64OrDie(), swap_bytes);
     result->assign(reinterpret_cast<const char*>(&out_int64), sizeof(int64_t));
     return WasmResult::Ok;
   case CelValue::Type::kUint64:
-    out_uint64 = value.Uint64OrDie();
+    out_uint64 = htowasm(value.Uint64OrDie(), swap_bytes);
     result->assign(reinterpret_cast<const char*>(&out_uint64), sizeof(uint64_t));
     return WasmResult::Ok;
   case CelValue::Type::kDouble:
-    out_double = value.DoubleOrDie();
+    out_double = htowasm(value.DoubleOrDie(), swap_bytes);
     result->assign(reinterpret_cast<const char*>(&out_double), sizeof(double));
     return WasmResult::Ok;
   case CelValue::Type::kBool:
@@ -391,12 +396,12 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     return WasmResult::Ok;
   case CelValue::Type::kDuration:
     // Warning: loss of precision to nanoseconds
-    out_int64 = absl::ToInt64Nanoseconds(value.DurationOrDie());
+    out_int64 = htowasm(absl::ToInt64Nanoseconds(value.DurationOrDie()), swap_bytes);
     result->assign(reinterpret_cast<const char*>(&out_int64), sizeof(int64_t));
     return WasmResult::Ok;
   case CelValue::Type::kTimestamp:
     // Warning: loss of precision to nanoseconds
-    out_int64 = absl::ToUnixNanos(value.TimestampOrDie());
+    out_int64 = htowasm(absl::ToUnixNanos(value.TimestampOrDie()), swap_bytes);
     result->assign(reinterpret_cast<const char*>(&out_int64), sizeof(int64_t));
     return WasmResult::Ok;
   case CelValue::Type::kMessage:
@@ -415,10 +420,10 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     const auto& keys = *keys_list.value();
     std::vector<std::pair<std::string, std::string>> pairs(map.size(), std::make_pair("", ""));
     for (auto i = 0; i < map.size(); i++) {
-      if (serializeValue(keys[i], &pairs[i].first) != WasmResult::Ok) {
+      if (serializeValue(keys[i], &pairs[i].first, swap_bytes) != WasmResult::Ok) {
         return WasmResult::SerializationFailure;
       }
-      if (serializeValue(map[keys[i]].value(), &pairs[i].second) != WasmResult::Ok) {
+      if (serializeValue(map[keys[i]].value(), &pairs[i].second, swap_bytes) != WasmResult::Ok) {
         return WasmResult::SerializationFailure;
       }
     }
@@ -435,7 +440,7 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     const auto& list = *value.ListOrDie();
     std::vector<std::pair<std::string, std::string>> pairs(list.size(), std::make_pair("", ""));
     for (auto i = 0; i < list.size(); i++) {
-      if (serializeValue(list[i], &pairs[i].first) != WasmResult::Ok) {
+      if (serializeValue(list[i], &pairs[i].first, swap_bytes) != WasmResult::Ok) {
         return WasmResult::SerializationFailure;
       }
     }
@@ -619,7 +624,7 @@ WasmResult Context::getProperty(std::string_view path, std::string* result) {
     }
   }
 
-  return serializeValue(value, result);
+  return serializeValue(value, result, wasm_->wasm_vm()->usesWasmByteOrder());
 }
 
 // Header/Trailer/Metadata Maps.

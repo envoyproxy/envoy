@@ -478,7 +478,35 @@ rust.repository_set(
     name = "rust_linux_s390x",
     edition = "2018",
     exec_triple = "s390x-unknown-linux-gnu",
+    exec_compatible_with = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+    ],
     versions = ["1.97.1"],
+    target_triple = "s390x-unknown-linux-gnu",
+    target_compatible_with = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+    ],
+)
+
+rust.repository_set(
+    name = "rust_linux_s390x",
+    target_triple = "wasm32-unknown-unknown",
+    target_compatible_with = [
+        "@platforms//cpu:wasm32",
+        "@rules_rust//rust/platform/os:unknown",
+    ],
+)
+
+rust.repository_set(
+    name = "rust_linux_s390x",
+    target_triple = "wasm32-wasip1",
+    target_compatible_with = [
+        "@platforms//cpu:wasm32",
+        "@platforms//os:wasi",
+        "@rules_rust//rust/platform:wasi_preview_1",
+    ],
 )
 rust.toolchain(
     edition = "2018",
