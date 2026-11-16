@@ -480,7 +480,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
         cm.set_http1_safe_max_connection_duration(true);
         // Drain timeout is not used for max_connection_duration if
         // http1_safe_max_connection_duration is enabled.
-        cm.mutable_drain_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
+        cm.mutable_drain_timeout()->CopyFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
+        // Close the connection only once the final response has been written. A delayed close
+        // timer runs on simulated time and can fire before the response is written, so the
+        // client would see the connection close instead of the response.
+        cm.mutable_delayed_close_timeout()->CopyFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
         cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
             ProtobufUtil::TimeUtil::SecondsToDuration(20));
       });
