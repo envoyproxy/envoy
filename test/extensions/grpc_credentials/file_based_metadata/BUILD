@@ -19,11 +19,23 @@ envoy_extension_cc_test(
     data = ["//test/config/integration/certs"],
     extension_names = ["envoy.grpc_credentials.file_based_metadata"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/grpc_credentials/file_based_metadata:config",

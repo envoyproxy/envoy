@@ -23,11 +23,11 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
     },
     deps = [
         "//envoy/buffer:buffer_interface",
@@ -82,8 +82,14 @@ envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
     },
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -114,8 +120,15 @@ envoy_cc_fuzz_test(
     srcs = ["http1_connection_fuzz_test.cc"],
     corpus = "http1_connection_corpus",
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "tsan": {"build": "default"},
+        "msan": {"build": "default"},
+        "fuzz_coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/http:conn_manager_lib",

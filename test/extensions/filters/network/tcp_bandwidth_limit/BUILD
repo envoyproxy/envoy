@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/network/tcp_bandwidth_limit",
         "//test/mocks/event:event_mocks",
@@ -31,8 +34,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/network/tcp_bandwidth_limit:config",
@@ -51,11 +57,19 @@ envoy_extension_cc_test(
     srcs = ["tcp_bandwidth_limit_integration_test.cc"],
     extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
+        "default": {"test": "linux_x64_medium"},
+        "openssl": {
             "link": "linux_x64_small",
+            "test": "linux_x64_medium",
         },
-        "gcc": {"build": "linux_x64_small"},
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     deps = [
         "//source/extensions/filters/network/tcp_bandwidth_limit:config",

@@ -30,8 +30,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tls.cert_validator.spiffe"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:transport_socket_options_lib",
@@ -69,11 +72,10 @@ envoy_extension_cc_test(
         "envoy.tls.cert_validator.spiffe",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
@@ -101,8 +103,11 @@ envoy_extension_cc_fuzz_test(
     corpus = "spiffe_validator_corpus",
     extension_names = ["envoy.tls.cert_validator.spiffe"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":spiffe_validator_fuzz_proto_cc_proto",

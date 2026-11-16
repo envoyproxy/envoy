@@ -28,8 +28,15 @@ envoy_extension_cc_fuzz_test(
     corpus = "ext_proc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [

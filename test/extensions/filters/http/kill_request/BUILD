@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "kill_request_filter_test",
     srcs = ["kill_request_filter_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
@@ -33,8 +36,11 @@ envoy_extension_cc_test(
     srcs = ["kill_request_config_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
@@ -50,11 +56,10 @@ envoy_extension_cc_test(
     srcs = ["kill_request_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 8,
     deps = [
@@ -70,11 +75,9 @@ envoy_extension_cc_test(
     coverage = False,
     extension_names = ["envoy.filters.http.kill_request"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 8,
     deps = [

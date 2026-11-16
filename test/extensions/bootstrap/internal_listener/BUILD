@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["internal_listener_registry_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -45,11 +45,9 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.bootstrap.internal_listener"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/config:api_version_lib",
@@ -81,7 +79,10 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["active_internal_listener_test.cc"],
     extension_names = ["envoy.bootstrap.internal_listener"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:address_lib",

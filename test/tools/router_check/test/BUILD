@@ -27,8 +27,11 @@ envoy_cc_test(
         ":configs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//tools/router_check:router_check_main_lib",

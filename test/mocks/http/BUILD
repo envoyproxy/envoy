@@ -135,7 +135,10 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "http_mocks_test",
     srcs = ["mocks_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":http_mocks",
         "//envoy/http:header_map_interface",

@@ -27,8 +27,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.tls.cert_validator.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/router:string_accessor_lib",

@@ -25,8 +25,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -51,7 +54,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:early_header_mutation_stop_chain",
     ],
     extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/http/early_header_mutation/dynamic_modules:early_header_mutation_lib",
         "//test/extensions/dynamic_modules:util",
@@ -67,7 +73,10 @@ envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/http/early_header_mutation/dynamic_modules:early_header_mutation_lib",
@@ -90,11 +99,10 @@ envoy_extension_cc_dyn_module_test(
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.http.early_header_mutation.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

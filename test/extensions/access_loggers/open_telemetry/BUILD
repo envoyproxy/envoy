@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["otlp_log_utils_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:serializer_lib",
@@ -41,8 +44,11 @@ envoy_extension_cc_test(
     srcs = ["grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -69,8 +75,11 @@ envoy_extension_cc_test(
     srcs = ["http_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/http:http_service_headers_lib",
@@ -91,8 +100,15 @@ envoy_extension_cc_test(
     srcs = ["access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/common:time_interface",
@@ -118,8 +134,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -139,11 +158,10 @@ envoy_extension_cc_test(
     srcs = ["access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -177,8 +195,15 @@ envoy_extension_cc_test(
     }),
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -210,7 +235,6 @@ envoy_extension_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
