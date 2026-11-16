@@ -65,6 +65,9 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+    # A one-line file from the stamp, so new with every commit: locally, rather than queued for
+    # remote execution on the critical path of every stamped link.
+    tags = ["no-remote-exec"],
 )
 
 # For macOS, which doesn't have GNU ld's `--build-id` flag.
@@ -80,6 +83,9 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+    # A one-line file from the stamp, so new with every commit: locally, rather than queued for
+    # remote execution on the critical path of every stamped link.
+    tags = ["no-remote-exec"],
 )
 
 cc_library(
