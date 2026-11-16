@@ -44,6 +44,7 @@ namespace AdaptiveWorkerCapacity {
 //   (max_tokens = bucket_size * refill_rate).
 class DynamicTokenBucket {
 public:
+  // Note: time_source must outlive the bucket, and bucket_size must be finite and positive.
   DynamicTokenBucket(TimeSource& time_source, absl::Duration bucket_size);
   DynamicTokenBucket(const DynamicTokenBucket&) = delete;
   DynamicTokenBucket& operator=(const DynamicTokenBucket&) = delete;

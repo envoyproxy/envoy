@@ -34,7 +34,12 @@ TEST(DynamicTokenBucketTest, UninitializedInitialState) {
   EXPECT_DOUBLE_EQ(0.0, bucket.getResourceUsage().resource_pressure_);
   EXPECT_DOUBLE_EQ(0.0, bucket.popBucketUtilization());
 
+  bucket.scaleRefillRate(2.0);
+  EXPECT_DOUBLE_EQ(0.0, bucket.refillRate());
+  EXPECT_EQ(std::nullopt, bucket.maxTokens());
+
   time_system.advanceTimeWait(std::chrono::milliseconds(500));
+  EXPECT_DOUBLE_EQ(0.0, bucket.popBucketUtilization());
   EXPECT_DOUBLE_EQ(100.0, bucket.popTokenConsumptionRate());
 }
 
@@ -134,7 +139,7 @@ TEST(DynamicTokenBucketTest, BucketUtilizationCalculatesConsumedAreaAccurately) 
   time_system.advanceTimeWait(std::chrono::milliseconds(200));
   EXPECT_DOUBLE_EQ(0.0, bucket.popBucketUtilization());
 
-  // Consume 50 tokens at t=0.
+  // Consume 50 tokens at t=200ms.
   for (int i = 0; i < 50; ++i) {
     bucket.onLoadAccepted();
   }
@@ -329,7 +334,7 @@ TEST(DynamicTokenBucketTest, SetRefillRateAfterUninitializedTimeDoesNotDiluteUti
   // Advance time by 200ms -> 20 tokens refill (50 -> 70 tokens).
   // Average tokens = 60, missing tokens = 40.
   // Area = 0.2s * 40 tokens = 8.0 token-seconds.
-  // Post-initialization window dt = 0.2s.
+  // Post-initialization window duration = 0.2s.
   // Undiluted utilization = 8.0 / (0.2s * 100 max_tokens) = 0.40.
   time_system.advanceTimeWait(std::chrono::milliseconds(200));
   EXPECT_NEAR(0.40, bucket.popBucketUtilization(), 1e-4);
@@ -421,6 +426,47 @@ TEST(DynamicTokenBucketTest, LargeRefillRateAndScalingClampedWithoutOverflowOrNa
 
   time_system.advanceTimeWait(std::chrono::milliseconds(10));
   EXPECT_FALSE(std::isnan(bucket.popBucketUtilization()));
+}
+
+TEST(DynamicTokenBucketTest, DownscalingPreservesExactFullAndSingleTokenBoundaries) {
+  {
+    Event::SimulatedTimeSystem time_system;
+    DynamicTokenBucket bucket(time_system, absl::Seconds(1));
+    bucket.setRefillRate(49.0);
+    bucket.setRefillRate(0.5);
+
+    ASSERT_TRUE(bucket.maxTokens().has_value());
+    EXPECT_DOUBLE_EQ(1.0, *bucket.maxTokens());
+    EXPECT_DOUBLE_EQ(1.0, bucket.tokenCount());
+    EXPECT_DOUBLE_EQ(0.0, bucket.getResourceUsage().resource_pressure_);
+  }
+
+  {
+    Event::SimulatedTimeSystem time_system;
+    DynamicTokenBucket bucket(time_system, absl::Seconds(1));
+    bucket.setRefillRate(49.0);
+    for (int i = 0; i < 42; ++i) {
+      bucket.onLoadAccepted();
+    }
+    ASSERT_DOUBLE_EQ(7.0, bucket.tokenCount());
+
+    bucket.setRefillRate(7.0);
+    ASSERT_TRUE(bucket.maxTokens().has_value());
+    EXPECT_DOUBLE_EQ(7.0, *bucket.maxTokens());
+    EXPECT_DOUBLE_EQ(1.0, bucket.tokenCount());
+    const double pressure = bucket.getResourceUsage().resource_pressure_;
+    EXPECT_LT(pressure, 1.0);
+    EXPECT_DOUBLE_EQ(6.0 / 7.0, pressure);
+  }
+}
+
+TEST(DynamicTokenBucketTest, ExtremeDownscalingUnderflowClampsToMinRefillRate) {
+  Event::SimulatedTimeSystem time_system;
+  DynamicTokenBucket bucket(time_system, absl::Seconds(1));
+  bucket.setRefillRate(0.1);
+
+  bucket.scaleRefillRate(1e-323);
+  EXPECT_DOUBLE_EQ(1e-3, bucket.refillRate());
 }
 
 } // namespace

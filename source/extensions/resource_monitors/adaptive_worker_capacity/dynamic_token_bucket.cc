@@ -114,9 +114,12 @@ void DynamicTokenBucket::setRefillRate(double new_refill_rate) {
   const double bucket_size_s = absl::ToDoubleSeconds(bucket_size_);
   max_tokens_ = std::clamp(bucket_size_s * refill_rate_, kMinMaxTokens, kMaxTokens);
   if (old_max_tokens.has_value()) {
-    const double scale = *max_tokens_ / *old_max_tokens;
-    token_count_ = std::clamp(token_count_ * scale, 0.0, *max_tokens_);
-    accumulated_area_ *= scale;
+    if (token_count_ >= *old_max_tokens) {
+      token_count_ = *max_tokens_;
+    } else {
+      token_count_ = std::clamp((token_count_ * *max_tokens_) / *old_max_tokens, 0.0, *max_tokens_);
+    }
+    accumulated_area_ = (accumulated_area_ * *max_tokens_) / *old_max_tokens;
   } else {
     token_count_ = *max_tokens_;
     last_utilization_pop_time_ = last_token_update_time_;
@@ -127,7 +130,7 @@ void DynamicTokenBucket::scaleRefillRate(double factor) {
   if (factor <= 0.0 || !std::isfinite(factor) || refill_rate_ <= 0.0) {
     return;
   }
-  setRefillRate(std::min(kMaxRefillRate, refill_rate_ * factor));
+  setRefillRate(std::clamp(refill_rate_ * factor, kMinRefillRate, kMaxRefillRate));
 }
 
 } // namespace AdaptiveWorkerCapacity
