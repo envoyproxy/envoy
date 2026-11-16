@@ -126,7 +126,7 @@ TEST_F(RedisClusterLoadBalancerTest, LoadBalancerStubMethods) {
       std::vector<ClusterSlot>{ClusterSlot(0, 16383, hosts[0]->address())});
   Upstream::HostMap all_hosts = generateHostMap(hosts);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
 
@@ -158,7 +158,7 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
       {hosts[2]->address()->asString(), hosts[2]},
   };
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
   TestLoadBalancerContext context(std::nullopt);
   EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context).host);
 };
@@ -179,7 +179,7 @@ TEST_F(RedisClusterLoadBalancerTest, Basic) {
       {hosts[2]->address()->asString(), hosts[2]},
   };
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // A list of (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -204,7 +204,7 @@ TEST_F(RedisClusterLoadBalancerTest, Shard) {
       {hosts[2]->address()->asString(), hosts[2]},
   };
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // A list of (hash: host_index) pair
   // Simple read command
@@ -248,7 +248,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // A list of (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> replica_assignments = {
@@ -290,7 +290,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyPrimary) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   hosts[0]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[1]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -337,7 +337,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   hosts[2]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[3]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -378,7 +378,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // A list of (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> primary_assignments = {
@@ -407,7 +407,7 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
   Upstream::HostMap all_hosts{{hosts[0]->address()->asString(), hosts[0]},
                               {hosts[1]->address()->asString(), hosts[1]}};
   init();
-  EXPECT_EQ(true, factory_->onClusterSlotUpdate(std::move(slots), all_hosts));
+  EXPECT_EQ(true, factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false));
 
   // A list of initial (hash: host_index) pair
   const std::vector<std::pair<uint32_t, uint32_t>> original_assignments = {
@@ -422,7 +422,7 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
       ClusterSlot(2001, 16383, hosts[0]->address()),
   };
   EXPECT_EQ(true, factory_->onClusterSlotUpdate(
-                      std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
+                      std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts, false));
 
   // A list of updated (hash: host_index) pair.
   const std::vector<std::pair<uint32_t, uint32_t>> updated_assignments = {
@@ -444,7 +444,7 @@ TEST_F(RedisClusterLoadBalancerTest, LoadBalancerRefreshesOnMemberUpdate) {
   factory_->onClusterSlotUpdate(std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
                                     ClusterSlot(0, 1000, hosts[0]->address()),
                                     ClusterSlot(1001, 16383, hosts[1]->address())}),
-                                all_hosts);
+                                all_hosts, false);
 
   // Create a single LB *before* any further slot updates and exercise it.
   Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
@@ -462,7 +462,7 @@ TEST_F(RedisClusterLoadBalancerTest, LoadBalancerRefreshesOnMemberUpdate) {
       std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
           ClusterSlot(0, 1000, hosts[0]->address()), ClusterSlot(1001, 2000, hosts[1]->address()),
           ClusterSlot(2001, 16383, hosts[0]->address())}),
-      all_hosts);
+      all_hosts, false);
 
   // Until the worker priority set fires its member update callback, the LB
   // still holds the previous snapshot.
@@ -483,6 +483,53 @@ TEST_F(RedisClusterLoadBalancerTest, LoadBalancerRefreshesOnMemberUpdate) {
     EXPECT_EQ(hosts[0]->address()->asString(),
               lb->chooseHost(&context).host->address()->asString());
   }
+}
+
+TEST_F(RedisClusterLoadBalancerTest, HostReplacementRefreshesLocalityAndHealth) {
+  auto primary = makeHostWithZone("tcp://127.0.0.1:90", "zone-a");
+  auto replica = makeHostWithZone("tcp://127.0.0.2:90", "zone-b");
+  Upstream::HostMap all_hosts{makePair(primary), makePair(replica)};
+  auto make_slots = [&]() {
+    auto slots = std::make_shared<std::vector<ClusterSlot>>();
+    slots->emplace_back(0, 16383, primary->address());
+    slots->back().addReplica(replica->address());
+    return slots;
+  };
+  init();
+  ON_CALL(random_, random()).WillByDefault(Return(0));
+  EXPECT_TRUE(factory_->onClusterSlotUpdate(make_slots(), all_hosts, true));
+  auto lb = factory_->create(lb_params_);
+  using ReadPolicy = NetworkFilters::Common::Redis::Client::ReadPolicy;
+  TestLoadBalancerContext primary_context(0, false, ReadPolicy::Primary);
+  TestLoadBalancerContext replica_context(0, true, ReadPolicy::Replica);
+  TestLoadBalancerContext any_context(0, true, ReadPolicy::Any);
+  TestLoadBalancerContext affinity_context(0, true, ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
+                                           "zone-a");
+  EXPECT_EQ(primary, lb->chooseHost(&affinity_context).host);
+
+  auto updated_primary = makeHostWithZone("tcp://127.0.0.1:90", "zone-b");
+  auto updated_replica = makeHostWithZone("tcp://127.0.0.2:90", "zone-a");
+  all_hosts = {makePair(updated_primary), makePair(updated_replica)};
+  EXPECT_TRUE(factory_->onClusterSlotUpdate(make_slots(), all_hosts, true));
+  EXPECT_EQ(primary, lb->chooseHost(&primary_context).host);
+  EXPECT_EQ(replica, lb->chooseHost(&replica_context).host);
+  worker_priority_set_.runUpdateCallbacks(0, {updated_primary, updated_replica},
+                                          {primary, replica});
+  EXPECT_EQ(updated_primary, lb->chooseHost(&primary_context).host);
+  EXPECT_EQ(updated_replica, lb->chooseHost(&replica_context).host);
+  EXPECT_EQ(updated_replica, lb->chooseHost(&affinity_context).host);
+
+  // Health updates must partition the replacement Hosts, not the retired objects.
+  updated_primary->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  factory_->onHostHealthUpdate();
+  worker_priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(updated_replica, lb->chooseHost(&any_context).host);
+  updated_primary->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  factory_->onHostHealthUpdate();
+  worker_priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(updated_primary, lb->chooseHost(&any_context).host);
+
+  EXPECT_FALSE(factory_->onClusterSlotUpdate(make_slots(), all_hosts, false));
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
@@ -518,7 +565,7 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
       {100, 0}, {1100, 1}, {2100, 2}};
 
   init();
-  EXPECT_EQ(true, factory_->onClusterSlotUpdate(std::move(slots), all_hosts));
+  EXPECT_EQ(true, factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false));
   validateAssignment(hosts, expected_assignments);
 
   // Calling cluster slot update without change should not change assignment.
@@ -530,7 +577,7 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
   updated_slot[0].addReplica(replicas[3]->address());
   updated_slot[0].addReplica(replicas[2]->address());
   EXPECT_EQ(false, factory_->onClusterSlotUpdate(
-                       std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
+                       std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts, false));
   validateAssignment(hosts, expected_assignments);
 }
 
@@ -746,7 +793,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityWithLocalReplica) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Client is in zone-a, should prefer replica in zone-a for slot 0
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -774,7 +821,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityNoLocalReplica) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Client is in zone-c (no local replica), should fall back to any replica
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -799,7 +846,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityNoReplica) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // No replicas, should fall back to primary
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -826,7 +873,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryWithLoca
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Client is in zone-a, should prefer replica in zone-a
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -854,7 +901,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryLocalPri
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Client is in zone-a, no local replica, but primary is in zone-a
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -882,7 +929,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryFallback
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Client is in zone-c (no local hosts), should fall back to any replica
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -908,7 +955,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryNoReplic
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // No replicas, should fall back to primary
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -937,7 +984,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityZoneDiscoveryFailure) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Client has a zone, but hosts don't - should fall back to any replica
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
@@ -963,7 +1010,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryUnhealth
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Mark primary unhealthy - should skip local primary even though zone matches
   hosts[0]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -994,7 +1041,7 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityEmptyClientZone) {
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
-  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts, false);
 
   // Empty client zone, should fall back to any replica
   const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {

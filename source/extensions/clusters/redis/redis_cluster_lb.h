@@ -158,10 +158,12 @@ public:
    * Callback when cluster slot is updated
    * @param slots provides the updated cluster slots.
    * @param all_hosts provides the updated hosts (with zone info already set in host locality).
-   * @return indicate if the cluster slot is updated or not.
+   * @param hosts_updated indicates that hosts changed, including replacement Host objects at
+   * the same address. Cached shard host references must be rebuilt in this case.
+   * @return whether the load balancer's slot or shard state was rebuilt.
    */
-  virtual bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
-                                   Upstream::HostMap& all_hosts) PURE;
+  virtual bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots, Upstream::HostMap& all_hosts,
+                                   bool hosts_updated) PURE;
 
   /**
    * Callback when a host's health status is updated
@@ -183,7 +185,8 @@ public:
   RedisClusterLoadBalancerFactory(Random::RandomGenerator& random) : random_(random) {}
 
   // ClusterSlotUpdateCallBack
-  bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots, Upstream::HostMap& all_hosts) override;
+  bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots, Upstream::HostMap& all_hosts,
+                           bool hosts_updated) override;
 
   void onHostHealthUpdate() override;
 
