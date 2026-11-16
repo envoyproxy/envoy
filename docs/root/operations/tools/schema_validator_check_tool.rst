@@ -35,9 +35,9 @@ Building
 
   The tool can also be built locally using Bazel. ::
 
-    bazel build //test/tools/schema_validator:schema_validator_tool
+    bazel build //tools/schema_validator:schema_validator_tool
 
 Running
   The tool takes a path as described above. ::
 
-    bazel-bin/test/tools/schema_validator/schema_validator_tool  --schema-type SCHEMA_TYPE  --config-path PATH
+    bazel-bin/tools/schema_validator/schema_validator_tool  --schema-type SCHEMA_TYPE  --config-path PATH
