@@ -1287,7 +1287,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
 absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
   if (config_->authType() != AuthType::PrivateKeyJwt) {
-    // The credential is returned by value, so it is copied exactly once here.
+    // The credential is returned by value, so the client credential is copied exactly once here.
     return std::string(config_->clientSecret());
   }
 
