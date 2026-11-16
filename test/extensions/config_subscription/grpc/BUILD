@@ -291,7 +291,10 @@ envoy_cc_test(
     srcs =
         ["xds_failover_integration_test.cc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     shard_count = 2,

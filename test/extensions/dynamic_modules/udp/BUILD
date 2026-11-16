@@ -65,7 +65,10 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_null_config",
     ],
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/udp/dynamic_modules:config",
@@ -88,7 +91,10 @@ envoy_extension_cc_dyn_module_test(
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -30,7 +30,10 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":ssl_certs_test_lib",
         ":test_private_key_method_provider_test_lib",
@@ -93,7 +96,10 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": {
             "build": "linux_x64_small",
             "test": "linux_x64_large",
@@ -158,7 +164,10 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
     },
     deps = [
@@ -200,7 +209,10 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "ssl_certs_test_lib",
         ":ssl_test_utils",
@@ -332,7 +344,10 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":ssl_socket_test",
         ":ssl_test_utils",
@@ -354,7 +369,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "handshaker_factory_test",
     srcs = ["handshaker_factory_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":ssl_test_utils",
         "//source/common/stream_info:stream_info_lib",
@@ -388,7 +406,10 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":ssl_certs_test_lib",
         "//source/common/tls:server_context_config_lib",

@@ -20,7 +20,10 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:tracer_no_op",
     ],
     extension_names = ["envoy.tracers.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/tracers/dynamic_modules:config",

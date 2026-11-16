@@ -28,7 +28,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:tls_certificate_selector_out_of_range",
     ],
     extension_names = ["envoy.tls.certificate_selectors.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/router:string_accessor_lib",
@@ -71,7 +74,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.tls.certificate_selectors.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

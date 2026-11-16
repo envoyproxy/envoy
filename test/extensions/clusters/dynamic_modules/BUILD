@@ -27,7 +27,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -93,7 +96,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

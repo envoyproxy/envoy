@@ -52,7 +52,10 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":tcp_proxy_test_base",
         "//envoy/common:hashable_interface",
@@ -66,7 +69,10 @@ envoy_cc_test(
         "tcp_proxy_test.cc",
     ],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },
@@ -89,7 +95,10 @@ envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },

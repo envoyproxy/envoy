@@ -216,7 +216,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
@@ -240,7 +243,10 @@ envoy_cc_test(
     name = "fine_grain_log_macros_test",
     srcs = ["log_macros_test.cc"],
     args = ["--enable-fine-grain-logging"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
@@ -267,7 +273,10 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "logger_test",
     srcs = ["logger_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/common:logger",
         "//source/common/common:minimal_logger_lib",
@@ -290,7 +299,10 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",

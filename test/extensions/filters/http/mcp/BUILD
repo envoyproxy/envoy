@@ -17,7 +17,10 @@ envoy_extension_cc_test(
     name = "mcp_filter_test",
     srcs = ["mcp_filter_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/mcp:mcp_filter_lib",
@@ -44,7 +47,10 @@ envoy_extension_cc_test(
     srcs = ["mcp_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -62,7 +68,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/mcp:config",
         "//test/mocks/server:factory_context_mocks",

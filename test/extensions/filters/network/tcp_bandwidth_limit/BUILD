@@ -30,7 +30,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/network/tcp_bandwidth_limit:config",
         "//test/mocks/event:event_mocks",
@@ -48,7 +51,10 @@ envoy_extension_cc_test(
     srcs = ["tcp_bandwidth_limit_integration_test.cc"],
     extension_names = ["envoy.filters.network.tcp_bandwidth_limit"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

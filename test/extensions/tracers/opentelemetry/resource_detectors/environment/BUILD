@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.environment"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:config",
@@ -29,7 +32,10 @@ envoy_extension_cc_test(
     name = "environment_resource_detector_test",
     srcs = ["environment_resource_detector_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.environment"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:environment_resource_detector_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -45,7 +51,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.environment"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

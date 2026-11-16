@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "fluentd_access_log_impl_test",
     srcs = ["fluentd_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/access_loggers/fluentd:config",
         "//test/mocks/server:factory_context_mocks",
@@ -48,7 +51,10 @@ envoy_extension_cc_test(
     srcs = ["fluentd_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

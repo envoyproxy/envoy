@@ -17,7 +17,10 @@ envoy_package()
 envoy_cc_test(
     name = "od_cds_api_impl_test",
     srcs = ["od_cds_api_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
@@ -35,7 +38,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xdstp_od_cds_api_impl_test",
     srcs = ["xdstp_od_cds_api_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
@@ -55,7 +61,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cds_api_impl_test",
     srcs = ["cds_api_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
@@ -77,7 +86,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_discovery_manager_test",
     srcs = ["cluster_discovery_manager_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
@@ -89,7 +101,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "deferred_cluster_initialization_test",
     srcs = ["deferred_cluster_initialization_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":test_cluster_manager",
         "//envoy/upstream:cluster_manager_interface",
@@ -144,7 +159,10 @@ envoy_cc_test(
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },
@@ -189,7 +207,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "odcd_test",
     srcs = ["odcd_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":cluster_manager_impl_test_common",
         "//envoy/upstream:cluster_manager_interface",
@@ -206,7 +227,10 @@ envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -229,7 +253,10 @@ envoy_cc_test(
     name = "cluster_manager_misc_test",
     srcs = ["cluster_manager_misc_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -252,7 +279,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_update_tracker_test",
     srcs = ["cluster_update_tracker_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/upstream:cluster_update_tracker_lib",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -335,7 +365,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "multi_health_checker_test",
     srcs = ["multi_health_checker_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":utility_lib",
         "//source/common/upstream:multi_health_checker_lib",
@@ -356,7 +389,10 @@ envoy_cc_test(
         "health_checker_impl_test.cc",
     ],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": {
             "build": "linux_x64_small",
             "test": "linux_x64_large",
@@ -409,7 +445,10 @@ envoy_cc_test(
     srcs = [
         "grpc_health_checker_impl_test.cc",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":health_checker_test_base_lib",
         ":utility_lib",
@@ -461,7 +500,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "host_utility_test",
     srcs = ["host_utility_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":utility_lib",
         "//source/common/network:utility_lib",
@@ -516,7 +558,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
@@ -538,7 +583,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/tls:context_lib",
         "//source/common/upstream:health_discovery_service_lib",
@@ -643,7 +691,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "transport_socket_matcher_test",
     srcs = ["transport_socket_matcher_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/api:api_interface",
         "//envoy/matcher:matcher_interface",
@@ -674,7 +725,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "prod_cluster_info_factory_test",
     srcs = ["prod_cluster_info_factory_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":utility_lib",
         "//source/common/upstream:prod_cluster_info_factory_lib",
@@ -693,7 +747,10 @@ envoy_cc_test(
     srcs = ["upstream_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": {
             "build": "linux_x64_small",
             "test": "linux_x64_large",
@@ -848,7 +905,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -909,7 +969,10 @@ envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
     srcs = ["health_check_fuzz_test.cc"],
     corpus = "health_check_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
@@ -974,7 +1037,10 @@ envoy_cc_test(
     size = "large",
     srcs = ["local_address_selector_integration_test.cc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

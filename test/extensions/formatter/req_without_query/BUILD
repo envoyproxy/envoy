@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "req_without_query_test",
     srcs = ["req_without_query_test.cc"],
     extension_names = ["envoy.formatter.req_without_query"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",

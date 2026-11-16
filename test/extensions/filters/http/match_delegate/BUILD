@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/match_delegate:config",
         "//test/mocks/server:factory_context_mocks",
@@ -23,7 +26,10 @@ envoy_cc_test(
     name = "match_delegate_integration_test",
     srcs = ["match_delegate_integration_test.cc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.trace_id_ratio_based"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based:config",
@@ -29,7 +32,10 @@ envoy_extension_cc_test(
     name = "trace_id_ratio_based_sampler_test",
     srcs = ["trace_id_ratio_based_sampler_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.trace_id_ratio_based"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based:config",
@@ -48,7 +54,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.trace_id_ratio_based"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

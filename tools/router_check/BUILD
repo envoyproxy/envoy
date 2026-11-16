@@ -18,9 +18,18 @@ envoy_cc_test_binary(
     srcs = ["router_check.cc"],
     linkstatic = envoy_select_linkstatic(),
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
-        "gcc": {"build": "linux_x64_large"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_large",
+        },
+        "gcc": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_small",
+        },
     },
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],

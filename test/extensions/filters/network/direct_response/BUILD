@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "default": {"test": "linux_x64_medium"},
         "tsan": {
             "build": "linux_x64_small",
+            "link": "linux_x64_small",
             "test": "linux_x64_medium",
         },
         "gcc": {

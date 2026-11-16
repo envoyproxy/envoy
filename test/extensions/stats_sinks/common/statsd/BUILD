@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "statsd_test",
     srcs = ["statsd_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",

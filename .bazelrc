@@ -253,6 +253,8 @@ build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target,-quiche
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
 # changes, this build type may need to be broken up.
+# Identifies the compile time options build, eg to `rbe_pool` (`bazel/envoy_rbe.bzl`).
+build:compile-time-options --define=ENVOY_CONFIG_COMPILE_TIME_OPTIONS=1
 build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
@@ -408,6 +410,8 @@ build:asan-fuzzer --copt=-fno-omit-frame-pointer
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
 build:fuzz-coverage --config=plain-fuzzer
+# Identifies the fuzz coverage build, eg to `rbe_pool` (`bazel/envoy_rbe.bzl`).
+build:fuzz-coverage --define=ENVOY_CONFIG_FUZZ_COVERAGE=1
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage,-quiche
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to

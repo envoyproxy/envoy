@@ -21,7 +21,10 @@ envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
@@ -54,7 +57,10 @@ envoy_extension_cc_test(
     name = "http_cache_test",
     srcs = ["http_cache_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/http/cache/simple_http_cache:config",
@@ -80,7 +86,10 @@ envoy_extension_cc_test(
     name = "cache_filter_test",
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
@@ -99,7 +108,10 @@ envoy_extension_cc_test(
     name = "cacheability_utils_test",
     srcs = ["cacheability_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/cache:cacheability_utils_lib",
         "//test/mocks/server:server_factory_context_mocks",
@@ -111,7 +123,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/http/cache/simple_http_cache:config",
@@ -131,7 +146,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

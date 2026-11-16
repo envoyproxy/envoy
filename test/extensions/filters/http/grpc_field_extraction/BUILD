@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",
         "//test/mocks/server:factory_context_mocks",
@@ -74,7 +77,10 @@ envoy_extension_cc_test(
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

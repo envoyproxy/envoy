@@ -57,9 +57,18 @@ envoy_cc_dyn_module_test(
         "GODEBUG": "cgocheck=0",
     },
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
-        "gcc": {"build": "linux_x64_large"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_large",
+        },
+        "gcc": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_small",
+        },
     },
     deps = [":test_runner_lib"],
 )

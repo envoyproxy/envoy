@@ -39,7 +39,10 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "msan": "linux_x64_small",
     },
     deps = [
@@ -95,7 +98,10 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

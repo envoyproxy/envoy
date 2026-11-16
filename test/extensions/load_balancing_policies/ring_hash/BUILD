@@ -17,7 +17,10 @@ envoy_extension_cc_test(
     name = "ring_hash_lb_test",
     srcs = ["ring_hash_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/router:router_interface",
         "//source/common/common:hash_lib",
@@ -44,7 +47,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -62,7 +68,10 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

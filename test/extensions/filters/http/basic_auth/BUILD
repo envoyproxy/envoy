@@ -27,7 +27,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.basic_auth"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/basic_auth:config",
         "//test/mocks/server:server_mocks",
@@ -42,7 +45,10 @@ envoy_extension_cc_test(
     srcs = ["basic_auth_integration_test.cc"],
     extension_names = ["envoy.filters.http.basic_auth"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
