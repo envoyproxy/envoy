@@ -79,11 +79,16 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
   std::unique_ptr<ActiveClient> new_client;
+  // The connection was already counted when the TCP client was created, so the
+  // HTTP client takes over its stats instead of recording the connection again.
+  adopting_connection_ = true;
   if (protocol_ == Http::Protocol::Http11) {
     new_client = std::make_unique<Http1::ActiveClient>(*this, data);
   } else {
     new_client = std::make_unique<Http2::ActiveClient>(*this, data);
   }
+  adopting_connection_ = false;
+  new_client->conn_length_ = std::move(client.conn_length_);
   // When we switch from TCP to HTTP clients, the base class onConnectionEvent
   // will be called for both, so add to the connecting stream capacity to
   // balance it being decremented.
