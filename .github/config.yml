@@ -1,4 +1,8 @@
 agent-ubuntu: ubuntu-24.04
+# Build the container images and packages with the release binaries, in one job per arch
+# (`release.publish`). Branches without this run `release.server_only`, and the Docker OCI and
+# Packages jobs.
+release-publish: true
 build-image:
   # Authoritative configuration for build image/s
   repo: docker.io/envoyproxy/envoy-build
