@@ -57,7 +57,7 @@ jobs:
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
       uploads: |
-        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
+        release.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/bin/, compression-level: 0}
 
   docker:
     secrets:
@@ -87,7 +87,7 @@ jobs:
         export ENVOY_OCI_DIR=build_images
       trusted: ${{ inputs.trusted }}
       uploads: |
-        oci.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/build_images
+        oci.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/build_images, compression-level: 0}
       runs-on: >-
         ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
             || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
@@ -122,4 +122,4 @@ jobs:
             || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       trusted: ${{ inputs.trusted }}
       uploads: |
-        packages.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}
+        packages.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}, compression-level: 0}
