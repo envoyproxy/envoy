@@ -5,6 +5,8 @@ load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_rbe.bzl", "envoy_exec_properties")
+load("//distribution/binary:debug.bzl", "compressed_debug_parts")
 load(":changes.bzl", "envoy_signed_changes")
 load(":packages.bzl", "MAINTAINER", "envoy_pkg_distros", "release_version_for")
 
@@ -57,6 +59,46 @@ label_flag(
     name = "envoy-contrib-dwarf",
     build_setting_default = "//contrib/exe:envoy-static.dwp",
 )
+
+# The `.dwp`s with their debug sections compressed: llvm-dwp writes them uncompressed, several GB.
+# With zlib, which the debug images' gdb (12, Ubuntu 22.04) reads; it reads zstd only from gdb 13.
+# TODO(phlax): zstd (smaller, and ~3x faster to compress) once the images are based on Ubuntu 24.04
+# (gdb 15), along with the release links' `--compress-debug-sections` (ci/do_ci.sh); see #49222.
+# In 4 parts, joined locally: each part is cached as a smaller blob, which the remote cache serves
+# directly (blobs over ~700MB are often served from its fallback, slowly), and the parts download in
+# parallel.
+# objcopy holds the whole file, which needs more than the 3GiB of an action on the default x86_64
+# pool (arm64 builds run on the arm pool, as their host).
+[
+    compressed_debug_parts(
+        name = "%s-parts" % dwarf,
+        src = ":%s" % dwarf,
+        compression = "zlib",
+        exec_properties = envoy_exec_properties(
+            rbe_pool = "linux_x64_large",
+            test = False,
+        ),
+        parts = 4,
+    )
+    for dwarf in [
+        "envoy-contrib-dwarf",
+        "envoy-dwarf",
+    ]
+]
+
+[
+    genrule(
+        name = "%s-joined" % dwarf,
+        srcs = [":%s-parts" % dwarf],
+        outs = ["%s-joined/%s.dwp" % (dwarf, dwarf)],
+        cmd = "cat $$(echo $(SRCS) | tr ' ' '\\n' | sort) > $@",
+        tags = ["no-remote"],
+    )
+    for dwarf in [
+        "envoy-contrib-dwarf",
+        "envoy-dwarf",
+    ]
+]
 
 envoy_pkg_distros(
     name = "packages",
