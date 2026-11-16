@@ -126,7 +126,9 @@ TEST(ErrTest, test_system_error_ECONNRESET) {
 
   const char* reason = ERR_reason_error_string(err);
   ASSERT_NE(nullptr, reason);
+  // clang-format off
   EXPECT_STREQ(strerror(ECONNRESET), reason);
+  // clang-format on
 }
 
 TEST(ErrTest, test_system_error_EPIPE) {
@@ -149,7 +151,9 @@ TEST(ErrTest, test_system_error_EPIPE) {
 
   const char* reason = ERR_reason_error_string(err);
   ASSERT_NE(nullptr, reason);
+  // clang-format off
   EXPECT_STREQ(strerror(EPIPE), reason);
+  // clang-format on
 }
 
 TEST(ErrTest, test_system_error_ETIMEDOUT) {
@@ -172,7 +176,9 @@ TEST(ErrTest, test_system_error_ETIMEDOUT) {
 
   const char* reason = ERR_reason_error_string(err);
   ASSERT_NE(nullptr, reason);
+  // clang-format off
   EXPECT_STREQ(strerror(ETIMEDOUT), reason);
+  // clang-format on
 }
 
 TEST(ErrTest, test_system_error_invalid_errno) {

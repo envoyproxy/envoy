@@ -17,7 +17,10 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -33,7 +36,13 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -58,7 +67,10 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -105,7 +117,13 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_small"},
+    },
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -135,6 +153,13 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["filter_persistence_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
+    rbe_pool = {
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_small"},
+    },
     shard_count = 4,
     tags = [
         "cpu:3",

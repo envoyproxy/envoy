@@ -123,6 +123,9 @@ TEST_P(AdminInstanceTest, MemoryTcmalloc) {
 #if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   EXPECT_EQ(Http::Code::OK, result_code);
   EXPECT_THAT(response.toString(), HasSubstr("Bytes in use by application"));
+#elif defined(JEMALLOC)
+  EXPECT_EQ(Http::Code::OK, result_code);
+  EXPECT_THAT(response.toString(), HasSubstr("Begin jemalloc statistics"));
 #else
   EXPECT_EQ(Http::Code::NotImplemented, result_code);
   EXPECT_EQ("Envoy was not built with tcmalloc.\n", response.toString());

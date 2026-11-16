@@ -18,6 +18,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
@@ -71,6 +72,8 @@ using OnBootstrapExtensionRunOnAllWorkersDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done);
 using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
+using OnBootstrapExtensionListenerWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
 
 class DynamicModuleBootstrapExtension;
 
@@ -161,13 +164,16 @@ public:
   /**
    * Sets the listener manager reference. Must be called during onServerInitialized before
    * the module can enable listener lifecycle events. Marks the server as initialized so the
-   * cluster manager can be accessed safely and the cluster writer accepts writes.
+   * cluster manager can be accessed safely and the writers accept writes.
    */
   void setListenerManager(Server::ListenerManager& listener_manager) {
     listener_manager_ = &listener_manager;
     server_initialized_ = true;
     if (cluster_writer_ != nullptr) {
       cluster_writer_->onServerInitialized();
+    }
+    if (listener_writer_ != nullptr) {
+      listener_writer_->onServerInitialized(listener_manager);
     }
   }
 
@@ -224,6 +230,19 @@ public:
   bool enableClusterWriter();
 
   /**
+   * Creates the listener writer, which lets the module add, update and remove listeners. Must be
+   * called on the main thread.
+   * @return false if the listener writer already exists or shutdown began.
+   */
+  bool enableListenerWriter();
+
+  /**
+   * Called on the main thread once Envoy finished initializing, right before it starts its
+   * workers.
+   */
+  void onPostInit();
+
+  /**
    * Called on the main thread when the server begins to shut down and when the extension is
    * destroyed.
    */
@@ -272,6 +291,8 @@ public:
       nullptr;
   OnBootstrapExtensionClusterWriterUpdateDoneType
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
+  OnBootstrapExtensionListenerWriterUpdateDoneType
+      on_bootstrap_extension_listener_writer_update_done_ = nullptr;
 
   // The name of the extension.
   const std::string extension_name_;
@@ -320,6 +341,8 @@ public:
 
   // The cluster writer, or nullptr until the module enables it.
   DynamicModuleClusterWriterPtr cluster_writer_;
+  // The listener writer, or nullptr until the module enables it.
+  DynamicModuleListenerWriterPtr listener_writer_;
 
 private:
   /**
@@ -388,6 +411,9 @@ private:
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;
+
+  // Set once the module signals that its initialization is complete.
+  bool init_complete_signaled_ = false;
 
   // Set once the server begins to shut down or the extension is destroyed.
   bool shutdown_started_ = false;

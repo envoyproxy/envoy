@@ -27,7 +27,11 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
   auto dynamic_module = std::move(load_result->loaded);
 
   auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-      proto_config, std::move(dynamic_module), context.scope());
+      proto_config, std::move(dynamic_module), context.scope(),
+      context.shouldBypassOverloadManager()
+          ? OptRef<Server::LoadShedPointProvider>()
+          : makeOptRef<Server::LoadShedPointProvider>(
+                context.serverFactoryContext().overloadManager()));
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
   // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix

@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "mutation_rules_test",
     srcs = ["mutation_rules_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
     ],

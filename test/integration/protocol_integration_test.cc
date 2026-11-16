@@ -164,6 +164,10 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 
 // Test upstream_rq_per_cx metric tracks requests per connection
 TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetric) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Histograms only reach the parent store on the stats flush (5s by default).
+    bootstrap.mutable_stats_flush_interval()->set_nanos(100 * 1000 * 1000);
+  });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1391,6 +1395,8 @@ TEST_P(ProtocolIntegrationTest, Retry) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.mutable_track_cluster_stats()->set_request_response_sizes(true);
+    // Histograms only reach the parent store on the stats flush (5s by default).
+    bootstrap.mutable_stats_flush_interval()->set_nanos(100 * 1000 * 1000);
   });
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
@@ -1436,8 +1442,9 @@ TEST_P(ProtocolIntegrationTest, Retry) {
             test_server_->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
                                                ".dropped_headers_with_underscores")));
 
-  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_headers_size");
-  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
+  // Both attempts must have been merged: with a short flush interval the first one can be.
+  test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_rq_headers_size", 2);
+  test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_rs_headers_size", 2);
 
   auto find_histo_sample_count = [&](const std::string& name) -> uint64_t {
     for (auto& histogram : test_server_->histograms()) {
@@ -3752,6 +3759,10 @@ TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTr
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100 * TIMEOUT_FACTOR));
+  // On HTTP/2 the connection is closed from the drain timer (5s by default) after the GOAWAY.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_drain_timeout()->set_nanos(100 * 1000 * 1000); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -4052,6 +4063,10 @@ TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotComplete) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   config_helper_.setDownstreamMaxRequestsPerConnection(2);
+  // On HTTP/2 the connection is closed from the drain timer (5s by default) after the GOAWAY.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_drain_timeout()->set_nanos(100 * 1000 * 1000); });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -4559,6 +4574,8 @@ TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.mutable_track_cluster_stats()->set_request_response_sizes(true);
+    // Histograms only reach the parent store on the stats flush (5s by default).
+    bootstrap.mutable_stats_flush_interval()->set_nanos(100 * 1000 * 1000);
   });
   initialize();
 

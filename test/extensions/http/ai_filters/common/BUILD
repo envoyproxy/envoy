@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "sync_filter_test",
     srcs = ["sync_filter_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
