@@ -1,4 +1,12 @@
-load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
+load(
+    "@aspect_bazel_lib//lib:repositories.bzl",
+    "register_copy_to_directory_toolchains",
+    "register_coreutils_toolchains",
+    "register_jq_toolchains",
+    "register_tar_toolchains",
+    "register_yq_toolchains",
+    "register_zstd_toolchains",
+)
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
@@ -17,6 +25,8 @@ load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
+load("@rules_oci//oci:pull.bzl", "oci_pull")
+load("@rules_oci//oci:repositories.bzl", "register_crane_toolchains", "register_regctl_toolchains")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
 load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
@@ -25,6 +35,36 @@ load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 load("@shellcheck//:deps.bzl", "shellcheck_dependencies")
 load("//bazel:repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+
+# The toolchains to build the container images (`//distribution/docker`) with rules_oci, and
+# their base images.
+def _container_images():
+    # As `oci_register_toolchains`, without the jq toolchains, which are registered already.
+    register_copy_to_directory_toolchains()
+    register_coreutils_toolchains()
+    register_tar_toolchains()
+    register_zstd_toolchains()
+    register_crane_toolchains("oci")
+    register_regctl_toolchains("oci")
+
+    oci_pull(
+        name = "distroless_base_nossl",
+        digest = "sha256:6a2a3346335b94d3be0732472245f42ca3ce3cc1135a9521a2bda4b677f2ef0d",
+        image = "gcr.io/distroless/base-nossl-debian13",
+        platforms = [
+            "linux/amd64",
+            "linux/arm64/v8",
+        ],
+    )
+    oci_pull(
+        name = "ubuntu_base",
+        digest = "sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401",
+        image = "mirror.gcr.io/library/ubuntu",
+        platforms = [
+            "linux/amd64",
+            "linux/arm64/v8",
+        ],
+    )
 
 # go version for rules_go
 GO_VERSION = "1.24.6"
@@ -138,6 +178,7 @@ def envoy_dependency_imports(
     )
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
+    _container_images()
     parser_deps()
 
     rules_buf_toolchains(

@@ -8,13 +8,11 @@ load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_rbe.bzl", "envoy_exec_properties")
 load("//distribution/binary:debug.bzl", "compressed_debug_parts")
 load(":changes.bzl", "envoy_signed_changes")
-load(":packages.bzl", "envoy_pkg_distros", "release_version_for")
+load(":packages.bzl", "MAINTAINER", "envoy_pkg_distros", "release_version_for")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
-
-MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
 
 exports_files(glob([
     "custom/envoy*",
