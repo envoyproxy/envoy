@@ -864,6 +864,14 @@ case $CI_TARGET in
             exit 0
         fi
 
+        # Compress the debug sections of the released binaries (lld, with the link's cores): the
+        # debug binaries, and the debug images built from them, are several times smaller, and
+        # quicker to package, upload and push. Only the release links change (not the tests', above).
+        # With zlib, which the debug images' gdb (12, Ubuntu 22.04) reads; it reads zstd only from 13.
+        # TODO(phlax): zstd (smaller, and ~3x faster to compress) once the images are based on
+        # Ubuntu 24.04 (gdb 15), along with the `.dwp`s (distribution/BUILD); see #49222.
+        BAZEL_RELEASE_OPTIONS+=("--linkopt=-Wl,--compress-debug-sections=zlib")
+
         ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
         if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
             echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
