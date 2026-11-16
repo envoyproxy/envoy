@@ -826,6 +826,79 @@ TEST_F(WaitForRemoteCloseTest, StreamSurvivesCallbacksDestroyedAfterWaitForRemot
   deliverServerEvents(http_callbacks);
 }
 
+TEST_F(EnvoyAsyncClientImplTest, ErrorResponseWhileWaitingForGracefulClose) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  {
+    NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+    auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                           Http::AsyncClient::StreamOptions());
+
+    grpc_stream.waitForRemoteCloseAndDelete();
+    // At this point both the stream and callback are deleted.
+  }
+
+  EXPECT_CALL(http_stream, reset());
+  // Simulate the HTTP client sending an error response (i.e. due to a timeout) after the gRPC
+  // stream and callback objects are deleted.
+  http_callbacks->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                                Http::TestResponseHeaderMapImpl{{":status", "503"}}),
+                            /*end_stream=*/false);
+}
+
+TEST_F(EnvoyAsyncClientImplTest, SpuriousDataWhileWaitingForGracefulClose) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  {
+    NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+    auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                           Http::AsyncClient::StreamOptions());
+
+    grpc_stream.waitForRemoteCloseAndDelete();
+    // At this point both the stream and callback are deleted.
+  }
+
+  EXPECT_CALL(http_stream, reset());
+  // Simulate the server sending a DATA frame (i.e. due to a message timing) after the stream and
+  // callback are deleted.
+  Envoy::Buffer::OwnedImpl data("some unexpected data");
+  http_callbacks->onData(data, false);
+}
+
 TEST_F(EnvoyAsyncClientImplTest, ClientDestroyedWhileWaitingForGracefulClose) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
