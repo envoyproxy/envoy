@@ -17,3 +17,13 @@ envoy_cc_test(
         "@abseil-cpp//absl/time",
     ],
 )
+
+envoy_cc_test(
+    name = "worker_utilization_tracker_test",
+    srcs = ["worker_utilization_tracker_test.cc"],
+    deps = [
+        "//source/extensions/resource_monitors/adaptive_worker_capacity:worker_utilization_tracker_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
