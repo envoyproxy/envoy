@@ -1,0 +1,5 @@
+bootstrap_extensions:
+- name: custom_bootstrap_extension_name
+  typed_config:
+    "@type": type.googleapis.com/test.common.config.DummyConfig
+    a: foo

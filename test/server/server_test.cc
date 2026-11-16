@@ -1707,6 +1707,38 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_extensions.yaml"));
 }
 
+TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsReportsFactoryName) {
+  NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  });
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+        const auto* proto =
+            Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
+        EXPECT_NE(nullptr, proto);
+        EXPECT_EQ(proto->a(), "foo");
+        auto mock_extension = std::make_unique<MockBootstrapExtension>();
+        EXPECT_CALL(*mock_extension, onServerInitialized(_)).WillOnce([&ctx]() {
+          // call to cluster manager, to make sure it is not nullptr.
+          ctx.clusterManager().clusters();
+        });
+        EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
+        return BootstrapExtensionPtr{std::move(mock_extension)};
+      });
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_extensions_custom_name.yaml"));
+
+  const auto& configured_extensions = server_->localInfo().node().configured_bootstrap_extensions();
+  ASSERT_EQ(configured_extensions.size(), 1);
+  EXPECT_EQ(configured_extensions[0], "envoy_test.bootstrap.foo");
+}
+
 TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
   NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
   EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {

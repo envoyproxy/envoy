@@ -200,6 +200,13 @@ message Node {
   // List of extensions and their versions supported by the node.
   repeated Extension extensions = 9;
 
+  // Names of bootstrap extensions configured in the bootstrap configuration, as listed in
+  // :ref:`bootstrap_extensions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.bootstrap_extensions>`.
+  // Each name matches the name of an entry in ``extensions`` with category ``envoy.bootstrap``.
+  // This list only includes extensions that are both compiled in and configured; see
+  // ``extensions`` for the extensions compiled into the binary.
+  repeated string configured_bootstrap_extensions = 13;
+
   // Client feature support list. These are well known features described
   // in the Envoy API repository for a given major version of an API. Client features
   // use reverse DNS naming scheme, for example ``com.acme.feature``.
@@ -213,11 +220,6 @@ message Node {
   // SocketAddress ``(0.0.0.0,80)``. The field is optional and just a hint.
   repeated Address listening_addresses = 11
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
-
-  // Names of bootstrap extensions configured in the bootstrap configuration. This list only
-  // includes extensions that are both compiled in and configured; see ``extensions`` for the
-  // extensions compiled into the binary.
-  repeated string configured_bootstrap_extensions = 13;
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,

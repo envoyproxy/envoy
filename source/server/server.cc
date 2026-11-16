@@ -658,7 +658,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   }
 
   for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
-    bootstrap_.mutable_node()->add_configured_bootstrap_extensions(bootstrap_extension.name());
+    const auto& factory =
+        Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+            bootstrap_extension);
+    bootstrap_.mutable_node()->add_configured_bootstrap_extensions(factory.name());
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
