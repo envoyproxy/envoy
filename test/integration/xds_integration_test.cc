@@ -599,6 +599,10 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 // Verify that http clients of default filter chain is drained and recreated if the default filter
 // chain updates.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterChain) {
+  // The old default filter chain's connection is only used after the new client has connected.
+  // Keep the drain deadline from hard-closing it first: on a slow run that close lands on the
+  // shared dispatcher while the new client is still handshaking, which ends the connect wait early.
+  setDrainTime(std::chrono::seconds(600));
   inplaceInitialize(true);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
