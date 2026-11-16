@@ -681,10 +681,15 @@ run:
     paths:
     - "**/*"
   release:
+    # Includes the publishing workflows (and so every path of `verify`, which needs the release's
+    # signed packages): a change to them runs the jobs they define.
     paths:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/_publish_*.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/envoy-verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*
