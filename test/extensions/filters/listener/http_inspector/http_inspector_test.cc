@@ -480,8 +480,8 @@ TEST_P(HttpInspectorTest, FastFailGuardDisabledStall) {
   if (parser_impl_ != Http1ParserImpl::BalsaParser) {
     return;
   }
-  // With the guard off, the beginning of an LDAP anonymous bind below (a
-  // token byte followed by a whitespace BER length byte and more bytes the
+  // With the guard off, the beginning of an `LDAP` anonymous bind below (a
+  // token byte followed by a whitespace `BER` length byte and more bytes the
   // parser treats as first-line separators) stalls inside the deferred
   // request-line validation: no island content and no line terminator ever
   // arrive, so the filter keeps waiting for more data.
@@ -518,21 +518,34 @@ TEST_P(HttpInspectorTest, FastFailGuardDisabledStall) {
 
 TEST_P(HttpInspectorTest, NonHttpPayloadAfterWhitespace) {
   // Regression test for https://github.com/envoyproxy/envoy/issues/49322:
-  // an LDAPv3 anonymous simple bind starts with a token byte followed by a
-  // BER length byte that is ASCII whitespace, so it slipped through the
+  // an `LDAPv3` anonymous simple bind starts with a token byte followed by a
+  // `BER` length byte that is ASCII whitespace, so it slipped through the
   // first-byte fast-fail and stalled the filter.
-  const char data[] = {0x30, 0x0c, 0x02, 0x01, 0x01, 0x60, 0x07,
-                       0x02, 0x01, 0x03, 0x04, 0x00, static_cast<char>(0x80), 0x00};
+  const char data[] = {0x30,
+                       0x0c,
+                       0x02,
+                       0x01,
+                       0x01,
+                       0x60,
+                       0x07,
+                       0x02,
+                       0x01,
+                       0x03,
+                       0x04,
+                       0x00,
+                       static_cast<char>(0x80),
+                       0x00};
   const absl::string_view header(data, sizeof(data));
   testHttpInspectNotFound(header);
 }
 
 TEST_P(HttpInspectorTest, NonHttpPayloadAfterSpaceSeparator) {
-  // The same stall shape with a BER length byte that is an ASCII space.
-  const char data[] = {0x30, 0x20, 0x02, 0x01, 0x01, 0x60, 0x1b, 0x02, 0x01, 0x03, 0x04,
-                       0x14, 0x63, 0x6e, 0x3d, 0x75, 0x73, 0x65, 0x72, 0x2c, 0x64, 0x63,
-                       0x3d, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2c, 0x64,
-                       static_cast<char>(0x80), 0x00};
+  // The same stall shape with a `BER` length byte that is an ASCII space.
+  const char data[] = {
+      0x30, 0x20, 0x02, 0x01, 0x01, 0x60, 0x1b, 0x02, 0x01, 0x03, 0x04,
+      0x14, 0x63, 0x6e, 0x3d, 0x75, 0x73, 0x65, 0x72, 0x2c, 0x64, 0x63,
+      0x3d, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2c, 0x64, static_cast<char>(0x80),
+      0x00};
   const absl::string_view header(data, sizeof(data));
   testHttpInspectNotFound(header);
 }
@@ -541,17 +554,31 @@ TEST_P(HttpInspectorTest, NonHttpPayloadAfterAlphaTargetStart) {
   // The same shape but with an alpha byte after the whitespace run; it
   // passes the request-target start check and is rejected by the version
   // word check.
-  const char data[] = {0x30, 0x0c, 0x02, 0x01, 0x01, 0x63, 0x07,
-                       0x02, 0x01, 0x03, 0x04, 0x00, static_cast<char>(0x80), 0x00};
+  const char data[] = {0x30,
+                       0x0c,
+                       0x02,
+                       0x01,
+                       0x01,
+                       0x63,
+                       0x07,
+                       0x02,
+                       0x01,
+                       0x03,
+                       0x04,
+                       0x00,
+                       static_cast<char>(0x80),
+                       0x00};
   const absl::string_view header(data, sizeof(data));
   testHttpInspectNotFound(header);
 }
 
 TEST_P(HttpInspectorTest, NonHttpPayloadControlLength) {
-  // Control case: the reporter's bind with a two-character DN has a BER
+  // Control case: the reporter's bind with a two-character `DN` has a `BER`
   // length byte that is not whitespace and already fast-failed.
-  const char data[] = {0x30, 0x0e, 0x02, 0x01, 0x01, 0x60, 0x09, 0x02,
-                       0x01, 0x03, 0x04, 0x02, 0x61, 0x62, static_cast<char>(0x80), 0x00};
+  const char data[] = {0x30, 0x0e, 0x02, 0x01, 0x01,
+                       0x60, 0x09, 0x02, 0x01, 0x03,
+                       0x04, 0x02, 0x61, 0x62, static_cast<char>(0x80),
+                       0x00};
   const absl::string_view header(data, sizeof(data));
   testHttpInspectNotFound(header);
 }
@@ -564,7 +591,7 @@ TEST_P(HttpInspectorTest, SimpleRequestLineWithoutVersion) {
 }
 
 TEST_P(HttpInspectorTest, ConnectRequestWithIpv6Target) {
-  // CONNECT's authority-form target may start with '['; it must not be
+  // `CONNECT`'s authority-form target may start with '['; it must not be
   // fast-failed.
   const absl::string_view header = "CONNECT [::1]:443 HTTP/1.1\r\n";
   testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);

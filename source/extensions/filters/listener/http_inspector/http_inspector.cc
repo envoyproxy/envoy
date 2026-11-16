@@ -152,7 +152,7 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     // HTTP-version)?` (RFC 9112 section 3). The parser treats every byte
     // <= ' ' as a first-line separator and defers validation until a line
     // terminator is seen, so a non-HTTP connection whose early bytes look
-    // like `token whitespace` — for example an LDAP bind request
+    // like `token whitespace` — for example an `LDAP` bind request
     // `30 0c 02 01 01 60 ...` — otherwise stalls here until the listener
     // filter timeout. The scan is bounded to the first
     // kMaxHttpMethodLength bytes of the line; a prefix that can still be
@@ -160,8 +160,7 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes")) {
       const size_t line_end = data.find('\n');
-      const absl::string_view prefix =
-          data.substr(0, std::min(line_end, kMaxHttpMethodLength));
+      const absl::string_view prefix = data.substr(0, std::min(line_end, kMaxHttpMethodLength));
       const size_t bad = prefix.find_first_not_of(kValidHttpMethodChars);
       if (bad != absl::string_view::npos) {
         // The method must be non-empty and terminated by ASCII whitespace.
