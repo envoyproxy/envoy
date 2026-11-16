@@ -194,11 +194,11 @@ jobs:
           # (`vars.ENVOY_PUBLISH_VM`), and its remote builds with more jobs (`vars.ENVOY_PUBLISH_JOBS`)
           # at the highest remote execution priority (`vars.ENVOY_PUBLISH_PRIORITY`). The version is
           # the requested commit's, so only for a trusted request, or a pull request by a member of
-          # the repo, or from a branch in it (eg the publishing app's release PRs). A pull request
-          # labelled `ci:fastpublish` (by a maintainer) also publishes as fast as it can.
-          | (((.request.trusted or $publishMember)
-              and ((.request.version.dev | not) or $publishFast))
-             or $publishLabelled) as $publishRelease
+          # the repo, or from a branch in it (eg the publishing app's release PRs). Such a pull request
+          # labelled `ci:fastpublish` (by a maintainer) also publishes as fast as it can; on anyone
+          # else's, the label (which stays on for every later push) does nothing.
+          | ((.request.trusted or $publishMember)
+             and ((.request.version.dev | not) or $publishFast or $publishLabelled)) as $publishRelease
           | .config.ci["agent-publish"] = (
               if $publishRelease then $publishVM else .config.ci["agent-ubuntu"] end)
           | .config.ci["publish-jobs"] = (

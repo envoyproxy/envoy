@@ -166,7 +166,7 @@ jobs:
     - container
     - github
     - sign
-    runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
+    runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     steps:
     - uses: envoyproxy/toolshed/actions/appauth@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
       id: appauth
