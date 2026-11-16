@@ -254,6 +254,7 @@ proto_library(
         "//envoy/extensions/filters/http/mcp_router/v3:pkg",
         "//envoy/extensions/filters/http/oauth2/v3:pkg",
         "//envoy/extensions/filters/http/on_demand/v3:pkg",
+        "//envoy/extensions/filters/http/orca_reporter/v3:pkg",
         "//envoy/extensions/filters/http/original_src/v3:pkg",
         "//envoy/extensions/filters/http/priority_load_shed/v3:pkg",
         "//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg",
