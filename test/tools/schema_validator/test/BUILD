@@ -16,7 +16,7 @@ envoy_cc_test(
     ],
     rbe_pool = "linux_x64_small",
     deps = [
-        "//test/tools/schema_validator:schema_validator_lib",
+        "//tools/schema_validator:schema_validator_lib",
     ],
 )
 
