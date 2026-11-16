@@ -96,6 +96,45 @@ stats_tags:
     }
   }
 
+  void accessHistograms() {
+    for (const auto& name : stat_names_) {
+      store_.rootScope()->histogramFromStatName(name->statName(), Stats::Histogram::Unit::Bytes);
+    }
+  }
+
+  void accessHistogramsInNewScopes(uint32_t num_scopes) {
+    std::vector<Stats::ScopeSharedPtr> scopes;
+    for (uint32_t i = 0; i < num_scopes; ++i) {
+      auto scope = store_.createScope("");
+      for (const auto& name : stat_names_) {
+        scope->histogramFromStatName(name->statName(), Stats::Histogram::Unit::Bytes);
+      }
+      scopes.push_back(std::move(scope));
+    }
+  }
+
+  void prepareHistogramRecords() {
+    histogram_scope_ = store_.createScope("");
+    for (const auto& name : stat_names_) {
+      histograms_.push_back(&histogram_scope_->histogramFromStatName(
+          name->statName(), Stats::Histogram::Unit::Bytes));
+    }
+  }
+
+  void recordHistograms() {
+    for (auto* histogram : histograms_) {
+      histogram->recordValue(42);
+    }
+  }
+
+  void clearHistogramRecords() {
+    histograms_.clear();
+    histogram_scope_.reset();
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  uint64_t numHistograms() const { return store_.histograms().size(); }
+
   uint64_t numCounters() const {
     uint64_t count = 0;
     heap_alloc_.forEachCounter([&count](size_t size) { count = size; }, [](Stats::Counter&) {});
@@ -130,6 +169,8 @@ private:
   Api::ApiPtr api_;
   envoy::config::metrics::v3::StatsConfig stats_config_;
   std::vector<std::unique_ptr<Stats::StatNameManagedStorage>> stat_names_;
+  Stats::ScopeSharedPtr histogram_scope_;
+  std::vector<Stats::Histogram*> histograms_;
 };
 
 } // namespace Envoy
@@ -226,6 +267,50 @@ static void BM_StatsNewScopeDefaultTags(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * 1000);
 }
 BENCHMARK(BM_StatsNewScopeDefaultTags);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_HistogramsRepeatedScopesCustomRegex(benchmark::State& state) {
+  Envoy::ThreadLocalStorePerf context;
+  context.initCustomRegexTags();
+  context.accessHistograms();
+  for (auto _ : state) { // NOLINT
+    context.accessHistogramsInNewScopes(7);
+  }
+  state.counters["retained_histograms"] = context.numHistograms();
+  state.SetItemsProcessed(state.iterations() * 7000);
+}
+BENCHMARK(BM_HistogramsRepeatedScopesCustomRegex);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_HistogramsNewScopeCustomRegex(benchmark::State& state) {
+  Envoy::ThreadLocalStorePerf context;
+  context.initCustomRegexTags();
+  for (auto _ : state) { // NOLINT
+    context.accessHistogramsInNewScopes(1);
+  }
+  state.counters["retained_histograms"] = context.numHistograms();
+  state.SetItemsProcessed(state.iterations() * 1000);
+}
+BENCHMARK(BM_HistogramsNewScopeCustomRegex);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_HistogramsFirstRecordCustomRegex(benchmark::State& state) {
+  Envoy::ThreadLocalStorePerf context;
+  context.initCustomRegexTags();
+  context.initThreading();
+  for (auto _ : state) { // NOLINT
+    state.PauseTiming();
+    context.prepareHistogramRecords();
+    state.ResumeTiming();
+    context.recordHistograms();
+    state.PauseTiming();
+    context.clearHistogramRecords();
+    state.ResumeTiming();
+  }
+  state.counters["retained_histograms"] = context.numHistograms();
+  state.SetItemsProcessed(state.iterations() * 1000);
+}
+BENCHMARK(BM_HistogramsFirstRecordCustomRegex);
 
 // TODO(jmarantz): add multi-threaded variant of this test, that aggressively
 // looks up stats in multiple threads to try to trigger contention issues.
