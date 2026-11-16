@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "eventstream_parser_test",
     srcs = ["eventstream_parser_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/common/aws/eventstream:eventstream_parser_lib",
         "//test/test_common:status_utility_lib",
@@ -23,6 +24,7 @@ envoy_cc_fuzz_test(
     name = "eventstream_parser_fuzz_test",
     srcs = ["eventstream_parser_fuzz_test.cc"],
     corpus = "eventstream_parser_corpus",
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/common/aws/eventstream:eventstream_parser_lib",
     ],

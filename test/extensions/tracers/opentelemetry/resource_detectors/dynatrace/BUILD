@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
@@ -32,7 +38,7 @@ envoy_extension_cc_test(
         "dynatrace_resource_detector_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:dynatrace_resource_detector_lib",
@@ -48,7 +54,14 @@ envoy_extension_cc_test(
         "dynatrace_resource_detector_integration_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11300MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",

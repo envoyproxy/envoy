@@ -17,7 +17,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["original_dst_fuzz_test.cc"],
     corpus = "original_dst_corpus",
     extension_names = ["envoy.filters.listener.original_dst"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
+    },
     deps = [
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
@@ -31,7 +34,14 @@ envoy_extension_cc_test(
         "original_dst_integration_test.cc",
     ],
     extension_names = ["envoy.filters.listener.original_dst"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11186MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -51,7 +61,10 @@ envoy_extension_cc_test(
     name = "original_dst_test",
     srcs = ["original_dst_test.cc"],
     extension_names = ["envoy.filters.listener.original_dst"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/network:listener_filter_buffer_lib",

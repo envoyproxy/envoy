@@ -17,7 +17,13 @@ envoy_extension_cc_test(
         "header_mutation_test.cc",
     ],
     extension_names = ["envoy.filters.http.header_mutation"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/header_mutation:config",
@@ -33,7 +39,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.header_mutation"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/header_mutation:config",
@@ -53,7 +65,17 @@ envoy_extension_cc_test(
         "envoy.filters.http.header_mutation",
         "envoy.formatter.cel",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -70,7 +92,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["header_mutation_integration_test.cc"],
     extension_names = ["envoy.filters.http.header_mutation"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/header_mutation:config",

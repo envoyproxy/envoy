@@ -16,7 +16,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.stat_sinks.hystrix"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
@@ -33,7 +39,13 @@ envoy_extension_cc_test(
     name = "hystrix_test",
     srcs = ["hystrix_test.cc"],
     extension_names = ["envoy.stat_sinks.hystrix"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:stats_lib",
@@ -53,7 +65,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = envoy_select_admin_functionality(["hystrix_integration_test.cc"]),
     extension_names = ["envoy.stat_sinks.hystrix"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/stat_sinks/hystrix:config",
         "//test/integration:http_protocol_integration_lib",

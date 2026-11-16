@@ -15,6 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/mocks/server:factory_context_mocks",
@@ -27,6 +34,10 @@ envoy_extension_cc_test(
     name = "mcp_json_rest_bridge_filter_test",
     srcs = ["mcp_json_rest_bridge_filter_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -42,7 +53,10 @@ envoy_extension_cc_test(
     name = "endpoint_keyed_filtering_test",
     srcs = ["endpoint_keyed_filtering_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -58,6 +72,7 @@ envoy_extension_cc_test(
     name = "http_request_builder_test",
     srcs = ["http_request_builder_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:http_request_builder_lib",
         "//test/test_common:status_utility_lib",
@@ -69,6 +84,12 @@ envoy_extension_cc_test(
     name = "mcp_json_rest_bridge_integration_test",
     srcs = ["mcp_json_rest_bridge_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/integration:fake_access_log_lib",
@@ -84,6 +105,7 @@ envoy_extension_cc_test(
     name = "trace_context_test",
     srcs = ["trace_context_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:trace_context_lib",
         "@nlohmann_json//:json",
@@ -94,6 +116,7 @@ envoy_extension_cc_test(
     name = "sse_response_extractor_test",
     srcs = ["sse_response_extractor_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:sse_response_extractor_lib",
         "//test/test_common:status_utility_lib",

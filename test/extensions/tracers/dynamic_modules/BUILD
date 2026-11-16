@@ -16,6 +16,13 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:tracer_config_fail",
         "//test/extensions/dynamic_modules/test_data/c:tracer_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/tracers/dynamic_modules:config",
@@ -38,6 +45,10 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:tracer_no_op_no_reserve_tags",
         "//test/extensions/dynamic_modules/test_data/c:tracer_with_values",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/tracers/dynamic_modules:tracer_config_lib",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -54,6 +65,10 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:tracer_no_op",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/tracers/dynamic_modules:abi_impl",
         "//source/extensions/tracers/dynamic_modules:tracer_config_lib",

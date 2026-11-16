@@ -9,7 +9,17 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -42,7 +52,12 @@ envoy_cc_test(
         "//test/config_test:configs_test_setup.sh",
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/common:logger",
         "//source/extensions/access_loggers/stream:config",
@@ -72,7 +87,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_test",
     srcs = ["dispatcher_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
@@ -92,6 +107,14 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 25754MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "tsan": {"link": "linux_x64_large"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
+    },
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
@@ -135,7 +158,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xds_verifier_test",
     srcs = ["xds_verifier_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         ":xds_verifier_lib",
         "//test/config:utility_lib",
@@ -146,7 +169,7 @@ envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
@@ -167,7 +190,14 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 13921MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
+    },
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",

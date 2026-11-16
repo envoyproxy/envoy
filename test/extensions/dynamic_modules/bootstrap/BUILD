@@ -33,6 +33,13 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_timer_fired",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_worker_initialized",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -52,6 +59,13 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -85,6 +99,13 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -106,6 +127,13 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_new",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
@@ -137,6 +165,12 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",

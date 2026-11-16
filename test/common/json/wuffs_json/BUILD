@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "parser_config_test",
     srcs = ["parser_config_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/json/wuffs_json:parser_config_lib",
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
@@ -21,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wuffs_json_cursor_test",
     srcs = ["wuffs_json_cursor_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
         "//test/test_common:status_utility_lib",
@@ -31,7 +33,7 @@ envoy_cc_fuzz_test(
     name = "wuffs_json_cursor_fuzz_test",
     srcs = ["wuffs_json_cursor_fuzz_test.cc"],
     corpus = "wuffs_json_cursor_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:macros",

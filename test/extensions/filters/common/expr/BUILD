@@ -21,7 +21,16 @@ envoy_extension_cc_test(
     srcs = ["context_test.cc"],
     data = [":test_data/flatbuffers_out"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
@@ -50,7 +59,10 @@ envoy_extension_cc_test(
     name = "evaluator_test",
     srcs = ["evaluator_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
@@ -64,7 +76,17 @@ envoy_extension_cc_test(
     name = "cel_config_test",
     srcs = ["cel_config_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
@@ -88,7 +110,11 @@ envoy_cc_fuzz_test(
     name = "evaluator_fuzz_test",
     srcs = ["evaluator_fuzz_test.cc"],
     corpus = "evaluator_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":evaluator_fuzz_proto_cc_proto",
@@ -102,7 +128,7 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "expr_context_benchmark",
     srcs = ["expr_context_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/router:string_accessor_lib",
@@ -140,7 +166,7 @@ envoy_extension_cc_test(
     srcs = ["flatbuffers_backed_cel_map_test.cc"],
     data = [":test_data/flatbuffers_out"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/expr:flatbuffers_backed_cel_map_lib",

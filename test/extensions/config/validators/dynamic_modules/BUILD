@@ -15,7 +15,13 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:config_validator_test",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/config:decoded_resource_lib",
@@ -41,7 +47,14 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:config_validator_test",
     ],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 11460MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

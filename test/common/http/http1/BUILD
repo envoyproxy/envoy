@@ -14,7 +14,7 @@ envoy_package()
 envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/http/http1:header_formatter_lib",
     ],
@@ -23,7 +23,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
@@ -53,7 +59,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "balsa_parser_test",
     srcs = ["balsa_parser_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/http/http1:balsa_parser_lib",
         "//test/test_common:test_runtime_lib",
@@ -63,7 +69,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "balsa_parser_benchmark",
     srcs = ["balsa_parser_benchmark_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/http1:balsa_parser_lib",
         "@benchmark",
@@ -78,7 +83,16 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -107,7 +121,17 @@ envoy_cc_fuzz_test(
     name = "http1_connection_fuzz_test",
     srcs = ["http1_connection_fuzz_test.cc"],
     corpus = "http1_connection_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "tsan": {"build": "default"},
+        "msan": {"build": "default"},
+        "fuzz_coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",

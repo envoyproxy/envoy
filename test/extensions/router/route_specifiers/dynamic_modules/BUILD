@@ -27,7 +27,13 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_unknown_status",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/router:config_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -53,7 +59,12 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:route_specifier_shadow",
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/router/route_specifiers/dynamic_modules:config",
         "//test/integration:http_integration_lib",

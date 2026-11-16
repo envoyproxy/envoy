@@ -16,7 +16,13 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["http_client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:http_service_headers_lib",
@@ -31,7 +37,27 @@ envoy_extension_cc_test(
     name = "ext_proc_http_integration_test",
     srcs = ["ext_proc_http_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_medium",
+    # linux_x64_xlarge: the coverage link peaks at 11675MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"test": "linux_x64_medium"},
+        "gcc": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+    },
     shard_count = 8,
     tags = [
         "cpu:3",

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "extractor_test",
     srcs = ["extractor_test.cc"],
     extension_names = ["envoy.http.ai_filters.request_info"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.http.ai_filters.request_info"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/router:string_accessor_interface",
         "//source/common/router:string_accessor_lib",
@@ -55,7 +55,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.request_info"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -77,7 +83,16 @@ envoy_extension_cc_test(
         "envoy.http.ai_filters.request_info",
         "envoy.filters.http.ai_protocol_manager",
     ],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11869MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/ext_proc:config",

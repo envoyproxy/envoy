@@ -38,7 +38,17 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
@@ -68,7 +78,17 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -105,7 +125,14 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11673MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -133,6 +160,7 @@ envoy_extension_cc_benchmark_binary(
         ":scrubber_test_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
@@ -164,6 +192,13 @@ envoy_extension_cc_fuzz_test(
     srcs = ["filter_fuzz_test.cc"],
     corpus = "fuzz_corpus",
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/common:assert_lib",

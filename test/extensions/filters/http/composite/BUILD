@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.composite"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",
@@ -40,7 +46,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["composite_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.composite"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     shard_count = 6,
     deps = [
         "//source/common/http:header_map_lib",

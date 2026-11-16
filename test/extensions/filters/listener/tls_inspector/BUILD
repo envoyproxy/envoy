@@ -20,7 +20,7 @@ envoy_extension_cc_test(
     name = "ja4_fingerprint_test",
     srcs = ["ja4_fingerprint_test.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
@@ -32,7 +32,10 @@ envoy_extension_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -53,7 +56,10 @@ envoy_extension_cc_test(
     name = "tls_inspector_ja4_test",
     srcs = ["tls_inspector_ja4_test.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
@@ -85,7 +91,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["tls_inspector_fuzz_test.cc"],
     corpus = "tls_inspector_corpus",
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
+    },
     deps = [
         ":tls_inspector_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
@@ -97,7 +106,7 @@ envoy_extension_cc_benchmark_binary(
     name = "tls_inspector_benchmark",
     srcs = ["tls_inspector_benchmark.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -139,7 +148,11 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",

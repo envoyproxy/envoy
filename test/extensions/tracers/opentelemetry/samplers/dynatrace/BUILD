@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
@@ -38,7 +44,13 @@ envoy_extension_cc_test(
         "trace_capture_reason_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:dynatrace_sampler_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -55,7 +67,14 @@ envoy_extension_cc_test(
         "dynatrace_sampler_integration_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11359MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",
