@@ -476,6 +476,105 @@ TEST_P(HttpInspectorTest, FastFailGuardDisabled) {
   testHttpInspectMultipleReadsNotFound(header);
 }
 
+TEST_P(HttpInspectorTest, FastFailGuardDisabledStall) {
+  if (parser_impl_ != Http1ParserImpl::BalsaParser) {
+    return;
+  }
+  // With the guard off, the beginning of an LDAP anonymous bind below (a
+  // token byte followed by a whitespace BER length byte and more bytes the
+  // parser treats as first-line separators) stalls inside the deferred
+  // request-line validation: no island content and no line terminator ever
+  // arrive, so the filter keeps waiting for more data.
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes", "false"}});
+  init();
+
+  const char data[] = {0x30, 0x0c, 0x02, 0x01, 0x01};
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= sizeof(data));
+        memcpy(buffer, data, sizeof(data));
+        return Api::SysCallSizeResult{ssize_t(sizeof(data)), 0};
+      })
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= sizeof(data));
+        memcpy(buffer, data, sizeof(data));
+        return Api::SysCallSizeResult{ssize_t(sizeof(data)), 0};
+      })
+      .WillRepeatedly(Return(Api::SysCallSizeResult{ssize_t(0), 0}));
+#endif
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
+  auto status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+}
+
+TEST_P(HttpInspectorTest, NonHttpPayloadAfterWhitespace) {
+  // Regression test for https://github.com/envoyproxy/envoy/issues/49322:
+  // an LDAPv3 anonymous simple bind starts with a token byte followed by a
+  // BER length byte that is ASCII whitespace, so it slipped through the
+  // first-byte fast-fail and stalled the filter.
+  const char data[] = {0x30, 0x0c, 0x02, 0x01, 0x01, 0x60, 0x07,
+                       0x02, 0x01, 0x03, 0x04, 0x00, static_cast<char>(0x80), 0x00};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, NonHttpPayloadAfterSpaceSeparator) {
+  // The same stall shape with a BER length byte that is an ASCII space.
+  const char data[] = {0x30, 0x20, 0x02, 0x01, 0x01, 0x60, 0x1b, 0x02, 0x01, 0x03, 0x04,
+                       0x14, 0x63, 0x6e, 0x3d, 0x75, 0x73, 0x65, 0x72, 0x2c, 0x64, 0x63,
+                       0x3d, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2c, 0x64,
+                       static_cast<char>(0x80), 0x00};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, NonHttpPayloadAfterAlphaTargetStart) {
+  // The same shape but with an alpha byte after the whitespace run; it
+  // passes the request-target start check and is rejected by the version
+  // word check.
+  const char data[] = {0x30, 0x0c, 0x02, 0x01, 0x01, 0x63, 0x07,
+                       0x02, 0x01, 0x03, 0x04, 0x00, static_cast<char>(0x80), 0x00};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, NonHttpPayloadControlLength) {
+  // Control case: the reporter's bind with a two-character DN has a BER
+  // length byte that is not whitespace and already fast-failed.
+  const char data[] = {0x30, 0x0e, 0x02, 0x01, 0x01, 0x60, 0x09, 0x02,
+                       0x01, 0x03, 0x04, 0x02, 0x61, 0x62, static_cast<char>(0x80), 0x00};
+  const absl::string_view header(data, sizeof(data));
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, SimpleRequestLineWithoutVersion) {
+  // `method SP request-target` alone is a valid simple request and must
+  // keep working.
+  const absl::string_view header = "GET /index\r\n";
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http10);
+}
+
+TEST_P(HttpInspectorTest, ConnectRequestWithIpv6Target) {
+  // CONNECT's authority-form target may start with '['; it must not be
+  // fast-failed.
+  const absl::string_view header = "CONNECT [::1]:443 HTTP/1.1\r\n";
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
+}
+
+TEST_P(HttpInspectorTest, OptionsAsteriskTarget) {
+  const absl::string_view header = "OPTIONS * HTTP/1.1\r\n";
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
+}
+
 TEST_P(HttpInspectorTest, InvalidHttpRequestLine) {
   const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
