@@ -38,7 +38,7 @@ constexpr bool isFirstLineWhitespace(char c) { return static_cast<uint8_t>(c) <=
 
 // Characters a CONNECT request-target (authority-form host) may start with,
 // mirroring the host characters the HTTP/1 request-target validation accepts.
-constexpr bool isValidConnectTargetChar(char c) {
+bool isValidConnectTargetChar(char c) {
   return absl::ascii_isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
          c == '(' || c == ')' || c == '*' || c == '+' || c == ',' || c == '-' || c == '.' ||
          c == ':' || c == ';' || c == '=' || c == '@' || c == '[' || c == ']' || c == '_' ||
@@ -47,7 +47,7 @@ constexpr bool isValidConnectTargetChar(char c) {
 
 // Whether character `c` at offset `offset` of the version word can still be
 // part of a "HTTP/x.y" version.
-constexpr bool isValidVersionChar(size_t offset, char c) {
+bool isValidVersionChar(size_t offset, char c) {
   if (offset < kHttpVersionPrefix.size()) {
     return c == kHttpVersionPrefix[offset];
   }
