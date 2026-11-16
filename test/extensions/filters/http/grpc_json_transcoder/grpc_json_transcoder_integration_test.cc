@@ -203,6 +203,9 @@ typed_config:
     if (fake_upstream_connection_) {
       ASSERT_TRUE(fake_upstream_connection_->close());
       ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+      // Wait for Envoy to drop the closed connection from its pool so a following request in
+      // the same test opens a new upstream connection rather than reusing the dead one.
+      test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", testing::Eq(0));
     }
   }
 
