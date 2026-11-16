@@ -61,9 +61,15 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
     a specifically versioned package, or the latest for that minor version.
     """
 
+    # The deb data is gzipped (`data.tar.gz` in the debs, which every dpkg reads), with all the cores:
+    # the debs are a fraction of the size, and so quicker to package, checksum, sign and upload.
+
     # generate deb data for all packages
     pkg_tar(
         name = "deb-data",
+        compressor = "@envoy_toolshed//pigz",
+        compressor_args = "-n",
+        extension = "tar.gz",
         srcs = [
             "//distribution/debian:copyright",
             config,
@@ -76,6 +82,9 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files, contri
     # generate deb data for all contrib packages
     pkg_tar(
         name = "contrib-deb-data",
+        compressor = "@envoy_toolshed//pigz",
+        compressor_args = "-n",
+        extension = "tar.gz",
         srcs = [
             "//distribution/debian:copyright",
             config,
