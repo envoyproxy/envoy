@@ -55,7 +55,7 @@ typed_config:
   // Diagnostics for a rare CI flake where the fake upstream never sees a new connection: shows
   // whether the request was answered locally or upstream (e.g. on a stale pooled connection), or
   // never left Envoy.
-  void dumpMissingUpstreamConnection(IntegrationStreamDecoder& response) {
+  std::string dumpMissingUpstreamConnection(IntegrationStreamDecoder& response) {
     std::string dump = "downstream response: ";
     if (response.waitForEndStream(std::chrono::milliseconds(500))) {
       absl::StrAppend(&dump, "status=", response.headers().getStatusValue(),
@@ -76,7 +76,7 @@ typed_config:
         absl::StrAppend(&dump, "\n  ", gauge->name(), ": ", gauge->value());
       }
     }
-    ADD_FAILURE() << dump;
+    return dump;
   }
 
   template <class RequestType, class ResponseType>
@@ -103,12 +103,9 @@ typed_config:
     }
 
     if (expect_connection_to_upstream) {
-      testing::AssertionResult connected =
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-      if (!connected) {
-        dumpMissingUpstreamConnection(*response);
-      }
-      ASSERT_TRUE(connected);
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_))
+          << dumpMissingUpstreamConnection(*response);
     }
 
     if (!expected_grpc_request_messages.empty() || !expected_upstream_request_body.empty()) {
