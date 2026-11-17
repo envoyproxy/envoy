@@ -799,6 +799,22 @@ config_setting(
     define_values = {"engflow_rbe": "true"},
 )
 
+# Set (by `//distribution/binary:compiler.bzl`) for an arm64 build that runs on arm64 workers from
+# another host: what such a build runs from the LLVM distribution has to be the arm64 one
+# (`@llvm_toolchain_arm64_llvm`), not the host's (`@llvm_toolchain_llvm`).
+bool_flag(
+    name = "arm64-workers",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "arm64_workers",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {":arm64-workers": "true"},
+    visibility = ["//visibility:public"],
+)
+
 # Set by `ci/do_ci.sh release.multiarch`, which builds both arches from an x64 host: on EngFlow,
 # their actions run on x86_64 workers, whichever arch they target.
 bool_flag(
