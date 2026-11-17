@@ -15,7 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = envoy_select_enable_http3(["envoy_quic_alarm_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_alarm_lib",
@@ -29,7 +29,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_clock_test",
     srcs = envoy_select_enable_http3(["envoy_quic_clock_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -41,7 +41,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = envoy_select_enable_http3(["envoy_quic_writer_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/network:io_socket_error_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
@@ -56,7 +56,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
@@ -76,7 +76,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_filter_manager_connection_impl_test",
     srcs = envoy_select_enable_http3(["quic_filter_manager_connection_impl_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/mocks/event:event_mocks",
@@ -89,7 +89,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = envoy_select_enable_http3(["quic_stat_names_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/stats:stats_lib",
@@ -101,7 +101,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_verifier_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
@@ -119,7 +119,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_stream_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//source/common/http:headers_lib",
@@ -141,7 +141,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_client_stream_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//source/common/http:headers_lib",
@@ -162,7 +162,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_session_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_session_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
         ":test_utils_lib",
@@ -192,7 +192,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_session_test",
     srcs = envoy_select_enable_http3(["envoy_quic_client_session_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
@@ -221,7 +221,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = envoy_select_enable_http3(["active_quic_listener_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
         ":test_utils_lib",
@@ -249,7 +249,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_dispatcher_test",
     srcs = envoy_select_enable_http3(["envoy_quic_dispatcher_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
         ":test_utils_lib",
@@ -296,7 +296,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "client_connection_factory_impl_test",
     srcs = envoy_select_enable_http3(["client_connection_factory_impl_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
@@ -321,7 +321,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = envoy_select_enable_http3(["quic_io_handle_wrapper_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//test/mocks/api:api_mocks",
@@ -334,7 +334,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_utils_test",
     srcs = envoy_select_enable_http3(["envoy_quic_utils_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/runtime:runtime_lib",
@@ -347,7 +347,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_simulated_watermark_buffer_test",
     srcs = envoy_select_enable_http3(["envoy_quic_simulated_watermark_buffer_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3(["//source/common/quic:envoy_quic_simulated_watermark_buffer_lib"]),
 )
 
@@ -380,7 +380,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
@@ -395,7 +395,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_datagram_handler_test",
     srcs = envoy_select_enable_http3(["http_datagram_handler_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:http_datagram_handler",
         "//test/mocks/buffer:buffer_mocks",
@@ -422,7 +422,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "envoy_deterministic_connection_id_generator_test",
     srcs = envoy_select_enable_http3(["envoy_deterministic_connection_id_generator_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":connection_id_matchers",
         "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
@@ -451,7 +451,7 @@ envoy_cc_fuzz_test(
     name = "envoy_quic_h3_fuzz_test",
     srcs = ["envoy_quic_h3_fuzz_test.cc"],
     corpus = "envoy_quic_h3_fuzz_test_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["nofips"],
     deps = [
         ":envoy_quic_h3_fuzz_helper_lib",

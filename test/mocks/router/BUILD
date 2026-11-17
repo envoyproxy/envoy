@@ -12,7 +12,7 @@ envoy_cc_mock(
     name = "router_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/formatter:substitution_formatter_interface",
@@ -45,7 +45,7 @@ envoy_cc_mock(
     name = "router_filter_interface",
     srcs = ["router_filter_interface.cc"],
     hdrs = ["router_filter_interface.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:router_lib",
         "//test/mocks/http:http_mocks",

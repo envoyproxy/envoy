@@ -25,7 +25,7 @@ envoy_extension_cc_test(
     name = "on_demand_filter_test",
     srcs = ["on_demand_filter_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
@@ -43,7 +43,7 @@ envoy_extension_cc_test(
     name = "on_demand_integration_test",
     srcs = ["on_demand_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 4,
     tags = ["cpu:2"],
     deps = [
@@ -67,7 +67,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["odcds_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:macros",
         "//source/extensions/filters/http/on_demand:config",

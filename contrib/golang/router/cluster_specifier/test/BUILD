@@ -15,7 +15,7 @@ envoy_cc_test(
         "//contrib/golang/router/cluster_specifier/test/test_data/simple:plugin.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/golang/router/cluster_specifier/source:config",
         "//source/exe:main_common_lib",

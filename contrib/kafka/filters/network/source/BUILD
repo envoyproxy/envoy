@@ -114,7 +114,7 @@ envoy_cc_library(
         "external/responses.h",
         "kafka_response_parser.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":kafka_response_lib",
         ":parser_lib",

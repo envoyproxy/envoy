@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_test(
     name = "new_grpc_mux_impl_test",
     srcs = ["new_grpc_mux_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
@@ -43,7 +43,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -77,7 +77,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "delta_subscription_impl_test",
     srcs = ["delta_subscription_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":delta_subscription_test_harness",
         "//envoy/config:xds_config_tracker_interface",
@@ -101,7 +101,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "delta_subscription_state_test",
     srcs = ["delta_subscription_state_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/config_subscription/grpc:delta_subscription_state_lib",
@@ -143,7 +143,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "sotw_subscription_state_test",
     srcs = ["sotw_subscription_state_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:resource_name_lib",
         "//source/common/stats:isolated_store_lib",
@@ -164,7 +164,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_grpc_mux_impl_test",
     srcs = ["xds_grpc_mux_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resource_name_lib",
@@ -195,7 +195,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "grpc_stream_test",
     srcs = ["grpc_stream_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:grpc_stream_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -212,7 +212,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "pausable_ack_queue_test",
     srcs = ["pausable_ack_queue_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:pausable_ack_queue_lib",
     ],
@@ -221,7 +221,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "watch_map_test",
     srcs = ["watch_map_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//source/extensions/config_subscription/grpc:watch_map_lib",
@@ -237,7 +237,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_source_id_test",
     srcs = ["xds_source_id_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:xds_source_id_lib",
     ],
@@ -246,7 +246,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_resources_cache_impl_test",
     srcs = ["eds_resources_cache_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
         "//test/mocks/event:event_mocks",
@@ -266,7 +266,7 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "grpc_mux_failover_test",
     srcs = ["grpc_mux_failover_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":grpc_stream_mocks",
         "//source/extensions/config_subscription/grpc:grpc_mux_failover_lib",
@@ -283,7 +283,7 @@ envoy_cc_test(
     name = "xds_failover_integration_test",
     srcs =
         ["xds_failover_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
