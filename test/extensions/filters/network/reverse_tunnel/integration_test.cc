@@ -1045,6 +1045,57 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelDrainIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ReverseTunnelDrainIntegrationTest, HealthCheckFailureAndRecoveryKeepIdleTunnels) {
+  DISABLE_IF_ADMIN_DISABLED;
+  setDeterministicValue();
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->set_drain_type(envoy::config::listener::v3::Listener::DEFAULT);
+    auto* filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
+    ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
+    config.set_enable_drain_with_goaway(true);
+    ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
+  });
+  initialize();
+
+  FakeRawConnectionPtr first_tunnel;
+  FakeRawConnectionPtr second_tunnel;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(first_tunnel));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(second_tunnel));
+  completeReverseTunnelHandshake(*first_tunnel);
+  completeReverseTunnelHandshake(*second_tunnel);
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(2));
+
+  auto health_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/healthcheck/fail", "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(health_response->complete());
+  ASSERT_EQ("200", health_response->headers().getStatusValue());
+  // Exercise multiple maintenance intervals without creating an HTTP codec on either tunnel.
+  // Health-check failure must not repeatedly close and replace the idle pool.
+  for (int i = 0; i < 3; ++i) {
+    timeSystem().advanceTimeWait(std::chrono::seconds(15));
+    EXPECT_TRUE(first_tunnel->connected());
+    EXPECT_TRUE(second_tunnel->connected());
+    EXPECT_EQ(2, test_server_->gauge("http.reverse_connection_hcm.downstream_cx_active")->value());
+    EXPECT_EQ(2, test_server_->counter("http.reverse_connection_hcm.downstream_cx_total")->value());
+    EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
+  }
+
+  health_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/healthcheck/ok", "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(health_response->complete());
+  ASSERT_EQ("200", health_response->headers().getStatusValue());
+  timeSystem().advanceTimeWait(std::chrono::seconds(15));
+  EXPECT_TRUE(first_tunnel->connected());
+  EXPECT_TRUE(second_tunnel->connected());
+  EXPECT_EQ(2, test_server_->gauge("http.reverse_connection_hcm.downstream_cx_active")->value());
+  test_server_.reset();
+  ASSERT_TRUE(first_tunnel->waitForDisconnect());
+  ASSERT_TRUE(second_tunnel->waitForDisconnect());
+}
+
 TEST_P(ReverseTunnelDrainIntegrationTest, DrainClosesIdleTunnelsAndPreservesActiveConnectStreams) {
   using Http2Frame = Http::Http2::Http2Frame;
   DISABLE_IF_ADMIN_DISABLED;

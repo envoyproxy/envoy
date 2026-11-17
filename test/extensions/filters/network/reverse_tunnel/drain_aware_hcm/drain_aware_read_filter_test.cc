@@ -157,13 +157,61 @@ TEST_F(DrainAwareReadFilterTest, GradualDrainRetainsOriginalDeadline) {
   timer_->invokeCallback();
 }
 
-TEST_F(DrainAwareReadFilterTest, HealthCheckFailureClosesIdleDefaultListener) {
+class DrainAwareReadFilterHealthCheckTest : public DrainAwareReadFilterTest,
+                                            public testing::WithParamInterface<bool> {
+protected:
+  DrainAwareReadFilterHealthCheckTest() {
+    runtime_.mergeValues(
+        {{"envoy.reloadable_features.use_connection_event_drain", GetParam() ? "true" : "false"}});
+  }
+
+  TestScopedRuntime runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(DrainModes, DrainAwareReadFilterHealthCheckTest, testing::Bool());
+
+TEST_P(DrainAwareReadFilterHealthCheckTest, HealthCheckFailureAndRecoveryKeepIdleTunnelOpen) {
   auto filter = makeFilter();
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  EXPECT_CALL(callbacks_.connection_, close(_, _)).Times(0);
   ON_CALL(context_, healthCheckFailed()).WillByDefault(Return(true));
+  timer_->invokeCallback();
+  EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
+  EXPECT_TRUE(timer_->enabled());
+
+  ON_CALL(context_, healthCheckFailed()).WillByDefault(Return(false));
+  timer_->invokeCallback();
+  EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
+  EXPECT_TRUE(timer_->enabled());
+}
+
+TEST_P(DrainAwareReadFilterHealthCheckTest, HealthCheckFailureAllowsNewTunnelAndHttpCodecHandoff) {
+  ON_CALL(context_, healthCheckFailed()).WillByDefault(Return(true));
+  EXPECT_CALL(callbacks_.connection_, close(_, _)).Times(0);
+  auto filter = makeFilter();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  timer_->invokeCallback();
+  EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
+  EXPECT_TRUE(timer_->enabled());
+
+  Buffer::OwnedImpl data("first request");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data, false));
+  EXPECT_EQ("first request", data.toString());
+  EXPECT_FALSE(timer_->enabled());
+}
+
+TEST_P(DrainAwareReadFilterHealthCheckTest, ListenerDrainClosesIdleTunnelWhileHealthCheckFailed) {
+  ON_CALL(context_, healthCheckFailed()).WillByDefault(Return(true));
+  auto filter = makeFilter();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  drain();
+  if (!GetParam()) {
+    EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
+  }
   EXPECT_CALL(callbacks_.connection_,
               close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining"));
   timer_->invokeCallback();
+  EXPECT_EQ(Network::Connection::State::Closed, callbacks_.connection_.state());
 }
 
 TEST_F(DrainAwareReadFilterTest, HealthCheckFailureDoesNotDrainModifyOnlyListener) {
@@ -183,9 +231,8 @@ TEST_F(DrainAwareReadFilterTest, LegacyDrainUsesInboundScopeAndRejectsFirstReque
   TestScopedRuntime runtime;
   runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto filter = makeFilter(Network::DrainDirection::InboundOnly);
-  EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::InboundOnly))
-      .WillOnce(Return(false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  drain();
   EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::InboundOnly))
       .WillOnce(Return(true));
   EXPECT_CALL(callbacks_.connection_,
@@ -198,10 +245,13 @@ TEST_F(DrainAwareReadFilterTest, LegacyDrainPollsAllScope) {
   TestScopedRuntime runtime;
   runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto filter = makeFilter();
-  EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds::zero(), _)).Times(0);
   drain();
+  EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(100), _));
+  timer_->invokeCallback();
+  EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
   EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.connection_,
               close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining"));

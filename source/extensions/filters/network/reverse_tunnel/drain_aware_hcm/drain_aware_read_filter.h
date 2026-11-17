@@ -86,9 +86,10 @@ private:
       return;
     }
     const bool draining =
-        use_connection_event_drain_
-            ? Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_)
-            : drain_decision_.drainClose(drain_direction_);
+        connection_drain_event_.has_value() &&
+        (use_connection_event_drain_
+             ? Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_)
+             : drain_decision_.drainClose(drain_direction_));
     if (draining) {
       connection_->close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining");
       return;
