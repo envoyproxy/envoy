@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["health_checker_impl_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -41,11 +44,10 @@ envoy_extension_cc_test(
     srcs = ["health_checker_integration_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     tags = ["cpu:3"],
     deps = [

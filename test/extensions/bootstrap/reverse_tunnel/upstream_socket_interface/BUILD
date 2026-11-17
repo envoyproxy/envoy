@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_acceptor_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:utility_lib",
@@ -37,8 +40,11 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_acceptor_extension_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:socket_interface_lib",
@@ -61,8 +67,11 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_upstream_lifecycle_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/router:string_accessor_interface",
@@ -85,8 +94,11 @@ envoy_extension_cc_test(
     srcs = ["upstream_socket_manager_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/router:string_accessor_interface",
@@ -112,8 +124,11 @@ envoy_extension_cc_test(
     srcs = ["upstream_reverse_connection_io_handle_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:utility_lib",
@@ -134,8 +149,11 @@ envoy_extension_cc_test(
     srcs = ["config_validation_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/access_loggers/stream:config",

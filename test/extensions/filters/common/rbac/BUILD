@@ -17,8 +17,15 @@ envoy_extension_cc_test(
     srcs = ["matchers_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -45,8 +52,15 @@ envoy_extension_cc_test(
     srcs = ["engine_impl_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -70,8 +84,15 @@ envoy_extension_cc_test(
     srcs = ["utility_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [

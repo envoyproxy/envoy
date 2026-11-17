@@ -89,11 +89,8 @@ envoy_cc_test(
         "//test/config/integration:google_com_proxy_port_0",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
@@ -115,11 +112,8 @@ envoy_cc_test(
         "//test/config/integration:google_com_proxy_port_0",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
@@ -136,15 +130,14 @@ envoy_cc_test(
     name = "extra_extensions_test",
     size = "large",
     srcs = ["extra_extensions_test.cc"],
+    # linux_x64_xlarge: the coverage link peaks at 16381MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
-        "default": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_xlarge",
-        },
-        "tsan": {
-            "build": "linux_x64_large",
-            "link": "linux_x64_large",
-        },
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_large"},
+        "msan": {"link": "default"},
     },
     deps = [
         "//test/test_common:environment_lib",
@@ -186,15 +179,14 @@ envoy_cc_test(
         },
         "//conditions:default": {},
     }),
+    # linux_x64_xlarge: the coverage link peaks at 16386MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
-        "default": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_xlarge",
-        },
-        "tsan": {
-            "build": "linux_x64_large",
-            "link": "linux_x64_large",
-        },
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_large"},
+        "msan": {"link": "default"},
     },
     deps = [
         "//source/common/version:version_lib",

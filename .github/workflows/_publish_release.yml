@@ -89,9 +89,12 @@ jobs:
       actions: read
       contents: read
       packages: read
+    # With `release-publish-multiarch`, the release is signed in the build (`release.multiarch`).
     if: >-
       fromJSON(inputs.request).run.release
       && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+      && !(fromJSON(inputs.request).config.release-publish
+           && fromJSON(inputs.request).config.release-publish-multiarch)
     name: Sign packages
     uses: ./.github/workflows/_run.yml
     with:
@@ -203,7 +206,11 @@ jobs:
       && fromJSON(inputs.request).run.release
       && !fromJSON(inputs.request).request.version.dev
       && needs.container.result == 'success'
-      && needs.sign.result == 'success'
+      && (needs.sign.result == 'success'
+          || (needs.sign.result == 'skipped'
+              && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+              && fromJSON(inputs.request).config.release-publish
+              && fromJSON(inputs.request).config.release-publish-multiarch))
       && needs.docs-archive.result != 'failure'
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
@@ -242,7 +249,11 @@ jobs:
       !cancelled()
       && fromJSON(inputs.request).run.release
       && fromJSON(inputs.request).request.version.dev
-      && needs.sign.result == 'success'
+      && (needs.sign.result == 'success'
+          || (needs.sign.result == 'skipped'
+              && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+              && fromJSON(inputs.request).config.release-publish
+              && fromJSON(inputs.request).config.release-publish-multiarch))
       && needs.docs-archive.result != 'failure'
     name: github
     uses: ./.github/workflows/_run.yml
@@ -253,4 +264,5 @@ jobs:
       downloads: |
         release.signed: container/release.signed
       request: ${{ inputs.request }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       trusted: ${{ inputs.trusted }}

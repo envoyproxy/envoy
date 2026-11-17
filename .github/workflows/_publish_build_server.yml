@@ -7,6 +7,8 @@ on:
   workflow_call:
     secrets:
       dockerhub-token:
+      gpg-key:
+      gpg-key-password:
     inputs:
       arch:
         type: string
@@ -32,6 +34,9 @@ jobs:
   binary:
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
+      # Only staged when signing (`signing`, below).
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
     permissions:
       actions: read
       contents: read
@@ -42,8 +47,34 @@ jobs:
       arch: ${{ inputs.arch }}
       bazel-extra: >-
         --config=rbe
-      target: release.server_only
-      target-suffix: ${{ inputs.arch }}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && fromJSON(inputs.request).config.release-publish-multiarch
+            && fromJSON(inputs.request).run.release
+            && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+            && !inputs.trusted
+            && '--//distribution:signing-key=snakeoil'
+            || '' }}
+      # With `release-publish-multiarch`, sign the release of both arches in the same invocation
+      # (as the release Sign packages job does otherwise).
+      signing: >-
+        ${{ fromJSON(inputs.request).config.release-publish
+            && fromJSON(inputs.request).config.release-publish-multiarch
+            && fromJSON(inputs.request).run.release
+            && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+            && true
+            || false }}
+      target: >-
+        ${{ fromJSON(inputs.request).config.release-publish
+            && (fromJSON(inputs.request).config.release-publish-multiarch
+                && 'release.multiarch'
+                || 'release.publish')
+            || 'release.server_only' }}
+      # With `release-publish-multiarch`, it builds every arch (on whichever host).
+      target-suffix: >-
+        ${{ !(fromJSON(inputs.request).config.release-publish
+              && fromJSON(inputs.request).config.release-publish-multiarch)
+            && inputs.arch
+            || '' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ inputs.arch }}
@@ -56,9 +87,32 @@ jobs:
             || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
+      # With `release-publish-multiarch`, only what the pipeline uses: the images of both arches (and
+      # the signed release, below).
       uploads: |
-        release.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/bin/, compression-level: 0}
+        ${{ !(fromJSON(inputs.request).config.release-publish
+              && fromJSON(inputs.request).config.release-publish-multiarch)
+            && format('release.{0}: {{path: container/envoy/{0}/bin/, compression-level: 0}}', inputs.arch)
+            || '' }}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && format('oci.{0}: {{path: container/envoy/{0}/build_images, compression-level: 0}}', inputs.arch)
+            || '' }}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && !fromJSON(inputs.request).config.release-publish-multiarch
+            && format('packages.{0}: {{path: container/envoy/{0}/packages, compression-level: 0}}', inputs.arch)
+            || '' }}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && fromJSON(inputs.request).config.release-publish-multiarch
+            && 'oci.arm64: {path: container/envoy/arm64/build_images, compression-level: 0}'
+            || '' }}
+        ${{ fromJSON(inputs.request).config.release-publish
+            && fromJSON(inputs.request).config.release-publish-multiarch
+            && fromJSON(inputs.request).run.release
+            && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+            && 'release.signed: {path: container/envoy/release.signed.tar.zst, compression-level: 0}'
+            || '' }}
 
+  # Branches whose binary jobs do not build the container images and packages (`release-publish`).
   docker:
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
@@ -67,6 +121,8 @@ jobs:
       contents: read
       packages: read
     name: Docker OCI
+    if: >-
+      !fromJSON(inputs.request).config.release-publish
     needs:
     - binary
     uses: ./.github/workflows/_run.yml
@@ -100,6 +156,8 @@ jobs:
       contents: read
       packages: read
     name: Packages
+    if: >-
+      !fromJSON(inputs.request).config.release-publish
     needs:
     - binary
     uses: ./.github/workflows/_run.yml

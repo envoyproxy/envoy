@@ -64,8 +64,11 @@ envoy_cc_test(
     name = "value_input_matcher_test",
     srcs = ["value_input_matcher_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/matcher:value_input_matcher_lib",
@@ -78,8 +81,11 @@ envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":test_utility_lib",

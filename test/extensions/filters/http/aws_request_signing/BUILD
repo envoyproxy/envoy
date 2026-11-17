@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     name = "aws_request_signing_filter_test",
     srcs = ["aws_request_signing_filter_test.cc"],
     extension_names = ["envoy.filters.http.aws_request_signing"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -30,8 +33,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.aws_request_signing"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/aws_request_signing:config",
@@ -46,8 +52,20 @@ envoy_extension_cc_test(
     srcs = ["aws_request_signing_integration_test.cc"],
     extension_names = ["envoy.filters.http.aws_request_signing"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -74,11 +92,10 @@ envoy_extension_cc_dyn_module_test(
         "envoy.filters.http.aws_request_signing",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/router:upstream_codec_filter_lib",

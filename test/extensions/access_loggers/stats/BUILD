@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["scope_provider_singleton_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:symbol_table_lib",
@@ -35,8 +38,11 @@ envoy_extension_cc_test(
     srcs = ["stats_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:stream_info_formatter_extension_lib",
@@ -65,11 +71,10 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.access_loggers.stats"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/access_loggers/stats:config",

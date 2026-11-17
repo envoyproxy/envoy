@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.extension_filters.process_ratelimit"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/access_log:access_log_lib",
@@ -49,15 +52,11 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.access_loggers.extension_filters.process_ratelimit"],
     rbe_pool = {
-        "asan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/access_loggers/filters/process_ratelimit:config",

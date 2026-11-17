@@ -26,8 +26,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.health_checkers.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -49,7 +52,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:health_checker_integration_test",
     ],
     extension_names = ["envoy.health_checkers.dynamic_modules"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/api:api_lib",
         "//source/common/config:metadata_lib",

@@ -31,8 +31,11 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ssl_certs_test_lib",
@@ -96,7 +99,12 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
@@ -104,7 +112,6 @@ envoy_cc_test(
             "build": "linux_x64_small",
             "test": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 10,
     deps = [
@@ -164,11 +171,15 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "msan": "linux_x64_small",
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "ssl_certs_test_lib",
@@ -210,8 +221,11 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "ssl_certs_test_lib",
@@ -345,8 +359,11 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ssl_socket_test",
@@ -370,8 +387,11 @@ envoy_cc_test(
     name = "handshaker_factory_test",
     srcs = ["handshaker_factory_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ssl_test_utils",
@@ -407,8 +427,11 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ssl_certs_test_lib",

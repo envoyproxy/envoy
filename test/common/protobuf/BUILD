@@ -69,8 +69,11 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":utility_test_protos_cc_proto",

@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/tracers/skywalking:config",
@@ -34,8 +37,11 @@ envoy_extension_cc_test(
     srcs = ["trace_segment_reporter_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":skywalking_test_helper",
@@ -71,8 +77,11 @@ envoy_extension_cc_test(
     srcs = ["tracer_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":skywalking_test_helper",
@@ -92,8 +101,11 @@ envoy_extension_cc_test(
     srcs = ["skywalking_tracer_impl_test.cc"],
     extension_names = ["envoy.tracers.skywalking"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":skywalking_test_helper",
