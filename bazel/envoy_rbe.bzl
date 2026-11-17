@@ -31,13 +31,15 @@ PLATFORM_RBE_POOL = "default"
 def _pool_spec(spec, config, test, link):
     """The exec properties for one configuration's pool spec: a name, or a build/link/test dict.
 
-    Every key the macro can set is set: `Pool` (compile, and every other execution group), for a C++
-    rule `cpp_link.Pool` (its link) and, for a test, `test.Pool`. The selects for the target-wide
-    spec and for the configuration's are unioned key by key, so a configuration's spec replaces the
-    target-wide one only if it sets every key the target-wide one did.
+    Every key the macro can set is set, to the platform default where the spec names no pool for it:
+    `Pool` (compile, and every other execution group), for a C++ rule `cpp_link.Pool` (its link)
+    and, for a test, `test.Pool`. The selects for the target-wide spec and for the configuration's
+    are unioned key by key, so a configuration's spec replaces the target-wide one only if it sets
+    every key the target-wide one did.
     """
     if type(spec) == type(""):
         build = spec
+        link_pool = spec
         test_pool = spec
     elif type(spec) != type({}):
         fail("rbe_pool: expected a pool name or a {build, link, test} dict for %r, got %r" % (config, spec))
@@ -48,10 +50,11 @@ def _pool_spec(spec, config, test, link):
         if "link" in spec and not link:
             fail("rbe_pool: a link pool for %r needs a C++ rule (with a `cpp_link` execution group)" % config)
         build = spec.get("build", PLATFORM_RBE_POOL)
+        link_pool = spec.get("link", PLATFORM_RBE_POOL)
         test_pool = spec.get("test", PLATFORM_RBE_POOL)
     props = {"Pool": build}
     if link:
-        props["cpp_link.Pool"] = spec.get("link", build) if type(spec) == type({}) else build
+        props["cpp_link.Pool"] = link_pool
     if test:
         props["test.Pool"] = test_pool
     return props
@@ -71,11 +74,9 @@ def envoy_exec_properties(
     coverage and asan).
 
     A pool spec is a pool name, which applies to every action of the target, as it always has, or a
-    dict with a `build` pool for its compile and link actions, a `link` pool for its link action if
-    that needs a different one, and/or a `test` pool for its test action. A build pool alone leaves
-    the test action on the platform default, and a test pool alone leaves the compile and link
-    actions there. A link pool without a build pool leaves the compile actions on the platform
-    default.
+    dict with a `build` pool for its compile actions, a `link` pool for its link action and/or a
+    `test` pool for its test action. Each action the dict does not name stays on the platform
+    default, so a target whose compiles and link both need a larger pool names both.
 
     `test` says whether the target has a test action (a `test` execution group). Without one, test
     pools are ignored. `link` says whether it is a C++ rule, whose link runs in a `cpp_link`
@@ -84,8 +85,8 @@ def envoy_exec_properties(
 
     Memory-heavy builds are the reason to pin a pool, so prefer naming the configuration and the
     actions that need it, e.g. `rbe_pool = {"msan": {"test": "linux_x64_large"}}` or
-    `rbe_pool = {"gcc": {"build": "linux_x64_medium"}}`, and a link pool where only the link needs
-    more, e.g. `rbe_pool = {"coverage": {"link": "linux_x64_large"}}`, over pinning everything.
+    `rbe_pool = {"gcc": {"build": "linux_x64_small", "link": "linux_x64_large"}}` or
+    `rbe_pool = {"coverage": {"link": "linux_x64_large"}}`, over pinning everything.
     """
     configs = [c for c, _ in _CONFIGS]
     if rbe_pool == None:
@@ -118,3 +119,16 @@ def envoy_exec_properties(
         if pool != None:
             props = props | select({setting: _pool_spec(pool, config, test, link), "//conditions:default": {}})
     return props
+
+def _without_link(spec):
+    if type(spec) != type({}):
+        return spec
+    return {k: v for k, v in spec.items() if k != "link"}
+
+def envoy_rbe_pool_without_link(rbe_pool):
+    """`rbe_pool` with its link pools dropped, for a non-C++ rule given a C++ target's pins."""
+    if type(rbe_pool) != type({}):
+        return rbe_pool
+    if not [k for k in rbe_pool if k not in ("build", "link", "test")]:
+        return _without_link(rbe_pool)
+    return {config: _without_link(spec) for config, spec in rbe_pool.items()}
