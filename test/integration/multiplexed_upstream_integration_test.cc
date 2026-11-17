@@ -601,6 +601,22 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
   mergeOptions(options);
+  // The retries below can open further HTTP/3 connections, which resume with 0-RTT. Until its
+  // handshake completes, such a connection is ready for early data without knowing the cached
+  // stream limit of 0, so a retry landing then is sent beyond the limit and fails a QUICHE_BUG.
+  // Disable early data, so that the retries wait for the handshake.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* early_data_policy = hcm.mutable_route_config()
+                                      ->mutable_virtual_hosts(0)
+                                      ->mutable_routes(0)
+                                      ->mutable_route()
+                                      ->mutable_early_data_policy();
+        envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+        early_data_policy->set_name("envoy.route.early_data_policy.default");
+        std::ignore = early_data_policy->mutable_typed_config()->PackFrom(config);
+      });
   initialize();
 
   // Create the client connection and send a request.
