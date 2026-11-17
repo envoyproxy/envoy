@@ -17,6 +17,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -908,6 +909,78 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
 
 // Tests that Envoy will automatically retry a GET request sent over early data if the upstream
 // rejects it with TooEarly response.
+// An upstream connection resumed with 0-RTT starts with the stream limit cached from the previous
+// connection, here 0. A request arriving while its handshake is still in progress must not be sent
+// as early data beyond that limit, which fails a QUICHE_BUG. The fake upstream is stalled so the
+// handshake can't complete while the request arrives.
+TEST_P(MultiplexedUpstreamIntegrationTest, ZeroRttRequestDuringHandshakeRespectsCachedStreamLimit) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    return;
+  }
+  // Start the fake upstream with 0 streams available.
+  upstreamConfig().http2_options_.mutable_max_concurrent_streams()->set_value(0);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
+  mergeOptions(options);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The first connection completes its handshake with no streams, then gets one. Its session
+  // ticket and transport parameters, with the limit of 0, are cached for 0-RTT.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  fake_upstream_connection_->updateConcurrentStreams(1);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_pending_total")->value());
+
+  // Stall the fake upstream so the next connection's handshake can't complete.
+  absl::Notification stalled;
+  absl::Notification release;
+  fake_upstreams_[0]->runOnDispatcherThread([&stalled, &release]() {
+    stalled.Notify();
+    release.WaitForNotification();
+  });
+  stalled.WaitForNotification();
+
+  // The second request opens a connection, which resumes with 0-RTT.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_with_0_rtt", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_pending_total", Eq(2));
+
+  // The third request arrives while the 0-RTT handshake is in progress. With a cached limit of 0 it
+  // has to wait, as the second request does.
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_pending_total", Eq(3));
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+
+  // Let the handshake complete. Neither request was sent as early data, so one is sent once the
+  // upstream grants a stream. The fake upstream can only grant one HTTP/3 stream per connection.
+  release.Notify();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  fake_upstream_connection_->updateConcurrentStreams(1);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", Eq(2));
+  // The other request is still waiting for a stream.
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
 #ifdef WIN32
   // TODO: debug why waiting on the 0-rtt upstream connection times out on Windows.

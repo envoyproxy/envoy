@@ -350,6 +350,12 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
   quic::QuicSpdyClientSession::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
   if (level == quic::ENCRYPTION_ZERO_RTT) {
     ENVOY_CONN_LOG(trace, "able to send early data", *this);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_zero_rtt_stream_limit")) {
+      // QUICHE applies the stream limit from the cached transport parameters after installing the
+      // 0-RTT key, and only reports it if it is above 0. Report that no streams are available yet,
+      // so the connection pool doesn't send early data streams with its default capacity.
+      OnCanCreateNewOutgoingStream(false);
+    }
     raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
   }
 }
