@@ -488,10 +488,9 @@ TEST_F(UpstreamRequestTest, CompletedCodecStreamIsNotResetOnDestroy) {
   UpstreamToDownstream* bridge = nullptr;
   setupUpstreamAndGetBridge(mock_upstream_ptr, bridge);
 
-  bridge->decodeHeaders(
-      std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestResponseHeaderMapImpl({{":status", "200"}})),
-      true);
+  bridge->decodeHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                            Http::TestResponseHeaderMapImpl({{":status", "200"}})),
+                        true);
 
   EXPECT_CALL(*mock_upstream_ptr, resetStream()).Times(0);
   upstream_request_.reset();
