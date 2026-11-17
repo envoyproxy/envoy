@@ -1,0 +1,6 @@
+body: "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"First part\"}]},\"index\":0}],\"modelVersion\":\"gemini-1.5-pro\"}\r\n\r\ndata: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\" second part\"}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":14,\"candidatesTokenCount\":9,\"thoughtsTokenCount\":3,\"cachedContentTokenCount\":2,\"totalTokenCount\":26},\"modelVersion\":\"gemini-1.5-pro\"}\r\n\r\n"
+fragmentation_seed: 18364758544493064721
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: GEMINI_GENERATE_CONTENT
+max_sse_event_size: 2047
+max_parsed_sse_events: 15

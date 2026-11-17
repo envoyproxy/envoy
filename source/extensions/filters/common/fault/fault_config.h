@@ -71,6 +71,7 @@ public:
 
   const std::string& responseBody() const { return response_body_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
+  bool dryRun() const { return dry_run_; }
 
 private:
   // Abstract abort provider.
@@ -148,6 +149,7 @@ private:
   AbortProviderPtr provider_;
   Router::HeaderParserPtr response_headers_parser_;
   const std::string response_body_;
+  const bool dry_run_;
 };
 
 using FaultAbortConfigPtr = std::unique_ptr<FaultAbortConfig>;

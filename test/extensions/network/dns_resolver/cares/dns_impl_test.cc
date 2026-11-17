@@ -1300,22 +1300,26 @@ TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
 
-  // Case 1: Negative TTL
+  // c-ares (>= 1.34.7) clamps TTLs that do not fit in a signed int to INT_MAX rather than letting
+  // them wrap negative, so an out-of-range record TTL never shortens the result.
+
+  // Case 1: Negative TTL on the A record; the CNAME TTL wins.
   server_->setRecordTtl(std::chrono::seconds(-5));
   server_->setCnameTtl(std::chrono::seconds(60));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Completed,
-                                             {"201.134.56.7"}, {}, std::chrono::seconds::zero()));
+                                             {"201.134.56.7"}, {}, std::chrono::seconds(60)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Case 2: TTL Overflow
+  // Case 2: TTL Overflow; both clamp to INT_MAX.
   server_->setRecordTtl(std::chrono::seconds(2147483648));
   server_->setCnameTtl(std::chrono::seconds(2147483648));
 
-  EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Completed,
-                                             {"201.134.56.7"}, {}, std::chrono::seconds::zero()));
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Completed, {"201.134.56.7"}, {},
+                                    std::chrono::seconds(2147483647)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Case 3: Max TTL
@@ -1571,6 +1575,10 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "127.0.0.1:53",
                                                 *stats_store_.rootScope());
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
+  // c-ares (>= 1.34.9) delivers the socket state callback when ares_getaddrinfo() returns, with
+  // the query already pending: onAresSocketStateChange() arms the timer before it creates the
+  // file event, and resolve() arms it again once the resolution has started.
+  EXPECT_CALL(*timer, enableTimer(_, _));
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
   EXPECT_NE(nullptr, resolveWithUnreferencedParameters("some.bad.domain.invalid",

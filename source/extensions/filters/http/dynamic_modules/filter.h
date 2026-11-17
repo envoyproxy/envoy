@@ -298,6 +298,11 @@ private:
   void destroy(OptRef<Event::Dispatcher> dispatcher = {});
 
   /**
+   * Removes the stream and reports its reset to the module, unless the filter is destroyed.
+   */
+  void reportHttpStreamReset(uint64_t stream_id);
+
+  /**
    * Registers this filter for downstream watermark callbacks once both decoder callbacks have been
    * set and the in-module filter has been constructed. Idempotent; safe to call from either
    * entry point regardless of which runs first.
@@ -388,6 +393,9 @@ private:
 
     // Track if this callback has already been cleaned up to avoid double cleanup.
     bool cleaned_up_ = false;
+
+    // Set when the module resets the stream.
+    bool reset_by_module_ = false;
 
   private:
     DynamicModuleHttpFilter& filter_;

@@ -7,6 +7,7 @@
 #include "envoy/upstream/locality.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
@@ -49,6 +50,15 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
   absl::Status initialize() override { return absl::OkStatus(); }
 
   DynamicModuleClusterHandleSharedPtr handle_;
+};
+
+/**
+ * Runs a cleanup when the main dispatcher destroys it on the main thread. Unlike posted callbacks,
+ * the dispatcher also destroys these when it shuts down.
+ */
+class MainThreadCleanup : public Event::DispatcherThreadDeletable, public Cleanup {
+public:
+  using Cleanup::Cleanup;
 };
 
 } // namespace
@@ -188,20 +198,22 @@ DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   }
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   // The lifecycle handle resets unregister from main-thread-owned notifiers. When the handle is
-  // destroyed on a worker thread, post the full teardown onto the main dispatcher.
+  // destroyed on a worker thread, defer the full teardown to the main dispatcher.
   if (!Thread::MainThread::isMainOrTestThread()) {
-    dispatcher.post([cluster = std::move(cluster)]() mutable {
-      cluster->server_initialized_handle_.reset();
-      cluster->shutdown_handle_.reset();
-      cluster->drain_handle_.reset();
-      cluster.reset();
-    });
+    dispatcher.deleteInDispatcherThread(
+        std::make_unique<MainThreadCleanup>([cluster = std::move(cluster)]() mutable {
+          cluster->server_initialized_handle_.reset();
+          cluster->shutdown_handle_.reset();
+          cluster->drain_handle_.reset();
+          cluster.reset();
+        }));
     return;
   }
   cluster->server_initialized_handle_.reset();
   cluster->shutdown_handle_.reset();
   cluster->drain_handle_.reset();
-  dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
+  dispatcher.deleteInDispatcherThread(std::make_unique<MainThreadCleanup>(
+      [cluster = std::move(cluster)]() mutable { cluster.reset(); }));
 }
 
 // =================================================================================================
@@ -217,38 +229,42 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                                               : nullptr),
       config_(std::move(config)),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
-      server_context_(context.serverFactoryContext()) {
-  // If the base cluster construction failed, do not run the module hook on an invalid cluster.
-  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+      server_context_(context.serverFactoryContext()) {}
 
+absl::Status DynamicModuleCluster::initializeInModuleCluster() {
   // Create the in-module cluster instance.
   in_module_cluster_ = config_->on_cluster_new_(config_->in_module_config_, this);
   if (in_module_cluster_ == nullptr) {
-    creation_status = absl::InvalidArgumentError("Failed to create in-module cluster instance");
-    return;
+    return absl::InvalidArgumentError("Failed to create in-module cluster instance");
   }
 
   // Initialize the priority set with an empty host set at priority 0.
   priority_set_.getOrCreateHostSet(0);
   // Allocate and seed the worker slot before worker threads can observe this cluster.
   ensureWorkerSlot();
+  for (const uint64_t event_id : worker_event_ids_from_on_cluster_new_) {
+    runOnAllWorkers(event_id);
+  }
+  worker_event_ids_from_on_cluster_new_.clear();
 
   registerLifecycleCallbacks();
+  return absl::OkStatus();
 }
 
 DynamicModuleCluster::~DynamicModuleCluster() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  // Cancel any pending HTTP callouts before destroying the cluster.
+  if (in_module_cluster_ != nullptr && config_->on_cluster_destroy_ != nullptr) {
+    config_->on_cluster_destroy_(in_module_cluster_);
+  }
+
+  // Cancel any pending HTTP callouts before destroying the cluster, including the ones that the
+  // destroy hook started.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
       callout.second->request_->cancel();
     }
   }
   http_callouts_.clear();
-
-  if (in_module_cluster_ != nullptr && config_->on_cluster_destroy_ != nullptr) {
-    config_->on_cluster_destroy_(in_module_cluster_);
-  }
 }
 
 void DynamicModuleCluster::registerLifecycleCallbacks() {
@@ -344,13 +360,46 @@ bool DynamicModuleCluster::applyPersistentHealthChange(const Upstream::HostShare
   return true;
 }
 
+void DynamicModuleCluster::initialize(std::function<absl::Status()> callback) {
+  // The callback refers to cluster manager state for this cluster, which is gone once the cluster
+  // manager released the cluster. Health checks can still finish the initialization after that.
+  ClusterImplBase::initialize([this, callback = std::move(callback)]() -> absl::Status {
+    return released_ || callback == nullptr ? absl::OkStatus() : callback();
+  });
+}
+
 void DynamicModuleCluster::startPreInit() {
   // Call the module's init function. The module is expected to call
   // envoy_dynamic_module_callback_cluster_pre_init_complete when ready.
   config_->on_cluster_init_(this, in_module_cluster_);
+  on_cluster_init_returned_ = true;
+  if (pre_init_complete_pending_) {
+    completePreInit();
+  }
 }
 
-void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
+void DynamicModuleCluster::preInitComplete() {
+  // Completing before on_cluster_init returns would create the load balancer while the module is
+  // still running.
+  if (!on_cluster_init_returned_) {
+    pre_init_complete_pending_ = true;
+    return;
+  }
+  // Completing in place can free the cluster that this one replaces while Envoy runs a callback
+  // list that holds it, such as the lifecycle or drain callbacks.
+  dispatcher_.post([weak_cluster = weak_from_this()]() {
+    if (std::shared_ptr<DynamicModuleCluster> cluster = weak_cluster.lock()) {
+      cluster->completePreInit();
+    }
+  });
+}
+
+void DynamicModuleCluster::completePreInit() {
+  // A released cluster must not start its health checks.
+  if (!released_) {
+    onPreInitComplete();
+  }
+}
 
 void DynamicModuleCluster::usePersistentHostMap() {
   priority_set_.usePersistentCrossPriorityHostMap();
@@ -384,15 +433,24 @@ void DynamicModuleCluster::runOnAllWorkers(uint64_t event_id) {
     // no-op: no slot allocation and no fan-out.
     return;
   }
+  // The workers are gone once thread local storage shut down, for example when a cluster is
+  // destroyed at exit.
+  if (server_context_.threadLocal().isShutdown()) {
+    return;
+  }
+  // The workers read in_module_cluster_, which is set once on_cluster_new returns.
+  if (in_module_cluster_ == nullptr) {
+    worker_event_ids_from_on_cluster_new_.push_back(event_id);
+    return;
+  }
 
   ensureWorkerSlot();
 
   // weak_from_this lets workers racing cluster destruction skip safely. The lambda also filters
   // out the main thread because Envoy's TLS engine fires runOnAllThreads on main too.
   auto weak_self = weak_from_this();
-  Event::Dispatcher& main_dispatcher = dispatcher_;
-  worker_slot_->runOnAllThreads([weak_self, event_id, &main_dispatcher](OptRef<WorkerSlotData>) {
-    if (main_dispatcher.isThreadSafe()) {
+  worker_slot_->runOnAllThreads([weak_self, event_id](OptRef<WorkerSlotData>) {
+    if (Thread::MainThread::isMainOrTestThread()) {
       return;
     }
     auto self = weak_self.lock();
@@ -410,13 +468,16 @@ void DynamicModuleCluster::workerSlotSet(
   ASSERT(dispatcher_.isThreadSafe(),
          "envoy_dynamic_module_callback_cluster_worker_slot_set must be called from the main "
          "thread");
-  ensureWorkerSlot();
-
   // Capture the wrapper by value so every thread observes the same shared_ptr (single-pointer
   // semantics); the prior wrapper is released when its last reference drops, firing the module's
   // destroy hook.
   auto wrapper = std::make_shared<WorkerSlotData>(
       data_ptr, config_->on_cluster_worker_slot_data_destroy_, config_);
+  // The workers are gone once thread local storage shut down, so the wrapper releases the data.
+  if (server_context_.threadLocal().isShutdown()) {
+    return;
+  }
+  ensureWorkerSlot();
   worker_slot_->set(
       [wrapper](Event::Dispatcher&) -> std::shared_ptr<WorkerSlotData> { return wrapper; });
 }
@@ -753,7 +814,7 @@ DynamicModuleCluster::sendHttpCallout(uint64_t* callout_id_out, absl::string_vie
 
   const uint64_t callout_id = getNextCalloutId();
   auto http_callout_callback =
-      std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(shared_from_this(), callout_id);
+      std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(*this, callout_id);
   DynamicModuleCluster::HttpCalloutCallback& callback = *http_callout_callback;
 
   auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
@@ -770,13 +831,16 @@ DynamicModuleCluster::sendHttpCallout(uint64_t* callout_id_out, absl::string_vie
 
 void DynamicModuleCluster::HttpCalloutCallback::onSuccess(const Http::AsyncClient::Request&,
                                                           Http::ResponseMessagePtr&& response) {
-  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
-  // result in operations that affect this callback's lifetime.
-  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  // Hold the cluster and copy the callout id since on_cluster_http_callout_done_ might result in
+  // operations that affect this callback's lifetime. The lock fails while the cluster waits for the
+  // main thread to destroy it, once a worker dropped the last reference.
+  std::shared_ptr<DynamicModuleCluster> cluster = cluster_.weak_from_this().lock();
   uint64_t callout_id = callout_id_;
 
-  if (!cluster->in_module_cluster_) {
-    cluster->http_callouts_.erase(callout_id);
+  // request_ is set only after the async client accepts the callout. A callout that send completes
+  // inline is already reported by the return code.
+  if (cluster == nullptr || !cluster->in_module_cluster_ || request_ == nullptr) {
+    cluster_.http_callouts_.erase(callout_id);
     return;
   }
 
@@ -802,13 +866,14 @@ void DynamicModuleCluster::HttpCalloutCallback::onSuccess(const Http::AsyncClien
 
 void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClient::Request&,
                                                           Http::AsyncClient::FailureReason reason) {
-  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
-  // result in operations that affect this callback's lifetime.
-  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  // Hold the cluster and copy the callout id since on_cluster_http_callout_done_ might result in
+  // operations that affect this callback's lifetime. The lock fails while the cluster waits for the
+  // main thread to destroy it, once a worker dropped the last reference.
+  std::shared_ptr<DynamicModuleCluster> cluster = cluster_.weak_from_this().lock();
   const uint64_t callout_id = callout_id_;
 
-  if (!cluster->in_module_cluster_) {
-    cluster->http_callouts_.erase(callout_id);
+  if (cluster == nullptr || !cluster->in_module_cluster_) {
+    cluster_.http_callouts_.erase(callout_id);
     return;
   }
 
@@ -825,8 +890,16 @@ void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClien
       result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
       break;
     }
-    cluster->config_->on_cluster_http_callout_done_(cluster.get(), cluster->in_module_cluster_,
-                                                    callout_id, result, nullptr, 0, nullptr, 0);
+    // This can run inside a cluster manager update, so report it from a posted callback.
+    cluster->dispatcher_.post([weak_cluster = std::weak_ptr<DynamicModuleCluster>(cluster),
+                               callout_id, result]() {
+      std::shared_ptr<DynamicModuleCluster> cluster = weak_cluster.lock();
+      if (cluster == nullptr) {
+        return;
+      }
+      cluster->config_->on_cluster_http_callout_done_(cluster.get(), cluster->in_module_cluster_,
+                                                      callout_id, result, nullptr, 0, nullptr, 0);
+    });
   }
 
   cluster->http_callouts_.erase(callout_id);
@@ -1130,11 +1203,22 @@ DynamicModuleClusterFactory::createClusterWithConfig(
                         cluster.name(), envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy));
   }
 
-  // Create the cluster.
+  // Create the cluster. A worker can drop the last reference to it, for example after a worker
+  // event, so the deleter hands the cluster to the main thread.
   absl::Status creation_status = absl::OkStatus();
-  auto new_cluster = std::shared_ptr<DynamicModuleCluster>(new DynamicModuleCluster(
-      cluster, std::move(config_or_error.value()), context, creation_status));
+  auto new_cluster = std::shared_ptr<DynamicModuleCluster>(
+      new DynamicModuleCluster(cluster, std::move(config_or_error.value()), context,
+                               creation_status),
+      [](DynamicModuleCluster* cluster) {
+        if (Thread::MainThread::isMainOrTestThread()) {
+          delete cluster;
+          return;
+        }
+        cluster->dispatcher_.deleteInDispatcherThread(
+            std::unique_ptr<const Event::DispatcherThreadDeletable>(cluster));
+      });
   RETURN_IF_NOT_OK(creation_status);
+  RETURN_IF_NOT_OK(new_cluster->initializeInModuleCluster());
 
   // Create the thread-aware load balancer only if the module provides LB (CLUSTER_PROVIDED).
   // For native LB policies, return nullptr so the cluster manager builds the native factory LB.
@@ -1144,7 +1228,14 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
   }
 
-  return std::make_pair(std::move(new_cluster), std::move(lb));
+  // The cluster manager gets its own pointer, whose deleter tells the cluster that it was released.
+  return std::make_pair(
+      Upstream::ClusterImplBaseSharedPtr(new_cluster.get(),
+                                         [new_cluster](Upstream::ClusterImplBase*) mutable {
+                                           new_cluster->released_ = true;
+                                           new_cluster.reset();
+                                         }),
+      std::move(lb));
 }
 
 REGISTER_FACTORY(DynamicModuleClusterFactory, Upstream::ClusterFactory);

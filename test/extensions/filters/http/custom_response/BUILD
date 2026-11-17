@@ -43,7 +43,13 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.custom_response"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//source/common/http:message_lib",
@@ -64,7 +70,13 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["custom_response_filter_test.cc"],
     extension_names = ["envoy.filters.http.custom_response"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//source/common/http:message_lib",
@@ -89,7 +101,12 @@ envoy_extension_cc_test(
         "custom_response_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.custom_response"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     shard_count = 2,
     tags = [
         "cpu:3",

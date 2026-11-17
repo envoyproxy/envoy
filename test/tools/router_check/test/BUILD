@@ -13,11 +13,10 @@ envoy_sh_test(
     name = "router_tool_test",
     size = "large",
     srcs = ["route_tests.sh"],
-    cc_binary = ["//test/tools/router_check:router_check_tool"],
+    cc_binary = ["//tools/router_check:router_check_tool"],
     data = [
         ":configs",
     ],
-    rbe_pool = "linux_x64_small",
     tags = ["nocoverage"],
 )
 
@@ -27,9 +26,15 @@ envoy_cc_test(
     data = [
         ":configs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
-        "//test/tools/router_check:router_check_main_lib",
+        "//tools/router_check:router_check_main_lib",
     ],
 )
 

@@ -189,8 +189,7 @@ public:
         tls_context, factory_context_, {}, false);
     RELEASE_ASSERT(cfg_or_error.ok(), std::string(cfg_or_error.status().message()));
     auto factory_or_error = Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(*cfg_or_error), BaseIntegrationTest::context_manager_,
-        server_factory_context_.serverScope());
+        std::move(*cfg_or_error), BaseIntegrationTest::context_manager_, upstreamStatsScope());
     RELEASE_ASSERT(factory_or_error.ok(), std::string(factory_or_error.status().message()));
     return std::move(*factory_or_error);
   }
@@ -259,8 +258,7 @@ public:
         tls_context, factory_context_, {}, false);
     RELEASE_ASSERT(cfg_or_error.ok(), std::string(cfg_or_error.status().message()));
     auto factory_or_error = Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(*cfg_or_error), BaseIntegrationTest::context_manager_,
-        server_factory_context_.serverScope());
+        std::move(*cfg_or_error), BaseIntegrationTest::context_manager_, upstreamStatsScope());
     RELEASE_ASSERT(factory_or_error.ok(), std::string(factory_or_error.status().message()));
     return std::move(*factory_or_error);
   }

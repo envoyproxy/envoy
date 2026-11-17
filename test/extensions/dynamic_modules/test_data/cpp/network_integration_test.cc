@@ -254,5 +254,56 @@ public:
 
 REGISTER_NETWORK_FILTER_CONFIG_FACTORY(DynamicMetadataConfigFactory, "dynamic_metadata");
 
+// Closes a new connection when the load shed point named in the filter config sheds it.
+class LoadShedPointFilter : public NetworkFilter {
+public:
+  LoadShedPointFilter(NetworkFilterHandle& handle, bool shed_load)
+      : handle_(handle), shed_load_(shed_load) {}
+
+  NetworkFilterStatus onNewConnection() override {
+    if (!shed_load_) {
+      return NetworkFilterStatus::Continue;
+    }
+    handle_.close(NetworkConnectionCloseType::NoFlush);
+    return NetworkFilterStatus::Stop;
+  }
+  NetworkFilterStatus onRead(NetworkBuffer&, bool) override {
+    return NetworkFilterStatus::Continue;
+  }
+  NetworkFilterStatus onWrite(NetworkBuffer&, bool) override {
+    return NetworkFilterStatus::Continue;
+  }
+  void onEvent(NetworkConnectionEvent) override {}
+  void onDestroy() override {}
+
+private:
+  NetworkFilterHandle& handle_;
+  const bool shed_load_;
+};
+
+class LoadShedPointFactory : public NetworkFilterFactory {
+public:
+  explicit LoadShedPointFactory(std::unique_ptr<LoadShedPoint> load_shed_point)
+      : load_shed_point_(std::move(load_shed_point)) {}
+
+  std::unique_ptr<NetworkFilter> create(NetworkFilterHandle& handle) override {
+    return std::make_unique<LoadShedPointFilter>(handle, load_shed_point_ != nullptr &&
+                                                             load_shed_point_->shouldShedLoad());
+  }
+
+private:
+  const std::unique_ptr<LoadShedPoint> load_shed_point_;
+};
+
+class LoadShedPointConfigFactory : public NetworkFilterConfigFactory {
+public:
+  std::unique_ptr<NetworkFilterFactory> create(NetworkFilterConfigHandle& handle,
+                                               std::string_view config) override {
+    return std::make_unique<LoadShedPointFactory>(handle.getLoadShedPoint(config));
+  }
+};
+
+REGISTER_NETWORK_FILTER_CONFIG_FACTORY(LoadShedPointConfigFactory, "load_shed_point");
+
 } // namespace DynamicModules
 } // namespace Envoy

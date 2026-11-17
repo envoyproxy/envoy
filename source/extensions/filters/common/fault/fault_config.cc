@@ -40,7 +40,7 @@ FaultAbortConfig::FaultAbortConfig(
     : response_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(abort_config.response_headers_to_add()),
           Router::HeaderParserPtr)),
-      response_body_(abort_config.response_body()) {
+      response_body_(abort_config.response_body()), dry_run_(abort_config.dry_run()) {
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
     provider_ =

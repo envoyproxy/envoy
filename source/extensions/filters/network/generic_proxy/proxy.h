@@ -126,7 +126,7 @@ private:
   TimeSource& time_source_;
 };
 
-class ActiveStream : public LinkedObject<ActiveStream>,
+class ActiveStream : public IntrusiveListNode<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
                      public EncodingContext,
                      public Tracing::Config,
@@ -428,7 +428,7 @@ public:
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.generic_proxy");
   }
 
-  std::list<ActiveStreamPtr>& activeStreamsForTest() { return active_streams_; }
+  IntrusiveList<ActiveStream>& activeStreamsForTest() { return active_streams_; }
   const auto& frameHandlersForTest() { return frame_handlers_; }
 
   // This may be called multiple times in some scenarios. But it is safe.
@@ -477,7 +477,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
 
   absl::flat_hash_map<uint64_t, ActiveStream*> frame_handlers_;
-  std::list<ActiveStreamPtr> active_streams_;
+  IntrusiveList<ActiveStream> active_streams_;
   ServerCodecPtr server_codec_;
 
   Buffer::OwnedImpl response_buffer_;
