@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "fair_token_bucket_impl_test",
     srcs = ["fair_token_bucket_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/bandwidth_share:fair_token_bucket_impl_lib",
         "//test/test_common:simulated_time_system_lib",

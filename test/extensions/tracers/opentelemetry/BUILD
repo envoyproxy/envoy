@@ -22,7 +22,17 @@ envoy_extension_cc_test(
         "-DHAVE_ABSEIL",
     ],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -55,7 +65,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -69,7 +89,7 @@ envoy_extension_cc_test(
     name = "span_context_extractor_test",
     srcs = ["span_context_extractor_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:status_utility_lib",
@@ -81,7 +101,10 @@ envoy_extension_cc_test(
     name = "grpc_trace_exporter_test",
     srcs = ["grpc_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
@@ -94,7 +117,17 @@ envoy_extension_cc_test(
     name = "http_trace_exporter_test",
     srcs = ["http_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/formatter/file_content:config",
         "//source/extensions/tracers/opentelemetry:trace_exporter",
@@ -111,7 +144,17 @@ envoy_extension_cc_test(
     name = "operation_name_test",
     srcs = ["operation_name_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
@@ -128,7 +171,31 @@ envoy_extension_cc_test(
     name = "grpc_trace_exporter_integration_test",
     srcs = ["grpc_trace_exporter_integration_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15178MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
@@ -146,7 +213,31 @@ envoy_extension_cc_test(
     name = "http_trace_exporter_integration_test",
     srcs = ["http_trace_exporter_integration_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15181MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",

@@ -11,7 +11,17 @@ envoy_package()
 envoy_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",

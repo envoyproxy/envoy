@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     name = "quic_stats_test",
     srcs = envoy_select_enable_http3(["quic_stats_test.cc"]),
     extension_names = ["envoy.quic.connection_debug_visitor.quic_stats"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/connection_debug_visitor/quic_stats:quic_stats_lib",
         "//test/mocks/event:event_mocks",
@@ -27,7 +28,29 @@ envoy_extension_cc_test(
     size = "large",
     srcs = envoy_select_enable_http3(["integration_test.cc"]),
     extension_names = ["envoy.quic.connection_debug_visitor.quic_stats"],
-    rbe_pool = "linux_x64_medium",
+    # linux_x64_xlarge: the coverage link peaks at 15164MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
         "//test/integration:http_integration_lib",

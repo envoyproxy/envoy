@@ -30,6 +30,7 @@ envoy_cc_test_library(
     srcs = [
         "configs_test.cc",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":test_lib",
         "//source/common/filesystem:filesystem_lib",
@@ -54,7 +55,20 @@ envoy_cc_test(
         "CONFIGS_TAR_PATH": "$(location :configs)",
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 19426MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    # linux_x64_xlarge: the tsan link peaks at 12588MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"link": "linux_x64_small"},
+        "cto": {"link": "linux_x64_large"},
+        "openssl": {"link": "linux_x64_large"},
+        "coverage": {
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_small",
+        },
+        "tsan": {"link": "linux_x64_xlarge"},
+    },
     deps = [":test_runner_lib"],
 )
 
@@ -62,7 +76,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",

@@ -20,7 +20,17 @@ envoy_proto_library(
 envoy_cc_test(
     name = "ratelimit_config_test",
     srcs = ["ratelimit_config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":ratelimit_config_test_proto_cc_proto",
         "//source/common/formatter:formatter_extension_lib",
