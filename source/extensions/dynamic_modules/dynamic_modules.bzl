@@ -77,6 +77,11 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
                 "%s/bin/llvm-objcopy " % LLVM_PATH +
                 "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
             ),
+            # An arm64 build on arm64 workers from another host runs the arm64 distribution's.
+            "@envoy//bazel:arm64_workers": (
+                "$(location @llvm_toolchain_arm64_llvm//:objcopy) " +
+                "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
+            ),
             "//conditions:default": (
                 "$(location @llvm_toolchain_llvm//:objcopy) " +
                 "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
@@ -84,6 +89,7 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
         }),
         tools = select({
             "@envoy_repo//:use_local_llvm": [],
+            "@envoy//bazel:arm64_workers": ["@llvm_toolchain_arm64_llvm//:objcopy"],
             "//conditions:default": ["@llvm_toolchain_llvm//:objcopy"],
         }),
         tags = tags,
