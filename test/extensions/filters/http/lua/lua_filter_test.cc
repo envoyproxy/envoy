@@ -1043,6 +1043,62 @@ TEST_F(LuaHttpFilterTest, FailClosedFailsAStreamOnce) {
   EXPECT_EQ(2, stats_store_.counter("test.lua.errors").value());
 }
 
+// A script error cancels an httpCall() the other direction's script is yielded on, since the
+// async client would otherwise call back into a wrapper that is gone.
+class LuaScriptErrorHttpCallTest : public LuaHttpFilterTest,
+                                   public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(FailClosed, LuaScriptErrorHttpCallTest, testing::Bool());
+
+TEST_P(LuaScriptErrorHttpCallTest, CancelsOppositeDirectionHttpCall) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "GET",
+          [":path"] = "/",
+          [":authority"] = "foo",
+        },
+        nil,
+        5000)
+    end
+
+    function envoy_on_response(response_handle)
+      error("boom")
+    end
+  )EOF"};
+
+  const bool fail_closed = GetParam();
+  if (fail_closed) {
+    setupFailClosed(SCRIPT);
+  } else {
+    setup(SCRIPT);
+  }
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Return(&request));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(request, cancel());
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(fail_closed ? 1 : 0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "504"}};
+  EXPECT_LOG_CONTAINS("error", "boom", {
+    EXPECT_EQ(fail_closed ? Http::FilterHeadersStatus::StopIteration
+                          : Http::FilterHeadersStatus::Continue,
+              filter_->encodeHeaders(response_headers, true));
+  });
+  testing::Mock::VerifyAndClearExpectations(&request);
+
+  EXPECT_CALL(request, cancel()).Times(0);
+  filter_->onDestroy();
+}
+
 // Use of header iterator across yield.
 TEST_F(LuaHttpFilterTest, HeadersIteratorAcrossYield) {
   const std::string SCRIPT(R"EOF(

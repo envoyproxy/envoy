@@ -1179,8 +1179,14 @@ Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, FilterCal
 bool Filter::scriptError(FilterCallbacks& callbacks, const absl::Status& status) {
   stats_.errors_.inc();
   scriptLog(spdlog::level::err, status.message());
-  request_stream_wrapper_.reset();
-  response_stream_wrapper_.reset();
+  // The other direction's script may be yielded on an httpCall(), whose callbacks would outlive
+  // the wrapper: onDestroy() only cancels it through a wrapper that is still set.
+  for (StreamHandleRef* handle : {&request_stream_wrapper_, &response_stream_wrapper_}) {
+    if (handle->get() != nullptr) {
+      handle->get()->onReset();
+    }
+    handle->reset();
+  }
   if (!config_->failClosed() || stream_failed_) {
     return false;
   }
