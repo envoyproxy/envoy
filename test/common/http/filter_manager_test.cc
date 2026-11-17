@@ -1799,7 +1799,15 @@ enum class TrailersDirection { Request, Response };
 
 enum class TrailersAddPhase { None, Data, StoppingData, HeaderOnlyHeaders };
 
-enum class TrailersStopKind { None, BufferData, ContinueOnData, StopAll, StopTrailers };
+enum class TrailersStopKind {
+  None,
+  BufferData,
+  ContinueOnData,
+  StopAll,
+  StopTrailers,
+  // Stops all iteration on headers, buffers the data on resume, and continues on trailers.
+  StopAllThenBufferData,
+};
 
 struct TrailersCase {
   TrailersDirection direction;
@@ -1814,8 +1822,8 @@ struct TrailersCase {
 std::string trailersCaseName(const testing::TestParamInfo<TrailersCase>& info) {
   constexpr std::array<absl::string_view, 4> phases{"CodecTrailers", "AddInData",
                                                     "AddInStoppingData", "AddInHeaderOnly"};
-  constexpr std::array<absl::string_view, 5> kinds{"NoStop", "BufferData", "ContinueOnData",
-                                                   "StopAll", "StopTrailers"};
+  constexpr std::array<absl::string_view, 6> kinds{
+      "NoStop", "BufferData", "ContinueOnData", "StopAll", "StopTrailers", "StopAllThenBufferData"};
   const TrailersCase& c = info.param;
   return absl::StrCat(c.direction == TrailersDirection::Request ? "Request" : "Response",
                       phases[static_cast<int>(c.add_phase)],
@@ -1837,7 +1845,8 @@ std::vector<TrailersCase> allTrailersCases() {
         cases.push_back({direction, phase, adder, TrailersStopKind::None, 0});
         for (TrailersStopKind kind :
              {TrailersStopKind::BufferData, TrailersStopKind::ContinueOnData,
-              TrailersStopKind::StopAll, TrailersStopKind::StopTrailers}) {
+              TrailersStopKind::StopAll, TrailersStopKind::StopTrailers,
+              TrailersStopKind::StopAllThenBufferData}) {
           // Codec trailers can be stopped anywhere; added trailers only after the adder.
           for (int stopper = phase == TrailersAddPhase::None ? 0 : adder + 1; stopper < 3;
                stopper++) {
@@ -1918,6 +1927,10 @@ public:
       break;
     case TrailersStopKind::StopTrailers:
       trailers = [] { return FilterTrailersStatus::StopIteration; };
+      break;
+    case TrailersStopKind::StopAllThenBufferData:
+      headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+      data = [](Buffer::Instance&, bool) { return FilterDataStatus::StopIterationAndBuffer; };
       break;
     }
   }

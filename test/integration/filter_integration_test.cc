@@ -658,6 +658,9 @@ TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrail
   if (!testing_downstream_filter_) {
     return;
   }
+  // With async host resolution the router stops all iteration too and replays the buffered body
+  // itself when it resumes, which would hide a body that the filter failed to forward.
+  async_lb_ = false;
   auto& counters = StopAllRebufferDecoderFilterFactory::counters();
   counters.decode_trailers_calls.store(0);
   counters.decode_complete_calls.store(0);
