@@ -1,9 +1,32 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 load("@envoy_toolshed//tarball:compressed_tar.bzl", "compressed_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("//distribution:packages.bzl", "PUBLISH_PACKAGING_TAGS")
 load("//distribution/binary:compiler.bzl", "bundled")
 
 licenses(["notice"])  # Apache 2
+
+# An execution platform with arm64 workers, for the bundled targets of an arm64 build to be built
+# on (see `compiler.bzl`).
+string_flag(
+    name = "arm64-exec-platform",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+# Strip the release binaries on the host (`strip.bzl`), rather than where they are built: with
+# `:arm64-exec-platform`, that is not somewhere the host can run the strip of.
+bool_flag(
+    name = "host-strip",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "host_strip",
+    flag_values = {":host-strip": "true"},
+    visibility = ["//visibility:public"],
+)
 
 bundled(
     name = "envoy",
