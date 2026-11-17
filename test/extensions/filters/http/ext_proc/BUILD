@@ -1068,6 +1068,8 @@ EXT_PROC_GRPC_FUZZ_TEST_DEPS = [
     "//test/fuzz:utility_lib",
     "//test/integration:http_integration_lib",
     "//test/test_common:utility_lib",
+    "@abseil-cpp//absl/base:core_headers",
+    "@abseil-cpp//absl/synchronization",
     "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
