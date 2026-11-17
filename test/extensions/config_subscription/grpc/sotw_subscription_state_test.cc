@@ -10,6 +10,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/enum_test_utils.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "gmock/gmock.h"
@@ -96,6 +97,9 @@ protected:
       : resource_decoder_(
             std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
                 envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")) {
+    // The tests below check the per-response arena; the decode cache has its own tests.
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.xds_skip_unchanged_resource_decode", "false"}});
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
     xds_resources_delegate_ = std::make_unique<TestXdsResourcesDelegate>();
     state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
@@ -184,6 +188,7 @@ protected:
 
   void throwExceptionInDelegate() { xds_resources_delegate_->setThrowsException(); }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -476,6 +481,114 @@ TEST_F(SotwSubscriptionStateTest, TypeUrlMismatch) {
       });
   EXPECT_CALL(*ttl_timer_, disableTimer());
   state_->handleResponse(response);
+}
+
+// With the decode cache on, identical bytes in the next response reuse the previous decode;
+// changed bytes are decoded again and resources dropped from a response are forgotten.
+TEST_F(SotwSubscriptionStateTest, SkipsDecodeOfUnchangedResources) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.xds_skip_unchanged_resource_decode", "true"}});
+
+  const Protobuf::Message* first_name1 = nullptr;
+  const Protobuf::Message* first_name2 = nullptr;
+  auto deliver = [&](const std::vector<std::string>& names, const std::string& version,
+                     std::vector<const Protobuf::Message*>& seen) {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info(version);
+    response.set_nonce(version);
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
+    for (const auto& name : names) {
+      std::ignore = response.add_resources()->PackFrom(resource(name));
+    }
+    EXPECT_CALL(callbacks_,
+                onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), version))
+        .WillOnce([&seen, &version](const std::vector<DecodedResourcePtr>& resources,
+                                    const std::string&) {
+          for (const auto& r : resources) {
+            EXPECT_EQ(version, r->version());
+            seen.push_back(&r->resource());
+          }
+        });
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    state_->handleResponse(response);
+  };
+
+  std::vector<const Protobuf::Message*> seen;
+  deliver({"name1", "name2"}, "v1", seen);
+  ASSERT_EQ(2, seen.size());
+  first_name1 = seen[0];
+  first_name2 = seen[1];
+
+  // Same bytes: the very same decoded messages are handed out, with the new version.
+  seen.clear();
+  deliver({"name1", "name2"}, "v2", seen);
+  ASSERT_EQ(2, seen.size());
+  EXPECT_EQ(first_name1, seen[0]);
+  EXPECT_EQ(first_name2, seen[1]);
+
+  // name2 leaves the response, so it is forgotten and decoded afresh when it comes back.
+  seen.clear();
+  deliver({"name1"}, "v3", seen);
+  ASSERT_EQ(1, seen.size());
+  EXPECT_EQ(first_name1, seen[0]);
+
+  seen.clear();
+  deliver({"name1", "name2"}, "v4", seen);
+  ASSERT_EQ(2, seen.size());
+  EXPECT_EQ(first_name1, seen[0]);
+  EXPECT_EQ("name2", dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+                         *seen[1])
+                         .cluster_name());
+}
+
+// A response with a resource that fails to decode must not become the cache's reference.
+TEST_F(SotwSubscriptionStateTest, SkipUnchangedDecodeFailureKeepsPreviousReference) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.xds_skip_unchanged_resource_decode", "true"}});
+
+  const Protobuf::Message* name1_message = nullptr;
+  {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info("v1");
+    response.set_nonce("n1");
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
+    std::ignore = response.add_resources()->PackFrom(resource("name1"));
+    EXPECT_CALL(callbacks_,
+                onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), "v1"))
+        .WillOnce([&](const std::vector<DecodedResourcePtr>& resources, const std::string&) {
+          name1_message = &resources[0]->resource();
+        });
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    state_->handleResponse(response);
+  }
+
+  {
+    // The second Any has a type URL that does not match the response, so the update is rejected.
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info("v2");
+    response.set_nonce("n2");
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
+    std::ignore = response.add_resources()->PackFrom(resource("name1"));
+    response.add_resources()->set_type_url("type.googleapis.com/bad.Type");
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+    EXPECT_CALL(*ttl_timer_, disableTimer()).Times(testing::AnyNumber());
+    state_->handleResponse(response);
+  }
+
+  {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info("v3");
+    response.set_nonce("n3");
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
+    std::ignore = response.add_resources()->PackFrom(resource("name1"));
+    EXPECT_CALL(callbacks_,
+                onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), "v3"))
+        .WillOnce([&](const std::vector<DecodedResourcePtr>& resources, const std::string&) {
+          EXPECT_EQ(name1_message, &resources[0]->resource());
+        });
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    state_->handleResponse(response);
+  }
 }
 
 } // namespace

@@ -472,6 +472,35 @@ TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   cleanupUpstreamAndDownstream();
 }
 
+// Re-sending a byte-identical resource set keeps the clusters serving, and a later update that
+// adds a cluster next to the unchanged one is applied.
+TEST_P(CdsIntegrationTest, IdenticalResendThenAddCluster) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  const uint64_t added = test_server_->counter("cluster_manager.cluster_added")->value();
+  const uint64_t modified = test_server_->counter("cluster_manager.cluster_modified")->value();
+  const uint64_t updates = test_server_->counter("cluster_manager.cds.update_success")->value();
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
+  sendClusterDiscoveryResponse({cluster1_}, {cluster1_}, {}, "56");
+  test_server_->waitForCounter("cluster_manager.cds.update_success", Ge(updates + 1));
+  EXPECT_EQ(added, test_server_->counter("cluster_manager.cluster_added")->value());
+  EXPECT_EQ(modified, test_server_->counter("cluster_manager.cluster_modified")->value());
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "56", {}, {}, {}));
+  sendClusterDiscoveryResponse({cluster1_, cluster2_}, {cluster2_}, {}, "57");
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
+  cleanupUpstreamAndDownstream();
+}
+
 // Tests adding a cluster, adding another, then removing the first.
 TEST_P(CdsIntegrationTest, TwoClusters) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.

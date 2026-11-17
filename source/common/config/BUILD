@@ -92,6 +92,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "decoded_resource_cache_lib",
+    srcs = ["decoded_resource_cache.cc"],
+    hdrs = ["decoded_resource_cache.h"],
+    deps = [
+        ":decoded_resource_lib",
+        "//envoy/config:subscription_interface",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "dependent_type_urls_lib",
     srcs = ["dependent_type_urls.cc"],
     hdrs = ["dependent_type_urls.h"],

@@ -7,6 +7,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
@@ -419,6 +420,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
     Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
     std::vector<DecodedResourcePtr> resources;
+    const bool skip_unchanged = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.xds_skip_unchanged_resource_decode");
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
@@ -429,16 +432,28 @@ void GrpcMuxImpl::onDiscoveryResponse(
                         resource.type_url(), type_url, message->DebugString()));
       }
 
-      auto decoded_resource = THROW_OR_RETURN_VALUE(
-          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info(),
-                                            batch_arena),
-          DecodedResourceImplPtr);
+      DecodedResourcePtr decoded_resource;
+      if (skip_unchanged) {
+        decoded_resource = THROW_OR_RETURN_VALUE(
+            api_state.decode_cache_.decode(resource_decoder, resource, message->version_info(),
+                                           batch_arena),
+            DecodedResourcePtr);
+      } else {
+        decoded_resource = THROW_OR_RETURN_VALUE(
+            DecodedResourceImpl::fromResource(resource_decoder, resource,
+                                              message->version_info(), batch_arena),
+            DecodedResourceImplPtr);
+      }
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
         resources.emplace_back(std::move(decoded_resource));
       }
     }
 
+    if (skip_unchanged) {
+      // Every resource decoded: this response is the cache's reference from now on.
+      api_state.decode_cache_.endUpdate();
+    }
     processDiscoveryResources(resources, api_state, type_url, message->version_info(),
                               /*call_delegate=*/true);
 
@@ -449,6 +464,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   }
   END_TRY
   CATCH(const EnvoyException& e, {
+    api_state.decode_cache_.abortUpdate();
     for (auto watch : api_state.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);

@@ -12,6 +12,7 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/decoded_resource_cache.h"
 #include "source/common/config/watched_directory.h"
 
 namespace Envoy {
@@ -62,6 +63,9 @@ protected:
   std::optional<uint64_t> config_hash_;
   SubscriptionCallbacks& callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;
+  // xds_skip_unchanged_resource_decode: reuses the decode of resources unchanged since the last
+  // update.
+  DecodedResourceCache decode_cache_;
   SubscriptionStats stats_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

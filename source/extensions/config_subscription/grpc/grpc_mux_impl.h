@@ -21,6 +21,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/decoded_resource_cache.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
@@ -297,6 +298,9 @@ private:
     // This resource type must have a Node sent at next request.
     bool must_send_node_{};
     TtlManager ttl_;
+    // xds_skip_unchanged_resource_decode: reuses the decode of resources unchanged since the
+    // previous response of this type.
+    DecodedResourceCache decode_cache_;
     // The identifier for the server that sent the most recent response, or
     // empty if there is none.
     std::string control_plane_identifier_;
