@@ -468,6 +468,35 @@ TEST_F(UpstreamRequestTest, ReentrantResetDuringDecodeMetadata) {
   upstream_request_.reset();
 }
 
+// If the upstream request is destroyed while its codec stream is still live (for example, an
+// upstream HTTP filter answered the request itself, so the codec never saw end of stream), the
+// codec filter must reset the stream. Otherwise the codec client keeps the stream, and its
+// callbacks still point at the destroyed GenericUpstream.
+TEST_F(UpstreamRequestTest, UnfinishedCodecStreamIsResetOnDestroy) {
+  MockGenericUpstream* mock_upstream_ptr = nullptr;
+  UpstreamToDownstream* bridge = nullptr;
+  setupUpstreamAndGetBridge(mock_upstream_ptr, bridge);
+
+  EXPECT_CALL(*mock_upstream_ptr, resetStream());
+  upstream_request_.reset();
+}
+
+// Once the codec has delivered the end of the response, the stream belongs to the codec again and
+// may already be freed, so destroying the upstream request must not touch it.
+TEST_F(UpstreamRequestTest, CompletedCodecStreamIsNotResetOnDestroy) {
+  MockGenericUpstream* mock_upstream_ptr = nullptr;
+  UpstreamToDownstream* bridge = nullptr;
+  setupUpstreamAndGetBridge(mock_upstream_ptr, bridge);
+
+  bridge->decodeHeaders(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestResponseHeaderMapImpl({{":status", "200"}})),
+      true);
+
+  EXPECT_CALL(*mock_upstream_ptr, resetStream()).Times(0);
+  upstream_request_.reset();
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
