@@ -25,7 +25,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:health_checker_integration_test",
     ],
     extension_names = ["envoy.health_checkers.dynamic_modules"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/registry",
         "//source/common/upstream:health_checker_lib",

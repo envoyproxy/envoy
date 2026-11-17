@@ -32,7 +32,10 @@ envoy_extension_cc_test(
     name = "kill_request_config_test",
     srcs = ["kill_request_config_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/mocks/server:factory_context_mocks",
@@ -47,7 +50,10 @@ envoy_extension_cc_test(
     srcs = ["kill_request_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     shard_count = 8,
@@ -64,7 +70,10 @@ envoy_extension_cc_test(
     coverage = False,
     extension_names = ["envoy.filters.http.kill_request"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     shard_count = 8,

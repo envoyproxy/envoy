@@ -31,7 +31,10 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:logging_rust.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -57,8 +60,14 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_small"},
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     tags = ["skip_on_windows"],
@@ -78,7 +87,10 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:start_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",

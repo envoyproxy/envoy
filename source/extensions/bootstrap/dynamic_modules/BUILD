@@ -29,6 +29,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "listener_writer_lib",
+    srcs = ["listener_writer.cc"],
+    hdrs = ["listener_writer.h"],
+    deps = [
+        ":resource_writer_lib",
+        "//envoy/event:schedulable_cb_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:listener_manager_interface",
+        "//source/common/common:fmt_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "resource_writer_lib",
     srcs = ["resource_writer.cc"],
     hdrs = ["resource_writer.h"],
@@ -66,6 +87,7 @@ envoy_cc_library(
         "//envoy/singleton:instance_interface",
         "//envoy/singleton:manager_interface",
         "//source/common/config:dependent_type_urls_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",
     ],
@@ -77,6 +99,7 @@ envoy_cc_library(
     hdrs = ["extension_config.h"],
     deps = [
         ":cluster_writer_lib",
+        ":listener_writer_lib",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",

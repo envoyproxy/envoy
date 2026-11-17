@@ -33,7 +33,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -45,7 +48,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "histogram_impl_test",
     srcs = ["histogram_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/stats:histogram_lib",
         "//source/common/stats:symbol_table_lib",
@@ -155,7 +161,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -371,7 +380,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":real_thread_test_base",
         ":stat_test_utility_lib",

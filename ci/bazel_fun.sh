@@ -113,7 +113,8 @@ lockfiles_generate() {
 }
 
 # Bazel never compares the crate_universe lockfile with Cargo.toml and Cargo.lock, so it is always
-# repinned. The crate extension does not track CARGO_BAZEL_REPIN, so a new server must evaluate it.
+# repinned. The crate extension's result is otherwise taken from MODULE.bazel.lock, which records
+# CARGO_BAZEL_REPIN as an input, so setting it re-evaluates the extension.
 cargo_lockfile_generate() {
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
     CARGO_BAZEL_REPIN=true bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci --repo=@envoy_rust_crate_index

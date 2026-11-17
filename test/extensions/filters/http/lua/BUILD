@@ -24,7 +24,10 @@ envoy_extension_cc_test(
     srcs = ["lua_filter_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "asan": "linux_x64_small",
         "tsan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
@@ -77,7 +80,10 @@ envoy_extension_cc_test(
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     shard_count = 4,
@@ -104,7 +110,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:factory_context_mocks",

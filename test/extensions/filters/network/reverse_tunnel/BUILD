@@ -21,7 +21,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/extensions/filters/network/reverse_tunnel:config",
@@ -37,7 +40,10 @@ envoy_extension_cc_test(
     srcs = ["filter_unit_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     shard_count = 4,
@@ -85,7 +91,10 @@ envoy_extension_cc_test(
         "envoy.filters.network.echo",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

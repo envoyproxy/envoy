@@ -93,7 +93,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "drain_close_util_test",
     srcs = ["drain_close_util_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/network:drain_close_util_lib",
         "//test/mocks/network:network_mocks",
@@ -106,7 +109,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",

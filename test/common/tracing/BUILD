@@ -65,7 +65,10 @@ envoy_cc_test(
     srcs = [
         "tracer_manager_impl_test.cc",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/tracing:tracer_config_lib",
         "//source/common/tracing:tracer_lib",

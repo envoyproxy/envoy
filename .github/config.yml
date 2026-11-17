@@ -1,4 +1,8 @@
 agent-ubuntu: ubuntu-24.04
+# Build the container images and packages with the release binaries, in one job per arch
+# (`release.publish`). Branches without this run `release.server_only`, and the Docker OCI and
+# Packages jobs.
+release-publish: true
 build-image:
   # Authoritative configuration for build image/s
   repo: docker.io/envoyproxy/envoy-build
@@ -166,12 +170,16 @@ checks:
           ```
     # yamllint enable rule:line-length
   publish:
-    name: >-
-      Envoy/Publish and verify
+    name: Envoy/Publish
     on-run:
     - release
     - verify
     - docs
+    required: true
+  verify:
+    name: Envoy/Verify
+    on-run:
+    - verify
     required: true
 
 run:
@@ -677,10 +685,15 @@ run:
     paths:
     - "**/*"
   release:
+    # Includes the publishing workflows (and so every path of `verify`, which needs the release's
+    # signed packages): a change to them runs the jobs they define.
     paths:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/_publish_*.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/envoy-verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*

@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "admission_control_filter_test",
     srcs = ["admission_control_filter_test.cc"],
     extension_names = ["envoy.filters.http.admission_control"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/common:enum_to_int",
         "//source/common/http:header_map_lib",
@@ -34,7 +37,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.admission_control"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -66,7 +72,10 @@ envoy_extension_cc_test(
     srcs = ["admission_control_integration_test.cc"],
     extension_names = ["envoy.filters.http.admission_control"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

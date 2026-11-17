@@ -24,7 +24,10 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.network.wasm"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
@@ -54,7 +57,10 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.network.wasm"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     tags = ["skip_on_windows"],

@@ -24,7 +24,10 @@ envoy_extension_cc_test(
         "envoy.internal_redirect_predicates.safe_cross_scheme",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

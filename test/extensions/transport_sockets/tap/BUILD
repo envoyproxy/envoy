@@ -56,7 +56,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.transport_sockets.tap"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

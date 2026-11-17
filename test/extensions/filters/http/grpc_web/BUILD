@@ -28,7 +28,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.grpc_web"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/grpc_web:config",
         "//test/mocks/server:factory_context_mocks",
@@ -41,7 +44,10 @@ envoy_extension_cc_test(
     srcs = ["grpc_web_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.grpc_web"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

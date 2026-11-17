@@ -35,7 +35,10 @@ envoy_extension_cc_test(
     srcs = ["metrics_service_integration_test.cc"],
     extension_names = ["envoy.stat_sinks.metrics_service"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

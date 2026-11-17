@@ -2,6 +2,7 @@
 
 #include "envoy/http/codec_runtime_overrides.h"
 
+#include "source/common/runtime/breaking_changes_flags.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/flags/commandlineflag.h"
@@ -93,6 +94,11 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strat
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not
 // lost. See https://github.com/envoyproxy/envoy/issues/46841
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
+// Forward trailers from the filter holding them (the filter that added them, or a filter that
+// stopped all iteration when they arrived) exactly once, once that filter iterates, so they reach
+// every later filter, instead of dispatching them from the adding filter at the end of the data
+// pass.
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -372,6 +378,12 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
           std::numeric_limits<uint32_t>::max(), "");            // NOLINT
+
+// Define all breaking changes flags as Envoy reloadable features.
+#define ENABLED_BREAKING_CHANGE_TO_RUNTIME(name) RUNTIME_GUARD(envoy_reloadable_features_##name)
+#define DISABLED_BREAKING_CHANGE_TO_RUNTIME(name)                                                  \
+  FALSE_RUNTIME_GUARD(envoy_reloadable_features_##name)
+ALL_BREAKING_CHANGES(ENABLED_BREAKING_CHANGE_TO_RUNTIME, DISABLED_BREAKING_CHANGE_TO_RUNTIME);
 
 namespace Envoy {
 namespace Runtime {

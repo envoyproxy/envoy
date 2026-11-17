@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.udp.session.ext_authz"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters/ext_authz:config",
@@ -34,7 +37,10 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_integration_test.cc"],
     extension_names = ["envoy.filters.udp.session.ext_authz"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -17,7 +17,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.override_host"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":test_lb",
         ":test_lb_proto_cc_proto",
@@ -43,7 +46,10 @@ envoy_extension_cc_test(
     name = "load_balancer_test",
     srcs = ["load_balancer_test.cc"],
     extension_names = ["envoy.load_balancing_policies.override_host"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":test_lb",
         ":test_lb_proto_cc_proto",
@@ -75,7 +81,10 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.override_host"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

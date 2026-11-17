@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
@@ -8,6 +9,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
@@ -48,7 +50,8 @@ public:
 private:
   // The addresses of the writers whose burst of writes is not fully applied yet.
   absl::flat_hash_set<const void*> writers_applying_;
-  Config::ScopedResume dependent_type_pause_;
+  // The held back requests per resource type URL, which share one start time.
+  absl::flat_hash_map<std::string, Config::ScopedResume> dependent_type_pauses_;
   MonotonicTime dependent_type_pause_start_;
 };
 

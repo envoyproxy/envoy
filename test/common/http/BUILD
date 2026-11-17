@@ -18,7 +18,10 @@ envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },
@@ -80,7 +83,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":common_lib",
         "//envoy/http:client_codec_factory_interface",
@@ -125,7 +131,10 @@ envoy_proto_library(
         srcs = ["codec_impl_fuzz_test.cc"],
         corpus = "codec_impl_corpus",
         defines = ["FUZZ_PROTOCOL_%s" % http_protocol],
-        rbe_pool = {"build": "linux_x64_small"},
+        rbe_pool = {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         deps = [
             ":codec_impl_fuzz_proto_cc_proto",
             "//source/common/http:conn_manager_lib",
@@ -151,7 +160,10 @@ envoy_proto_library(
 envoy_cc_test(
     name = "filter_manager_test",
     srcs = ["filter_manager_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/http:filter_manager_lib",
         "//test/mocks/event:event_mocks",
@@ -286,7 +298,10 @@ envoy_cc_fuzz_test(
     name = "conn_manager_impl_fuzz_test",
     srcs = ["conn_manager_impl_fuzz_test.cc"],
     corpus = "conn_manager_impl_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -361,6 +376,7 @@ envoy_cc_test(
     rbe_pool = {
         "default": {
             "build": "linux_x64_small",
+            "link": "linux_x64_small",
             "test": "linux_x64_medium",
         },
         "msan": "linux_x64_small",
@@ -382,7 +398,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_manager_misc_test",
     srcs = ["conn_manager_misc_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     shard_count = 5,
     deps = [
         ":conn_manager_impl_test_base_lib",
@@ -397,7 +416,10 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },
@@ -501,7 +523,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_utility_test",
     srcs = ["header_utility_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/http:header_utility_lib",
         "//test/mocks/http:header_validator_mocks",
@@ -528,7 +553,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_service_headers_test",
     srcs = ["http_service_headers_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:http_service_headers_lib",
@@ -584,7 +612,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":header_formatter_test_lib",
         "//envoy/http:header_formatter_interface",
@@ -658,7 +689,10 @@ envoy_cc_test(
     name = "conn_pool_grid_test",
     srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },
@@ -712,7 +746,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_server_properties_cache_manager_test",
     srcs = ["http_server_properties_cache_manager_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":common_lib",
         "//source/common/http:http_server_properties_cache",
@@ -775,7 +812,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_mutation_test",
     srcs = ["header_mutation_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_mutation_lib",
@@ -811,7 +851,10 @@ envoy_cc_fuzz_test(
     name = "hcm_router_fuzz_test",
     srcs = ["hcm_router_fuzz_test.cc"],
     corpus = "hcm_router_fuzz_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":hcm_router_fuzz_proto_cc_proto",
@@ -841,7 +884,10 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "muxdemux_test",
     srcs = ["muxdemux_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/buffer:buffer_lib",
@@ -860,6 +906,7 @@ envoy_cc_test(
     srcs = ["session_idle_list_test.cc"],
     deps = [
         "//source/common/http:session_idle_list_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],

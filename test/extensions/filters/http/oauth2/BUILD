@@ -34,7 +34,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/oauth2:config",
         "//test/mocks/init:init_mocks",
@@ -54,7 +57,10 @@ envoy_extension_cc_test(
     srcs = ["oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -78,7 +84,10 @@ envoy_extension_cc_test(
     srcs = ["oauth_route_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -102,7 +111,10 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "asan": "linux_x64_small",
         "tsan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
@@ -132,7 +144,10 @@ envoy_extension_cc_test(
     name = "oauth_client_test",
     srcs = ["oauth_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/filters/http/oauth2:oauth_client",

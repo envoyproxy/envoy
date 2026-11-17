@@ -12,7 +12,10 @@ envoy_cc_test(
     name = "config_discovery_impl_test",
     srcs = ["config_discovery_impl_test.cc"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
     },

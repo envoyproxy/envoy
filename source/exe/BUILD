@@ -30,9 +30,18 @@ envoy_cc_binary(
         "//conditions:default": [],
     }),
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
-        "gcc": {"build": "linux_x64_large"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_large",
+        },
+        "gcc": {
+            "build": "linux_x64_large",
+            "link": "linux_x64_small",
+        },
     },
     stamped = True,
     deps = [":envoy_main_entry_lib"],

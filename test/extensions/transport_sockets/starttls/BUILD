@@ -43,7 +43,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.transport_sockets.starttls"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [
@@ -67,7 +70,10 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.transport_sockets.starttls"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         ":starttls_integration_proto_cc_proto",
         "//source/extensions/filters/network/common:factory_base_lib",

@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     srcs = ["ratelimit_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -43,7 +46,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
         "//test/mocks/server:factory_context_mocks",
@@ -59,7 +65,10 @@ envoy_extension_cc_test(
     srcs = ["ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

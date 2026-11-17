@@ -29,7 +29,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.aws_request_signing"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/aws_request_signing:config",
         "//test/mocks/server:factory_context_mocks",
@@ -42,7 +45,10 @@ envoy_extension_cc_test(
     name = "aws_request_signing_integration_test",
     srcs = ["aws_request_signing_integration_test.cc"],
     extension_names = ["envoy.filters.http.aws_request_signing"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_large",
+    },
     deps = [
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
@@ -68,7 +74,10 @@ envoy_extension_cc_dyn_module_test(
         "envoy.filters.http.aws_request_signing",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

@@ -17,7 +17,10 @@ envoy_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/access_log:access_log_lib",
         "//source/common/formatter:formatter_extension_lib",

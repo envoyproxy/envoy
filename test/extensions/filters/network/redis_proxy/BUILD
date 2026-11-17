@@ -41,7 +41,10 @@ envoy_extension_cc_test(
     name = "conn_pool_impl_test",
     srcs = ["conn_pool_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
@@ -77,7 +80,10 @@ envoy_extension_cc_test(
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = [
@@ -115,7 +121,10 @@ envoy_extension_cc_test(
     name = "aws_iam_auth_test",
     srcs = ["aws_iam_auth_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         ":redis_mocks",
         "//source/extensions/filters/network/common/redis:aws_iam_authenticator_lib",
@@ -153,7 +162,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -212,7 +224,10 @@ envoy_extension_cc_test(
     srcs = ["redis_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_small"},
     },
     deps = [

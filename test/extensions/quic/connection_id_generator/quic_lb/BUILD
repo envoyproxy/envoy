@@ -17,14 +17,19 @@ envoy_extension_cc_test(
     srcs = envoy_select_enable_http3(["quic_lb_test.cc"]),
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = envoy_select_enable_http3([
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "@quiche//:quic_load_balancer_config_lib",
         "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
@@ -35,7 +40,10 @@ envoy_extension_cc_test(
     srcs = envoy_select_enable_http3(["integration_test.cc"]),
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "gcc": {"build": "linux_x64_large"},
     },
     deps = envoy_select_enable_http3([
