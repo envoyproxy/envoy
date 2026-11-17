@@ -526,7 +526,12 @@ TEST_F(HdsTest, TestProcessMessageUnwritableEventLogPath) {
       .WillOnce(Return(testing::ByMove(absl::StatusOr<AccessLog::AccessLogFileSharedPtr>(
           absl::InvalidArgumentError("unable to open file '/path/to/unwritable/event.log'")))));
 
-  EXPECT_THROW(hds_delegate_->onReceiveMessage(std::move(message)), EnvoyException);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  EXPECT_FALSE(server_response_timer_->enabled_);
+  EXPECT_TRUE(hds_delegate_->hdsClusters().empty());
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
 }
 
 // Test if processMessage exits gracefully upon receiving an invalid socket address.
@@ -545,7 +550,12 @@ TEST_F(HdsTest, TestProcessMessageUnresolvableEndpointAddress) {
 
   EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
 
-  EXPECT_THROW(hds_delegate_->onReceiveMessage(std::move(message)), EnvoyException);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  EXPECT_FALSE(server_response_timer_->enabled_);
+  EXPECT_TRUE(hds_delegate_->hdsClusters().empty());
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
 }
 
 // Test if sendResponse() retains the structure of all endpoints ingested in the specifier
