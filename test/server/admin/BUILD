@@ -100,9 +100,12 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:admin_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -232,6 +235,7 @@ envoy_cc_benchmark_binary(
         "//source/server/admin:admin_lib",
         "//test/common/stats:real_thread_test_base",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_time_lib",
         "@benchmark",
     ],
 )

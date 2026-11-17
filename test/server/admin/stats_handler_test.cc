@@ -87,7 +87,7 @@ public:
    * @param url the admin endpoint to query.
    * @return the Http Code and the response body as a string.
    */
-  CodeResponse handlerStats(absl::string_view url) {
+  CodeResponse handlerStats(absl::string_view url, bool prometheus_endpoint = false) {
     NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
@@ -98,7 +98,8 @@ public:
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
-    Admin::RequestPtr request = handler.makeRequest(admin_stream_);
+    Admin::RequestPtr request = prometheus_endpoint ? handler.makePrometheusRequest(admin_stream_)
+                                                    : handler.makeRequest(admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;
@@ -1697,6 +1698,35 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
   const CodeResponse code_response = handlerStats("/stats?format=prometheus&text_readouts");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpoint) {
+  createTestStats();
+  const CodeResponse code_response = handlerStats("/stats/prometheus?text_readouts", true);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+# TYPE envoy_control_plane_identifier gauge
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
+)EOF",
+            code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointInvalidRegex) {
+  const CodeResponse code_response = handlerStats("/stats/prometheus?filter=(+invalid)", true);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointUnsupportedBucketMode) {
+  const CodeResponse code_response =
+      handlerStats("/stats/prometheus?histogram_buckets=disjoint", true);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("unsupported prometheus histogram bucket mode", code_response.second);
 }
 
 } // namespace Server
