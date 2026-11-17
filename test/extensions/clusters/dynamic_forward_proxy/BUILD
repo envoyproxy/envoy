@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     data = ["//test/common/tls/test_data:certs"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/router:string_accessor_lib",

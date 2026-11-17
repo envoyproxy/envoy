@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "body_size_limit_filter_test",
     srcs = ["body_size_limit_filter_test.cc"],
     extension_names = ["envoy.filters.http.body_size_limit"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/body_size_limit:body_size_limit_filter_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -30,11 +33,10 @@ envoy_extension_cc_test(
     srcs = ["body_size_limit_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.body_size_limit"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 4,
     deps = [
@@ -53,8 +55,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.body_size_limit"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/body_size_limit:config",

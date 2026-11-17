@@ -69,8 +69,11 @@ envoy_cc_test(
         "//conditions:default": [],
     }),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/protobuf:utility_lib",

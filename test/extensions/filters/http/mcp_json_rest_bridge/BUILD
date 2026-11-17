@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
@@ -34,8 +37,9 @@ envoy_extension_cc_test(
     srcs = ["mcp_json_rest_bridge_filter_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+        "asan": {"build": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
@@ -52,7 +56,10 @@ envoy_extension_cc_test(
     name = "endpoint_keyed_filtering_test",
     srcs = ["endpoint_keyed_filtering_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:mcp_json_rest_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -80,12 +87,10 @@ envoy_extension_cc_test(
     srcs = ["mcp_json_rest_bridge_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 4,
     deps = [
@@ -134,7 +139,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["mcp_json_rest_bridge_fuzz_test.cc"],
     corpus = "mcp_json_rest_bridge_corpus",
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":mcp_json_rest_bridge_fuzz_proto_cc_proto",
         "//source/common/common:base64_lib",

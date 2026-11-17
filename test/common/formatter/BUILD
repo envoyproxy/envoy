@@ -27,7 +27,10 @@ envoy_cc_fuzz_test(
         "substitution_formatter_fuzz_test.dict",
         "//test/fuzz:headers.dict",
     ],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
         "//source/common/formatter:formatter_extension_lib",
@@ -66,8 +69,11 @@ envoy_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":command_extension_lib",
@@ -103,8 +109,11 @@ envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":command_extension_lib",

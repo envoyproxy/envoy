@@ -17,7 +17,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["original_dst_fuzz_test.cc"],
     corpus = "original_dst_corpus",
     extension_names = ["envoy.filters.listener.original_dst"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
@@ -32,11 +35,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.listener.original_dst"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/http:header_map_lib",
@@ -57,7 +59,10 @@ envoy_extension_cc_test(
     name = "original_dst_test",
     srcs = ["original_dst_test.cc"],
     extension_names = ["envoy.filters.listener.original_dst"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/network:listener_filter_buffer_lib",

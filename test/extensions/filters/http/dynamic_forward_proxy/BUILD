@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
@@ -36,8 +39,11 @@ envoy_extension_cc_test(
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -103,8 +109,23 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {"test": "linux_x64_medium"},
+        "gcc": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     # TODO(envoyproxy/windows-dev): Diagnose failure shown on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517

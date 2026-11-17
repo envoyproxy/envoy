@@ -55,8 +55,12 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":http_filter_test_base_lib",
@@ -92,11 +96,11 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_filter_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
     },
     deps = [
         ":http_filter_test_base_lib",
@@ -132,8 +136,15 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/grpc:async_client_manager_lib",
@@ -156,8 +167,20 @@ envoy_extension_cc_test(
     data = ["ext_authz.yaml"],
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
     },
     shard_count = 8,
     deps = [
@@ -210,8 +233,11 @@ envoy_extension_cc_fuzz_test(
     corpus = "ext_authz_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ext_authz_fuzz_lib",
@@ -232,8 +258,15 @@ envoy_extension_cc_fuzz_test(
     corpus = "ext_authz_http_corpus",
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ext_authz_fuzz_lib",

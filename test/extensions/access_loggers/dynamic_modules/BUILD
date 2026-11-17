@@ -26,8 +26,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.access_loggers.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -50,8 +53,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.access_loggers.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -70,8 +76,14 @@ envoy_extension_cc_test(
     srcs = ["abi_impl_test.cc"],
     extension_names = ["envoy.access_loggers.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
     },
     deps = [
         "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
@@ -95,11 +107,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.access_loggers.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/access_loggers/dynamic_modules:config",

@@ -31,7 +31,10 @@ envoy_extension_cc_test(
     name = "client_impl_test",
     srcs = ["client_impl_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":thrift_mocks",
         "//source/common/network:utility_lib",
@@ -48,7 +51,10 @@ envoy_extension_cc_test(
     name = "thrift_test",
     srcs = ["thrift_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":thrift_mocks",
         "//source/common/api:api_lib",
@@ -71,8 +77,15 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/upstream:health_checker_lib",

@@ -20,7 +20,10 @@ envoy_extension_cc_test(
     name = "new_grpc_mux_impl_test",
     srcs = ["new_grpc_mux_impl_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
@@ -51,7 +54,10 @@ envoy_extension_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -85,7 +91,10 @@ envoy_extension_cc_test(
     name = "delta_subscription_impl_test",
     srcs = ["delta_subscription_impl_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":delta_subscription_test_harness",
         "//envoy/config:xds_config_tracker_interface",
@@ -109,7 +118,7 @@ envoy_extension_cc_test(
     name = "delta_subscription_state_test",
     srcs = ["delta_subscription_state_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
@@ -149,7 +158,7 @@ envoy_extension_cc_test(
     name = "sotw_subscription_state_test",
     srcs = ["sotw_subscription_state_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/config:resource_name_lib",
         "//source/common/stats:isolated_store_lib",
@@ -170,7 +179,10 @@ envoy_extension_cc_test(
     name = "xds_grpc_mux_impl_test",
     srcs = ["xds_grpc_mux_impl_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resource_name_lib",
@@ -202,7 +214,10 @@ envoy_extension_cc_test(
     name = "grpc_stream_test",
     srcs = ["grpc_stream_test.cc"],
     extension_names = ["envoy.config_subscription.grpc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/config_subscription/grpc:grpc_stream_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -291,11 +306,10 @@ envoy_cc_test(
     srcs =
         ["xds_failover_integration_test.cc"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 2,
     deps = [

@@ -26,8 +26,11 @@ envoy_extension_cc_test(
     srcs = envoy_select_admin_functionality(["tap_filter_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":common",
@@ -45,8 +48,9 @@ envoy_extension_cc_test(
     srcs = envoy_select_admin_functionality(["tap_config_impl_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+        "asan": {"build": "linux_x64_small"},
     },
     deps = [
         ":common",
@@ -66,11 +70,10 @@ envoy_extension_cc_test(
     srcs = envoy_select_admin_functionality(["tap_filter_integration_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/tap:config",

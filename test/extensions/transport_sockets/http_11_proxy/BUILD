@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["connect_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
@@ -42,11 +45,23 @@ envoy_extension_cc_test(
     srcs = ["connect_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     rbe_pool = {
-        "tsan": {
+        "default": {"test": "linux_x64_medium"},
+        "gcc": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
         },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     deps = [
         "//source/common/network:utility_lib",
