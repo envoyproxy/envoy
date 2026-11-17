@@ -112,6 +112,17 @@ build:macos --@toolchains_llvm//toolchain/config:libunwind=false
 common:clang-common --linkopt=-fuse-ld=lld
 common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
 common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
+# Warnings in external dependencies that this branch can not fix, and that fill the logs
+# (protobuf's are also built for the host, which the build's `--copt`s do not apply to).
+build:clang-common --per_file_copt=external/com_github_cares_cares/.*@-Wno-unused-function
+build:clang-common --per_file_copt=external/com_github_grpc_grpc/.*@-Wno-unused-result,-Wno-unneeded-internal-declaration,-Wno-unused-function
+build:clang-common --per_file_copt=external/com_google_protobuf/.*@-Wno-deprecated-this-capture
+build:clang-common --host_per_file_copt=external/com_google_protobuf/.*@-Wno-deprecated-this-capture,-Wno-deprecated-declarations
+build:clang-common --per_file_copt=external/com_github_google_libprotobuf_mutator/.*@-Wno-unused-result
+build:clang-common --per_file_copt=external/com_google_protoprocessinglib/.*@-Wno-unused-result
+build:clang-common --per_file_copt=external/simdutf/.*@-Wno-unused-function
+build:clang-common --host_per_file_copt=external/simdutf/.*@-Wno-unused-function
+build:clang-common --per_file_copt=external/com_github_envoyproxy_sqlparser/.*@-Wno-unused-but-set-variable
 
 # Clang with libc++ (default)
 common:clang --config=clang-common
@@ -291,6 +302,9 @@ build:asan-common --define ENVOY_CONFIG_ASAN=1
 build:asan-common --build_tag_filters=-no_san
 build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
+# V8 (built from source on this branch) redefines the ASAN interface's macros in every file that
+# includes its heap: ~1400 warnings, with their include chains (most of the ASAN job's log).
+build:asan-common --per_file_copt=external/v8/.*@-Wno-macro-redefined
 build:asan-common --linkopt -fsanitize=address,undefined
 # vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
 build:asan-common --copt -fno-sanitize=vptr,function
