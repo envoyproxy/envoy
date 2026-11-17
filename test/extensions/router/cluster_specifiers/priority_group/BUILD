@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["priority_group_cluster_specifier_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.priority_group"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/router/cluster_specifiers/priority_group:config",
@@ -38,11 +41,10 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/lua:config",

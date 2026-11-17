@@ -16,8 +16,11 @@ envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
@@ -32,8 +35,11 @@ envoy_extension_cc_test(
     srcs = ["ip_range_matcher_test.cc"],
     extension_names = ["envoy.matching.custom_matchers.ip_range_matcher"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/matcher:matcher_lib",
@@ -58,8 +64,11 @@ envoy_extension_cc_test(
     srcs = ["domain_matcher_test.cc"],
     extension_names = ["envoy.matching.custom_matchers.domain_matcher"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/matcher:matcher_lib",

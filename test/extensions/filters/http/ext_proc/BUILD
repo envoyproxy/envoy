@@ -22,8 +22,15 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -93,9 +100,22 @@ envoy_extension_cc_test(
     rbe_pool = {
         "default": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "gcc": {
+            "build": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     shard_count = 8,
     tags = ["skip_on_windows"],
@@ -143,11 +163,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -175,8 +199,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -208,8 +239,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -235,11 +273,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -266,8 +308,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -309,8 +358,15 @@ envoy_extension_cc_test(
     srcs = ["ordering_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -331,8 +387,8 @@ envoy_extension_cc_test(
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -355,8 +411,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -374,7 +437,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["save_processing_response_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
@@ -401,8 +464,11 @@ envoy_extension_cc_test(
     srcs = ["mutation_utils_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -423,7 +489,7 @@ envoy_extension_cc_test_library(
     srcs = ["ext_proc_integration_common.cc"],
     hdrs = ["ext_proc_integration_common.h"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_test_filters_proto_cc_proto",
@@ -467,8 +533,35 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     shard_count = 8,
     tags = [
@@ -526,8 +619,34 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "default",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     shard_count = 4,
     tags = [
@@ -577,8 +696,34 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "default",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     shard_count = 8,
     tags = [
@@ -627,8 +772,11 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
     },
     shard_count = 8,
     tags = [
@@ -659,11 +807,23 @@ envoy_extension_cc_test(
         "envoy.filters.http.ext_proc",
     ],
     rbe_pool = {
-        "tsan": {
+        "default": {"test": "linux_x64_large"},
+        "gcc": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     tags = [
         "cpu:3",
@@ -689,8 +849,29 @@ envoy_extension_cc_test(
         "envoy.filters.http.ext_proc",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "cto": {
+            "build": "default",
+            "test": "linux_x64_medium",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -715,11 +896,12 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
     },
     tags = [
         "cpu:3",
@@ -841,16 +1023,15 @@ envoy_extension_cc_fuzz_test(
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11384MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
-        "asan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
     },
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
@@ -862,16 +1043,15 @@ envoy_extension_cc_fuzz_test(
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11385MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
-        "asan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
     },
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
@@ -881,7 +1061,11 @@ envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+    },
     tags = [
         "no_san",
         "nocoverage",

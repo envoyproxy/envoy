@@ -49,8 +49,11 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mock_lib",
@@ -65,8 +68,11 @@ envoy_extension_cc_test(
     srcs = ["filter_config_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/router:string_accessor_lib",
@@ -85,8 +91,11 @@ envoy_extension_cc_test(
     srcs = ["jwks_async_fetcher_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/jwt_authn:jwks_async_fetcher_lib",
@@ -101,8 +110,11 @@ envoy_extension_cc_test(
     srcs = ["filter_factory_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/jwt_authn:config",
@@ -118,8 +130,11 @@ envoy_extension_cc_test(
     srcs = ["jwks_cache_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -150,8 +165,15 @@ envoy_extension_cc_test(
     srcs = ["authenticator_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mock_lib",
@@ -178,11 +200,10 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_filter_state",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 4,
     tags = [
@@ -207,8 +228,11 @@ envoy_extension_cc_test(
     srcs = ["matcher_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mock_lib",
@@ -225,8 +249,11 @@ envoy_extension_cc_test(
     srcs = ["group_verifier_test.cc"],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mock_lib",
@@ -245,8 +272,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mock_lib",
@@ -276,8 +306,15 @@ envoy_extension_cc_fuzz_test(
     corpus = "jwt_authn_corpus",
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":jwt_authn_fuzz_proto_cc_proto",

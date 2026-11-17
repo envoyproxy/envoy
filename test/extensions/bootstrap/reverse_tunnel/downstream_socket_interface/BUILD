@@ -17,8 +17,15 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_initiator_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:address_lib",
@@ -44,11 +51,15 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_initiator_extension_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/api:os_sys_calls_lib",
@@ -90,11 +101,16 @@ envoy_extension_cc_test(
     srcs = ["reverse_connection_io_handle_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/common:base_includes",
@@ -128,8 +144,15 @@ envoy_extension_cc_test(
     srcs = ["downstream_reverse_connection_io_handle_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -154,7 +177,10 @@ envoy_extension_cc_test(
     size = "medium",
     srcs = ["reverse_connection_address_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
@@ -172,7 +198,7 @@ envoy_extension_cc_test(
     size = "medium",
     srcs = ["reverse_connection_resolver_test.cc"],
     extension_names = ["envoy.resolvers.reverse_connection"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/network:address_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
@@ -189,11 +215,15 @@ envoy_extension_cc_test(
     srcs = ["rc_connection_wrapper_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/buffer:buffer_lib",

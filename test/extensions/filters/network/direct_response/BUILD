@@ -19,16 +19,9 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.direct_response"],
     rbe_pool = {
-        "default": {"test": "linux_x64_medium"},
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-            "test": "linux_x64_medium",
-        },
-        "gcc": {
-            "build": "linux_x64_small",
-            "test": "linux_x64_medium",
-        },
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/network/direct_response:config",
@@ -41,7 +34,10 @@ envoy_extension_cc_test(
     name = "direct_response_test",
     srcs = ["direct_response_test.cc"],
     extension_names = ["envoy.filters.network.direct_response"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/network/direct_response:filter",
         "//test/mocks/network:network_mocks",

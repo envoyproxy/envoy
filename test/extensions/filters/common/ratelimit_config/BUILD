@@ -21,8 +21,11 @@ envoy_cc_test(
     name = "ratelimit_config_test",
     srcs = ["ratelimit_config_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":ratelimit_config_test_proto_cc_proto",

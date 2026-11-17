@@ -29,8 +29,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.tls.certificate_selectors.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:utility_lib",
@@ -74,11 +77,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.tls.certificate_selectors.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/tls:ssl_handshaker_lib",

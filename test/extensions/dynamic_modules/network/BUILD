@@ -28,8 +28,11 @@ envoy_extension_cc_dyn_module_test(
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/http:message_lib",
@@ -61,8 +64,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -88,8 +94,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -124,11 +137,9 @@ envoy_extension_cc_dyn_module_test(
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/access_loggers/file:config",

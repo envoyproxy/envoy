@@ -27,8 +27,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.http.stateful_header_formatters.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -78,11 +81,10 @@ envoy_extension_cc_dyn_module_test(
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.http.stateful_header_formatters.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

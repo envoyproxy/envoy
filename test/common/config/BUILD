@@ -52,8 +52,11 @@ envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":grpc_subscription_test_harness",
@@ -146,8 +149,11 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:api_version_lib",
@@ -194,8 +200,11 @@ envoy_cc_test(
     name = "config_provider_impl_test",
     srcs = ["config_provider_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":dummy_config_proto_cc_proto",
@@ -224,8 +233,11 @@ envoy_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/common:empty_string",
@@ -285,8 +297,11 @@ envoy_cc_test(
     name = "custom_config_validators_impl_test",
     srcs = ["custom_config_validators_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:resource_name_lib",
@@ -302,9 +317,17 @@ envoy_cc_test(
     rbe_pool = {
         "default": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
         },
-        "msan": "linux_x64_small",
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     deps = [
         "//source/common/config:xds_manager_lib",

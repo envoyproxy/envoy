@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",
@@ -32,7 +35,10 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:filter",
@@ -54,7 +60,10 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:extractor_impl",
@@ -77,11 +86,10 @@ envoy_extension_cc_test(
     data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",

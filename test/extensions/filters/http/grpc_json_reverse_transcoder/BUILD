@@ -32,8 +32,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/protobuf",
@@ -54,8 +57,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:config",
@@ -77,11 +83,23 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
     rbe_pool = {
-        "tsan": {
+        "default": {"test": "linux_x64_large"},
+        "gcc": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     tags = [
         "cpu:3",

@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
@@ -34,8 +37,11 @@ envoy_extension_cc_test(
     srcs = ["open_telemetry_impl_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:histogram_lib",
@@ -55,8 +61,11 @@ envoy_extension_cc_test(
     srcs = ["open_telemetry_http_impl_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_http_lib",
@@ -72,11 +81,10 @@ envoy_extension_cc_test(
     srcs = ["open_telemetry_integration_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
@@ -95,11 +103,10 @@ envoy_extension_cc_test(
         "envoy.stat_sinks.open_telemetry",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/access_loggers/stats:config",

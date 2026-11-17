@@ -28,8 +28,11 @@ envoy_extension_cc_test(
     srcs = ["original_src_config_factory_test.cc"],
     extension_names = ["envoy.filters.listener.original_src"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/listener/original_src:config",
@@ -43,7 +46,10 @@ envoy_extension_cc_test(
     name = "original_src_test",
     srcs = ["original_src_test.cc"],
     extension_names = ["envoy.filters.listener.original_src"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:socket_option_lib",
         "//source/extensions/filters/listener/original_src:original_src_lib",
@@ -71,7 +77,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["original_src_fuzz_test.cc"],
     corpus = "original_src_corpus",
     extension_names = ["envoy.filters.listener.original_src"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_src:original_src_lib",

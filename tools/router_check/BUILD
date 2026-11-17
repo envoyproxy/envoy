@@ -22,13 +22,13 @@ envoy_cc_test_binary(
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "tsan": {
-            "build": "linux_x64_large",
-            "link": "linux_x64_large",
-        },
         "gcc": {
-            "build": "linux_x64_large",
-            "link": "linux_x64_small",
+            "build": "linux_x64_small",
+            "link": "default",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
         },
     },
     deps = [":router_check_main_lib"] + select({
