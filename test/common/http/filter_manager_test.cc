@@ -1336,8 +1336,9 @@ public:
     filter_manager_->decodeTrailers(*trailers_);
   }
 
-  void expectAbortInPhase(StrictMock<MockStreamDecoderFilter>& filter, DecodePhase phase,
-                          bool end_stream, std::function<void()> abort_action) {
+  void applyStopIterationActionInPhase(StrictMock<MockStreamDecoderFilter>& filter,
+                                       DecodePhase phase, bool end_stream,
+                                       std::function<void()> abort_action) {
     switch (phase) {
     case DecodePhase::Headers:
       EXPECT_CALL(filter, decodeHeaders(_, end_stream))
@@ -1365,7 +1366,8 @@ public:
     }
   }
 
-  void drivePhase(DecodePhase phase, bool end_stream) {
+  // Runs phases up to and including `phase`
+  void driveThroughPhase(DecodePhase phase, bool end_stream) {
     switch (phase) {
     case DecodePhase::Headers:
       filter_manager_->decodeHeaders(*headers_, end_stream);
@@ -1381,13 +1383,13 @@ public:
     }
   }
 
-  void runLocalReplyOnEndStreamTest(DecodePhase phase) {
+  void runLocalReplyOnEndStreamTest(DecodePhase end_stream_phase) {
     auto filter = setupSingleDecoderFilter();
     EXPECT_CALL(*filter, decodeMetadata(_)).Times(0);
 
     InSequence s;
-    expectAbortInPhase(*filter, phase, /*end_stream=*/true, [&]() {
-      if (phase == DecodePhase::Headers) {
+    applyStopIterationActionInPhase(*filter, end_stream_phase, /*end_stream=*/true, [&]() {
+      if (end_stream_phase == DecodePhase::Headers) {
         MetadataMap metadata_map = {{"a", "b"}};
         filter->callbacks_->addDecodedMetadata().emplace_back(
             std::make_unique<MetadataMap>(metadata_map));
@@ -1400,7 +1402,7 @@ public:
     EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout());
     EXPECT_CALL(*filter, onDestroy());
 
-    drivePhase(phase, /*end_stream=*/true);
+    driveThroughPhase(end_stream_phase, /*end_stream=*/true);
     EXPECT_EQ(nullptr, filter->callbacks_->decodingBuffer());
     filter_manager_->destroyFilters();
   }
@@ -1412,8 +1414,9 @@ public:
     }
 
     InSequence s;
-    expectAbortInPhase(*filter, phase, end_stream,
-                       [&]() { filter->callbacks_->sendGoAwayAndClose(/*graceful=*/true); });
+    applyStopIterationActionInPhase(*filter, phase, end_stream, [&]() {
+      filter->callbacks_->sendGoAwayAndClose(/*graceful=*/true);
+    });
     EXPECT_CALL(filter_manager_callbacks_, sendGoAwayAndClose(true));
     if (end_stream) {
       EXPECT_CALL(*filter, decodeComplete());
@@ -1421,7 +1424,7 @@ public:
     }
     EXPECT_CALL(*filter, onDestroy());
 
-    drivePhase(phase, end_stream);
+    driveThroughPhase(phase, end_stream);
     filter_manager_->destroyFilters();
   }
 
@@ -1431,7 +1434,7 @@ public:
     EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout()).Times(0);
 
     InSequence s;
-    expectAbortInPhase(*filter, phase, /*end_stream=*/true, [&]() {
+    applyStopIterationActionInPhase(*filter, phase, /*end_stream=*/true, [&]() {
       filter->callbacks_->resetStream(StreamResetReason::LocalReset, "");
     });
     EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, ""))
@@ -1439,7 +1442,7 @@ public:
             [this](StreamResetReason, absl::string_view) { filter_manager_->destroyFilters(); });
     EXPECT_CALL(*filter, onDestroy());
 
-    drivePhase(phase, /*end_stream=*/true);
+    driveThroughPhase(phase, /*end_stream=*/true);
   }
 
   RequestHeaderMapPtr headers_{

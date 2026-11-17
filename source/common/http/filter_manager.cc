@@ -687,7 +687,10 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
                   (*entry)->filter_context_.config_name));
 
     // If this filter ended the stream, decodeComplete() should be called for it.
-    if ((*entry)->end_stream_) {
+    if ((*entry)->end_stream_ && !state_.destroyed_) {
+      // TODO(rblaze): Add FilterCallState::DecodeComplete (included in IsDecodingMask) and
+      // set/unset it around decodeComplete() so aborts triggered from decodeComplete() set
+      // state_.decoder_filter_chain_aborted_.
       (*entry)->handle_->decodeComplete();
     }
 
@@ -823,6 +826,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     if ((*entry)->end_stream_ && !state_.destroyed_) {
+      // TODO(rblaze): Add FilterCallState::DecodeComplete (included in IsDecodingMask) and
+      // set/unset it around decodeComplete() so aborts triggered from decodeComplete() set
+      // state_.decoder_filter_chain_aborted_.
       (*entry)->handle_->decodeComplete();
     }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
@@ -947,6 +953,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     if (!state_.destroyed_) {
+      // TODO(rblaze): Add FilterCallState::DecodeComplete (included in IsDecodingMask) and
+      // set/unset it around decodeComplete() so aborts triggered from decodeComplete() set
+      // state_.decoder_filter_chain_aborted_.
       (*entry)->handle_->decodeComplete();
     }
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
