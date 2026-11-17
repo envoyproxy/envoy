@@ -12,6 +12,35 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+# The LLVM distribution that bindgen runs: the host's, or for an arm64 build on arm64 workers from
+# another host (`//bazel:arm64_workers`), the arm64 one.
+LLVM_REPOS = [
+    "llvm_toolchain_llvm",
+    "llvm_toolchain_arm64_llvm",
+]
+
+BINDGEN_ENV = {
+    llvm_repo: {
+        "LIBCLANG_PATH": "$(location @%s//:lib/libclang.so)" % llvm_repo,
+        "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
+            "-resource-dir $${pwd}/external/%s/lib/clang/%s" % (llvm_repo, LLVM_MAJOR),
+            "-isystem $${pwd}/external/%s/lib_legacy/clang/%s/include" % (llvm_repo, LLVM_MAJOR),
+            "-isystem $${pwd}/external/%s/include/x86_64-unknown-linux-gnu/c++/v1/" % llvm_repo,
+            "-isystem $${pwd}/external/%s/include/aarch64-unknown-linux-gnu/c++/v1/" % llvm_repo,
+        ]),
+    }
+    for llvm_repo in LLVM_REPOS
+}
+
+BINDGEN_DATA = {
+    llvm_repo: [
+        "@%s//:include" % llvm_repo,
+        "@%s//:lib/libclang.so" % llvm_repo,
+        "@%s//:lib_legacy" % llvm_repo,
+    ]
+    for llvm_repo in LLVM_REPOS
+}
+
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
@@ -25,26 +54,16 @@ cargo_build_script(
                 "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
             ]),
         },
-        "@platforms//os:linux": {
-            "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
-            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/" + LLVM_MAJOR,
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/" + LLVM_MAJOR + "/include",
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
-            ]),
-        },
+        "//bazel:arm64_workers": BINDGEN_ENV["llvm_toolchain_arm64_llvm"],
+        "@platforms//os:linux": BINDGEN_ENV["llvm_toolchain_llvm"],
         "//conditions:default": {},
     }),
     data = [
         "//source/extensions/dynamic_modules/abi:abi.h",
     ] + select({
         "@envoy_repo//:use_local_llvm": [],
-        "@platforms//os:linux": [
-            "@llvm_toolchain_llvm//:include",
-            "@llvm_toolchain_llvm//:lib/libclang.so",
-            "@llvm_toolchain_llvm//:lib_legacy",
-        ],
+        "//bazel:arm64_workers": BINDGEN_DATA["llvm_toolchain_arm64_llvm"],
+        "@platforms//os:linux": BINDGEN_DATA["llvm_toolchain_llvm"],
         "//conditions:default": [],
     }),
     edition = "2021",

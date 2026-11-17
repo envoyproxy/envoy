@@ -65,6 +65,7 @@
 # does for any other build (locally, on the host).
 
 _ARM64_EXEC_PLATFORM = "//distribution/binary:arm64-exec-platform"
+_ARM64_WORKERS = "//bazel:arm64-workers"
 _EXEC_PLATFORMS = "//command_line_option:extra_execution_platforms"
 _PLATFORMS = "//command_line_option:platforms"
 
@@ -72,7 +73,8 @@ def _compilation_config_impl(settings, attr):
     exec_platforms = settings[_EXEC_PLATFORMS]
     arm64_exec_platform = settings[_ARM64_EXEC_PLATFORM]
     arm64_build = any([str(platform).endswith("_arm64") for platform in settings[_PLATFORMS]])
-    if arm64_exec_platform and arm64_build:
+    arm64_workers = bool(arm64_exec_platform and arm64_build)
+    if arm64_workers:
         exec_platforms = [arm64_exec_platform] + [
             platform
             for platform in exec_platforms
@@ -81,6 +83,8 @@ def _compilation_config_impl(settings, attr):
     return {
         "//command_line_option:compilation_mode": attr.mode,
         "//command_line_option:stripopt": attr.stripopts,
+        # For what the build runs from the LLVM distribution (`//bazel:arm64_workers`).
+        _ARM64_WORKERS: arm64_workers,
         _EXEC_PLATFORMS: exec_platforms,
     }
 
@@ -94,6 +98,7 @@ compilation_config = transition(
     outputs = [
         "//command_line_option:compilation_mode",
         "//command_line_option:stripopt",
+        _ARM64_WORKERS,
         _EXEC_PLATFORMS,
     ],
 )
