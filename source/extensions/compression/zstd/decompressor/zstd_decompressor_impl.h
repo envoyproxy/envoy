@@ -57,7 +57,7 @@ private:
   }
 
   friend class ZstdDecompressorStatsTest;
-  bool process(Buffer::Instance& output_buffer, uint64_t& remaining_output);
+  bool process(Buffer::Instance& output_buffer, uint64_t output_start, uint64_t limit);
   bool isError(size_t result);
 
   std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> dctx_;

@@ -23,9 +23,10 @@ void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
     return;
   }
   constexpr uint64_t max_output = std::numeric_limits<uint64_t>::max();
-  uint64_t remaining_output = max_inflate_ratio_ > (max_output - max_block_size_) / input_size
-                                  ? max_output
-                                  : input_size * max_inflate_ratio_ + max_block_size_;
+  const uint64_t limit = max_inflate_ratio_ > (max_output - max_block_size_) / input_size
+                             ? max_output
+                             : input_size * max_inflate_ratio_ + max_block_size_;
+  const uint64_t output_start = output_buffer.length();
 
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     if (input_slice.len_ > 0) {
@@ -48,29 +49,32 @@ void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
       }
 
       setInput(input_slice);
-      if (!process(output_buffer, remaining_output)) {
+      if (!process(output_buffer, output_start, limit)) {
         return;
       }
     }
   }
 }
 
-bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t& remaining_output) {
+bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t output_start,
+                                   uint64_t limit) {
   while (input_.pos < input_.size) {
     const size_t result = ZSTD_decompressStream(dctx_.get(), &output_, &input_);
     if (isError(result)) {
       return false;
     }
 
-    const size_t step_size = output_.pos;
     getOutput(output_buffer);
-    if (step_size > remaining_output) {
+
+    // Check bomb protection after every decompression step, not after the
+    // entire slice is drained. This matches gzip and brotli behavior.
+    const uint64_t output_size = output_buffer.length() - output_start;
+    if (output_size > limit) {
       stats_.zstd_generic_error_.inc();
-      ENVOY_LOG(trace, "excessive decompression ratio detected: {} bytes for {} bytes remaining",
-                step_size, remaining_output);
+      ENVOY_LOG(trace, "excessive decompression ratio detected: output size {} for limit {}",
+                output_size, limit);
       return false;
     }
-    remaining_output -= step_size;
   }
 
   return true;
