@@ -761,7 +761,10 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
     return Http::HeaderMap::Iterate::Continue;
   });
 
-  if (!lookup_subscribers_.front().context_->lookup().isCacheableResponse(*headers) ||
+  // Only the response decides eviction. A request's own Cache-Control: no-store forbids storing
+  // its response, but must not evict an entry that was stored for other requests.
+  const ActiveLookupRequest& validating_lookup = lookup_subscribers_.front().context_->lookup();
+  if (!validating_lookup.cacheableResponseChecker()->isCacheableResponse(*headers) ||
       VaryHeaderUtils::hasVary(*headers)) {
     // A 304 can make a previously cacheable response private or otherwise uncacheable.
     // Evict before publishing the merged headers to any subscribers. Since a 304 has no

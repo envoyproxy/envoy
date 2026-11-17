@@ -590,6 +590,49 @@ TEST_P(CacheIntegrationTest, UncacheableValidationDoesNotSharePrivateResponse) {
   }
 }
 
+TEST_P(CacheIntegrationTest, RequestNoStoreValidationKeepsCachedEntry) {
+  initializeFilter(default_config);
+  const auto request_headers = httpRequestHeader("GET", "RequestNoStoreValidation");
+  const std::string response_body(42, 'a');
+  const auto response_headers =
+      httpResponseHeadersForBody(response_body, "public, max-age=3600", {{"etag", "\"v1\""}});
+  {
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
+        request_headers,
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
+    EXPECT_EQ(response_decoder->body(), response_body);
+  }
+  simTime().advanceTimeWait(Seconds(1));
+
+  // Request no-cache forces validation of the fresh entry. The origin's 304 keeps the response
+  // public, so the request's own no-store must not evict the shared entry.
+  {
+    auto no_store_request = request_headers;
+    no_store_request.addCopy("cache-control", "no-cache, no-store");
+    IntegrationStreamDecoderPtr response_decoder =
+        sendHeaderOnlyRequestAwaitResponse(no_store_request, [&]() {
+          waitForNextUpstreamRequest();
+          EXPECT_THAT(upstream_request_->headers(), ContainsHeader("if-none-match", "\"v1\""));
+          upstream_request_->encodeHeaders(
+              Http::TestResponseHeaderMapImpl{
+                  {":status", "304"}, {"etag", "\"v1\""}, {"date", formatter_.now(simTime())}},
+              /*end_stream=*/true);
+        });
+    ASSERT_TRUE(response_decoder->complete());
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(":status", "200"));
+    EXPECT_EQ(response_decoder->body(), response_body);
+  }
+  simTime().advanceTimeWait(Seconds(1));
+
+  // An ordinary request is still served from the cache without contacting the origin.
+  {
+    IntegrationStreamDecoderPtr response_decoder =
+        sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "1"));
+    EXPECT_EQ(response_decoder->body(), response_body);
+  }
+}
+
 TEST_P(CacheIntegrationTest, ExpiredByExpiresHeaderValidated) {
   initializeFilter(default_config);
 

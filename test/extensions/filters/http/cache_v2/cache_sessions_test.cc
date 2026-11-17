@@ -705,18 +705,27 @@ TEST_P(CacheSessionsValidationTest, UncacheableValidationEvictsAndRefetches) {
   ASSERT_EQ(fake_upstreams_.size(), 4);
 }
 
-TEST_F(CacheSessionsTest, CacheableValidationChecksMergedHeaders) {
+class CacheableValidationTest : public CacheSessionsTest,
+                                public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(RequestNoStore, CacheableValidationTest, testing::Bool());
+
+TEST_P(CacheableValidationTest, ChecksMergedHeadersAndKeepsCachedEntry) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
-  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+  EXPECT_CALL(*mock_http_cache_, evict).Times(0);
+  EXPECT_CALL(*mock_http_cache_, insert).Times(0);
+  auto request_headers = requestHeaders("/a");
+  request_headers.addCopy("cache-control", GetParam() ? "no-cache, no-store" : "no-cache");
   ActiveLookupResultPtr result;
-  cache_sessions_->lookup(testLookupRequest("/a"),
+  cache_sessions_->lookup(testLookupRequest(request_headers),
                           [&result](ActiveLookupResultPtr r) { result = std::move(r); });
   pumpDispatcher();
   auto cached_headers = cacheableResponseHeaders(5);
   cached_headers->setCopy(Http::CustomHeaders::get().CacheControl, "public, max-age=60");
   cached_headers->setCopy(Http::CustomHeaders::get().Etag, "\"v1\"");
   ResponseMetadata metadata;
-  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(61);
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
   consumeCallback(captured_lookup_callbacks_[0])(
       LookupResult{std::make_unique<testing::StrictMock<MockCacheReader>>(),
                    std::move(cached_headers), nullptr, metadata, 5});
@@ -736,6 +745,15 @@ TEST_F(CacheSessionsTest, CacheableValidationChecksMergedHeaders) {
   pumpDispatcher();
   ASSERT_THAT(result, NotNull());
   EXPECT_EQ(result->status_, CacheEntryStatus::Validated);
+
+  // The request's no-store directive must not remove the shared entry for later requests.
+  ActiveLookupResultPtr next_result;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&next_result](ActiveLookupResultPtr r) { next_result = std::move(r); });
+  pumpDispatcher();
+  ASSERT_THAT(next_result, NotNull());
+  EXPECT_EQ(next_result->status_, CacheEntryStatus::Hit);
+  EXPECT_EQ(fake_upstream_sent_headers_.size(), 1);
 }
 
 TEST_F(CacheSessionsTest, CacheInsertFailureResetsLookupsAndWillLookupAgain) {
