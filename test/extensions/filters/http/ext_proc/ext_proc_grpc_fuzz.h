@@ -17,6 +17,9 @@
 //    and this class. This involves adding a new ExtProcIntegrationBase class
 //    common to both.
 
+#include <memory>
+#include <string>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
@@ -32,6 +35,9 @@
 #include "test/fuzz/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
+
+#include "absl/base/thread_annotations.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,7 +70,15 @@ public:
     client_type_ = client_type;
   }
 
+  ~ExtProcIntegrationFuzz() override { tearDown(false); }
+
   void tearDown(bool keep_test_server) {
+    {
+      absl::MutexLock lock(mutex_);
+      fuzz_helper_.reset();
+      ext_proc_provider_.reset();
+      ext_proc_data_.clear();
+    }
     cleanupUpstreamAndDownstream();
     codec_client_ = nullptr;
     if (!keep_test_server) {
@@ -209,6 +223,10 @@ public:
   }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
+  absl::Mutex mutex_;
+  std::string ext_proc_data_ ABSL_GUARDED_BY(mutex_);
+  std::unique_ptr<FuzzedDataProvider> ext_proc_provider_ ABSL_GUARDED_BY(mutex_);
+  std::unique_ptr<ExtProcFuzzHelper> fuzz_helper_ ABSL_GUARDED_BY(mutex_);
   TestProcessor test_processor_;
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;
@@ -229,14 +247,8 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   FuzzedDataProvider downstream_provider(
       reinterpret_cast<const uint8_t*>(input.downstream_data().data()),
       input.downstream_data().size());
-  static std::unique_ptr<std::string> ext_proc_data = nullptr;
-  ext_proc_data = std::make_unique<std::string>(input.ext_proc_data());
-  static std::unique_ptr<FuzzedDataProvider> ext_proc_provider = nullptr;
-  ext_proc_provider = std::make_unique<FuzzedDataProvider>(
-      reinterpret_cast<const uint8_t*>(ext_proc_data->data()), ext_proc_data->size());
 
   static std::unique_ptr<ExtProcIntegrationFuzz> fuzzer = nullptr;
-  static std::unique_ptr<ExtProcFuzzHelper> fuzz_helper = nullptr;
 
   static uint32_t fuzz_exec_count = 0;
   // Initialize fuzzer with IP and gRPC version from environment
@@ -244,8 +256,16 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
     fuzzer = std::make_unique<ExtProcIntegrationFuzz>(
         TestEnvironment::getIpVersionsForTest()[0], TestEnvironment::getsGrpcVersionsForTest()[0]);
   }
-  // Initialize fuzz_helper.
-  fuzz_helper = std::make_unique<ExtProcFuzzHelper>(ext_proc_provider.get());
+  auto* fuzzer_ptr = fuzzer.get();
+  {
+    absl::MutexLock lock(fuzzer_ptr->mutex_);
+    fuzzer_ptr->ext_proc_data_ = input.ext_proc_data();
+    fuzzer_ptr->ext_proc_provider_ = std::make_unique<FuzzedDataProvider>(
+        reinterpret_cast<const uint8_t*>(fuzzer_ptr->ext_proc_data_.data()),
+        fuzzer_ptr->ext_proc_data_.size());
+    fuzzer_ptr->fuzz_helper_ =
+        std::make_unique<ExtProcFuzzHelper>(fuzzer_ptr->ext_proc_provider_.get());
+  }
 
   // Initialize test server.
   if (fuzzCreateEnvoy(fuzz_exec_count, persistent_mode)) {
@@ -254,7 +274,7 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
     // target from receiving the response.
     fuzzer->test_processor_.start(
         fuzzer->ip_version_,
-        [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        [fuzzer_ptr](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
           while (true) {
             ProcessingRequest req;
             if (!stream->Read(&req)) {
@@ -262,7 +282,14 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
             }
             bool immediate_close_grpc = false;
             ProcessingResponse resp;
-            auto result = fuzz_helper->generateResponse(req, resp, immediate_close_grpc);
+            grpc::Status result;
+            {
+              absl::MutexLock lock(fuzzer_ptr->mutex_);
+              if (fuzzer_ptr->fuzz_helper_ == nullptr) {
+                return grpc::Status(grpc::StatusCode::CANCELLED, "fuzz iteration ended");
+              }
+              result = fuzzer_ptr->fuzz_helper_->generateResponse(req, resp, immediate_close_grpc);
+            }
             if (immediate_close_grpc) {
               return result;
             }
@@ -298,9 +325,6 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
   } else {
     fuzzer->tearDown(true);
   }
-  ext_proc_data.reset();
-  ext_proc_provider.reset();
-  fuzz_helper.reset();
 }
 
 } // namespace ExternalProcessing
