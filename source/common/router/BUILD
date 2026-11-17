@@ -32,6 +32,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "original_connect_port_lib",
+    hdrs = ["original_connect_port.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
@@ -42,6 +51,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":original_connect_port_lib",
         ":path_rewrite_utility_lib",
         ":per_filter_config_lib",
         ":retry_policy_lib",

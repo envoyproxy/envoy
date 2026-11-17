@@ -325,6 +325,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "local_reply_owner_object_lib",
+    hdrs = ["local_reply_owner_object.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_manager_lib",
     srcs = [
         "filter_manager.cc",
@@ -334,6 +343,7 @@ envoy_cc_library(
     ],
     deps = [
         ":headers_lib",
+        ":local_reply_owner_object_lib",
         "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",

@@ -37,6 +37,7 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/original_connect_port.h"
 #include "source/common/router/per_filter_config.h"
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/route_specifier_impl.h"
@@ -54,19 +55,6 @@ namespace Router {
 using RouteMetadataPack = Envoy::Config::MetadataPack<HttpRouteTypedMetadataFactory>;
 using RouteMetadataPackPtr = Envoy::Config::MetadataPackPtr<HttpRouteTypedMetadataFactory>;
 using DefaultRouteMetadataPack = ConstSingleton<RouteMetadataPack>;
-
-/**
- * Original port from the authority header.
- */
-class OriginalConnectPort : public StreamInfo::FilterState::Object {
-public:
-  explicit OriginalConnectPort(uint32_t port) : port_(port) {}
-  const uint32_t& value() const { return port_; }
-  static const std::string& key();
-
-private:
-  const uint32_t port_;
-};
 
 /**
  * Lazily derives and caches per-request values used during route matching

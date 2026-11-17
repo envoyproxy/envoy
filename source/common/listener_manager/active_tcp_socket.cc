@@ -24,8 +24,7 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
 
   // Automatically populate network namespace from listener address if present.
   if (network_namespace && !network_namespace->empty()) {
-    stream_info_->filterState()->setIndexedData(
-        StreamInfo::FilterStateIndex::NetworkNamespace,
+    stream_info_->filterState()->setIndexedData<StreamInfo::FilterStateIndex::NetworkNamespace>(
         std::make_unique<Network::DownstreamNetworkNamespace>(*network_namespace),
         StreamInfo::FilterState::LifeSpan::Connection);
   }

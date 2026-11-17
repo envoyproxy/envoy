@@ -33,6 +33,7 @@ envoy_cc_library(
     hdrs = ["filter_state.h"],
     deps = [
         "//envoy/config:typed_config_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",

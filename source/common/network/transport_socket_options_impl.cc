@@ -63,8 +63,8 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   std::unique_ptr<const TransportSocketOptions::Http11ProxyInfo> proxy_info;
 
   bool needs_transport_socket_options = false;
-  if (auto typed_data = filter_state.getIndexedDataReadOnly<UpstreamServerName>(
-          StreamInfo::FilterStateIndex::UpstreamServerName);
+  if (auto typed_data =
+          filter_state.getIndexedDataReadOnly<StreamInfo::FilterStateIndex::UpstreamServerName>();
       typed_data != nullptr) {
     server_name = typed_data->value();
     needs_transport_socket_options = true;
@@ -77,8 +77,9 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
     needs_transport_socket_options = true;
   }
 
-  if (auto typed_data = filter_state.getIndexedDataReadOnly<UpstreamSubjectAltNames>(
-          StreamInfo::FilterStateIndex::UpstreamSubjectAltNames);
+  if (auto typed_data =
+          filter_state
+              .getIndexedDataReadOnly<StreamInfo::FilterStateIndex::UpstreamSubjectAltNames>();
       typed_data != nullptr) {
     subject_alt_names = typed_data->value();
     needs_transport_socket_options = true;

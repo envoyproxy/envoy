@@ -20,6 +20,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/local_reply_owner_object.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
@@ -39,29 +40,6 @@ struct ActiveStreamDecoderFilter;
 struct ActiveStreamEncoderFilter;
 using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
 using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
-
-constexpr absl::string_view LocalReplyFilterStateKey =
-    "envoy.filters.network.http_connection_manager.local_reply_owner";
-class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
-public:
-  // The filter_config_name is expected to outlive the LocalReplyOwnerObject, as it typically
-  // comes from the filter configuration.
-  LocalReplyOwnerObject(absl::string_view filter_config_name)
-      : filter_config_name_(filter_config_name) {}
-
-  ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<Protobuf::StringValue>();
-    message->set_value(filter_config_name_);
-    return message;
-  }
-
-  std::optional<std::string> serializeAsString() const override {
-    return std::string(filter_config_name_);
-  }
-
-private:
-  const absl::string_view filter_config_name_;
-};
 
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
 // construct the filter in place in the vector. This should reduce the heap allocation and
