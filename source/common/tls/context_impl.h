@@ -161,8 +161,9 @@ protected:
 
   // The scope certificate expiration gauges are created in: the context-owned child scope when
   // one could be allocated, otherwise the scope passed to the context (stats mocks may not
-  // provide child scopes).
-  Stats::Scope& certScope() { return cert_scope_ != nullptr ? *cert_scope_ : scope_; }
+  // provide child scopes). Not named certScope(): certificate-selector async contexts already
+  // define AsyncContext::certScope() and multiply-inherit from this class.
+  Stats::Scope& certExpirationScope() { return cert_scope_ != nullptr ? *cert_scope_ : scope_; }
 
   // Helper function to validate cert for TCP connections asynchronously.
   ValidationResults customVerifyCertChain(
