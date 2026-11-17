@@ -508,6 +508,46 @@ TEST_F(HdsTest, TestProcessMessageInvalidFieldsWithFallback) {
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
 }
 
+// Test if processMessage exits gracefully upon receiving an invalid log path.
+TEST_F(HdsTest, TestProcessMessageUnwritableEventLogPath) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message.reset(createSimpleMessage());
+  auto* health_check = message->mutable_cluster_health_checks(0)->mutable_health_checks(0);
+  // Make the specifier invalid by using a log path that will fail.
+  health_check->set_event_log_path("/path/to/unwritable/event.log");
+
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(server_context_.access_log_manager_,
+              createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File,
+                                                          "/path/to/unwritable/event.log"}))
+      .WillOnce(Return(testing::ByMove(absl::StatusOr<AccessLog::AccessLogFileSharedPtr>(
+          absl::InvalidArgumentError("unable to open file '/path/to/unwritable/event.log'")))));
+
+  EXPECT_THROW(hds_delegate_->onReceiveMessage(std::move(message)), EnvoyException);
+}
+
+// Test if processMessage exits gracefully upon receiving an invalid socket address.
+TEST_F(HdsTest, TestProcessMessageUnresolvableEndpointAddress) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message.reset(createSimpleMessage());
+  message->mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->mutable_endpoints(0)
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_address("malformed");
+
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+
+  EXPECT_THROW(hds_delegate_->onReceiveMessage(std::move(message)), EnvoyException);
+}
+
 // Test if sendResponse() retains the structure of all endpoints ingested in the specifier
 // from onReceiveMessage(). This verifies that all endpoints are grouped by the correct
 // cluster and the correct locality.
