@@ -1,3 +1,5 @@
+#include <tuple>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -23,13 +25,35 @@ using testing::Ge;
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                 public HttpIntegrationTest {
+// The IP version, the gRPC client type and whether
+// envoy.restart_features.enable_optimized_lrs_bookkeeping is enabled.
+using LoadStatsIntegrationTestParams =
+    std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>;
+
+class LoadStatsIntegrationParamTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<LoadStatsIntegrationTestParams> {
+public:
+  static std::string
+  protocolTestParamsToString(const ::testing::TestParamInfo<LoadStatsIntegrationTestParams>& p) {
+    const bool google_grpc = std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc;
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       google_grpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) ? "OptimizedLrsBookkeeping" : "LegacyLrsBookkeeping");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  bool enableOptimizedLrsBookkeeping() const { return std::get<2>(GetParam()); }
+};
+
+class LoadStatsIntegrationTest : public LoadStatsIntegrationParamTest, public HttpIntegrationTest {
 public:
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.
     setDeterministicValue();
+    config_helper_.addRuntimeOverride("envoy.restart_features.enable_optimized_lrs_bookkeeping",
+                                      enableOptimizedLrsBookkeeping() ? "true" : "false");
   }
 
   void addEndpoint(envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoints,
@@ -521,9 +545,12 @@ public:
   const uint32_t load_report_interval_ms_ = 1000;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientType, LoadStatsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Bool()),
+    LoadStatsIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(LoadStatsIntegrationTest, EmptyLocalityAfterHealthCheckFailure) {
   initialize(true);

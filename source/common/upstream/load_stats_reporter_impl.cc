@@ -1,10 +1,21 @@
 #include "source/common/upstream/load_stats_reporter_impl.h"
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include "envoy/common/optref.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/host_description.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -20,6 +31,30 @@ MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
   return request;
 }
 
+// Latches the load stats of a newly tracked cluster and of all its hosts, so that only load
+// incurred from now on is reported for it.
+//
+// The custom load metrics of the hosts (HostDescription::loadMetricStats()) are deliberately not
+// latched, which preserves the long-standing behavior: metrics recorded before the cluster was
+// tracked are reported with the first report that visits the host, on their own if
+// envoy.reloadable_features.report_load_for_non_zero_stats is enabled and together with the next
+// request stats otherwise. Should they need to be discarded as well, add
+// host->loadMetricStats().latch() to the loop below and drop the returned map; latch() just moves
+// the map out from under the host's mutex, so this would add little to the cost of tracking a
+// cluster. LoadStatsReporterImplTest.NewlyTrackedClusterStatsAreLatched* pin the current behavior.
+void latchClusterLoadStats(const Cluster& cluster) {
+  ClusterLoadReportStats& load_report_stats = cluster.info()->loadReportStats();
+  for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
+      host->stats().rq_success_.latch();
+      host->stats().rq_error_.latch();
+      host->stats().rq_total_.latch();
+    }
+  }
+  load_report_stats.upstream_rq_dropped_.latch();
+  load_report_stats.upstream_rq_drop_overload_.latch();
+}
+
 } // namespace
 
 LoadStatsReporterImpl::LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info,
@@ -31,7 +66,10 @@ LoadStatsReporterImpl::LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_i
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
-      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()) {
+      request_template_(MakeRequestTemplate(local_info)),
+      optimized_lrs_bookkeeping_(Runtime::runtimeFeatureEnabled(
+          "envoy.restart_features.enable_optimized_lrs_bookkeeping")),
+      time_source_(dispatcher.timeSource()) {
   retry_timer_ = dispatcher.createTimer([this]() -> void {
     stats_.retries_.inc();
     establishNewStream();
@@ -83,6 +121,12 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
   // One possible way to deal with this would be to get a notification whenever a new cluster is
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
+
+  if (optimized_lrs_bookkeeping_) {
+    sendLoadStatsRequestOptimized();
+    return;
+  }
+
   Envoy::Protobuf::Arena arena;
   auto* request =
       Envoy::Protobuf::Arena::Create<envoy::service::load_stats::v3::LoadStatsRequest>(&arena);
@@ -254,6 +298,202 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
   }
 }
 
+void LoadStatsReporterImpl::sendLoadStatsRequestOptimized() {
+  Envoy::Protobuf::Arena arena;
+  auto* request =
+      Envoy::Protobuf::Arena::Create<envoy::service::load_stats::v3::LoadStatsRequest>(&arena);
+  request->MergeFrom(request_template_);
+  // Runtime features are evaluated once per report rather than once per cluster or host.
+  const bool report_load_for_non_zero_stats =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_load_for_non_zero_stats");
+  if (message_ != nullptr && message_->send_all_clusters()) {
+    // Walk the cluster manager's active clusters instead of looking every tracked cluster up by
+    // name. Active clusters that are not tracked yet are picked up by startLoadReportPeriod().
+    cm_.forEachActiveCluster([&](const Cluster& cluster) {
+      const auto it = clusters_with_state_.find(cluster.info()->name());
+      if (it == clusters_with_state_.end()) {
+        return;
+      }
+      addClusterStats(*request, it->first, cluster, it->second, report_load_for_non_zero_stats);
+    });
+  } else {
+    for (auto& [cluster_name, state] : clusters_with_state_) {
+      OptRef<const Upstream::Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
+      if (!active_cluster.has_value()) {
+        ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
+        continue;
+      }
+      addClusterStats(*request, cluster_name, *active_cluster, state,
+                      report_load_for_non_zero_stats);
+    }
+  }
+
+  ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request->DebugString());
+  stream_->sendMessage(*request, false);
+  stats_.responses_.inc();
+  // When the connection is established, the message has not yet been read so we will not have a
+  // load reporting period.
+  if (message_) {
+    startLoadReportPeriod();
+  }
+}
+
+void LoadStatsReporterImpl::addClusterStats(
+    envoy::service::load_stats::v3::LoadStatsRequest& request, const std::string& cluster_name,
+    const Cluster& cluster, ClusterLoadReportState& state, bool report_load_for_non_zero_stats) {
+  auto* cluster_stats = request.add_cluster_stats();
+  cluster_stats->set_cluster_name(cluster_name);
+  const ClusterInfoConstSharedPtr cluster_info = cluster.info();
+  if (const auto& name = cluster_info->edsServiceName(); !name.empty()) {
+    cluster_stats->set_cluster_service_name(name);
+  }
+  ClusterLoadReportStats& load_report_stats = cluster_info->loadReportStats();
+  addLocalityStats(*cluster_stats, cluster, report_load_for_non_zero_stats);
+  cluster_stats->set_total_dropped_requests(load_report_stats.upstream_rq_dropped_.latch());
+  const uint64_t drop_overload_count = load_report_stats.upstream_rq_drop_overload_.latch();
+  if (drop_overload_count > 0) {
+    auto* dropped_request = cluster_stats->add_dropped_requests();
+    dropped_request->set_category(cluster.dropCategory());
+    dropped_request->set_dropped_count(drop_overload_count);
+  }
+
+  const auto now = time_source_.monotonicTime().time_since_epoch();
+  const auto measured_interval = now - state.interval_start;
+  cluster_stats->mutable_load_report_interval()->MergeFrom(
+      Protobuf::util::TimeUtil::MicrosecondsToDuration(
+          std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
+  state.interval_start = now;
+}
+
+void LoadStatsReporterImpl::addLocalityStats(
+    envoy::config::endpoint::v3::ClusterStats& cluster_stats, const Cluster& cluster,
+    bool report_load_for_non_zero_stats) {
+  for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
+    for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
+      if (hosts.empty()) {
+        continue;
+      }
+      uint64_t rq_success = 0;
+      uint64_t rq_error = 0;
+      uint64_t rq_active = 0;
+      uint64_t rq_issued = 0;
+      LoadMetricStats::StatMap aggregated_host_custom_metrics;
+
+      // This message is removed if no upstream locality stats need to be sent.
+      auto* locality_stats = cluster_stats.add_upstream_locality_stats();
+      locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
+      locality_stats->set_priority(host_set->priority());
+
+      for (const HostSharedPtr& host : hosts) {
+        uint64_t host_rq_success = host->stats().rq_success_.latch();
+        uint64_t host_rq_error = host->stats().rq_error_.latch();
+        uint64_t host_rq_active = host->stats().rq_active_.value();
+        uint64_t host_rq_issued = host->stats().rq_total_.latch();
+
+        // Check if the host has any load stats updates. If the host has no load stats updates, we
+        // skip it.
+        bool endpoint_has_updates =
+            (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
+
+        std::unique_ptr<LoadMetricStats::StatMap> host_custom_metrics;
+        if (report_load_for_non_zero_stats) {
+          host_custom_metrics = host->loadMetricStats().latch();
+          if (host_custom_metrics != nullptr) {
+            endpoint_has_updates = true;
+          }
+        }
+
+        if (endpoint_has_updates) {
+          rq_success += host_rq_success;
+          rq_error += host_rq_error;
+          rq_active += host_rq_active;
+          rq_issued += host_rq_issued;
+
+          envoy::config::endpoint::v3::UpstreamEndpointStats* upstream_endpoint_stats = nullptr;
+          // Set the upstream endpoint stats if we are reporting endpoint granularity.
+          if (message_ && message_->report_endpoint_granularity()) {
+            upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
+            Network::Utility::addressToProtobufAddress(*host->address(),
+                                                       *upstream_endpoint_stats->mutable_address());
+            upstream_endpoint_stats->set_total_successful_requests(host_rq_success);
+            upstream_endpoint_stats->set_total_error_requests(host_rq_error);
+            upstream_endpoint_stats->set_total_requests_in_progress(host_rq_active);
+            upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
+          }
+
+          // TODO(fcfort): Remove this latch() call when cleaning up
+          // `report_load_for_non_zero_stats`.
+          if (host_custom_metrics == nullptr) {
+            host_custom_metrics = host->loadMetricStats().latch();
+          }
+          if (host_custom_metrics != nullptr) {
+            for (const auto& metric : *host_custom_metrics) {
+              const auto& metric_name = metric.first;
+              const auto& metric_value = metric.second;
+
+              // Add the metric to the load metrics map.
+              LoadMetricStats::Stat& stat = aggregated_host_custom_metrics[metric_name];
+              stat.num_requests_with_metric += metric_value.num_requests_with_metric;
+              stat.total_metric_value += metric_value.total_metric_value;
+
+              // If we are reporting endpoint granularity, add the metric to the upstream endpoint
+              // stats.
+              if (upstream_endpoint_stats != nullptr) {
+                auto* endpoint_load_metric = upstream_endpoint_stats->add_load_metric_stats();
+                endpoint_load_metric->set_metric_name(metric_name);
+                endpoint_load_metric->set_num_requests_finished_with_metric(
+                    metric_value.num_requests_with_metric);
+                endpoint_load_metric->set_total_metric_value(metric_value.total_metric_value);
+              }
+            }
+          }
+        }
+      }
+
+      // Upstream locality stats
+
+      bool should_send_locality_stats = false;
+      if (report_load_for_non_zero_stats) {
+        bool has_host_custom_metrics = false;
+        for (const auto& metric : aggregated_host_custom_metrics) {
+          if (metric.second.num_requests_with_metric != 0 ||
+              metric.second.total_metric_value != 0) {
+            has_host_custom_metrics = true;
+            break;
+          }
+        }
+        should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 ||
+                                     rq_issued != 0 || has_host_custom_metrics;
+      } else {
+        // If rq_active is non-zero, we should send the locality stats even if
+        // rq_issued is zero (no new requests have been issued in this poll
+        // window). This is needed to report long-lived connections/requests (e.g., when
+        // web-sockets are used).
+        should_send_locality_stats = (rq_issued != 0) || (rq_active != 0);
+      }
+
+      if (should_send_locality_stats) {
+        locality_stats->set_total_successful_requests(rq_success);
+        locality_stats->set_total_error_requests(rq_error);
+        locality_stats->set_total_requests_in_progress(rq_active);
+        locality_stats->set_total_issued_requests(rq_issued);
+        for (const auto& metric : aggregated_host_custom_metrics) {
+          auto* load_metric_stats = locality_stats->add_load_metric_stats();
+          load_metric_stats->set_metric_name(metric.first);
+          load_metric_stats->set_num_requests_finished_with_metric(
+              metric.second.num_requests_with_metric);
+          load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+        }
+      } else {
+        // If no upstream locality stats need to be sent, this trims the empty message that was
+        // added near the beginning of the host set loop.
+        cluster_stats.mutable_upstream_locality_stats()->RemoveLast();
+      }
+    }
+  }
+}
+
 void LoadStatsReporterImpl::handleFailure() {
   stats_.errors_.inc();
   setRetryTimer();
@@ -275,7 +515,19 @@ void LoadStatsReporterImpl::onReceiveMessage(
   stats_.requests_.inc();
 }
 
+bool LoadStatsReporterImpl::trackCluster(absl::string_view cluster_name,
+                                         std::chrono::steady_clock::duration now) {
+  const auto [it, inserted] = clusters_with_state_.try_emplace(cluster_name, now);
+  it->second.generation = generation_;
+  return inserted;
+}
+
 void LoadStatsReporterImpl::startLoadReportPeriod() {
+  if (optimized_lrs_bookkeeping_) {
+    startLoadReportPeriodOptimized();
+    return;
+  }
+
   // Once a cluster is tracked, we don't want to reset its stats between reports
   // to avoid racing between request/response.
   // TODO(htuch): They key here could be absl::string_view, but this causes
@@ -337,6 +589,38 @@ void LoadStatsReporterImpl::startLoadReportPeriod() {
       handle_cluster_func(cluster_name);
     }
   }
+  response_timer_->enableTimer(std::chrono::milliseconds(
+      DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
+}
+
+void LoadStatsReporterImpl::startLoadReportPeriodOptimized() {
+  // Once a cluster is tracked, we don't want to reset its stats between reports
+  // to avoid racing between request/response.
+  const auto now = time_source_.monotonicTime().time_since_epoch();
+  ++generation_;
+  if (message_->send_all_clusters()) {
+    cm_.forEachActiveCluster([this, now](const Cluster& cluster) {
+      if (trackCluster(cluster.info()->name(), now)) {
+        latchClusterLoadStats(cluster);
+      }
+    });
+  } else {
+    for (const std::string& cluster_name : message_->clusters()) {
+      if (trackCluster(cluster_name, now)) {
+        // The cluster may not exist (yet). Its stats are then not latched when it appears, so
+        // that all of its load is reported, consistent with the measurement interval starting
+        // now.
+        if (OptRef<const Cluster> cluster = cm_.getActiveCluster(cluster_name);
+            cluster.has_value()) {
+          latchClusterLoadStats(*cluster);
+        }
+      }
+    }
+  }
+  // Stop tracking clusters that are no longer selected by the LRS server. With send_all_clusters
+  // this also drops clusters that no longer exist.
+  absl::erase_if(clusters_with_state_,
+                 [this](const auto& entry) { return entry.second.generation != generation_; });
   response_timer_->enableTimer(std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
 }

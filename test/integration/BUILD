@@ -2261,6 +2261,7 @@ envoy_cc_test(
         },
         "gcc": {"build": "linux_x64_small"},
     },
+    shard_count = 2,
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
