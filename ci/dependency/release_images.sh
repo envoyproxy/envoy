@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 
-# Update the base images pinned in the release Dockerfile to the current digest of their tag,
-# and describe the result as JSON (`output`, `title`, `summary`) for the workflow to name the
+# Update the base images pinned for the release container images to the current digest of their
+# tag, and describe the result as JSON (`output`, `title`, `summary`) for the workflow to name the
 # branch and PR.
 #
 # The pinned images are the `BUILD_OS:BUILD_TAG@sha256:BUILD_SHA` args, and any
-# `FROM image:tag@sha256:... AS envoy-<name>` stage.
+# `FROM image:tag@sha256:... AS envoy-<name>` stage, of the release Dockerfile. The published images
+# are built with rules_oci (`//distribution/docker`) from the same digests, pinned by `oci.pull` in
+# `MODULE.bazel`, which are updated with them.
 
 set -e -o pipefail
 
 DOCKERFILE="${DOCKERFILE:-distribution/docker/Dockerfile-envoy}"
+MODULE_BAZEL="${MODULE_BAZEL:-MODULE.bazel}"
 
 fail() {
     echo "::error::$*" >&2
@@ -51,6 +54,8 @@ changed=()
 summary=""
 for line in "${pinned[@]}"; do
     read -r name image current <<< "$line"
+    grep -q "sha256:${current}" "$MODULE_BAZEL" \
+        || fail "${image} is pinned to ${current:0:7} in ${DOCKERFILE}, but not in ${MODULE_BAZEL}"
     latest="$(image_sha "$image")"
     [[ -n "$latest" ]] || fail "Unable to resolve the digest of ${image}"
     if [[ "$latest" == "$current" ]]; then
@@ -58,7 +63,7 @@ for line in "${pinned[@]}"; do
         continue
     fi
     echo "${image}: ${current:0:7} -> ${latest:0:7}" >&2
-    sed -i "s/${current}/${latest}/" "$DOCKERFILE"
+    sed -i "s/${current}/${latest}/" "$DOCKERFILE" "$MODULE_BAZEL"
     changed+=("${name}-${latest:0:7}")
     summary+="- \`${image}\`: ${current:0:7} -> ${latest:0:7}"$'\n'
 done
