@@ -9,7 +9,17 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -43,11 +53,23 @@ envoy_cc_test(
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "default": {"build": "linux_x64_small"},
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/common:logger",
+        "//source/common/config:decoded_resource_lib",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -63,12 +85,17 @@ envoy_cc_test(
         "//test/integration:integration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:file_system_for_test_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -94,9 +121,14 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 22009MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "cto": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_large"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
     },
     deps = [
         "//source/common/common:thread_lib",
@@ -173,8 +205,10 @@ envoy_cc_fuzz_test(
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
     },
     deps = [
         ":xds_fuzz_lib",

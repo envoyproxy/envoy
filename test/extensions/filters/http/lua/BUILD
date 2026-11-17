@@ -25,9 +25,19 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "asan": "linux_x64_small",
-        "tsan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/singleton:manager_impl_lib",
@@ -54,7 +64,10 @@ envoy_extension_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:upstream_subject_alt_names_lib",
@@ -77,8 +90,10 @@ envoy_extension_cc_test(
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     shard_count = 4,
     deps = [
@@ -104,7 +119,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:factory_context_mocks",

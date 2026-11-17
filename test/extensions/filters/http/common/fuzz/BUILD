@@ -70,9 +70,30 @@ envoy_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11621MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
     },
     # All Envoy extensions must be linked to the test in order for the fuzzer to pick
     # these up via the NamedHttpFilterConfigFactory.

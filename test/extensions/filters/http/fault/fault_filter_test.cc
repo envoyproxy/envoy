@@ -93,6 +93,33 @@ public:
     response_body: "custom response body"
   )EOF";
 
+  const std::string abort_dry_run_yaml = R"EOF(
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 429
+    dry_run: true
+  filter_metadata:
+    hello: "world"
+  )EOF";
+
+  const std::string fixed_delay_and_abort_dry_run_yaml = R"EOF(
+  delay:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+    dry_run: true
+  filter_metadata:
+    hello: "world"
+  )EOF";
+
   const std::string fixed_delay_and_abort_yaml = R"EOF(
   delay:
     percentage:
@@ -555,6 +582,104 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
+TEST_F(FaultFilterTest, AbortDryRunWithHttpStatus) {
+  setUpTest(abort_dry_run_yaml);
+
+  request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  (*(*filter_metadata["envoy.filters.http.fault"].mutable_fields())["dry_run_abort"]
+        .mutable_struct_value()
+        ->mutable_fields())["http_status"]
+      .set_number_value(429);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.max_active_faults", _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, _)).Times(0);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.cluster.abort.abort_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
+      .WillOnce(Return(429));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", 429))
+      .WillOnce(Return(429));
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(dynamic_metadata));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_dry_run_.value());
+  EXPECT_EQ(0UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
+  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.aborts_dry_run").value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
+}
+
+TEST_F(FaultFilterTest, AbortDryRunWithGrpcStatus) {
+  decoder_filter_callbacks_.is_grpc_request_ = true;
+
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
+  fault.mutable_abort()->mutable_percentage()->set_numerator(100);
+  fault.mutable_abort()->mutable_percentage()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  fault.mutable_abort()->set_grpc_status(5);
+  fault.mutable_abort()->set_dry_run(true);
+  setUpTest(fault);
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  (*(*(*dynamic_metadata.mutable_filter_metadata())["envoy.filters.http.fault"]
+          .mutable_fields())["dry_run_abort"]
+        .mutable_struct_value()
+        ->mutable_fields())["http_status"]
+      .set_number_value(429);
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  (*(*filter_metadata["envoy.filters.http.fault"].mutable_fields())["dry_run_abort"]
+        .mutable_struct_value()
+        ->mutable_fields())["grpc_status"]
+      .set_number_value(5);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.max_active_faults", _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.abort.abort_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.grpc_status", 5))
+      .WillOnce(Return(5));
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(dynamic_metadata));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_dry_run_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
+}
+
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   setUpTest(fixed_delay_only_yaml);
 
@@ -985,6 +1110,73 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, FixedDelayAndAbortDryRun) {
+  setUpTest(fixed_delay_and_abort_dry_run_yaml);
+
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(dynamic_metadata));
+
+  envoy::config::core::v3::Metadata expected_metadata;
+  auto& filter_metadata = *expected_metadata.mutable_filter_metadata();
+  auto& fault_fields = *filter_metadata["envoy.filters.http.fault"].mutable_fields();
+  fault_fields["hello"].set_string_value("world");
+  (*fault_fields["dry_run_abort"].mutable_struct_value()->mutable_fields())["http_status"]
+      .set_number_value(503);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  // Delay related calls.
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.delay.fixed_delay_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("FixedDelayAndAbortDryRun");
+  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+
+  // Abort dry-run calls after delay expires.
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.abort.abort_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
+      .WillOnce(Return(503));
+
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected))
+      .Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  timer_->invokeCallback();
+
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_THAT(dynamic_metadata, ProtoEq(expected_metadata));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_dry_run_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
@@ -1579,6 +1771,9 @@ TEST_F(FaultFilterTest, StatsAreTagged) {
                            *store.rootScope(), context_);
 
   // The plain filter stats carry no tags of their own.
+  EXPECT_EQ("prefix.fault.aborts_dry_run", config.stats().aborts_dry_run_.name());
+  EXPECT_EQ("prefix.fault.aborts_dry_run", config.stats().aborts_dry_run_.tagExtractedName());
+  EXPECT_TRUE(config.stats().aborts_dry_run_.tags().empty());
   EXPECT_EQ("prefix.fault.aborts_injected", config.stats().aborts_injected_.name());
   EXPECT_EQ("prefix.fault.aborts_injected", config.stats().aborts_injected_.tagExtractedName());
   EXPECT_TRUE(config.stats().aborts_injected_.tags().empty());
@@ -1586,8 +1781,17 @@ TEST_F(FaultFilterTest, StatsAreTagged) {
   // The per-downstream-cluster stats carry the cluster as a tag and drop it from the
   // tag-extracted name.
   Stats::StatNameDynamicStorage cluster("cluster", store.symbolTable());
+  config.incAbortsDryRun(cluster.statName());
   config.incAborts(cluster.statName());
   config.incDelays(cluster.statName());
+  const Stats::CounterSharedPtr aborts_dry_run =
+      TestUtility::findCounter(store, "prefix.fault.cluster.aborts_dry_run");
+  ASSERT_NE(aborts_dry_run, nullptr);
+  EXPECT_EQ(1U, aborts_dry_run->value());
+  EXPECT_EQ("prefix.fault.aborts_dry_run", aborts_dry_run->tagExtractedName());
+  ASSERT_EQ(1U, aborts_dry_run->tags().size());
+  EXPECT_EQ("envoy.fault_downstream_cluster", aborts_dry_run->tags()[0].name_);
+  EXPECT_EQ("cluster", aborts_dry_run->tags()[0].value_);
   const Stats::CounterSharedPtr aborts =
       TestUtility::findCounter(store, "prefix.fault.cluster.aborts_injected");
   ASSERT_NE(aborts, nullptr);

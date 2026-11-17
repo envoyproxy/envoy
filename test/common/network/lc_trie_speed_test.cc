@@ -153,4 +153,30 @@ static void lcTrieLookupMinimal(benchmark::State& state) {
 
 BENCHMARK(lcTrieLookupMinimal);
 
+// The same lookups through getDataSet(), which returns the trie's own data instead of copying it
+// into a vector. Each pair sums the same tag counts.
+template <class Inputs> static void lcTrieLookupDataSet(benchmark::State& state, Inputs inputs) {
+  CidrInputs cidr_inputs;
+  AddressInputs address_inputs;
+  auto lc_trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(inputs(cidr_inputs));
+
+  static size_t i = 0;
+  size_t output_tags = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    i++;
+    i %= address_inputs.addresses_.size();
+    const auto data = lc_trie->getDataSet(address_inputs.addresses_[i]);
+    output_tags += data.has_value() ? data->size() : 0;
+  }
+  benchmark::DoNotOptimize(output_tags);
+}
+
+BENCHMARK_CAPTURE(lcTrieLookupDataSet, Default,
+                  [](CidrInputs& inputs) -> auto& { return inputs.tag_data_; });
+BENCHMARK_CAPTURE(lcTrieLookupDataSet, WithNestedPrefixes,
+                  [](CidrInputs& inputs) -> auto& { return inputs.tag_data_nested_prefixes_; });
+BENCHMARK_CAPTURE(lcTrieLookupDataSet, Minimal,
+                  [](CidrInputs& inputs) -> auto& { return inputs.tag_data_minimal_; });
+
 } // namespace Envoy
