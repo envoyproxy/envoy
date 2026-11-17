@@ -7,6 +7,7 @@ load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_rbe.bzl", "envoy_exec_properties")
 load("//distribution/binary:debug.bzl", "compressed_debug_parts")
+load("//distribution/binary:strip.bzl", "host_stripped")
 load(":changes.bzl", "debian_files", "envoy_signed_changes")
 load(":packages.bzl", "MAINTAINER", "PUBLISH_PACKAGING_TAGS", "envoy_pkg_distros", "release_version_for")
 
@@ -38,7 +39,7 @@ label_flag(
 
 label_flag(
     name = "envoy-binary-stripped",
-    build_setting_default = "//source/exe:envoy-static.stripped",
+    build_setting_default = ":envoy-binary-stripped-default",
 )
 
 label_flag(
@@ -53,13 +54,46 @@ label_flag(
 
 label_flag(
     name = "envoy-contrib-binary-stripped",
-    build_setting_default = "//contrib/exe:envoy-static.stripped",
+    build_setting_default = ":envoy-contrib-binary-stripped-default",
 )
 
 label_flag(
     name = "envoy-contrib-dwarf",
     build_setting_default = "//contrib/exe:envoy-static.dwp",
 )
+
+# The stripped binaries: their `.stripped`, stripped where they are built, or with
+# `//distribution/binary:host-strip` stripped on the host (`//distribution/binary:strip.bzl`),
+# locally: the binaries are downloaded for packaging anyway.
+# Not the tools (`//tools/...:*_tool.stripped`): they are `testonly` on this branch, which only
+# their output files can be used without, and they are small.
+STRIPPED = {
+    "envoy-binary": ("//source/exe:envoy-static", ":envoy-binary"),
+    "envoy-contrib-binary": ("//contrib/exe:envoy-static", ":envoy-contrib-binary"),
+}
+
+[
+    host_stripped(
+        name = "%s-host-stripped" % name,
+        src = flag or binary,
+        # The host of `ci/do_ci.sh release.multiarch`, which sets `host-strip`.
+        exec_compatible_with = ["@platforms//cpu:x86_64"],
+        tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
+    )
+    for name, (binary, flag) in STRIPPED.items()
+]
+
+[
+    alias(
+        name = "%s-stripped-default" % name,
+        actual = select({
+            "//distribution/binary:host_strip": ":%s-host-stripped" % name,
+            "//conditions:default": "%s.stripped" % binary,
+        }),
+        visibility = ["//distribution:__subpackages__"],
+    )
+    for name, (binary, _flag) in STRIPPED.items()
+]
 
 # The `.dwp`s with their debug sections compressed: llvm-dwp writes them uncompressed, several GB.
 # With zlib, which the debug images' gdb (12, Ubuntu 22.04) reads; it reads zstd only from gdb 13.

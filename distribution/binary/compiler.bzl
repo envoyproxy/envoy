@@ -55,19 +55,46 @@
 # ```
 #
 
+# With `//distribution/binary:arm64-exec-platform` set (to an execution platform with arm64 workers,
+# eg `//bazel/platforms/rbe:linux_arm64`), the targets of an arm64 build prefer it, so that they are
+# built on arm64 workers, natively, whatever the host is, rather than cross-compiled: this branch's
+# `rules_foreign_cc` dependencies (eg ICU, LuaJIT) can not be. It needs a toolchain for that platform
+# (`--extra_toolchains=@llvm_toolchain_arm64//:all`).
+#
+# Only the bundled targets (the binaries) are built there: what packages them is not, and runs as it
+# does for any other build (locally, on the host).
+
+_ARM64_EXEC_PLATFORM = "//distribution/binary:arm64-exec-platform"
+_EXEC_PLATFORMS = "//command_line_option:extra_execution_platforms"
+_PLATFORMS = "//command_line_option:platforms"
+
 def _compilation_config_impl(settings, attr):
-    _ignore = settings
+    exec_platforms = settings[_EXEC_PLATFORMS]
+    arm64_exec_platform = settings[_ARM64_EXEC_PLATFORM]
+    arm64_build = any([str(platform).endswith("_arm64") for platform in settings[_PLATFORMS]])
+    if arm64_exec_platform and arm64_build:
+        exec_platforms = [arm64_exec_platform] + [
+            platform
+            for platform in exec_platforms
+            if str(platform) != arm64_exec_platform
+        ]
     return {
         "//command_line_option:compilation_mode": attr.mode,
         "//command_line_option:stripopt": attr.stripopts,
+        _EXEC_PLATFORMS: exec_platforms,
     }
 
 compilation_config = transition(
     implementation = _compilation_config_impl,
-    inputs = [],
+    inputs = [
+        _ARM64_EXEC_PLATFORM,
+        _EXEC_PLATFORMS,
+        _PLATFORMS,
+    ],
     outputs = [
         "//command_line_option:compilation_mode",
         "//command_line_option:stripopt",
+        _EXEC_PLATFORMS,
     ],
 )
 

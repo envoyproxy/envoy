@@ -1250,8 +1250,20 @@ case $CI_TARGET in
             done
             PUBLISH_OPTIONS=()
             if [[ "$CI_TARGET" == "release.multiarch" ]]; then
-                # Both arches' actions run on x86_64 workers (`//bazel:multiarch`).
-                PUBLISH_OPTIONS+=(--//bazel:multiarch)
+                # The arm64 binaries are built on arm64 workers, with a toolchain for them: this
+                # branch's `rules_foreign_cc` dependencies (eg ICU, LuaJIT) can not be
+                # cross-compiled. They are packaged on the host, as the x64 ones are.
+                # They are stripped by the host's strip (`host-strip`), locally, as it can not run
+                # the arm64 workers'.
+                PUBLISH_OPTIONS+=(
+                    --//distribution/binary:arm64-exec-platform=//bazel/platforms/rbe:linux_arm64
+                    --//distribution/binary:host-strip
+                    --extra_toolchains=@llvm_toolchain_arm64//:all)
+            else
+                # Strip locally: the client downloads the release binaries anyway (the release
+                # tarball and the images are built locally), while a remote strip waits on a
+                # worker fetching the freshly linked binary (~30s).
+                PUBLISH_OPTIONS+=(--modify_execution_info=CcStrip=+no-remote-exec)
             fi
             # `release.multiarch` with a signing key (`ENVOY_SIGNING_KEY_PATH`) also signs the release
             # of both arches (`//distribution:signed`, as `release.signed`), in the same invocation:
@@ -1277,13 +1289,9 @@ case $CI_TARGET in
                 PUBLISH_TARGETS+=(//distribution:signed)
                 rm -f "${BUILD_DIR}/envoy/release.signed.tar.zst"
             fi
-            # Strip locally: the client downloads the release binaries anyway (the release tarball
-            # and the images are built locally), while a remote strip waits on a worker fetching the
-            # freshly linked binary (~30s).
             bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
                   "${PUBLISH_OPTIONS[@]}" \
                   --remote_download_toplevel \
-                  --modify_execution_info=CcStrip=+no-remote-exec \
                   "${PUBLISH_TARGETS[@]}"
             # The outputs are large (several GB): hardlink them where they are on the same filesystem
             # (bazel replaces its outputs rather than writing to them), else copy them (dereferenced: some
