@@ -1,11 +1,11 @@
-load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_repo//:version.bzl", "VERSION")
 load("@envoy_toolshed//pgp:defs.bzl", "pgp_public_key", "pgp_sign_checksums")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_rbe.bzl", "envoy_exec_properties")
 load("//distribution/binary:debug.bzl", "compressed_debug_parts")
 load(":changes.bzl", "debian_files", "envoy_signed_changes")
 load(":packages.bzl", "MAINTAINER", "PUBLISH_PACKAGING_TAGS", "envoy_pkg_distros", "release_version_for")
@@ -61,35 +61,6 @@ label_flag(
     build_setting_default = "//contrib/exe:envoy-static.dwp",
 )
 
-# Set by `ci/do_ci.sh release.multiarch`, which builds both arches from an x64 host: on EngFlow,
-# their actions run on x86_64 workers, whichever arch they target.
-bool_flag(
-    name = "multiarch",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "multiarch_build",
-    flag_values = {":multiarch": "true"},
-)
-
-selects.config_setting_group(
-    name = "engflow_rbe_multiarch",
-    match_all = [
-        "//bazel:engflow_rbe",
-        ":multiarch_build",
-    ],
-)
-
-# EngFlow builds whose actions run on x86_64 workers: x64 builds, and both arches of a multiarch one.
-selects.config_setting_group(
-    name = "engflow_rbe_x86_64_workers",
-    match_any = [
-        "//bazel:engflow_rbe_x86_64",
-        ":engflow_rbe_multiarch",
-    ],
-)
-
 # The `.dwp`s with their debug sections compressed: llvm-dwp writes them uncompressed, several GB.
 # With zlib, which the debug images' gdb (12, Ubuntu 22.04) reads; it reads zstd only from gdb 13.
 # TODO(phlax): zstd (smaller, and ~3x faster to compress) once the images are based on Ubuntu 24.04
@@ -104,13 +75,10 @@ selects.config_setting_group(
         name = "%s-parts" % dwarf,
         src = ":%s" % dwarf,
         compression = "zlib",
-        # The large x86_64 pool for x64 builds, and for both arches with `release.multiarch` (the
-        # arm64 release is built in the x64 job, on x86_64 workers). A native arm64 build keeps its
-        # platform's arm pool.
-        exec_properties = select({
-            ":engflow_rbe_x86_64_workers": {"Pool": "linux_x64_large"},
-            "//conditions:default": {},
-        }),
+        exec_properties = envoy_exec_properties(
+            rbe_pool = "linux_x64_large",
+            test = False,
+        ),
         parts = 4,
     )
     for dwarf in [

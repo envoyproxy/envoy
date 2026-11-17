@@ -1200,8 +1200,8 @@ case $CI_TARGET in
             done
             PUBLISH_OPTIONS=()
             if [[ "$CI_TARGET" == "release.multiarch" ]]; then
-                # Both arches' actions run on x86_64 workers (`//distribution:multiarch`).
-                PUBLISH_OPTIONS+=(--//distribution:multiarch)
+                # Both arches' actions run on x86_64 workers (`//bazel:multiarch`).
+                PUBLISH_OPTIONS+=(--//bazel:multiarch)
             fi
             # `release.multiarch` with a signing key (`ENVOY_SIGNING_KEY_PATH`) also signs the release
             # of both arches (`//distribution:signed`, as `release.signed`), in the same invocation:
