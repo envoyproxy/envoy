@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "proxy_protocol_header_test",
     srcs = ["proxy_protocol_header_test.cc"],
     rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
         "coverage": {"link": "linux_x64_large"},
         "tsan": {"link": "linux_x64_small"},
     },
