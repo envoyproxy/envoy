@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
@@ -40,7 +43,10 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/access_loggers/grpc:grpc_access_log_utils",
         "//test/mocks/local_info:local_info_mocks",
@@ -59,7 +65,11 @@ envoy_extension_cc_test(
     name = "http_grpc_access_log_impl_test",
     srcs = ["http_grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
@@ -79,7 +89,17 @@ envoy_extension_cc_test(
     name = "http_config_test",
     srcs = ["http_config_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
         "//test/mocks/server:factory_context_mocks",
@@ -93,7 +113,34 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "linux_x64_medium",
+    # linux_x64_xlarge: the coverage link peaks at 15140MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+    },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -113,7 +160,17 @@ envoy_extension_cc_test(
     name = "tcp_config_test",
     srcs = ["tcp_config_test.cc"],
     extension_names = ["envoy.access_loggers.tcp_grpc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/access_loggers/grpc:tcp_config",
         "//test/mocks/server:factory_context_mocks",
@@ -133,7 +190,27 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.access_loggers.tcp_grpc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 16036MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

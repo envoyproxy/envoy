@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "csrf_filter_test",
     srcs = ["csrf_filter_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/csrf:config",
@@ -34,7 +44,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["csrf_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15095MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

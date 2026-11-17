@@ -11,7 +11,17 @@ envoy_package()
 envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/http:protocol_interface",
         "//envoy/router:router_interface",
@@ -39,7 +49,19 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "asan": {"build": "default"},
+    },
     deps = [
         "//source/extensions/upstreams/http/udp:config",
         "//source/extensions/upstreams/http/udp:upstream_request_lib",

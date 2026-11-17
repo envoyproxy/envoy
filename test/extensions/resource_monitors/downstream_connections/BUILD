@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     name = "downstream_connections_monitor_test",
     srcs = ["downstream_connections_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
         "@com_google_absl//absl/types:optional",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/extensions/resource_monitors/downstream_connections:config",
@@ -44,7 +44,27 @@ envoy_cc_test(
     name = "cx_limit_overload_integration_test",
     size = "large",
     srcs = ["cx_limit_overload_integration_test.cc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15217MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = [
         "cpu:3",
     ],

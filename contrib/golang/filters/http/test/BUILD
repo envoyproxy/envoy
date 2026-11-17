@@ -16,7 +16,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//contrib/golang/filters/http/test/test_data/destroyconfig:destroyconfig_test_lib",
@@ -31,7 +31,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/golang/filters/http/source:golang_filter_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -54,7 +54,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
@@ -80,7 +80,7 @@ envoy_cc_fuzz_test(
     name = "golang_filter_fuzz_test",
     srcs = ["golang_filter_fuzz_test.cc"],
     corpus = "golang_filter_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
         "//contrib/golang/common/dso/test:dso_mocks",
@@ -102,7 +102,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     tags = [
         "cpu:3",
     ],

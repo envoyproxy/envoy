@@ -68,7 +68,7 @@ envoy_cc_test_library(
         "uber_readfilter.cc",
     ],
     hdrs = ["uber_readfilter.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":network_readfilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
@@ -90,7 +90,23 @@ envoy_cc_fuzz_test(
     srcs = ["network_readfilter_fuzz_test.cc"],
     corpus = "network_readfilter_corpus",
     dictionaries = ["network_readfilter_fuzz_test.dict"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 14288MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     deps = [
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
@@ -120,7 +136,7 @@ envoy_cc_test_library(
         "uber_writefilter.cc",
     ],
     hdrs = ["uber_writefilter.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":network_writefilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
@@ -135,7 +151,19 @@ envoy_cc_fuzz_test(
     name = "network_writefilter_fuzz_test",
     srcs = ["network_writefilter_fuzz_test.cc"],
     corpus = "network_writefilter_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 12819MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [

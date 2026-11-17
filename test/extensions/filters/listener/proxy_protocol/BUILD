@@ -18,7 +18,17 @@ envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
         "//source/common/buffer:buffer_lib",
@@ -58,7 +68,11 @@ envoy_cc_fuzz_test(
     name = "proxy_protocol_fuzz_test",
     srcs = ["proxy_protocol_fuzz_test.cc"],
     corpus = "proxy_protocol_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
+    },
     deps = [
         ":proxy_protocol_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
@@ -77,7 +91,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["proxy_proto_integration_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15228MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":proxy_proto_integration_test_lib",
         "//source/common/buffer:buffer_lib",

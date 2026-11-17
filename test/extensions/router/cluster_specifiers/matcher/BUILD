@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "matcher_cluster_specifier_test",
     srcs = ["matcher_cluster_specifier_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/router/cluster_specifiers/matcher:config",
         "//source/extensions/router/cluster_specifiers/matcher:matcher_cluster_specifier_lib",
@@ -30,7 +40,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/router/cluster_specifiers/matcher:config",
         "//test/mocks/server:factory_context_mocks",
@@ -42,7 +62,27 @@ envoy_extension_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15096MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/router/cluster_specifiers/matcher:config",

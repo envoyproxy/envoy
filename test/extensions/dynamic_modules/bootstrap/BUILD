@@ -22,6 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_server_initialized",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_worker_initialized",
     ],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -37,6 +38,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:extension_lib",
         "//test/test_common:environment_lib",
@@ -51,6 +53,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_new",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//test/mocks/server:factory_context_mocks",
@@ -68,6 +81,27 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
     ],
+    # linux_x64_xlarge: the coverage link peaks at 15084MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//test/integration:http_integration_lib",

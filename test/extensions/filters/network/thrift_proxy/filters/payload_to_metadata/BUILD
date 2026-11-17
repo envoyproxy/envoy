@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.thrift.payload_to_metadata"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:config",
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:payload_to_metadata_filter_lib",
@@ -29,7 +39,17 @@ envoy_extension_cc_test(
     name = "payload_to_metadata_filter_test",
     srcs = ["payload_to_metadata_filter_test.cc"],
     extension_names = ["envoy.filters.thrift.payload_to_metadata"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:payload_to_metadata_filter_lib",
         "//test/extensions/filters/network/thrift_proxy:mocks",

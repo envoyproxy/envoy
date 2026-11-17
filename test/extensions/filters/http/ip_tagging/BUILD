@@ -15,7 +15,11 @@ envoy_extension_cc_test(
     name = "ip_tagging_filter_test",
     srcs = ["ip_tagging_filter_test.cc"],
     extension_names = ["envoy.filters.http.ip_tagging"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -36,7 +40,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["ip_tagging_integration_test.cc"],
     extension_names = ["envoy.filters.http.ip_tagging"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15068MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/ip_tagging:config",
         "//test/integration:http_integration_lib",

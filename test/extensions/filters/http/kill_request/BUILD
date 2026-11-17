@@ -16,7 +16,11 @@ envoy_extension_cc_test(
     name = "kill_request_filter_test",
     srcs = ["kill_request_filter_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
@@ -33,7 +37,17 @@ envoy_extension_cc_test(
     name = "kill_request_config_test",
     srcs = ["kill_request_config_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/mocks/server:factory_context_mocks",
@@ -47,7 +61,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["kill_request_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.kill_request"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15045MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 8,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
@@ -60,7 +94,21 @@ envoy_cc_test(
     size = "large",
     srcs = ["crash_integration_test.cc"],
     coverage = False,
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 8,
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",

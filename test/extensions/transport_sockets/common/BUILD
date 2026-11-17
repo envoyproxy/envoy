@@ -11,7 +11,11 @@ envoy_package()
 envoy_cc_test(
     name = "passthrough_test",
     srcs = ["passthrough_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/transport_sockets/common:passthrough_lib",
         "//test/mocks/buffer:buffer_mocks",

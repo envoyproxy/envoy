@@ -29,7 +29,27 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 17190MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
@@ -57,7 +77,27 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 17172MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
@@ -91,7 +131,27 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 17190MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -128,7 +188,27 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 17115MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -151,7 +231,27 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 16867MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 4,
     tags = ["skip_on_windows"],
     deps = [
@@ -179,7 +279,30 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:panic_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_large",
+    # linux_x64_xlarge: the coverage link peaks at 22616MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "gcc": {
+            "build": "linux_x64_small",
+            "link": "default",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",

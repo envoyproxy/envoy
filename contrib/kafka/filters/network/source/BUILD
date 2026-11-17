@@ -46,6 +46,7 @@ envoy_cc_library(
         "external/requests.h",
         "kafka_request_parser.h",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":kafka_request_lib",
         ":parser_lib",
@@ -114,7 +115,7 @@ envoy_cc_library(
         "external/responses.h",
         "kafka_response_parser.h",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":kafka_response_lib",
         ":parser_lib",

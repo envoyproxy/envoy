@@ -23,7 +23,19 @@ envoy_cc_fuzz_test(
     name = "ext_proc_unit_test_fuzz",
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 12975MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_unit_test_fuzz_proto_cc_proto",

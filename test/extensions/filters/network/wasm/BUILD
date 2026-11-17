@@ -24,7 +24,34 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.network.wasm"],
-    rbe_pool = "linux_x64_large",
+    # linux_x64_xlarge: the coverage link peaks at 16866MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
@@ -53,7 +80,34 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/wasm/test_data:resume_call_rust.wasm",
     ]),
     extension_names = ["envoy.filters.network.wasm"],
-    rbe_pool = "linux_x64_large",
+    # linux_x64_xlarge: the coverage link peaks at 16533MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/wasm:wasm_filter_lib",

@@ -20,6 +20,11 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -36,6 +41,11 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/udp/dynamic_modules:filter_lib",
@@ -52,6 +62,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
@@ -68,6 +89,27 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
     ],
+    # linux_x64_xlarge: the coverage link peaks at 14856MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//source/extensions/filters/udp/udp_proxy:config",

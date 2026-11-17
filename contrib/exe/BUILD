@@ -37,7 +37,7 @@ envoy_cc_library(
 
 envoy_cc_binary(
     name = "envoy-static",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"link": "linux_x64_small"},
     stamped = True,
     visibility = ["//visibility:public"],
     deps = [
@@ -67,7 +67,7 @@ envoy_cc_test(
         "DISABLE_TEST_MERGE": "true",
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"link": "linux_x64_small"},
     deps = [
         "//test/config_test:example_configs_test_lib",
     ] + SELECTED_CONTRIB_EXTENSIONS,

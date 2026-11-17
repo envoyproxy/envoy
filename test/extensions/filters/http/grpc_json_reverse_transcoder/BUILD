@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "utils_test",
     srcs = ["utils_test.cc"],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:utils",
@@ -31,7 +31,17 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:filter",
@@ -46,7 +56,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:config",
         "//test/mocks/server:factory_context_mocks",
@@ -64,7 +84,34 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_large",
+    # linux_x64_xlarge: the coverage link peaks at 15142MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     tags = [
         "cpu:3",
     ],
