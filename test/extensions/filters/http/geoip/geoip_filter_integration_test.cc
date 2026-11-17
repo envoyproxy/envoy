@@ -1,5 +1,7 @@
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 
+#include "source/common/stats/utility.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -246,6 +248,54 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataDontPopulatedWhenCalledFromLocalhosNoX
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.hit"));
 }
 
+// The loopback address is in none of the test databases, so the lookup populates nothing. The
+// geolocation headers the client sent must not reach the upstream in its place.
+TEST_P(GeoipFilterIntegrationTest, ClientSuppliedGeoHeadersRemovedWhenLookupHasNoData) {
+  config_helper_.prependFilter(TestEnvironment::substitute(DefaultConfig));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},       {":path", "/"},          {":scheme", "http"},
+      {":authority", "host"},   {"x-geo-country", "US"}, {"x-geo-region", "WA"},
+      {"x-geo-city", "Milton"}, {"x-geo-asn", "209"},    {"x-unrelated", "kept"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-geo-country")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-geo-region")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-geo-city")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-geo-asn")).empty());
+  EXPECT_EQ("kept", headerValue("x-unrelated"));
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.city_db.hit"));
+}
+
+// When the lookup does have data, the value from the database is the only one the upstream sees:
+// the client's copy is removed rather than left as a second value of the same header.
+TEST_P(GeoipFilterIntegrationTest, ClientSuppliedGeoHeadersReplacedWhenLookupHasData) {
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "216.160.83.56"},
+                                                 {"x-geo-country", "ZZ"},
+                                                 {"x-geo-anon-vpn", "true"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, upstream_request_->headers().get(Http::LowerCaseString("x-geo-country")).size());
+  EXPECT_EQ("US", headerValue("x-geo-country"));
+  EXPECT_EQ("Milton", headerValue("x-geo-city"));
+  // 216.160.83.56 is not in the anonymous IP test database, so the lookup sets no anon headers
+  // and the client's claim is not carried through either.
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-geo-anon-vpn")).empty());
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
+}
+
 TEST_P(GeoipFilterIntegrationTest, GeoAnonDataPopulatedUseXff) {
   config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
   initialize();
@@ -488,8 +538,16 @@ TEST_P(GeoipFilterIntegrationTest, OnlyApplePrivateRelayHeaderIsPopulated) {
 TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
   config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
   initialize();
-  EXPECT_EQ(1671567063,
-            test_server_->gauge("http.config_test.maxmind.city_db.db_build_epoch")->value());
+  // A database file is shared between listeners, so the stats describing it are rooted at the
+  // provider's own "maxmind." namespace rather than at the listener's stat prefix, and they name
+  // the file they describe.
+  const std::string db_name = Stats::Utility::sanitizeStatsName(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/"
+      "GeoLite2-City-Test.mmdb"));
+  const Stats::GaugeSharedPtr build_epoch =
+      test_server_->gauge(absl::StrCat("maxmind.city_db.", db_name, ".db_build_epoch"));
+  ASSERT_NE(build_epoch, nullptr);
+  EXPECT_EQ(1671567063, build_epoch->value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {

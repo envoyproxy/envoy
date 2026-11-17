@@ -73,20 +73,37 @@ void IoHandleImpl::setAbortiveClose() {
   }
 }
 
+void IoHandleImpl::onPeerDestroy() {
+  // Record that the peer fully closed (close(), not shutdown(WR)) so half-close-enabled
+  // connections can deliver any remaining data + end_stream and then close normally without
+  // leaking or synthesizing ECONNRESET. Kept under the same runtime guard as setAbortiveClose().
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+    peer_closed_ = true;
+  }
+  peer_handle_ = nullptr;
+  sent_eof_ = true;
+  if (user_file_event_) {
+    // A connection waiting to flush may only be listening for Write. Wake it so that it can
+    // detect the closed peer and release its pending write buffer.
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+  }
+}
+
 Api::IoCallUint64Result IoHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
+      // Record peer destruction before waking Read/Closed events on the peer.
+      peer_handle_->onPeerDestroy();
       if (rst_requested_) {
         peer_handle_->setRst();
       } else {
         // Notify the peer that it will not receive more data. shutdown(WRITE).
         peer_handle_->setEof();
       }
-      // Notify the peer that we no longer accept data. shutdown(RD).
-      peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
     } else {
       ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
@@ -103,6 +120,8 @@ Api::IoCallUint64Result IoHandleImpl::close() {
 bool IoHandleImpl::isOpen() const { return !closed_; }
 
 bool IoHandleImpl::wasConnected() const { return false; }
+
+bool IoHandleImpl::wasPeerFullyClosed() const { return peer_closed_; }
 
 Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                             uint64_t num_slice) {

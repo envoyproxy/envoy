@@ -17,7 +17,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), server_context, init_manager);
+        config.sds_config(), config.name(), server_context, init_manager, true);
   } else {
     return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
@@ -33,7 +33,8 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
   auto secret_provider = secretsProvider(credential_secret, context, init_manager);
 
   auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
-      std::move(secret_provider), context.threadLocal(), context.api());
+      std::move(secret_provider), context.threadLocal(), context.api(),
+      context.mainThreadDispatcher());
   std::string header = config.header();
   if (header.empty()) {
     header = "Authorization";

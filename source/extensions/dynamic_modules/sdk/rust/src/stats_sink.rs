@@ -6,6 +6,7 @@
 //! return a [`StatSink`] from it.
 
 use crate::{abi, ffi_export, EnvoyBuffer, EnvoyGaugeId, NewStatSinkConfigFunction};
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::{c_char, c_void};
 use std::marker::PhantomData;
@@ -42,7 +43,9 @@ pub struct HistogramBucket {
 /// Read-only view over the metrics captured for a single flush.
 ///
 /// The snapshot is owned by Envoy and is valid only until the [`StatSink::on_flush`] call
-/// returns. Stat names and text-readout values are decoded directly into a caller-provided
+/// returns. To read it after that, for example on a Tokio worker, call
+/// [`retain`](Self::retain). Stat names and text-readout values are decoded directly into a
+/// caller-provided
 /// `Vec<u8>`, which the SDK clears and grows as needed, so a single buffer can be reused across
 /// every entry to avoid allocating a string per metric. The bytes are the same UTF-8 form
 /// produced by Envoy's stats subsystem.
@@ -368,6 +371,87 @@ impl<'a> MetricSnapshot<'a> {
     })
   }
 
+  /// Reads the histogram's tag-extracted name into `name`. See
+  /// [`counter_tag_extracted_name`](Self::counter_tag_extracted_name).
+  ///
+  /// During [`StatSink::on_flush`], use the raw name from [`histogram`](Self::histogram) as a
+  /// cache key and copy this name and all tags into module-owned storage. This lets a sink keep
+  /// aggregating raw observations from [`StatSink::on_histogram_complete`] off-thread without
+  /// guessing labels from the flat name. These getters read metadata, not histogram statistics.
+  pub fn histogram_tag_extracted_name(&self, index: usize, name: &mut Vec<u8>) -> bool {
+    fill_buffer(name, |ptr, capacity, size| unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+        self.envoy_ptr,
+        index,
+        ptr,
+        capacity,
+        size,
+      )
+    })
+  }
+
+  /// The number of tags on the histogram at `index`, or `None` when the index is out of range.
+  pub fn histogram_tag_count(&self, index: usize) -> Option<usize> {
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+        self.envoy_ptr,
+        index,
+        &mut count,
+      )
+    };
+    found.then_some(count)
+  }
+
+  /// Reads tag `tag_index` of the histogram at `index` into `name` and `value`. See
+  /// [`counter_tag`](Self::counter_tag). Copy every tag before caching the histogram's identity;
+  /// an incomplete label set can conflate distinct histograms with the same tag-extracted name.
+  pub fn histogram_tag(
+    &self,
+    index: usize,
+    tag_index: usize,
+    name: &mut Vec<u8>,
+    value: &mut Vec<u8>,
+  ) -> bool {
+    fill_two_buffers(
+      name,
+      value,
+      |name_ptr, name_cap, name_size, value_ptr, value_cap, value_size| unsafe {
+        abi::envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+          self.envoy_ptr,
+          index,
+          tag_index,
+          name_ptr,
+          name_cap,
+          name_size,
+          value_ptr,
+          value_cap,
+          value_size,
+        )
+      },
+    )
+  }
+
+  /// Keeps this snapshot readable after [`StatSink::on_flush`] returns.
+  ///
+  /// Envoy takes a reference on every stat and copies their values, so the returned
+  /// [`RetainedMetricSnapshot`] reports the values as of this call. Unlike
+  /// [`to_owned`](Self::to_owned), this decodes no names on the main thread. Names and tags are
+  /// decoded when they are read from the retained snapshot, on whichever thread holds it.
+  ///
+  /// On the snapshot passed to [`StatSink::on_flush`], this must be called on the main thread,
+  /// from that hook. On a [`RetainedMetricSnapshot`], it may be called on whichever thread holds
+  /// it, and the new snapshot reports the values copied by the first retain, not values as of this
+  /// call.
+  #[must_use]
+  pub fn retain(&self) -> RetainedMetricSnapshot {
+    let envoy_ptr =
+      unsafe { abi::envoy_dynamic_module_callback_stat_sink_snapshot_retain(self.envoy_ptr) };
+    RetainedMetricSnapshot {
+      snapshot: MetricSnapshot::new(envoy_ptr),
+    }
+  }
+
   /// Copies the whole snapshot into an [`OwnedMetricSnapshot`].
   ///
   /// The returned value owns its data and is `Send`, so it can be moved to another thread to
@@ -378,7 +462,7 @@ impl<'a> MetricSnapshot<'a> {
   pub fn to_owned(&self) -> OwnedMetricSnapshot {
     let mut name = Vec::new();
     let mut value = Vec::new();
-    let counters = (0..self.counter_count())
+    let counters = (0 .. self.counter_count())
       .filter_map(|index| {
         self.counter(index, &mut name).map(|counter| OwnedCounter {
           name: String::from_utf8_lossy(&name).into_owned(),
@@ -387,7 +471,7 @@ impl<'a> MetricSnapshot<'a> {
         })
       })
       .collect();
-    let gauges = (0..self.gauge_count())
+    let gauges = (0 .. self.gauge_count())
       .filter_map(|index| {
         self.gauge(index, &mut name).map(|gauge_value| OwnedGauge {
           name: String::from_utf8_lossy(&name).into_owned(),
@@ -395,7 +479,7 @@ impl<'a> MetricSnapshot<'a> {
         })
       })
       .collect();
-    let text_readouts = (0..self.text_readout_count())
+    let text_readouts = (0 .. self.text_readout_count())
       .filter_map(|index| {
         if self.text_readout(index, &mut name, &mut value) {
           Some(OwnedTextReadout {
@@ -407,10 +491,10 @@ impl<'a> MetricSnapshot<'a> {
         }
       })
       .collect();
-    let histograms = (0..self.histogram_count())
+    let histograms = (0 .. self.histogram_count())
       .filter_map(|index| {
         self.histogram(index, &mut name).map(|histogram| {
-          let buckets = (0..self.histogram_bucket_count(index))
+          let buckets = (0 .. self.histogram_bucket_count(index))
             .filter_map(|bucket_index| self.histogram_bucket(index, bucket_index))
             .collect();
           OwnedHistogram {
@@ -427,6 +511,48 @@ impl<'a> MetricSnapshot<'a> {
       gauges,
       text_readouts,
       histograms,
+    }
+  }
+}
+
+/// A [`MetricSnapshot`] that stays readable after [`StatSink::on_flush`] returns, created by
+/// [`MetricSnapshot::retain`].
+///
+/// It dereferences to [`MetricSnapshot`], so it is read with the same methods, which report the
+/// values copied when it was retained. It is `Send` but not `Sync`: move it to another thread, for
+/// example into a Tokio task, to read and format the metrics off the main thread, where only that
+/// thread reads it. Dropping it releases the Envoy-side snapshot and its stat references.
+///
+/// A stat stays in the store while a retained snapshot references it, even after its scope is
+/// removed or it is evicted, so it keeps appearing in later flush snapshots, and a stat created
+/// again under its name gets it back with its value. A retained snapshot still held when the next
+/// flush starts keeps such stats in that flush, and retaining every flush before dropping the
+/// previous one keeps them indefinitely. To let removed stats go, drop each retained snapshot
+/// before the next [`StatSink::on_flush`].
+///
+/// Every retained snapshot must be dropped before the [`StatSink`] that retained it is dropped, so
+/// a sink that hands them to worker threads should stop and join those workers in its [`Drop`]
+/// implementation.
+pub struct RetainedMetricSnapshot {
+  snapshot: MetricSnapshot<'static>,
+}
+
+// SAFETY: by ABI contract a retained snapshot handle may be read and released on any thread, by one
+// thread at a time. Not implementing Sync is what keeps it to one thread at a time.
+unsafe impl Send for RetainedMetricSnapshot {}
+
+impl std::ops::Deref for RetainedMetricSnapshot {
+  type Target = MetricSnapshot<'static>;
+
+  fn deref(&self) -> &Self::Target {
+    &self.snapshot
+  }
+}
+
+impl Drop for RetainedMetricSnapshot {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_stat_sink_snapshot_release(self.snapshot.envoy_ptr);
     }
   }
 }
@@ -577,6 +703,9 @@ where
 /// [`on_histogram_complete`]: StatSink::on_histogram_complete
 pub trait StatSink: Send + Sync {
   /// Called with a snapshot of the metrics that passed the configured sink predicates.
+  ///
+  /// This runs on the main thread. To format the snapshot elsewhere, call
+  /// [`MetricSnapshot::retain`] and move the [`RetainedMetricSnapshot`] to a worker.
   fn on_flush(&self, snapshot: &MetricSnapshot<'_>);
 
   /// Called for every completed histogram sample. The name is valid only for this call.
@@ -658,9 +787,10 @@ impl EnvoyStatSinkConfig {
 /// [`EnvoyStatSinkConfigScheduler::commit`] to run [`StatSink::on_config_scheduled`] on the main
 /// thread. It is created by [`EnvoyStatSinkConfig::new_config_scheduler`] and releases the
 /// Envoy-side resource when dropped.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyStatSinkConfigScheduler: Send + Sync {
-  /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given `event_id`.
+  /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given
+  /// `event_id`.
   ///
   /// This can be called multiple times to schedule multiple events. The configuration is guaranteed
   /// to be alive when the event runs.

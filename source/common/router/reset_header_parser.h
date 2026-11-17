@@ -8,7 +8,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/router/router.h"
+#include "envoy/router/retry.h"
 
 #include "source/common/protobuf/protobuf.h"
 

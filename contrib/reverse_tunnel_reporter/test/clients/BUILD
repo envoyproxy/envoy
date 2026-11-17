@@ -12,6 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "grpc_client_test",
     srcs = ["grpc_client_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/reverse_tunnel_reporter/source/clients/grpc_client:grpc_client_lib",
         "//envoy/grpc:async_client_interface",

@@ -103,7 +103,6 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
 }
 
 void UpstreamSocketManager::onGoAway(int fd) {
-  markSocketDraining(fd);
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
     ENVOY_LOG(warn, "reverse_tunnel: fd {} not found in fd_to_node_map_.", fd);

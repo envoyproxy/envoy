@@ -4,9 +4,11 @@
 #include <vector>
 
 #include "source/common/common/base64.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,14 +20,29 @@ namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 namespace {
 
-class LoadAwareLocalityIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+// Simulated time: the weight-update timer is driven by advanceWeightTick() rather than by sleeping
+// through each weight_update_period, and the utilization timestamps the tick compares against
+// advance by the same amount.
+class LoadAwareLocalityIntegrationTest : public Event::TestUsingSimulatedTime,
+                                         public testing::TestWithParam<Network::Address::IpVersion>,
                                          public HttpIntegrationTest {
 public:
   LoadAwareLocalityIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
     use_bootstrap_node_metadata_ = true;
   }
 
-  void TearDown() override { HttpIntegrationTest::cleanupUpstreamAndDownstream(); }
+  void TearDown() override {
+    for (auto& connection : upstream_connections_) {
+      if (connection != nullptr) {
+        AssertionResult result = connection->close();
+        RELEASE_ASSERT(result, result.message());
+        result = connection->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+    upstream_connections_.clear();
+    HttpIntegrationTest::cleanupUpstreamAndDownstream();
+  }
 
   void initializeConfig(double variance_threshold = 0.1, double remote_probe_fraction = 0.1,
                         int weight_update_period_seconds = 10,
@@ -35,6 +52,7 @@ public:
     endpoints_per_zone_ = endpoints_per_zone;
     num_upstreams_ = endpoints_per_zone_ * static_cast<uint32_t>(1 + remote_zones.size());
     setUpstreamCount(num_upstreams_);
+    upstream_connections_.resize(num_upstreams_);
 
     const auto ip_version = GetParam();
     config_helper_.addConfigModifier(
@@ -111,22 +129,44 @@ public:
     return response_headers;
   }
 
+  // Waits for the next request to arrive on any upstream and returns that upstream's index.
+  // Connections are kept open on both sides across requests: the tests measure the balancer's
+  // host selection over hundreds of requests, so each one reuses the downstream connection and
+  // Envoy's upstream connection pools instead of paying for a connect/close pair per request.
+  uint64_t waitForNextRequestOnAnyUpstream() {
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    while (bound.withinBound()) {
+      for (uint64_t i = 0; i < num_upstreams_; ++i) {
+        if (upstream_connections_[i] == nullptr &&
+            !fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, upstream_connections_[i],
+                                                       std::chrono::milliseconds(5))) {
+          continue;
+        }
+        if (upstream_connections_[i]->waitForNewStream(*dispatcher_, upstream_request_,
+                                                       std::chrono::milliseconds(5))) {
+          const AssertionResult result = upstream_request_->waitForEndStream(*dispatcher_);
+          RELEASE_ASSERT(result, result.message());
+          return i;
+        }
+      }
+    }
+    RELEASE_ASSERT(false, "Timed out waiting for an upstream request.");
+    return 0;
+  }
+
   uint64_t sendRequestWithOrcaResponse(const std::vector<double>& utilizations) {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
+    if (codec_client_ == nullptr) {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+    }
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    std::vector<uint64_t> upstream_indices(num_upstreams_);
-    std::iota(upstream_indices.begin(), upstream_indices.end(), 0);
-    auto upstream_index = waitForNextUpstreamRequest(upstream_indices);
-    RELEASE_ASSERT(upstream_index.has_value(), "Expected upstream request");
-
+    const uint64_t upstream_index = waitForNextRequestOnAnyUpstream();
     upstream_request_->encodeHeaders(
-        responseHeadersWithOrcaUtilization(utilizations[*upstream_index]), true);
+        responseHeadersWithOrcaUtilization(utilizations[upstream_index]), true);
     RELEASE_ASSERT(response->waitForEndStream(), "Expected response");
-    cleanupUpstreamAndDownstream();
-    return *upstream_index;
+    return upstream_index;
   }
 
   std::vector<uint64_t> sendRequestsAndTrack(uint64_t count,
@@ -195,6 +235,7 @@ public:
 protected:
   uint32_t num_upstreams_{4};
   uint32_t endpoints_per_zone_{2};
+  std::vector<FakeHttpConnectionPtr> upstream_connections_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LoadAwareLocalityIntegrationTest,
@@ -291,6 +332,8 @@ TEST_P(LoadAwareLocalityIntegrationTest, EwmaDampensSpike) {
 }
 
 TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
+  ASSERT_EQ(concurrency_, 1) << "This test relies on a reproducible seeded RNG draw order";
+  setDeterministicSeed(12345);
   initializeConfig(/*variance_threshold=*/0.1, /*remote_probe_fraction=*/0.1,
                    /*weight_update_period_seconds=*/10, /*smoothing_time_constant_seconds=*/1,
                    /*remote_zones=*/{"zone-b", "zone-c"});
@@ -303,11 +346,245 @@ TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
   const uint64_t zone_b = zoneTraffic(usage, 1);
   const uint64_t zone_c = zoneTraffic(usage, 2);
 
-  EXPECT_GT(zone_a, 0u);
-  EXPECT_GT(zone_b, 0u);
-  EXPECT_GT(zone_c, 0u);
-  EXPECT_GT(zone_b, zone_c);
-  EXPECT_GT(zone_c, zone_a);
+  constexpr double request_count = 400.0;
+  constexpr double total_weight = 0.4 + 1.4 + 1.0;
+  // Allow roughly five standard deviations of sampling variance while still detecting the
+  // weighting regressions covered by this test.
+  constexpr double tolerance = 50.0;
+  EXPECT_NEAR(zone_a, (0.4 / total_weight) * request_count, tolerance);
+  EXPECT_NEAR(zone_b, (1.4 / total_weight) * request_count, tolerance);
+  EXPECT_NEAR(zone_c, (1.0 / total_weight) * request_count, tolerance);
+}
+
+// Full load_balancing_policy configs for the OOB fixture. Both use a 1s weight
+// tick and 1s OOB reporting period so tests converge quickly.
+constexpr absl::string_view kOobWithRoundRobinChildYaml = R"EOF(
+policies:
+- typed_extension_config:
+    name: envoy.load_balancing_policies.load_aware_locality
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
+      endpoint_picking_policy:
+        policies:
+        - typed_extension_config:
+            name: envoy.load_balancing_policies.round_robin
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+      weight_update_period:
+        seconds: 1
+      smoothing_time_constant:
+        seconds: 1
+      enable_oob_load_report: true
+      oob_reporting_period:
+        seconds: 1
+)EOF";
+
+// LoadAwareLocality enables OOB; the ClientSideWeightedRoundRobin child does not
+// (enable_oob_load_report omitted, defaults false). Used to prove fan-out: reports arriving on
+// load_aware_locality's own stream still reach the ClientSideWeightedRoundRobin child's host data.
+constexpr absl::string_view kOobLalOnlyCswrrChildYaml = R"EOF(
+policies:
+- typed_extension_config:
+    name: envoy.load_balancing_policies.load_aware_locality
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
+      endpoint_picking_policy:
+        policies:
+        - typed_extension_config:
+            name: envoy.load_balancing_policies.client_side_weighted_round_robin
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+      weight_update_period:
+        seconds: 1
+      smoothing_time_constant:
+        seconds: 1
+      enable_oob_load_report: true
+      oob_reporting_period:
+        seconds: 1
+)EOF";
+
+// Both the locality policy AND the ClientSideWeightedRoundRobin child enable OOB.
+constexpr absl::string_view kOobBothLevelsYaml = R"EOF(
+policies:
+- typed_extension_config:
+    name: envoy.load_balancing_policies.load_aware_locality
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
+      endpoint_picking_policy:
+        policies:
+        - typed_extension_config:
+            name: envoy.load_balancing_policies.client_side_weighted_round_robin
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+              enable_oob_load_report: true
+              oob_reporting_period:
+                seconds: 1
+      weight_update_period:
+        seconds: 1
+      smoothing_time_constant:
+        seconds: 1
+      enable_oob_load_report: true
+      oob_reporting_period:
+        seconds: 1
+)EOF";
+
+// OOB integration fixture: HTTP/2 upstreams (OOB streams are gRPC), two hosts
+// per zone, Envoy local zone is zone-a. Modeled on the ClientSideWeightedRoundRobin OOB fixture.
+class LoadAwareLocalityOobIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  LoadAwareLocalityOobIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    use_bootstrap_node_metadata_ = true;
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void TearDown() override { cleanupOobStreams(); }
+
+  void initializeConfig(absl::string_view policy_yaml, std::vector<std::string> remote_zones) {
+    setUpstreamCount(2 * (1 + remote_zones.size()));
+    const auto ip_version = GetParam();
+    config_helper_.addConfigModifier(
+        [ip_version, policy_yaml = std::string(policy_yaml),
+         remote_zones](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* node = bootstrap.mutable_node();
+          node->set_id("node_name");
+          node->set_cluster("cluster_name");
+          auto* locality = node->mutable_locality();
+          locality->set_region("test-region");
+          locality->set_zone("zone-a");
+
+          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+          ASSERT(cluster->name() == "cluster_0");
+          cluster->mutable_load_assignment()->clear_endpoints();
+          cluster->mutable_load_assignment()->set_cluster_name("cluster_0");
+
+          const std::string local_address = Network::Test::getLoopbackAddressString(ip_version);
+          std::vector<std::string> all_zones = {"zone-a"};
+          all_zones.insert(all_zones.end(), remote_zones.begin(), remote_zones.end());
+          for (const auto& zone : all_zones) {
+            auto* locality_pb = cluster->mutable_load_assignment()->add_endpoints();
+            locality_pb->mutable_locality()->set_region("test-region");
+            locality_pb->mutable_locality()->set_zone(zone);
+            for (int i = 0; i < 2; ++i) {
+              auto* addr = locality_pb->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+              addr->set_address(local_address);
+              addr->set_port_value(0);
+            }
+          }
+          TestUtility::loadFromYaml(policy_yaml, *cluster->mutable_load_balancing_policy());
+        });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Accept one OOB stream on the given upstream and reply with one
+  // server-streamed OrcaLoadReport carrying `utilization`. Connection and
+  // stream stay open so the session remains active.
+  void acceptOobStream(size_t upstream_index, double utilization) {
+    FakeHttpConnectionPtr conn;
+    ASSERT_TRUE(fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_, conn));
+    FakeStreamPtr stream;
+    ASSERT_TRUE(conn->waitForNewStream(*dispatcher_, stream));
+    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+
+    Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                                 {"content-type", "application/grpc"}};
+    stream->encodeHeaders(resp_headers, false);
+
+    xds::data::orca::v3::OrcaLoadReport report;
+    report.set_application_utilization(utilization);
+    auto frame = Grpc::Common::serializeToGrpcFrame(report);
+    stream->encodeData(*frame, false);
+
+    stream_holder_.push_back(std::move(stream));
+    conn_holder_.push_back(std::move(conn));
+  }
+
+  void cleanupOobStreams() {
+    for (auto& conn : conn_holder_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+        result = conn->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+    stream_holder_.clear();
+    conn_holder_.clear();
+  }
+
+  std::vector<FakeHttpConnectionPtr> conn_holder_;
+  std::vector<FakeStreamPtr> stream_holder_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, LoadAwareLocalityOobIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+// With OOB enabled on the locality policy alone, one stream opens per host and
+// server-pushed reports alone -- with no downstream request traffic at all --
+// drive the locality weight computation and the spill decision.
+TEST_P(LoadAwareLocalityOobIntegrationTest, OobReportsDriveLocalityWeights) {
+  initializeConfig(kOobWithRoundRobinChildYaml, /*remote_zones=*/{"zone-b"});
+
+  // Upstreams 0-1 are local zone-a, 2-3 are remote zone-b.
+  acceptOobStream(0, /*utilization=*/0.9);
+  acceptOobStream(1, /*utilization=*/0.9);
+  acceptOobStream(2, /*utilization=*/0.1);
+  acceptOobStream(3, /*utilization=*/0.1);
+
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", testing::Eq(4));
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", testing::Ge(4));
+  test_server_->waitForCounter("cluster.cluster_0.load_aware_locality.spill_active_total",
+                               testing::Ge(1));
+}
+
+// When the child endpoint policy also enables OOB, each level runs its own manager, so every
+// host receives two independent streams (2 hosts x 2 managers = 4 sessions) and the
+// cluster-scoped lb_orca_oob.* stats compose across both. SingleOobStreamFeedsBothPolicies
+// below covers the recommended single-level configuration.
+TEST_P(LoadAwareLocalityOobIntegrationTest, BothLevelsOpenIndependentStreams) {
+  initializeConfig(kOobBothLevelsYaml, /*remote_zones=*/{});
+
+  // Two connections arrive per upstream, one from each manager.
+  acceptOobStream(0, /*utilization=*/0.5);
+  acceptOobStream(0, /*utilization=*/0.5);
+  acceptOobStream(1, /*utilization=*/0.5);
+  acceptOobStream(1, /*utilization=*/0.5);
+
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", testing::Eq(4));
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", testing::Ge(4));
+}
+
+// Fan-out proof: enabling OOB at one level (load_aware_locality) still feeds both consumers
+// even though the ClientSideWeightedRoundRobin child opens no stream of its own. This is the
+// configuration the docs recommend.
+TEST_P(LoadAwareLocalityOobIntegrationTest, SingleOobStreamFeedsBothPolicies) {
+  initializeConfig(kOobLalOnlyCswrrChildYaml, /*remote_zones=*/{"zone-b"});
+
+  // Upstreams 0-1 are local zone-a, 2-3 are remote zone-b. Reports carry only
+  // application_utilization (no rps_fractional): load_aware_locality's consumer accepts
+  // that, ClientSideWeightedRoundRobin's consumer does not.
+  acceptOobStream(0, /*utilization=*/0.9);
+  acceptOobStream(1, /*utilization=*/0.9);
+  acceptOobStream(2, /*utilization=*/0.1);
+  acceptOobStream(3, /*utilization=*/0.1);
+
+  // One manager x 4 hosts: the ClientSideWeightedRoundRobin child opened no streams of its own.
+  test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", testing::Eq(4));
+
+  // report_errors increments only when a recipient's onOrcaLoadReport() returns non-OK.
+  // LocalityLbHostData::onOrcaLoadReport always returns OkStatus, while
+  // ClientSideWeightedRoundRobin's OrcaHostLbPolicyData::onOrcaLoadReport rejects any report
+  // with rps_fractional <= 0 ("QPS must be positive"). So these errors can only come from the
+  // ClientSideWeightedRoundRobin child's consumer.
+  test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.report_errors", testing::Ge(4));
+
+  // Proves the load_aware_locality consumer received the same reports.
+  test_server_->waitForCounter("cluster.cluster_0.load_aware_locality.spill_active_total",
+                               testing::Ge(1));
 }
 
 } // namespace

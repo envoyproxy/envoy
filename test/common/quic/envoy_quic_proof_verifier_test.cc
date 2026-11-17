@@ -130,9 +130,14 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_NE(verify_details, nullptr);
-  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+  auto& result = static_cast<CertVerifyResult&>(*verify_details);
+  EXPECT_TRUE(result.isValid());
+  // The verifier-built chain (leaf + issuing CA) is captured so the connection info can report the
+  // validated issuer, and it survives cloning.
+  EXPECT_GE(result.validatedChain().size(), 2);
   std::unique_ptr<CertVerifyResult> cloned(static_cast<CertVerifyResult*>(verify_details->Clone()));
   EXPECT_TRUE(cloned->isValid());
+  EXPECT_EQ(cloned->validatedChain().size(), result.validatedChain().size());
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
@@ -162,12 +167,12 @@ typed_config:
   EXPECT_TRUE(verify_timer->enabled());
 
   EXPECT_CALL(*quic_verify_callback, Run(true, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
             EXPECT_NE(verify_details, nullptr);
             auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
             EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
-          }));
+          });
   verify_timer->invokeCallback();
 }
 
@@ -268,12 +273,12 @@ typed_config:
 
   EXPECT_CALL(*quic_verify_callback,
               Run(false, "Leaf certificate doesn't match hostname: unknown.org", _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
             EXPECT_NE(verify_details, nullptr);
             auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
             EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
-          }));
+          });
   verify_timer->invokeCallback();
 }
 

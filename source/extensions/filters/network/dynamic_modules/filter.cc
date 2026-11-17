@@ -1,6 +1,6 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
-#include "source/extensions/dynamic_modules/worker_index.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,7 +71,7 @@ void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
   // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
   cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
 
-  worker_index_ = parseWorkerIndexFromDispatcherName(callbacks.connection().dispatcher().name());
+  worker_index_ = callbacks.connection().dispatcher().workerId().value_or(0);
 
   // Delay the in-module filter initialization until read callbacks are set
   // to allow accessing worker index during filter creation.
@@ -87,31 +87,43 @@ void DynamicModuleNetworkFilter::initializeWriteFilterCallbacks(
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
+  // A connection closed before this call raises no later close event to stop the flush timer.
+  if (!config_->access_logs_.empty() && connection().state() == Network::Connection::State::Open) {
+    startAccessLogs();
+    // An access logger can close the connection while it writes the start record.
+    if (connection().state() != Network::Connection::State::Open) {
+      return Network::FilterStatus::StopIteration;
+    }
+  }
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     if (read_callbacks_ != nullptr) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     }
     return Network::FilterStatus::StopIteration;
   }
+  new_connection_passed_to_module_ = true;
   auto status = config_->on_network_filter_new_connection_(thisAsVoidPtr(), in_module_filter_);
   return toEnvoyFilterStatus(status);
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onData(Buffer::Instance& data, bool end_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
-  // Set the current read buffer for ABI callbacks. The buffer pointer is kept after the callback
-  // returns so that modules can access buffered data outside of on_read (e.g., in on_scheduled or
-  // on_http_callout_done). The buffer is the connection's persistent read buffer and remains valid
-  // for the lifetime of the connection.
+  // Expose the read buffer only while the hook runs. The argument may be a transient injected
+  // buffer, so it is cleared on return. Deferred access outside on_read resolves the connection
+  // read buffer in currentReadBuffer().
   current_read_buffer_ = &data;
   auto status = config_->on_network_filter_read_(thisAsVoidPtr(), in_module_filter_, data.length(),
                                                  end_stream);
+  current_read_buffer_ = nullptr;
   return toEnvoyFilterStatus(status);
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data, bool end_stream) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return Network::FilterStatus::Continue;
   }
@@ -127,6 +139,14 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
 }
 
 void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
+  if (!config_->access_logs_.empty() && (event == Network::ConnectionEvent::RemoteClose ||
+                                         event == Network::ConnectionEvent::LocalClose)) {
+    connection().streamInfo().downstreamTiming().onDownstreamConnectionEnd(
+        connection().dispatcher().timeSource());
+    // The filter can outlive the connection, so the timer is destroyed here on the worker.
+    access_log_flush_timer_.reset();
+  }
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
@@ -134,13 +154,67 @@ void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
                                     toAbiConnectionEvent(event));
 }
 
+void DynamicModuleNetworkFilter::log(const Formatter::Context& log_context,
+                                     const StreamInfo::StreamInfo& stream_info) {
+  for (const AccessLog::InstanceSharedPtr& access_log : config_->access_logs_) {
+    access_log->log(log_context, stream_info);
+  }
+}
+
+void DynamicModuleNetworkFilter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
+  if (config_->access_logs_.empty()) {
+    return;
+  }
+  const StreamInfo::StreamInfo& stream_info = connection().streamInfo();
+  const Formatter::Context log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+  log(log_context, stream_info);
+  if (access_log_type != AccessLog::AccessLogType::TcpPeriodic) {
+    return;
+  }
+  const SystemTime now = connection().dispatcher().timeSource().systemTime();
+  if (const StreamInfo::BytesMeterSharedPtr& meter = stream_info.getDownstreamBytesMeter();
+      meter != nullptr) {
+    meter->takeDownstreamPeriodicLoggingSnapshot(now);
+  }
+  if (const StreamInfo::BytesMeterSharedPtr& meter = stream_info.getUpstreamBytesMeter();
+      meter != nullptr) {
+    meter->takeDownstreamPeriodicLoggingSnapshot(now);
+  }
+}
+
+void DynamicModuleNetworkFilter::startAccessLogs() {
+  StreamInfo::StreamInfo& stream_info = connection().streamInfo();
+  if (!stream_info.getStreamIdProvider().has_value()) {
+    stream_info.setStreamIdProvider(
+        std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->random_generator_->uuid()));
+  }
+  if (config_->access_log_flush_interval_.has_value()) {
+    access_log_flush_timer_ =
+        connection().dispatcher().createTimer([this]() -> void { onAccessLogFlushInterval(); });
+    access_log_flush_timer_->enableTimer(*config_->access_log_flush_interval_);
+  }
+  if (config_->flush_access_log_on_start_) {
+    flushAccessLog(AccessLog::AccessLogType::TcpConnectionStart);
+  }
+}
+
+void DynamicModuleNetworkFilter::onAccessLogFlushInterval() {
+  flushAccessLog(AccessLog::AccessLogType::TcpPeriodic);
+  // An access logger can close the connection, which destroys the timer.
+  if (access_log_flush_timer_ != nullptr) {
+    access_log_flush_timer_->enableTimer(*config_->access_log_flush_interval_);
+  }
+}
+
 void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
+  HookScope hook_scope(*this);
   if (in_module_filter_ != nullptr && config_->on_network_filter_scheduled_ != nullptr) {
     config_->on_network_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
   }
 }
 
 void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr ||
       config_->on_network_filter_above_write_buffer_high_watermark_ == nullptr) {
     return;
@@ -149,6 +223,7 @@ void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
 }
 
 void DynamicModuleNetworkFilter::onBelowWriteBufferLowWatermark() {
+  HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr ||
       config_->on_network_filter_below_write_buffer_low_watermark_ == nullptr) {
     return;
@@ -192,7 +267,9 @@ void DynamicModuleNetworkFilter::storeSocketOptionBytes(
 bool DynamicModuleNetworkFilter::tryGetSocketOptionInt(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     int64_t& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (opt.is_int && opt.level == level && opt.name == name && opt.state == state) {
       value_out = opt.int_value;
       return true;
@@ -204,7 +281,9 @@ bool DynamicModuleNetworkFilter::tryGetSocketOptionInt(
 bool DynamicModuleNetworkFilter::tryGetSocketOptionBytes(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     absl::string_view& value_out) const {
-  for (const auto& opt : socket_options_) {
+  // Iterate newest first so a re-set option returns its latest value.
+  for (auto it = socket_options_.rbegin(); it != socket_options_.rend(); ++it) {
+    const auto& opt = *it;
     if (!opt.is_int && opt.level == level && opt.name == name && opt.state == state) {
       value_out = opt.byte_value;
       return true;
@@ -277,9 +356,11 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
   // ends up deallocating this callback itself.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
-  // Check if the filter is destroyed before the callout completed.
+  // request_ is set only after the async client accepts the callout. Gating on it avoids a
+  // reentrant module call when send completes the callout inline, which is already reported by the
+  // return code.
   if (!filter || !filter->in_module_filter_ ||
-      !filter->config_->on_network_filter_http_callout_done_) {
+      !filter->config_->on_network_filter_http_callout_done_ || request_ == nullptr) {
     return;
   }
 
@@ -302,6 +383,7 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
         envoy_dynamic_module_type_envoy_buffer{static_cast<const char*>(slice.mem_), slice.len_});
   }
 
+  DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
   filter->config_->on_network_filter_http_callout_done_(
       filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id,
       envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
@@ -313,13 +395,15 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
 
 void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
-  // Copy the filter shared_ptr and callout id to the local scope since
-  // on_network_filter_http_callout_done_ might cause destruction of the filter. That eventually
-  // ends up deallocating this callback itself.
+  // Copy the filter shared_ptr and callout id to the local scope since removing the callout below
+  // frees this callback.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
+  // request_ is set only after the async client accepts the callout. Gating on it avoids a
+  // reentrant module call when send fails the callout inline, which is already reported by the
+  // return code.
   if (!filter || !filter->in_module_filter_ ||
-      !filter->config_->on_network_filter_http_callout_done_) {
+      !filter->config_->on_network_filter_http_callout_done_ || request_ == nullptr) {
     return;
   }
 
@@ -334,9 +418,17 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     break;
   }
 
-  filter->config_->on_network_filter_http_callout_done_(filter->thisAsVoidPtr(),
-                                                        filter->in_module_filter_, callout_id,
-                                                        result, nullptr, 0, nullptr, 0);
+  // This can run inside a cluster manager update, so report it from a posted callback.
+  filter->dispatcher()->post([weak_filter = filter_, callout_id, result]() {
+    DynamicModuleNetworkFilterSharedPtr filter = weak_filter.lock();
+    if (filter == nullptr || filter->in_module_filter_ == nullptr) {
+      return;
+    }
+    DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
+    filter->config_->on_network_filter_http_callout_done_(filter->thisAsVoidPtr(),
+                                                          filter->in_module_filter_, callout_id,
+                                                          result, nullptr, 0, nullptr, 0);
+  });
 
   // Remove the callout from the map.
   filter->http_callouts_.erase(callout_id);

@@ -25,11 +25,21 @@ impl Default for EnvoyBuffer<'_> {
   }
 }
 
-impl EnvoyBuffer<'_> {
+impl<'a> EnvoyBuffer<'a> {
   /// This is a helper function to create an [`EnvoyBuffer`] from a byte slice.
   ///
   /// This is meant for use by the end users in unit tests.
-  pub fn new(s: &[u8]) -> Self {
+  /// The returned buffer cannot outlive the slice.
+  ///
+  /// ```compile_fail,E0515
+  /// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyBuffer;
+  ///
+  /// fn dangling_buffer() -> EnvoyBuffer<'static> {
+  ///   let bytes = vec![1, 2, 3];
+  ///   EnvoyBuffer::new(&bytes)
+  /// }
+  /// ```
+  pub fn new(s: &'a [u8]) -> Self {
     Self {
       raw_ptr: s.as_ptr(),
       length: s.len(),
@@ -66,14 +76,73 @@ impl EnvoyBuffer<'_> {
   }
 }
 
+impl std::ops::Deref for EnvoyBuffer<'_> {
+  type Target = [u8];
+  fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl PartialEq for EnvoyBuffer<'_> {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for EnvoyBuffer<'_> {}
+
+impl PartialEq<[u8]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &[u8]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl PartialEq<EnvoyBuffer<'_>> for [u8] {
+  fn eq(&self, other: &EnvoyBuffer<'_>) -> bool {
+    self == other.as_slice()
+  }
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &[u8; N]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &&[u8; N]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
+impl PartialEq<&[u8]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &&[u8]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
 /// This is exactly the same as [`EnvoyBuffer`] except that it is mutable and data can be written
 /// in-place. See [`EnvoyBuffer`] for more details.
+///
+/// Mutable buffers cannot be cloned because the underlying memory must be borrowed exclusively.
+///
+/// ```compile_fail,E0599
+/// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer;
+///
+/// fn alias(mut buffer: EnvoyMutBuffer<'_>) {
+///   let mut other = buffer.clone();
+///   let first = buffer.as_mut_slice();
+///   let second = other.as_mut_slice();
+///   first[0] = 1;
+///   second[0] = 2;
+/// }
+/// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct EnvoyMutBuffer<'a> {
   raw_ptr: *mut u8,
   length: usize,
-  _marker: std::marker::PhantomData<&'a ()>,
+  _marker: std::marker::PhantomData<&'a mut [u8]>,
 }
 
 impl EnvoyMutBuffer<'_> {
@@ -146,8 +215,60 @@ impl Default for EnvoyMutBuffer<'_> {
   }
 }
 
+impl std::ops::Deref for EnvoyMutBuffer<'_> {
+  type Target = [u8];
+  fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl std::ops::DerefMut for EnvoyMutBuffer<'_> {
+  fn deref_mut(&mut self) -> &mut [u8] {
+    self.as_mut_slice()
+  }
+}
+
+impl PartialEq for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for EnvoyMutBuffer<'_> {}
+
+impl PartialEq<[u8]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &[u8]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl PartialEq<EnvoyMutBuffer<'_>> for [u8] {
+  fn eq(&self, other: &EnvoyMutBuffer<'_>) -> bool {
+    self == other.as_slice()
+  }
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &[u8; N]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &&[u8; N]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
+impl PartialEq<&[u8]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &&[u8]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
 // Envoy fills caller-allocated `Vec`s of these types in place by reinterpreting them as the ABI
-// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations sound.
+// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations
+// sound.
 const _: () = {
   type EnvoyBufferPair = (EnvoyBuffer<'static>, EnvoyBuffer<'static>);
 
@@ -209,6 +330,31 @@ const _: () = {
   );
 };
 
+/// Reads Envoy buffer chunk descriptors into a list and returns them with the total byte length
+/// summed from the chunks. `count` is the chunk count from a size callback and `fill` must write
+/// exactly `count` descriptors into the reserved storage when it returns true. Summing the chunk
+/// lengths drops a separate total size crossing that the caller would otherwise make. The caller
+/// binds the returned lifetime to its own borrow so the buffers cannot outlive the Envoy memory.
+pub(crate) fn read_buffer_chunks<'a>(
+  count: usize,
+  fill: impl FnOnce(*mut crate::abi::envoy_dynamic_module_type_envoy_buffer) -> bool,
+) -> (Vec<EnvoyBuffer<'a>>, usize) {
+  if count == 0 {
+    return (Vec::new(), 0);
+  }
+  let mut chunks: Vec<EnvoyBuffer<'a>> = Vec::with_capacity(count);
+  let filled = fill(chunks.as_mut_ptr() as *mut crate::abi::envoy_dynamic_module_type_envoy_buffer);
+  if !filled {
+    return (Vec::new(), 0);
+  }
+  // A successful fill initializes exactly `count` descriptors, matching the size callback.
+  unsafe {
+    chunks.set_len(count);
+  }
+  let total = chunks.iter().map(|chunk| chunk.length).sum();
+  (chunks, total)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -220,10 +366,41 @@ mod tests {
 
   #[test]
   fn test_envoy_buffer_as_slice_treats_null_and_empty_alike() {
-    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list getters
-    // can return Envoy-filled entries directly without normalizing empty ones.
+    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list
+    // getters can return Envoy-filled entries directly without normalizing empty ones.
     assert_eq!(EnvoyBuffer::default().as_slice(), b"");
     assert_eq!(EnvoyBuffer::new(b"").as_slice(), b"");
+  }
+
+  #[test]
+  fn test_envoy_buffer_deref_returns_underlying_bytes() {
+    let buf = EnvoyBuffer::new(b"hello");
+    assert_eq!(&*buf, b"hello");
+    assert_eq!(buf.len(), 5);
+  }
+
+  #[test]
+  fn test_envoy_buffer_deref_treats_null_as_empty() {
+    let buf = EnvoyBuffer::default();
+    assert_eq!(&*buf, b"");
+    assert!(buf.is_empty());
+  }
+
+  #[test]
+  fn test_option_envoy_buffer_as_deref() {
+    let some: Option<EnvoyBuffer> = Some(EnvoyBuffer::new(b"val"));
+    let none: Option<EnvoyBuffer> = None;
+    assert_eq!(some.as_deref(), Some(b"val".as_slice()));
+    assert_eq!(none.as_deref(), None);
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_deref_and_deref_mut() {
+    let mut data = *b"hello";
+    let mut buffer = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(&*buffer, b"hello");
+    buffer[0] = b'j';
+    assert_eq!(&*buffer, b"jello");
   }
 
   #[test]
@@ -240,5 +417,93 @@ mod tests {
     let mut buffer = EnvoyMutBuffer::default();
     assert_eq!(buffer.as_slice(), b"");
     assert_eq!(buffer.as_mut_slice(), b"");
+  }
+
+  #[test]
+  fn test_envoy_buffer_partial_eq() {
+    let x = Vec::from(*b"same");
+    let y = Vec::from(*b"same");
+    let cases: &[(&str, EnvoyBuffer, &[u8], bool)] = &[
+      ("same content", EnvoyBuffer::new(b"hello"), b"hello", true),
+      (
+        "different content",
+        EnvoyBuffer::new(b"hello"),
+        b"world",
+        false,
+      ),
+      ("both empty", EnvoyBuffer::new(b""), b"", true),
+      ("empty vs non-empty", EnvoyBuffer::new(b""), b"a", false),
+      ("content not pointers", EnvoyBuffer::new(&x), &y, true),
+      ("null default", EnvoyBuffer::default(), b"", true),
+    ];
+    for (name, buf, expected, eq) in cases {
+      assert_eq!((*buf == *expected), *eq, "{name}");
+    }
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_partial_eq() {
+    let mut data = *b"hello";
+    let buf = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(buf, b"hello");
+    assert_ne!(buf, b"world");
+  }
+
+  #[test]
+  fn read_buffer_chunks_sums_lengths_across_varying_chunks() {
+    // Two chunks of differing lengths report the summed byte length and reassemble in order.
+    static DATA: [u8; 5] = *b"abcde";
+    let (chunks, total) = read_buffer_chunks(2, |ptr| {
+      unsafe {
+        *ptr.add(0) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: DATA.as_ptr() as _,
+          length: 2,
+        };
+        *ptr.add(1) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: DATA.as_ptr().wrapping_add(2) as _,
+          length: 3,
+        };
+      }
+      true
+    });
+    assert_eq!(total, 5);
+    assert_eq!(chunks.len(), 2);
+    assert_eq!(chunks[0], b"ab");
+    assert_eq!(chunks[1], b"cde");
+  }
+
+  #[test]
+  fn read_buffer_chunks_returns_empty_for_zero_count() {
+    let (chunks, total) =
+      read_buffer_chunks(0, |_| unreachable!("fill must not run for zero count"));
+    assert_eq!(total, 0);
+    assert!(chunks.is_empty());
+  }
+
+  #[test]
+  fn read_buffer_chunks_returns_empty_when_fill_fails() {
+    // A failed fill yields no chunks and a zero total so the caller sees an empty read.
+    let (chunks, total) = read_buffer_chunks(2, |_| false);
+    assert_eq!(total, 0);
+    assert!(chunks.is_empty());
+  }
+
+  #[test]
+  fn read_buffer_chunks_sums_many_chunks() {
+    // The total is summed across many chunks so a fragmented buffer sizes correctly.
+    static DATA: [u8; 1] = *b"a";
+    let (chunks, total) = read_buffer_chunks(6, |ptr| {
+      for i in 0 .. 6 {
+        unsafe {
+          *ptr.add(i) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: DATA.as_ptr() as _,
+            length: 1,
+          };
+        }
+      }
+      true
+    });
+    assert_eq!(total, 6);
+    assert_eq!(chunks.len(), 6);
   }
 }

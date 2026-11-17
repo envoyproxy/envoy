@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -32,6 +33,13 @@ public:
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
+    // DynamoStats creates a 'prefix.dynamodb' subscope; back it with a mock scope so its stats
+    // still land on the string-based expectations of the mock store.
+    ON_CALL(stats_.mockScope(), createScope_(_, _))
+        .WillByDefault(Invoke([this](const std::string& name, const std::string&) {
+          const Stats::StatNameDynamicStorage storage(name, stats_.symbolTable());
+          return stats_.makeScope(storage.statName());
+        }));
     auto stats = std::make_shared<DynamoStats>(*stats_.rootScope(), "prefix.");
     filter_ = std::make_unique<DynamoFilter>(loader_, stats,
                                              decoder_callbacks_.dispatcher().timeSource());

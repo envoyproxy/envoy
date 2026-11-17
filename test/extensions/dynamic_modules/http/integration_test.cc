@@ -10,6 +10,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/integration/base_overload_integration_test.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 
@@ -243,6 +244,77 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(10U, response->body().size());
+}
+
+TEST_P(DynamicModulesIntegrationTest, FilterConstructorFailsClosed) {
+  // A module whose filter constructor fails must return a 500 to the client instead of crashing the
+  // worker. Only the Rust module can force this path with a caught constructor panic.
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_new_panic filter is only in the rust test module";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  // The caught constructor panic is what leaves a null filter, so pin the 500 to that path.
+  EXPECT_LOG_CONTAINS("error", "caught panic at FFI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, GoHttpFilterConstructorPanicFailsClosed) {
+  // A Go module whose filter constructor panics must fail closed with a 500 instead of aborting the
+  // worker. The Go SDK panic barrier recovers the panic at the ABI boundary and returns a null
+  // filter.
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  if (GetParam() != "go") {
+    GTEST_SKIP() << "this exercises the Go SDK panic barrier";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "recovered panic at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HttpFilterConstructorExceptionFailsClosed) {
+  // A C++ module whose filter constructor throws must fail closed with a 500 instead of aborting
+  // the worker. The C++ SDK barrier catches the exception at the ABI boundary and returns a null
+  // filter.
+  if (GetParam() != "cpp") {
+    GTEST_SKIP() << "the throw_on_filter_new filter is only in the cpp test module";
+  }
+  initializeFilter("throw_on_filter_new");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "caught exception at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
@@ -591,6 +663,47 @@ TEST_P(DynamicModulesIntegrationTest, PerRouteStructConfig) {
                 .getStringView());
 }
 
+// Verifies that the ``value`` of an ``xds.type.v3.TypedStruct`` per-route configuration is
+// serialized to JSON before being passed to the module, the same payload a plain
+// ``google.protobuf.Struct`` produces while preserving a logical type URL for config dumps.
+TEST_P(DynamicModulesIntegrationTest, PerRouteTypedStructConfig) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    // The per_route_config test filter that surfaces the raw config bytes back as a header is
+    // implemented by the Rust integration test data, so the TypedStruct check is scoped to those
+    // language flavors.
+    return;
+  }
+
+  // The regular filter config remains a ``StringValue`` for the ``x-config`` header, while the
+  // per-route override is supplied as an ``xds.type.v3.TypedStruct`` whose ``value`` carries the
+  // Struct payload.
+  initializeFilter("per_route_config", "a", R"({"struct_key":"struct_value"})",
+                   "type.googleapis.com/google.protobuf.StringValue", false,
+                   "type.googleapis.com/xds.type.v3.TypedStruct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  // The per-route ``TypedStruct`` must arrive as the JSON serialization of its ``value`` field,
+  // identical to the payload a plain ``Struct`` produces.
+  EXPECT_EQ(R"({"struct_key":"struct_value"})",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-per-route-config"))[0]
+                ->value()
+                .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
   initializeFilter("body_callbacks");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -664,8 +777,9 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
 // A live, non-serializable object stored in filter state at Request lifespan is carried across
 // recreate_stream: the rebuilt filter recovers the same object and echoes its value.
 TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
-  if (GetParam() != "rust" && GetParam() != "rust_static") {
-    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  if (GetParam() != "rust" && GetParam() != "rust_static" && GetParam() != "go") {
+    GTEST_SKIP()
+        << "the filter_state_object_recreate filter is only in the rust and go test modules";
   }
   initializeFilter("filter_state_object_recreate");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -806,6 +920,17 @@ TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwin
                                testing::Eq(1));
 }
 
+TEST_P(DynamicModulesIntegrationTest, StreamTimingIsAvailableOnStreamComplete) {
+  initializeFilter("stream_timing");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.stream_timing_observed_total", testing::Eq(1));
+}
+
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
   initializeFilter("http_callouts", "missing");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -881,48 +1006,6 @@ TEST_P(DynamicModulesIntegrationTest, SpanAcrossCallbacks) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_GE(offThreadWorkSpansFinished().load(), before + 1);
-}
-
-// Regression test for the shared continue-flag wedge. The upstream replies complete at headers
-// while the client is still uploading. The module holds the response at on_response_headers, a
-// request body chunk continues the decode direction, and the held response is then resumed via
-// continue_encoding. With a single shared continue flag the decode-side continue suppressed the
-// resume and the response never reached the client.
-TEST_P(DynamicModulesIntegrationTest, EarlyResponseDuringUpload) {
-  if (GetParam() != "rust") {
-    GTEST_SKIP() << "Early response during upload test only runs for Rust";
-  }
-  // The upstream half-closes its response while the request keeps uploading, so the router must
-  // keep decoding request data instead of resetting the stream.
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  initializeFilter("early_response_during_upload");
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  auto& request_encoder = encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // The request is still open, so wait for the upstream stream without requiring its end of stream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Reply complete at headers, for example an early 403, while the client is still uploading.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-
-  // Wait until the module has held the response at on_response_headers before uploading more, so
-  // the request body continue is interleaved after the encode direction is paused.
-  test_server_->waitForCounter("dynamicmodulescustom.response_pause_total", testing::Ge(1));
-
-  // The request body continues the decode direction, then on_scheduled resumes the held response.
-  codec_client_->sendData(request_encoder, "upload", true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
@@ -1166,6 +1249,18 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionAttemptsAreAvailableOnStreamComplete) {
+  initializeFilter("upstream_connection_attempts");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.upstream_connection_attempts_observed_total",
+                               testing::Eq(1));
 }
 
 TEST_P(DynamicModulesIntegrationTest, CustomMetricsNamespace) {
@@ -1442,6 +1537,15 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
   FAIL() << "Config was not updated in time";
 }
 
+// A scheduled event emits a metric through the filter config, with no stream involved.
+TEST_P(DynamicModulesIntegrationTest, ConfigSchedulerEmitsMetric) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the scheduled event metric is only in the rust test module";
+  }
+  initializeFilter("http_config_scheduler");
+  test_server_->waitForGauge("dynamicmodulescustom.config_scheduled_events", testing::Eq(1));
+}
+
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   initializeFilter("buffer_limit_filter");
@@ -1522,6 +1626,129 @@ TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
   auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
   ASSERT_FALSE(bool_1.empty());
   EXPECT_EQ("false", bool_1[0]->value().getStringView());
+}
+
+// Reads every runtime type through the module's SDK and confirms both paths: a key present in the
+// static runtime layer yields its configured value, and an absent key yields the default the module
+// passed in. The module reads these while its config is being created, which is the only place the
+// runtime is reachable, so this also pins that config creation runs where the server context is
+// installed.
+TEST_P(DynamicModulesIntegrationTest, RuntimeValues) {
+  config_helper_.addRuntimeOverride("test.runtime_bool", "true");
+  config_helper_.addRuntimeOverride("test.runtime_int", "42");
+  config_helper_.addRuntimeOverride("test.runtime_number", "0.25");
+  // test.runtime_missing_* are deliberately never set, so the module gets its defaults back.
+
+  initializeFilter("runtime_values");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  auto header = [&response](absl::string_view name) -> std::string {
+    auto values = response->headers().get(Http::LowerCaseString(std::string(name)));
+    if (values.empty()) {
+      return "<missing>";
+    }
+    return std::string(values[0]->value().getStringView());
+  };
+
+  // Keys present in the static runtime layer override the defaults the module passed in.
+  EXPECT_EQ("true", header("x-runtime-bool"));
+  EXPECT_EQ("42", header("x-runtime-int"));
+  EXPECT_EQ("0.25", header("x-runtime-number"));
+
+  // Absent keys fall back to the module's own defaults rather than a zero value, and each type
+  // keeps its own default.
+  EXPECT_EQ("true", header("x-runtime-missing-bool"));
+  EXPECT_EQ("1234", header("x-runtime-missing-int"));
+  EXPECT_EQ("2.5", header("x-runtime-missing-number"));
+}
+
+class DynamicModulesLoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
+                                                   public DynamicModulesIntegrationTest {
+public:
+  // Saturates the trigger of the load shed point that the module checks.
+  void initializeOverloadedLoadShedPoint(bool bypass_overload_manager,
+                                         bool upstream_filter = false) {
+    setupOverloadManagerConfig(
+        TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "test.dynamic_module_load_shed_point"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+    config_helper_.addConfigModifier(
+        [this, bypass_overload_manager](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          *bootstrap.mutable_overload_manager() = overload_manager_config_;
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->set_bypass_overload_manager(
+              bypass_overload_manager);
+        });
+    initializeFilter("load_shed_point", "test.dynamic_module_load_shed_point", "",
+                     "type.googleapis.com/google.protobuf.StringValue", upstream_filter);
+    updateResource(0.95);
+    test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                               testing::Eq(100));
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  }
+
+  // Returns what the module told the upstream about whether it got the load shed point.
+  std::string loadShedPointPresence() {
+    const auto presence =
+        upstream_request_->headers().get(Http::LowerCaseString("x-load-shed-point"));
+    return presence.empty() ? "" : std::string(presence[0]->value().getStringView());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, DynamicModulesLoadShedPointIntegrationTest, DynamicModulesIntegrationTestValues,
+    Extensions::DynamicModules::DynamicModuleTestLanguages::languageParamToTestName);
+
+TEST_P(DynamicModulesLoadShedPointIntegrationTest, ShedsLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ("shed", response->body());
+  test_server_->waitForCounter("overload.test.dynamic_module_load_shed_point.shed_load_count",
+                               testing::Eq(1));
+
+  updateResource(0.8);
+  test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                             testing::Eq(0));
+  response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("present", loadShedPointPresence());
+}
+
+TEST_P(DynamicModulesLoadShedPointIntegrationTest,
+       ListenerBypassingOverloadManagerGetsNoLoadShedPoint) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/true);
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("absent", loadShedPointPresence());
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
+}
+
+TEST_P(DynamicModulesLoadShedPointIntegrationTest, UpstreamFilterGetsNoLoadShedPoint) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false, /*upstream_filter=*/true);
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("absent", loadShedPointPresence());
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
 }
 
 } // namespace Envoy

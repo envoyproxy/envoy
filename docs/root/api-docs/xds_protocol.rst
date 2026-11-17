@@ -74,8 +74,11 @@ Filesystem subscriptions
 
 The simplest approach to delivering dynamic configuration is to place it
 at a well known path specified in the :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`.
-Envoy will use ``inotify`` (``kqueue`` on macOS) to monitor the file for
-changes and parse the
+By default, Envoy will use ``inotify`` (``kqueue`` on macOS) to watch the path for move events.
+Alternatively, :ref:`poll_interval
+<envoy_v3_api_field_config.core.v3.PathConfigSource.poll_interval>` can be configured when
+filesystem notifications are unreliable or when a custom deployment model does not generate
+the move or modification events handled by watching the path or directory. Envoy parses the
 :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` proto in the file on update.
 Binary protobufs, JSON, YAML and proto text are supported formats for
 the

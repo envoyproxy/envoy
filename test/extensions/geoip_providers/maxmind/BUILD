@@ -23,7 +23,13 @@ envoy_extension_cc_test(
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/geoip_providers/maxmind:config",
@@ -46,10 +52,17 @@ envoy_extension_cc_test(
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
+        "//source/common/stats:utility_lib",
         "//source/extensions/geoip_providers/maxmind:config",
         "//source/extensions/geoip_providers/maxmind:provider_impl",
         "//test/mocks/server:factory_context_mocks",

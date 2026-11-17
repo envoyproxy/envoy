@@ -18,7 +18,11 @@ public:
     if (reset_callbacks_started_ || local_end_stream_) {
       return;
     }
-    ASSERT(high_watermark_callbacks_ > 0);
+    if (high_watermark_callbacks_ == 0) {
+      IS_ENVOY_BUG(
+          "HTTP stream low watermark callback without a preceding high watermark callback");
+      return;
+    }
     --high_watermark_callbacks_;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {

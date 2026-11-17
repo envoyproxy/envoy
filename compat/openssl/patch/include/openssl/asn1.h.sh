@@ -20,6 +20,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl ASN1_IA5STRING_free \
   --uncomment-func-decl ASN1_INTEGER_new \
   --uncomment-func-decl ASN1_INTEGER_free \
+  --uncomment-func-decl ASN1_INTEGER_set_int64 \
   --uncomment-func-decl ASN1_INTEGER_set_uint64 \
   --uncomment-func-decl c2i_ASN1_INTEGER \
   --uncomment-func-decl ASN1_INTEGER_to_BN \
@@ -44,3 +45,13 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro DECLARE_ASN1_ALLOC_FUNCTIONS_name \
   --uncomment-macro ASN1_BOOLEAN_TRUE \
   --uncomment-macro ASN1_BOOLEAN_FALSE
+
+# BoringSSL-only ASN1_R_* reason codes (no OpenSSL equivalent).
+# Values use a 10000+ range to avoid collisions with OpenSSL's ASN1_R_*
+# numbering (which covers 100-233).
+cat >> "$1" <<'EOT'
+
+#ifndef ASN1_R_INVALID_BIT_STRING_PADDING
+#define ASN1_R_INVALID_BIT_STRING_PADDING 10001
+#endif
+EOT

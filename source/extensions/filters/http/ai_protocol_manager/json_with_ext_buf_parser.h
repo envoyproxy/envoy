@@ -73,6 +73,13 @@ public:
   // for the final chunk; before that the document is empty.
   JsonWithExtBuf takeDocument() { return std::move(document_); }
 
+  // True once any string has been recorded as a reference rather than materialized, i.e. once the
+  // document depends on the offloaded bytes outliving it.
+  bool hasExternalRefs() const { return has_external_refs_; }
+
+  // Total raw byte length of strings that were replaced by ExternalRefs rather than kept inline.
+  std::uint64_t externalRefBytes() const { return external_ref_bytes_; }
+
   // Json::Wuffs::WuffsJsonCursor::Handler
   bool openStringCapture(absl::string_view key, int depth, size_t token_start) override;
   bool onStringChunk(absl::string_view key, int depth, absl::string_view chunk) override;
@@ -104,6 +111,7 @@ private:
   const Config config_;
   Json::Wuffs::WuffsJsonCursor cursor_;
   JsonWithExtBuf document_;
+  bool has_external_refs_{false};
 
   nlohmann::json root_;
   bool root_set_{false};
@@ -130,6 +138,7 @@ private:
   std::string pending_string_;
   size_t string_token_start_{0};
   bool string_offloaded_{false};
+  std::uint64_t external_ref_bytes_{0};
 };
 
 } // namespace AiProtocolManager

@@ -3,6 +3,8 @@
 #include "envoy/extensions/filters/listener/local_ratelimit/v3/local_ratelimit.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/filters/listener/local_ratelimit/local_ratelimit.h"
 
 #include "test/integration/base_integration_test.h"
@@ -33,6 +35,22 @@ public:
     });
     config_helper_.renameListener("tcp_proxy");
     initialize();
+  }
+
+  // Whether the stats store derives tags with the explicit-tags logic rather than the legacy
+  // tag-extraction rules. Both modes must produce identical stat names, tag-extracted names and
+  // tags, so the two IP versions run the server in different modes.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    // The mode is read during server initialization, before the runtime loader exists, so it has
+    // to be set directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
+    BaseIntegrationTest::initialize();
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
   }
 };
 
@@ -83,6 +101,24 @@ token_bucket:
 
   test_server_->waitForCounter("listener_local_ratelimit.local_rate_limit_stats.rate_limited",
                                testing::Ge(1));
+}
+
+// The stat prefix is an explicit tag of the stats in both stats modes.
+TEST_P(LocalRateLimitTcpIntegrationTest, StatsAreTagged) {
+  setup(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 1
+  fill_interval: 0.2s
+  )EOF");
+
+  const auto rate_limited =
+      test_server_->counter("listener_local_ratelimit.local_rate_limit_stats.rate_limited");
+  ASSERT_NE(rate_limited.get(), nullptr);
+  EXPECT_EQ("listener_local_ratelimit.rate_limited", rate_limited->tagExtractedName());
+  EXPECT_THAT(rate_limited->tags(),
+              testing::UnorderedElementsAreArray(Stats::TagVector{
+                  {"envoy.local_listener_ratelimit_prefix", "local_rate_limit_stats"}}));
 }
 
 } // namespace Envoy

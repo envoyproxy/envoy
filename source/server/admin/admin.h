@@ -207,6 +207,7 @@ public:
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
   bool shouldStripTrailingHostDot() const override { return false; }
+  bool recordRouteResolutionStats() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -373,7 +374,7 @@ private:
       socket_create_ = true;
       return socket_;
     }
-    Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
+    Network::ListenSocketFactoryPtr clone(uint32_t) const override { return nullptr; }
     void closeAllSockets() override {}
     absl::Status doFinalPreWorkerInit() override { return absl::OkStatus(); }
 

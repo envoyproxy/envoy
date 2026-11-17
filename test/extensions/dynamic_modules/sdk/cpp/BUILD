@@ -40,3 +40,16 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "sdk_barrier_test",
+    srcs = ["sdk_barrier_test.cc"],
+    tags = [
+        "no_san",
+        "nocoverage",
+    ],
+    deps = [
+        "//source/extensions/dynamic_modules/sdk/cpp:sdk_internal_common",
+        "@googletest//:gtest_main",
+    ],
+)

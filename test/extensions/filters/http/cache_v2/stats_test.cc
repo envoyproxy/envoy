@@ -20,25 +20,20 @@ protected:
 
 MATCHER_P(OptCounterHasValue, m, "") {
   return testing::ExplainMatchResult(
-      testing::Optional(
-          testing::Property("get", &std::reference_wrapper<const Stats::Counter>::get,
-                            testing::Property("value", &Envoy::Stats::Counter::value, m))),
-      arg, result_listener);
+      testing::Optional(testing::Property("value", &Envoy::Stats::Counter::value, m)), arg,
+      result_listener);
 }
 
 MATCHER_P(OptGaugeHasValue, m, "") {
   return testing::ExplainMatchResult(
-      testing::Optional(
-          testing::Property("get", &std::reference_wrapper<const Stats::Gauge>::get,
-                            testing::Property("value", &Envoy::Stats::Gauge::value, m))),
-      arg, result_listener);
+      testing::Optional(testing::Property("value", &Envoy::Stats::Gauge::value, m)), arg,
+      result_listener);
 }
 
 MATCHER_P(OptCounterHasName, m, "") {
   return testing::ExplainMatchResult(
-      testing::Optional(testing::Property(
-          "get", &std::reference_wrapper<const Stats::Counter>::get,
-          testing::Property("tagExtractedName", &Envoy::Stats::Counter::tagExtractedName, m))),
+      testing::Optional(
+          testing::Property("tagExtractedName", &Envoy::Stats::Counter::tagExtractedName, m)),
       arg, result_listener);
 }
 

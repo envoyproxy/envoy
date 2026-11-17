@@ -4,9 +4,12 @@
 #include <cstddef>
 #include <deque>
 #include <functional>
+#include <utility>
 
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/executor.h"
+
+#include "absl/functional/any_invocable.h"
 
 namespace Envoy {
 namespace Coroutine {
@@ -23,19 +26,23 @@ namespace Coroutine {
  */
 class ManualExecutor : public Executor {
 public:
-  void schedule(std::coroutine_handle<> handle) override { queue_.push_back(handle); }
+  void schedule(std::coroutine_handle<> handle) override {
+    post([handle]() mutable { handle.resume(); });
+  }
+
+  void post(absl::AnyInvocable<void()> cb) override { queue_.push_back(std::move(cb)); }
 
   Event::TimerPtr createTimer(std::function<void()>) override {
     PANIC("ManualExecutor does not support timers; use DispatcherExecutor");
   }
 
-  // Resume all queued handles (FIFO). Handles scheduled during a resume are
-  // picked up in the same drain.
+  // Resume all queued callbacks/handles (FIFO). Callbacks scheduled during a
+  // resume are picked up in the same drain.
   void drain() {
     while (!queue_.empty()) {
-      std::coroutine_handle<> handle = queue_.front();
+      absl::AnyInvocable<void()> cb = std::move(queue_.front());
       queue_.pop_front();
-      handle.resume();
+      cb();
     }
   }
 
@@ -43,7 +50,7 @@ public:
   size_t size() const { return queue_.size(); }
 
 private:
-  std::deque<std::coroutine_handle<>> queue_;
+  std::deque<absl::AnyInvocable<void()>> queue_;
 };
 
 } // namespace Coroutine

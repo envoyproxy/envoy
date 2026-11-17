@@ -123,6 +123,20 @@ TEST_P(DynamicModuleBridgeIntegrationTest, LocalReplyMode) {
   EXPECT_EQ("access denied", response->body());
 }
 
+// Regression test for a bridge use after free. The module sends a complete response during
+// encode_headers while the downstream request is still open, so the router resets the upstream and
+// destroys the bridge synchronously. The response is now applied after the hook returns, so the
+// bridge is never torn down under a live module borrow.
+TEST_P(DynamicModuleBridgeIntegrationTest, LocalReplyBeforeDownstreamEndStream) {
+  initializeWithBridgeConfig("local_reply");
+
+  setupConnection();
+  ASSERT_TRUE(response_->waitForEndStream());
+
+  EXPECT_EQ("403", response_->headers().getStatusValue());
+  EXPECT_EQ("access denied", response_->body());
+}
+
 // The upstream HTTP bridge loads its module lazily on the data path and has no factory context, so
 // a missing module is visible only through the loader error log.
 TEST_P(DynamicModuleBridgeIntegrationTest, ModuleLoadFailureLogsAtRuntime) {

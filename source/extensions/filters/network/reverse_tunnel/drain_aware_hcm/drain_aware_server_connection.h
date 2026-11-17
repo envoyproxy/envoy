@@ -13,7 +13,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/network/drain_close_util.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_listener.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,42 +63,59 @@ private:
   bool peer_goaway_handled_{false};
 };
 
-// Wraps an Http::ServerConnection and proactively sends an HTTP/2 GOAWAY frame when the listener
-// that owns this connection begins draining. Opt-in connections react immediately to drain events;
-// a short timer also checks gradual drain, health checks and the legacy drain decision. When the
-// runtime feature "envoy.reloadable_features.use_connection_event_drain" is enabled, the drain
-// decision is derived from the connection-level drain event delivered via
-// Network::Connection::onDrain(); otherwise it falls back to polling DrainDecision::drainClose()
-// (which avoids calling addOnDrainCloseCb(), intentionally unsupported on
-// PerFilterChainFactoryContextImpl).
+// Per-connection drain schedule. Every delay is an offset from the start of the drain. A
+// metadata_delay or shutdown_notice_delay of 0 skips that step, and both steps only run when the
+// connection has an on_local_drain callback (a reverse tunnel with enable_drain_with_goaway). The
+// METADATA frame is sent before the shutdown notice, and both before the final GOAWAY; config
+// validation enforces that order. Build it with designated initializers so the fields cannot be
+// swapped silently.
+struct DrainDelayConfig {
+  // Soft GOAWAY (shutdown notice) telling the peer to stop opening new streams on this tunnel.
+  std::chrono::milliseconds shutdown_notice_delay;
+  // METADATA frame carrying the drain marker to the peer.
+  std::chrono::milliseconds metadata_delay;
+  // Final GOAWAY. The jittered hcm_config.drain_timeout, drawn when the connection is created.
+  // Only used when this wrapper detects a listener drain; when the HCM starts the drain itself
+  // (e.g. max_connection_duration), the HCM's own drain timer sends the final GOAWAY.
+  std::chrono::milliseconds goaway_delay;
+};
+
+// Wraps an Http::ServerConnection and drains it when the owning listener drains: a shutdown notice
+// first, then a GOAWAY after drain_timeout. Drain is detected on a short timer. When the runtime
+// feature "envoy.reloadable_features.use_connection_event_drain" is enabled, the drain decision is
+// derived from the connection-level drain event delivered via Network::Connection::onDrain();
+// otherwise it falls back to polling DrainDecision::drainClose() (which avoids calling
+// addOnDrainCloseCb(), intentionally unsupported on PerFilterChainFactoryContextImpl).
 class DrainAwareServerConnection : public Http::ServerConnection,
                                    public Network::ConnectionCallbacks,
                                    public Logger::Loggable<Logger::Id::filter> {
 public:
-  // `on_local_drain` (optional) fires once when this connection begins draining locally (the HCM
-  // sends a shutdownNotice due to max_connection_duration/graceful shutdown, or the listener
-  // drains). For reverse tunnels this asks the initiator to dial a replacement tunnel immediately
-  // while the old one finishes in-flight streams.
+  // `on_local_drain` is set for reverse tunnels and dials a replacement on connection rotation.
+  // A listener drain stops the initiator first, so the same callback cannot replenish it.
   DrainAwareServerConnection(
       Http::ServerConnectionPtr inner, Network::Connection& connection,
       const Network::DrainDecision& drain_decision,
       Server::Configuration::ServerFactoryContext& server_context,
-      std::function<void()> on_local_drain = nullptr,
+      const DrainDelayConfig drain_delay_config, std::function<void()> on_local_drain = nullptr,
       std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper = nullptr,
-      bool drain_immediately = false,
       Network::DrainDirection drain_direction = Network::DrainDirection::All)
       : callbacks_wrapper_(std::move(callbacks_wrapper)), inner_(std::move(inner)),
         connection_(connection), drain_decision_(drain_decision), server_context_(server_context),
         drain_type_(Network::listenerDrainType(connection)),
-        on_local_drain_(std::move(on_local_drain)), drain_immediately_(drain_immediately),
-        drain_direction_(drain_direction) {
+        on_local_drain_(std::move(on_local_drain)), drain_direction_(drain_direction),
+        drain_delay_config_(drain_delay_config) {
     ENVOY_LOG(debug, "drain_aware_hcm: created server connection wrapper, protocol={}",
               static_cast<int>(inner_->protocol()));
     // Observe connection-level drain notifications so onDrainCheckTimer() can react to them.
     connection_.addConnectionCallbacks(*this);
     drain_check_timer_ = connection_.dispatcher().createTimer([this]() { onDrainCheckTimer(); });
     drain_check_timer_->enableTimer(std::chrono::milliseconds(100));
-    initialized_ = true;
+
+    drain_connection_metadata_timer_ =
+        createTimer([this]() { sendDrainMetadata(); }, drain_delay_config_.metadata_delay);
+    drain_shutdown_notice_timer_ = createTimer([this]() { inner_->shutdownNotice(); },
+                                               drain_delay_config_.shutdown_notice_delay);
+    drain_goaway_timer_ = connection_.dispatcher().createTimer([this]() { goAway(); });
   }
 
   // `connection_` is guaranteed to outlive this wrapper: the wrapper is owned by
@@ -113,31 +130,35 @@ public:
     }
   }
 
-  Http::Status dispatch(Buffer::Instance& data) override {
-    // A drain event can be replayed during construction. Send GOAWAY before dispatching any new
-    // streams, after the HCM has taken ownership of the codec.
-    if (drain_immediately_ && !drain_goaway_sent_ && shouldDrainClose()) {
-      startDrain();
+  Http::Status dispatch(Buffer::Instance& data) override { return inner_->dispatch(data); }
+  void goAway() override {
+    if (drain_goaway_sent_) {
+      return;
     }
-    return inner_->dispatch(data);
+
+    drain_goaway_sent_ = true;
+    inner_->goAway();
   }
-  void goAway() override { inner_->goAway(); }
   Http::Protocol protocol() override { return inner_->protocol(); }
   void shutdownNotice() override {
-    if (drain_immediately_ && shouldDrainClose()) {
-      startDrain();
+    if (local_drain_notified_) {
       return;
     }
+    local_drain_notified_ = true;
+
     // The HCM calls this at the start of a graceful drain (e.g. max_connection_duration). For
     // reverse tunnels (on_local_drain_ set) we use it as the "tunnel draining" signal to dial a
-    // replacement now, but SUPPRESS the early GOAWAY so the peer keeps using this tunnel during the
-    // grace window. The HCM's final GOAWAY at drain_timeout (via goAway()) then migrates new
-    // requests to the established replacement while in-flight requests finish here.
-    if (on_local_drain_ != nullptr) {
-      notifyLocalDrain();
-      return;
+    // replacement now, but SUPPRESS the immediate soft GOAWAY so the peer keeps using this tunnel
+    // during the grace window; it is sent later at shutdown_notice_delay, if configured. The final
+    // GOAWAY then migrates new requests to the established replacement while in-flight requests
+    // finish here.
+    if (!on_local_drain_) {
+      return inner_->shutdownNotice();
     }
-    inner_->shutdownNotice();
+
+    on_local_drain_();
+    schedule(drain_connection_metadata_timer_, drain_delay_config_.metadata_delay);
+    schedule(drain_shutdown_notice_timer_, drain_delay_config_.shutdown_notice_delay);
   }
   bool wantsToWrite() override { return inner_->wantsToWrite(); }
 
@@ -154,6 +175,13 @@ public:
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
       drain_check_timer_->disableTimer();
+      if (drain_connection_metadata_timer_ != nullptr) {
+        drain_connection_metadata_timer_->disableTimer();
+      }
+      if (drain_shutdown_notice_timer_ != nullptr) {
+        drain_shutdown_notice_timer_->disableTimer();
+      }
+      drain_goaway_timer_->disableTimer();
     }
   }
   void onAboveWriteBufferHighWatermark() override {}
@@ -161,9 +189,6 @@ public:
   void onDrain(Network::ConnectionDrainEvent drain_event) override {
     if (!connection_drain_event_.has_value()) {
       connection_drain_event_ = drain_event;
-    }
-    if (initialized_ && drain_immediately_ && use_connection_event_drain_ && shouldDrainClose()) {
-      startDrain();
     }
   }
 
@@ -174,43 +199,45 @@ private:
       return drain_decision_.drainClose(drain_direction_);
     }
 
-    if (drain_immediately_ && connection_drain_event_.has_value()) {
-      stopInitiatingReverseConnections(connection_);
-    }
-
     return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
   }
 
   void onDrainCheckTimer() {
-    if (drain_goaway_sent_ || connection_.state() != Network::Connection::State::Open) {
+    if (local_drain_notified_ || connection_.state() != Network::Connection::State::Open) {
       return;
     }
     if (shouldDrainClose()) {
-      startDrain();
-      return;
+      ENVOY_LOG(info, "drain_aware_hcm: drain detected, starting drain sequence");
+
+      shutdownNotice();
+      return drain_goaway_timer_->enableTimer(drain_delay_config_.goaway_delay);
     }
     drain_check_timer_->enableTimer(std::chrono::milliseconds(100));
   }
 
-  void startDrain() {
-    if (drain_goaway_sent_ || connection_.state() != Network::Connection::State::Open) {
-      return;
-    }
-    ENVOY_LOG(info, "drain_aware_hcm: drain detected, sending GOAWAY");
-    drain_goaway_sent_ = true;
-    drain_check_timer_->disableTimer();
-    notifyLocalDrain();
-    // A final GOAWAY excludes new streams while existing streams retain the connection.
-    inner_->goAway();
+  void sendDrainMetadata() {
+    Http::MetadataMap metadata_map;
+    metadata_map.emplace(
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY,
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_VALUE);
+    Http::MetadataMapVector metadata_map_vector;
+    metadata_map_vector.push_back(std::make_unique<Http::MetadataMap>(std::move(metadata_map)));
+
+    inner_->encodeMetadata(metadata_map_vector);
   }
 
-  // Fires the local-drain callback at most once.
-  void notifyLocalDrain() {
-    if (local_drain_notified_ || on_local_drain_ == nullptr) {
+  Event::TimerPtr createTimer(std::function<void()>&& callback, std::chrono::milliseconds delay) {
+    return delay.count() && on_local_drain_
+               ? connection_.dispatcher().createTimer(std::move(callback))
+               : nullptr;
+  }
+
+  void schedule(Event::TimerPtr& timer, std::chrono::milliseconds delay) {
+    if (!timer || !delay.count()) {
       return;
     }
-    local_drain_notified_ = true;
-    on_local_drain_();
+
+    timer->enableTimer(delay);
   }
 
   // Declared before inner_ so the codec (which holds a reference to this wrapper) is destroyed
@@ -231,12 +258,14 @@ private:
   const bool use_connection_event_drain_{
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")};
   std::function<void()> on_local_drain_;
-  const bool drain_immediately_;
   const Network::DrainDirection drain_direction_;
   Event::TimerPtr drain_check_timer_;
-  bool initialized_{false};
   bool drain_goaway_sent_{false};
   bool local_drain_notified_{false};
+  const DrainDelayConfig drain_delay_config_;
+  Event::TimerPtr drain_connection_metadata_timer_;
+  Event::TimerPtr drain_shutdown_notice_timer_;
+  Event::TimerPtr drain_goaway_timer_;
 };
 
 } // namespace ReverseTunnel

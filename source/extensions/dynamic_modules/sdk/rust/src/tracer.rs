@@ -1,5 +1,9 @@
 use crate::{
-  abi, bytes_to_module_buffer, ffi_export, str_to_module_buffer, wrap_into_c_void_ptr,
+  abi,
+  bytes_to_module_buffer,
+  ffi_export,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
   NEW_TRACER_CONFIG_FUNCTION,
 };
 use std::ffi::c_void;
@@ -9,37 +13,37 @@ use std::ffi::c_void;
 // -----------------------------------------------------------------------------
 
 /// Handle for a counter metric without labels defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerCounterHandle {
   id: usize,
 }
 
 /// Handle for a labeled counter metric defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerCounterVecHandle {
   id: usize,
 }
 
 /// Handle for a gauge metric without labels defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerGaugeHandle {
   id: usize,
 }
 
 /// Handle for a labeled gauge metric defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerGaugeVecHandle {
   id: usize,
 }
 
 /// Handle for a histogram metric without labels defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerHistogramHandle {
   id: usize,
 }
 
 /// Handle for a labeled histogram metric defined by the tracer module.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TracerHistogramVecHandle {
   id: usize,
 }
@@ -85,16 +89,19 @@ impl TracerConfigContext {
   pub fn define_counter_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerCounterVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_counter(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -127,16 +134,19 @@ impl TracerConfigContext {
   pub fn define_gauge_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerGaugeVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_gauge(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -169,16 +179,19 @@ impl TracerConfigContext {
   pub fn define_histogram_vec(
     &self,
     name: &str,
-    labels: &[&str],
+    label_names: &[&str],
   ) -> Result<TracerHistogramVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_names: Vec<_> = label_names
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_define_histogram(
         self.envoy_ptr,
         str_to_module_buffer(name),
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_names.as_ptr() as *mut _,
+        label_names.len(),
         &mut id,
       )
     })?;
@@ -206,16 +219,19 @@ impl TracerConfigContext {
   pub fn increment_counter_vec(
     &self,
     handle: TracerCounterVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_increment_counter(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -242,16 +258,19 @@ impl TracerConfigContext {
   pub fn set_gauge_vec(
     &self,
     handle: TracerGaugeVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_set_gauge(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -278,16 +297,19 @@ impl TracerConfigContext {
   pub fn record_histogram_vec(
     &self,
     handle: TracerHistogramVecHandle,
-    labels: &[&str],
+    label_values: &[&str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
-    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let label_values: Vec<_> = label_values
+      .iter()
+      .map(|l| str_to_module_buffer(l))
+      .collect();
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_record_histogram_value(
         self.envoy_ptr,
         handle.id,
-        label_bufs.as_ptr() as *mut _,
-        label_bufs.len(),
+        label_values.as_ptr() as *mut _,
+        label_values.len(),
         value,
       )
     })
@@ -336,6 +358,9 @@ pub trait TracerSpan: Send {
 
   /// Set a tag on this span.
   fn set_tag(&mut self, key: &str, value: &str);
+
+  /// Reserve capacity for tags that will be set via [`set_tag`](Self::set_tag).
+  fn reserve_tags(&mut self, _size: usize) {}
 
   /// Record a log event on this span.
   fn log(&mut self, timestamp_ns: i64, event: &str);
@@ -681,6 +706,20 @@ ffi_export! {
   ///
   /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
   /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_tracer_span_reserve_tags(
+    span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
+    tags_size: usize,
+  ) {
+    let wrapper = unsafe { &mut *(span_module_ptr as *mut SpanWrapper) };
+    wrapper.inner.reserve_tags(tags_size);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
   unsafe fn envoy_dynamic_module_on_tracer_span_log(
     span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
     timestamp_ns: i64,
@@ -928,4 +967,27 @@ macro_rules! declare_tracer_init_functions {
       on_panic = ::std::ptr::null()
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashSet;
+
+  #[test]
+  fn metric_handles_are_comparable_and_hashable() {
+    let a = TracerCounterHandle { id: 1 };
+    assert_eq!(a, TracerCounterHandle { id: 1 });
+    assert_ne!(a, TracerCounterHandle { id: 2 });
+
+    let mut set = HashSet::new();
+    set.insert(a);
+    assert!(!set.insert(TracerCounterHandle { id: 1 }));
+
+    assert_eq!(TracerGaugeHandle { id: 5 }, TracerGaugeHandle { id: 5 });
+    assert_eq!(
+      TracerHistogramHandle { id: 7 },
+      TracerHistogramHandle { id: 7 }
+    );
+  }
 }

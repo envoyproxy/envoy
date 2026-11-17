@@ -1,14 +1,100 @@
 #pragma once
 
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "sdk.h"
 
 namespace Envoy {
 namespace DynamicModules {
+
+// HeaderView is cast to and from the ABI header structs in place, which avoids copying the headers
+// into a second array, so it must keep the layout of those structs.
+static_assert(std::is_standard_layout_v<HeaderView>);
+static_assert(sizeof(HeaderView) == sizeof(envoy_dynamic_module_type_envoy_http_header));
+static_assert(alignof(HeaderView) == alignof(envoy_dynamic_module_type_envoy_http_header));
+static_assert(sizeof(HeaderView) == sizeof(envoy_dynamic_module_type_module_http_header));
+static_assert(alignof(HeaderView) == alignof(envoy_dynamic_module_type_module_http_header));
+// The member order is checked where the compiler can, since it does not change the size.
+#if defined(__has_builtin)
+#if __has_builtin(__is_layout_compatible)
+static_assert(__is_layout_compatible(HeaderView, envoy_dynamic_module_type_envoy_http_header));
+static_assert(__is_layout_compatible(HeaderView, envoy_dynamic_module_type_module_http_header));
+#endif
+#endif
+
+// Logs an exception caught at the ABI boundary at error level so a failure inside a module hook
+// stays visible.
+inline void logAbiException(const char* function_name, const char* what) {
+  std::string message(function_name);
+  message += ": caught exception at the ABI boundary: ";
+  message += what;
+  envoy_dynamic_module_callback_log_v2(
+      envoy_dynamic_module_type_log_level_Error,
+      envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
+      envoy_dynamic_module_type_module_buffer{nullptr, 0}, 0);
+}
+
+// Runs a module hook body and returns fail_closed if it throws, so a module exception never crosses
+// the C ABI boundary and aborts the process. This mirrors the Rust SDK panic barrier. The return
+// type is taken from the body, so fail_closed only needs to be convertible to it.
+template <class Fail, class Body>
+auto failClosed(const char* function_name, Fail&& fail_closed, Body&& body) noexcept
+    -> decltype(body()) {
+  try {
+    return body();
+  } catch (const std::exception& e) {
+    logAbiException(function_name, e.what());
+  } catch (...) {
+    logAbiException(function_name, "unknown exception");
+  }
+  return static_cast<decltype(body())>(std::forward<Fail>(fail_closed));
+}
+
+// The void returning counterpart of failClosed.
+template <class Body> void failClosedVoid(const char* function_name, Body&& body) noexcept {
+  try {
+    body();
+  } catch (const std::exception& e) {
+    logAbiException(function_name, e.what());
+  } catch (...) {
+    logAbiException(function_name, "unknown exception");
+  }
+}
+
+/**
+ * Implements the CommonHandle process-wide callbacks against the C ABI, as a mixin over the
+ * handle interface being implemented. Each concrete config handle derives from
+ * CommonHandleImpl<ItsInterface> and so gains all of them without restating any.
+ *
+ * @tparam Base the config handle interface to implement, which must derive from CommonHandle.
+ */
+template <class Base> class CommonHandleImpl : public Base {
+public:
+  bool getRuntimeBool(std::string_view key, bool default_value) override {
+    return envoy_dynamic_module_callback_get_runtime_bool(
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, default_value);
+  }
+
+  uint64_t getRuntimeInt(std::string_view key, uint64_t default_value) override {
+    return envoy_dynamic_module_callback_get_runtime_int(
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, default_value);
+  }
+
+  double getRuntimeNumber(std::string_view key, double default_value) override {
+    return envoy_dynamic_module_callback_get_runtime_number(
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, default_value);
+  }
+};
 
 /**
  * Generic Scheduler implementation backed by a host-managed event dispatcher.
@@ -59,6 +145,35 @@ private:
   uint64_t next_task_id_{1}; // 0 is reserved.
   std::map<uint64_t, std::function<void()>> tasks_;
 };
+
+/**
+ * Implements LoadShedPoint against the C ABI.
+ */
+class LoadShedPointImpl : public LoadShedPoint {
+public:
+  explicit LoadShedPointImpl(envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point)
+      : load_shed_point_(load_shed_point) {}
+
+  bool shouldShedLoad() override {
+    return envoy_dynamic_module_callback_load_shed_point_should_shed_load(load_shed_point_);
+  }
+
+private:
+  envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point_;
+};
+
+/**
+ * Wraps a load shed point that a get_load_shed_point callback returned.
+ * @param load_shed_point The load shed point, which is null when there is none.
+ * @return The load shed point, or nullptr if there is none.
+ */
+inline std::unique_ptr<LoadShedPoint>
+newLoadShedPoint(envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point) {
+  if (load_shed_point == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<LoadShedPointImpl>(load_shed_point);
+}
 
 } // namespace DynamicModules
 } // namespace Envoy

@@ -237,7 +237,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   state_ = OAuthState::Idle;
 
   // Check that the auth cluster returned a happy response.
-  const auto response_code = message->headers().Status()->value().getStringView();
+  const absl::string_view response_code = message->headers().getStatusValue();
 
   if (response_code != "200") {
     const std::string response_body = message->bodyAsString();

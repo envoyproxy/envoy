@@ -9,4 +9,5 @@ HTTP
   caches/caches
   caches_v2/caches
   cluster_specifier/cluster_specifier
+  route_specifier/route_specifier
   tcp_bridge/tcp_bridge

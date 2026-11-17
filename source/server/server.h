@@ -321,12 +321,11 @@ public:
     return validation_context_;
   }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    // Server has two message validation visitors, one for static and
-    // other for dynamic configuration. Choose the dynamic validation
-    // visitor if server main dispatch loop started, as if all configuration
-    // after main dispatch loop started should be dynamic.
-    return main_dispatch_loop_started_.load() ? validation_context_.dynamicValidationVisitor()
-                                              : validation_context_.staticValidationVisitor();
+    // Server has two message validation visitors, one for static and other for dynamic
+    // configuration. The bootstrap (static) resources are all loaded during initialization, so
+    // anything validated after that point was delivered by xDS and is dynamic.
+    return bootstrap_config_loaded_.load() ? validation_context_.dynamicValidationVisitor()
+                                           : validation_context_.staticValidationVisitor();
   }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -380,7 +379,9 @@ private:
   bool shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
-  std::atomic<bool> main_dispatch_loop_started_{false};
+  // Set once all the bootstrap (static) configuration has been loaded, which is the boundary
+  // between static and dynamic configuration. See messageValidationVisitor().
+  std::atomic<bool> bootstrap_config_loaded_{false};
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.

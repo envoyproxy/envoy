@@ -7,7 +7,6 @@ envoy_mobile_package()
 envoy_cc_test(
     name = "bridge_fragment_test",
     srcs = ["bridge_fragment_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common/buffer:bridge_fragment_lib",
         "//library/common/types:c_types_lib",

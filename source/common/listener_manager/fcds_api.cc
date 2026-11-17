@@ -1,11 +1,11 @@
 #include "source/common/listener_manager/fcds_api.h"
 
-#include "envoy/config/listener/v3/listener_components.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -14,19 +14,23 @@ FcdsApiImpl::FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_confi
                          const std::string& filter_chain_name,
                          FilterChainUpdateCallbacks& callbacks, Upstream::ClusterManager& cm,
                          Stats::Scope& scope,
-                         ProtobufMessage::ValidationVisitor& validation_visitor,
+                         const Config::ResourceTypeHelper<FilterChainProto>& resource_type_helper,
                          absl::Status& creation_status)
-    : fcds_config_(fcds_config), filter_chain_name_(filter_chain_name), callbacks_(callbacks),
+    : filter_chain_name_(filter_chain_name), callbacks_(callbacks),
       scope_(scope.createScope(absl::StrCat(filter_chain_name, "."))),
-      resource_type_helper_(validation_visitor, "name"),
       init_target_(absl::StrCat("FCDS init ", filter_chain_name_), [this]() { start(); }) {
-  const auto resource_name = resource_type_helper_.getResourceName();
+  const auto resource_name = resource_type_helper.getResourceName();
   auto subscription_or_error = cm.subscriptionFactory().subscriptionFromConfigSource(
-      fcds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-      resource_type_helper_.resourceDecoder(), {});
+      fcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+      resource_type_helper.resourceDecoder(), {});
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(subscription_or_error).value();
 }
+
+FcdsApiImpl::FcdsApiImpl(const std::string& filter_chain_name,
+                         FilterChainUpdateCallbacks& callbacks)
+    : filter_chain_name_(filter_chain_name), callbacks_(callbacks),
+      init_target_(absl::StrCat("FCDS init ", filter_chain_name_), [] {}) {}
 
 FcdsApiImpl::~FcdsApiImpl() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
@@ -43,7 +47,6 @@ void FcdsApiImpl::start() {
 
 void FcdsApiImpl::setFilterChain(Network::DrainableFilterChainSharedPtr&& filter_chain) {
   filter_chain_ = std::move(filter_chain);
-  warming_ = false;
   init_target_.ready();
 }
 
@@ -77,27 +80,40 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
     return absl::InvalidArgumentError(
         "Invalid FCDS update: cannot add and remove in the same update");
   }
-  if (updated_or_removed && config_ &&
-      Protobuf::util::MessageDifferencer::Equals(*updated_or_removed, *config_)) {
-    ENVOY_LOG(debug, "fcds: skip update for name {}", filter_chain_name_);
-    return absl::OkStatus();
-  }
-  system_version_info_ = system_version_info;
   if (updated_or_removed) {
-    RETURN_IF_NOT_OK(callbacks_.onFilterChainUpdated(*updated_or_removed));
-    // Delay readiness until the filter chain runtime instance is constructed.
-    config_ = *updated_or_removed;
-    warming_ = true;
-  } else {
-    if (filter_chain_) {
-      Network::DrainableFilterChainSharedPtr draining = std::move(filter_chain_);
-      callbacks_.onFilterChainRemoved(std::move(draining));
-      config_ = {};
-      warming_ = false;
+    absl::StatusOr<bool> updated = update(*updated_or_removed);
+    RETURN_IF_NOT_OK(updated.status());
+    if (!*updated) {
+      return absl::OkStatus();
     }
-    init_target_.ready();
+  } else {
+    remove();
   }
+  // Record the version only after an update or removal is actually applied, matching the CDS
+  // behavior of advancing the version on applied changes rather than skipped or rejected ones.
+  system_version_info_ = system_version_info;
   return absl::OkStatus();
+}
+
+absl::StatusOr<bool> FcdsApiImpl::update(const FilterChainProto& filter_chain) {
+  const uint64_t new_hash = MessageUtil::hash(filter_chain);
+  if (config_hash_ == new_hash) {
+    ENVOY_LOG(debug, "fcds: skip update for name {}", filter_chain_name_);
+    return false;
+  }
+  RETURN_IF_NOT_OK(callbacks_.onFilterChainUpdated(filter_chain));
+  // Delay readiness until the filter chain runtime instance is constructed.
+  config_hash_ = new_hash;
+  return true;
+}
+
+void FcdsApiImpl::remove() {
+  if (filter_chain_) {
+    Network::DrainableFilterChainSharedPtr draining = std::move(filter_chain_);
+    callbacks_.onFilterChainRemoved(std::move(draining));
+    config_hash_.reset();
+  }
+  init_target_.ready();
 }
 
 absl::Status FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -127,7 +143,10 @@ FcdsFilterChainFactoryContextImpl::FcdsFilterChainFactoryContextImpl(
     : server_context_(server_context), scope_(server_context_.scope().createScope("")),
       prefixed_scope_(server_context_.scope().createScope(
           absl::StrCat("filter_chain.", filter_chain.name(), "."))),
-      init_manager_(absl::StrCat("fcds_filter_chain ", filter_chain.name())) {}
+      init_manager_(absl::StrCat("fcds_filter_chain ", filter_chain.name())),
+      transport_socket_factory_context_(
+          server_context_, server_context_.serverScope(),
+          server_context_.messageValidationContext().dynamicValidationVisitor(), init_manager_) {}
 
 void FcdsFilterChainFactoryContextImpl::initialize(std::function<void()> completion) {
   ASSERT(init_watcher_ == nullptr);

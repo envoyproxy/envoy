@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/http/injected_credentials/oauth2:config",
         "//test/mocks/server:factory_context_mocks",
@@ -26,13 +32,20 @@ envoy_extension_cc_test(
     name = "token_provider_test",
     srcs = ["token_provider_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:headers_lib",
         "//source/extensions/http/injected_credentials/common:secret_reader_lib",
         "//source/extensions/http/injected_credentials/oauth2:client_credentials_lib",
         "//source/extensions/http/injected_credentials/oauth2:token_provider_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/server:server_mocks",
@@ -47,7 +60,12 @@ envoy_extension_cc_test(
     name = "credential_injector_oauth_integration_test",
     srcs = ["credential_injector_oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/credential_injector:config",

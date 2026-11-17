@@ -13,8 +13,8 @@ namespace AiProtocolManager {
 #define ALL_AI_PROTOCOL_MANAGER_STATS(COUNTER)                                                     \
   COUNTER(request_parsed)                                                                          \
   COUNTER(request_parse_error)                                                                     \
-  COUNTER(request_schema_invalid)                                                                  \
   COUNTER(request_passthrough)                                                                     \
+  COUNTER(route_binding_unused)                                                                    \
   COUNTER(request_external_buffer_error)                                                           \
   COUNTER(response_external_buffer_error)                                                          \
   COUNTER(token_usage_found)                                                                       \

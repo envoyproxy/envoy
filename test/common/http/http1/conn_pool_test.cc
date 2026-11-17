@@ -36,7 +36,6 @@ using testing::_;
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -305,13 +304,13 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   // Override the TransportSocketFactory with a mock version we can add expectations to.
   auto factory = std::make_unique<Network::MockTransportSocketFactory>();
   EXPECT_CALL(*factory, createTransportSocket(_, _))
-      .WillOnce(Invoke([](Network::TransportSocketOptionsConstSharedPtr options,
-                          Upstream::HostDescriptionConstSharedPtr) -> Network::TransportSocketPtr {
+      .WillOnce([](Network::TransportSocketOptionsConstSharedPtr options,
+                   Upstream::HostDescriptionConstSharedPtr) -> Network::TransportSocketPtr {
         EXPECT_TRUE(options != nullptr);
         EXPECT_EQ(options->applicationProtocolFallback()[0],
                   Http::Utility::AlpnNames::get().Http11);
         return std::make_unique<Network::RawBufferSocket>();
-      }));
+      });
   cluster_->transport_socket_matcher_ =
       std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(factory));
 
@@ -364,9 +363,9 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
   // when the first request fails.
   ConnPoolCallbacks callbacks1;
   Http::ConnectionPool::Cancellable* handle2{};
-  EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce([&]() -> void {
     handle2->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-  }));
+  });
   ConnPoolCallbacks callbacks2;
   EXPECT_CALL(callbacks2.pool_failure_, ready()).Times(0);
 
@@ -565,10 +564,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
 
   NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
-  EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).WillOnce([&]() -> void {
     conn_pool_->expectClientCreate();
     EXPECT_NE(nullptr, conn_pool_->newStream(outer_decoder2, callbacks2, {false, true}));
-  }));
+  });
 
   conn_pool_->test_clients_[0].connect_timer_->invokeCallback();
 
@@ -1043,11 +1042,11 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   Buffer::OwnedImpl empty_data;
   EXPECT_CALL(*conn_pool_->test_clients_[0].codec_, dispatch(BufferEqual(&empty_data)))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+      .WillOnce([&](Buffer::Instance& data) -> Http::Status {
         // Simulate the onResponseComplete call to decodeData since dispatch is mocked out.
         inner_decoder->decodeData(data, true);
         return Http::okStatus();
-      }));
+      });
 
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush, _));
@@ -1179,14 +1178,14 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
   // occurs in ~HttpConnPoolImplBase. Avoid recursion.
   bool deferring_delete = false;
   ON_CALL(dispatcher_, clearDeferredDeleteList())
-      .WillByDefault(Invoke([this, &deferring_delete]() -> void {
+      .WillByDefault([this, &deferring_delete]() -> void {
         if (deferring_delete) {
           return;
         }
         deferring_delete = true;
         dispatcher_.to_delete_.clear();
         deferring_delete = false;
-      }));
+      });
   dispatcher_.clearDeferredDeleteList();
 }
 

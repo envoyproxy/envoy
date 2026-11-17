@@ -71,7 +71,9 @@ public:
   findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& config_name,
                                     Server::Configuration::ServerFactoryContext& server_context,
-                                    OptRef<Init::Manager> init_manager) override;
+                                    OptRef<Init::Manager> init_manager, bool warm) override;
+
+  std::vector<absl::string_view> dynamicActiveSecretNames() const override;
 
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
@@ -123,7 +125,7 @@ private:
       return secret_provider;
     }
 
-    std::vector<std::shared_ptr<SecretType>> allSecretProviders() {
+    std::vector<std::shared_ptr<SecretType>> allSecretProviders() const {
       std::vector<std::shared_ptr<SecretType>> providers;
       for (const auto& secret_entry : dynamic_secret_providers_) {
         std::shared_ptr<SecretType> secret_provider = secret_entry.second.lock();

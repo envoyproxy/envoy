@@ -25,8 +25,8 @@ absl::StatusOr<Http::FilterFactoryCb>
 ApiKeyAuthFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const ApiKeyAuthProto& proto_config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix,
-                             extra_context.scopeOr(context));
+  return createFilterFactory(proto_config, extra_context.statsPrefixOr(),
+                             extra_context.statsPrefixScopeOr(context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

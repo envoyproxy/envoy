@@ -12,7 +12,7 @@ envoy_cc_mock(
     name = "router_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/formatter:substitution_formatter_interface",
@@ -22,6 +22,7 @@ envoy_cc_mock(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:route_config_update_info_interface",
+        "//envoy/router:route_specifier_interface",
         "//envoy/router:router_interface",
         "//envoy/router:router_ratelimit_interface",
         "//envoy/router:scopes_interface",
@@ -31,6 +32,7 @@ envoy_cc_mock(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/router:retry_state_lib",
         "//source/common/router:upstream_to_downstream_impl_base",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
@@ -46,7 +48,7 @@ envoy_cc_mock(
     name = "router_filter_interface",
     srcs = ["router_filter_interface.cc"],
     hdrs = ["router_filter_interface.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/router:router_lib",
         "//test/mocks/http:http_mocks",

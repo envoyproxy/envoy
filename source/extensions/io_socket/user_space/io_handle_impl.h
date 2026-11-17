@@ -51,6 +51,7 @@ public:
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;
+  bool wasPeerFullyClosed() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
@@ -128,10 +129,7 @@ public:
           (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
-  void onPeerDestroy() override {
-    peer_handle_ = nullptr;
-    sent_eof_ = true;
-  }
+  void onPeerDestroy() override;
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
       user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
@@ -183,6 +181,10 @@ private:
   // pending data to drain.
   bool receive_data_end_stream_{false};
   bool receive_data_reset_{false};
+  // Set by onPeerDestroy() when the in-process peer fully closed (close(), not shutdown(WR)).
+  // Reads still drain pending data and return a normal EOF, while ConnectionImpl queries
+  // wasPeerFullyClosed() to close half-close-enabled connections cleanly after end_stream.
+  bool peer_closed_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.

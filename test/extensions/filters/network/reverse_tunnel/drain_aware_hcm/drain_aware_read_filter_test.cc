@@ -28,7 +28,6 @@ protected:
     auto filter = std::make_unique<DrainAwareReadFilter>(drain_decision_, context_, direction);
     timer_ = new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
     EXPECT_CALL(callbacks_, connection()).WillOnce(ReturnRef(callbacks_.connection_));
-    ON_CALL(callbacks_.connection_, getSocket()).WillByDefault(ReturnRef(socket_));
     filter->initializeReadFilterCallbacks(callbacks_);
     return filter;
   }
@@ -38,7 +37,6 @@ protected:
   }
 
   StrictMock<Network::MockReadFilterCallbacks> callbacks_;
-  Network::ConnectionSocketPtr socket_;
   StrictMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Event::MockTimer* timer_{nullptr};

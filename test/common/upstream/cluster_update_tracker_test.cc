@@ -40,7 +40,7 @@ TEST_F(ClusterUpdateTrackerTest, ClusterDoesExistAtConstructionTime) {
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
   EXPECT_TRUE(cluster_tracker.threadLocalCluster().has_value());
-  EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
+  EXPECT_EQ(cluster_tracker.threadLocalCluster()->info(), expected_.cluster_.info_);
 }
 
 TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
@@ -66,7 +66,7 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
     cluster_tracker.onClusterAddOrUpdate(cluster_name_, command);
 
     ASSERT_TRUE(cluster_tracker.threadLocalCluster().has_value());
-    EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
+    EXPECT_EQ(cluster_tracker.threadLocalCluster()->info(), expected_.cluster_.info_);
   }
 
   {
@@ -74,7 +74,7 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
     cluster_tracker.onClusterRemoval(irrelevant_.cluster_.info_->name_);
 
     ASSERT_TRUE(cluster_tracker.threadLocalCluster().has_value());
-    EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
+    EXPECT_EQ(cluster_tracker.threadLocalCluster()->info(), expected_.cluster_.info_);
   }
 
   {

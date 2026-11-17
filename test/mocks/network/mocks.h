@@ -162,6 +162,7 @@ public:
   MOCK_METHOD(const ConnectionSocket&, socket, ());
   MOCK_METHOD(void, continueReading, ());
   MOCK_METHOD(void, injectReadDataToFilterChain, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(OptRef<Buffer::Instance>, readBuffer, ());
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
   MOCK_METHOD(void, upstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(bool, startUpstreamSecureTransport, ());
@@ -469,7 +470,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, (uint32_t));
   MOCK_METHOD(bool, reusePort, (), (const));
-  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
+  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (uint32_t), (const));
   MOCK_METHOD(void, closeAllSockets, ());
   MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
@@ -588,10 +589,17 @@ public:
                Network::ConnectionDrainEvent drain_event));
   MOCK_METHOD(void, onListenerDrain,
               (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, stopListenerAddresses,
+              (const ListenerConfig& listener,
+               const std::vector<Address::InstanceConstSharedPtr>& addresses));
+  MOCK_METHOD(void, onListenerAddressesDrain,
+              (const ListenerConfig& listener, ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, removeListenerAddresses, (const ListenerConfig& listener));
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, workerId, (), (const));
   MOCK_METHOD(void, closeIdleHttpConnections, (bool), (override));
 
   uint64_t num_handler_connections_{};
@@ -610,7 +618,9 @@ class MockNonDispatchedUdpPacketHandler : public NonDispatchedUdpPacketHandler {
 public:
   ~MockNonDispatchedUdpPacketHandler() override;
 
-  MOCK_METHOD(void, handle, (uint32_t worker_index, const UdpRecvData& packet));
+  MOCK_METHOD(void, handle,
+              (uint32_t worker_index, const Address::Instance& listener_address,
+               const UdpRecvData& packet));
 };
 
 class MockIp : public Address::Ip {

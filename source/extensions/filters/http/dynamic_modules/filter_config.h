@@ -5,11 +5,13 @@
 #include "envoy/init/manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,13 +93,15 @@ public:
    * @param init_manager the init manager to register dynamic secret subscriptions with, if any.
    * This is only valid for the duration of ``envoy_dynamic_module_on_http_filter_config_new`` and
    * is cleared afterwards.
+   * @param load_shed_point_provider the provider of the load shed points the module can check, if
+   * any.
    */
-  DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
-                                const absl::string_view filter_config,
-                                const absl::string_view metrics_namespace,
-                                DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-                                Server::Configuration::ServerFactoryContext& context,
-                                OptRef<Init::Manager> init_manager = std::nullopt);
+  DynamicModuleHttpFilterConfig(
+      const absl::string_view filter_name, const absl::string_view filter_config,
+      const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+      Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context,
+      OptRef<Init::Manager> init_manager = std::nullopt,
+      OptRef<Server::LoadShedPointProvider> load_shed_point_provider = std::nullopt);
 
   ~DynamicModuleHttpFilterConfig();
 
@@ -140,7 +144,8 @@ public:
   Envoy::Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& main_thread_dispatcher_;
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
   // and not later during request handling, so that we don't have to wrap the stat storage in a
   // lock.
@@ -168,182 +173,15 @@ public:
   // context, so the factory clears this right after the hook returns.
   OptRef<Init::Manager> init_manager_;
 
+  // The provider of the load shed points that the module can check. It is empty for upstream
+  // filters and when the factory context of the filter bypasses the overload manager.
+  const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
+
   bool terminal_filter_ = false;
 
-  class ModuleCounterHandle {
-  public:
-    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
-
-    void add(uint64_t amount) const { counter_.add(amount); }
-
-  private:
-    Stats::Counter& counter_;
-  };
-
-  class ModuleCounterVecHandle {
-  public:
-    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
-        : name_(name), label_names_(label_names) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-  };
-
-  class ModuleGaugeHandle {
-  public:
-    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-
-    void increase(uint64_t amount) const { gauge_.add(amount); }
-    void decrease(uint64_t amount) const { gauge_.sub(amount); }
-    void set(uint64_t amount) const { gauge_.set(amount); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
-  class ModuleGaugeVecHandle {
-  public:
-    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                         Stats::Gauge::ImportMode import_mode)
-        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-
-    void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                  uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
-    }
-    void decrease(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                  uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
-    }
-    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Gauge::ImportMode import_mode_;
-  };
-
-  class ModuleHistogramHandle {
-  public:
-    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
-
-    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
-
-  private:
-    Stats::Histogram& histogram_;
-  };
-
-  class ModuleHistogramVecHandle {
-  public:
-    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                             Stats::Histogram::Unit unit)
-        : name_(name), label_names_(label_names), unit_(unit) {}
-
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-
-    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t value) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Histogram::Unit unit_;
-  };
-
-// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
-// for our internal storage. These helper functions do that conversion.
-#define ID_TO_INDEX(id) ((id) - 1)
-
-  size_t addCounter(ModuleCounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-
-  size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    counter_vecs_.push_back(std::move(counter_vec));
-    return counter_vecs_.size();
-  }
-
-  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id == 0 || id > counters_.size()) {
-      return {};
-    }
-    return counters_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id == 0 || id > counter_vecs_.size()) {
-      return {};
-    }
-    return counter_vecs_[ID_TO_INDEX(id)];
-  }
-
-  size_t addGauge(ModuleGaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-
-  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    gauge_vecs_.push_back(std::move(gauge_vec));
-    return gauge_vecs_.size();
-  }
-
-  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id == 0 || id > gauges_.size()) {
-      return {};
-    }
-    return gauges_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id == 0 || id > gauge_vecs_.size()) {
-      return {};
-    }
-    return gauge_vecs_[ID_TO_INDEX(id)];
-  }
-
-  size_t addHistogram(ModuleHistogramHandle&& hist) {
-    hists_.push_back(std::move(hist));
-    return hists_.size();
-  }
-
-  size_t addHistogramVec(ModuleHistogramVecHandle&& hist_vec) {
-    hist_vecs_.push_back(std::move(hist_vec));
-    return hist_vecs_.size();
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id == 0 || id > hists_.size()) {
-      return {};
-    }
-    return hists_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id == 0 || id > hist_vecs_.size()) {
-      return {};
-    }
-    return hist_vecs_[ID_TO_INDEX(id)];
-  }
-
-#undef ID_TO_INDEX
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
+  const Extensions::DynamicModules::MetricRegistry& metrics() const { return metrics_; }
 
   /**
    * Subscribes to a generic secret so that the module can read its value by the returned ID.
@@ -386,19 +224,11 @@ private:
   // The namespace prefix for metrics.
   const std::string metrics_namespace_;
 
-  // The cached references to stats and their metadata.
-  std::vector<ModuleCounterHandle> counters_;
-  std::vector<ModuleCounterVecHandle> counter_vecs_;
-  std::vector<ModuleGaugeHandle> gauges_;
-  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
-  std::vector<ModuleHistogramHandle> hists_;
-  std::vector<ModuleHistogramVecHandle> hist_vecs_;
-
   // The generic secrets subscribed by the module during ``config_new``, indexed by ID - 1. Appended
   // to only while ``secret_subscription_frozen_`` is false, and read-only afterwards, which is what
   // makes the reads from worker threads safe. Each entry keeps its own thread local copy of the
   // value so that a read is a thread local lookup rather than a lock.
-  std::vector<std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>> generic_secrets_;
+  std::vector<Secret::ThreadLocalGenericSecretProviderPtr> generic_secrets_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -445,8 +275,9 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id)
-        : config_(config), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id,
+                        Event::Dispatcher& dispatcher)
+        : config_(config), callout_id_(id), dispatcher_(dispatcher) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -461,6 +292,8 @@ private:
   private:
     DynamicModuleHttpFilterConfig& config_;
     const uint64_t callout_id_{};
+    // The dispatcher of the thread that runs the callout.
+    Event::Dispatcher& dispatcher_;
   };
 
   /**
@@ -469,8 +302,9 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id)
-        : callout_id_(callout_id), config_(config) {}
+    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id,
+                              Event::Dispatcher& dispatcher)
+        : callout_id_(callout_id), config_(config), dispatcher_(dispatcher) {}
     ~HttpStreamCalloutCallback() override = default;
 
     void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
@@ -484,9 +318,13 @@ private:
     Http::RequestTrailerMapPtr request_trailers_ = nullptr;
     const uint64_t callout_id_{};
     bool cleaned_up_ = false;
+    // Set when the module resets the stream.
+    bool reset_by_module_ = false;
 
   private:
     DynamicModuleHttpFilterConfig& config_;
+    // The dispatcher of the thread that runs the stream.
+    Event::Dispatcher& dispatcher_;
   };
 
   /**
@@ -494,6 +332,11 @@ private:
    * various event hooks.
    */
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  /**
+   * Removes the stream and reports its reset to the module.
+   */
+  void reportHttpStreamReset(uint64_t stream_id);
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
@@ -534,8 +377,10 @@ public:
   DynamicModuleHttpPerRouteFilterConfig(
       envoy_dynamic_module_type_http_filter_config_module_ptr config,
       OnHttpPerRouteConfigDestroyType destroy,
-      Extensions::DynamicModules::DynamicModulePtr dynamic_module)
-      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)) {}
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+      Event::Dispatcher& main_dispatcher)
+      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)),
+        main_dispatcher_(main_dispatcher) {}
   ~DynamicModuleHttpPerRouteFilterConfig() override;
 
   envoy_dynamic_module_type_http_filter_config_module_ptr config_;
@@ -543,6 +388,7 @@ public:
 private:
   OnHttpPerRouteConfigDestroyType destroy_;
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+  Event::Dispatcher& main_dispatcher_;
 };
 
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
@@ -552,7 +398,8 @@ using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
 newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module);
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                   Event::Dispatcher& main_dispatcher);
 
 /**
  * Creates a new DynamicModuleHttpFilterConfig for given configuration.
@@ -566,6 +413,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
  * @param init_manager the init manager that dynamic secret subscriptions created by the module are
  * registered with. When absent, such subscriptions start immediately instead of gating the owner's
  * initialization.
+ * @param load_shed_point_provider the provider of the load shed points the module can check, if
+ * any.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
@@ -573,7 +422,8 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
     const absl::string_view metrics_namespace, const bool terminal_filter,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Server::Configuration::ServerFactoryContext& context,
-    OptRef<Init::Manager> init_manager = std::nullopt);
+    OptRef<Init::Manager> init_manager = std::nullopt,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider = std::nullopt);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

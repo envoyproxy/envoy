@@ -1,9 +1,11 @@
 #pragma once
 
 #include <atomic>
+#include <deque>
 #include <string>
-#include <vector>
 
+#include "envoy/access_log/access_log.h"
+#include "envoy/event/timer.h"
 #include "envoy/http/async_client.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -26,6 +28,7 @@ using DynamicModuleNetworkFilterWeakPtr = std::weak_ptr<DynamicModuleNetworkFilt
  */
 class DynamicModuleNetworkFilter : public Network::Filter,
                                    public Network::ConnectionCallbacks,
+                                   public AccessLog::Instance,
                                    public std::enable_shared_from_this<DynamicModuleNetworkFilter>,
                                    public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
@@ -46,19 +49,54 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
+  // ---------- AccessLog::Instance ----------
+  void log(const Formatter::Context& log_context,
+           const StreamInfo::StreamInfo& stream_info) override;
+
   // Accessors for ABI callbacks.
   Network::ReadFilterCallbacks* readCallbacks() { return read_callbacks_; }
   Network::WriteFilterCallbacks* writeCallbacks() { return write_callbacks_; }
-  Buffer::Instance* currentReadBuffer() { return current_read_buffer_; }
+  Buffer::Instance* currentReadBuffer() {
+    if (current_read_buffer_ != nullptr) {
+      return current_read_buffer_;
+    }
+    // Outside on_read the connection read buffer stays valid for the connection lifetime, so use it
+    // rather than the possibly transient buffer on_read received.
+    return read_callbacks_ != nullptr ? read_callbacks_->readBuffer().ptr() : nullptr;
+  }
   Buffer::Instance* currentWriteBuffer() { return current_write_buffer_; }
 
   // Test-only setters for buffer pointers.
   void setCurrentReadBufferForTest(Buffer::Instance* buffer) { current_read_buffer_ = buffer; }
   void setCurrentWriteBufferForTest(Buffer::Instance* buffer) { current_write_buffer_ = buffer; }
 
-  // Temporary storage for the serialized typed filter state value returned by
-  // get_filter_state_typed. Valid until the end of the current event hook.
-  std::optional<std::string> last_serialized_filter_state_;
+  // RAII guard placed at each event hook that can invoke a module filter-state getter. Nested hooks
+  // share the outermost scope, so the returned views stay valid until the outermost hook returns
+  // and are then cleared.
+  class HookScope {
+  public:
+    explicit HookScope(DynamicModuleNetworkFilter& filter) : filter_(filter) {
+      ++filter_.hook_depth_;
+    }
+    ~HookScope() {
+      if (--filter_.hook_depth_ == 0) {
+        filter_.filter_state_scratch_.clear();
+      }
+    }
+
+  private:
+    DynamicModuleNetworkFilter& filter_;
+  };
+
+  // Test-only accessor for the number of buffered filter-state getter results.
+  size_t filterStateScratchSizeForTest() const { return filter_state_scratch_.size(); }
+
+  // Scratch buffer for serialized typed filter-state getter results. A deque keeps stable element
+  // addresses, so consecutive getter calls in the same hook stay valid until the hook returns.
+  std::deque<std::string> filter_state_scratch_;
+
+  // Depth of nested event hooks. The scratch is cleared when the outermost hook returns.
+  uint32_t hook_depth_ = 0;
 
   // Test-only setter for callbacks.
   void setCallbacksForTest(Network::ReadFilterCallbacks* read_callbacks) {
@@ -84,6 +122,17 @@ public:
    * Check if the filter has been destroyed.
    */
   bool isDestroyed() const { return destroyed_; }
+
+  /**
+   * Check if the filter has passed the new connection to the module.
+   */
+  bool newConnectionPassedToModule() const { return new_connection_passed_to_module_; }
+
+  /**
+   * Flush the configured access logs with the given type. A periodic flush also snapshots the
+   * bytes meters of the connection, as the TCP proxy does.
+   */
+  void flushAccessLog(AccessLog::AccessLogType access_log_type);
 
   /**
    * Get the filter configuration.
@@ -163,6 +212,17 @@ private:
   void initializeInModuleFilter();
 
   /**
+   * Gives a new connection a stream ID if it has none, arms the flush timer and flushes the start
+   * record, as configured.
+   */
+  void startAccessLogs();
+
+  /**
+   * Flushes a periodic access log and rearms the flush timer.
+   */
+  void onAccessLogFlushInterval();
+
+  /**
    * Helper to get the `this` pointer as a void pointer.
    */
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
@@ -180,14 +240,22 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
-  // The connection read buffer, set on the first on_read callback and kept for the lifetime of the
-  // connection so modules can access buffered read data outside of on_read.
+  // The buffer passed to the active on_read callback, or null outside on_read. Deferred read access
+  // resolves the connection read buffer via currentReadBuffer() instead.
   Buffer::Instance* current_read_buffer_ = nullptr;
   // The write buffer for the active on_write callback only. The connection reuses or moves it after
   // on_write, so it is restored when the call returns rather than cached.
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
+
+  // The reports and access log flushes of the module have no effect until the filter passes the new
+  // connection to it. A TCP proxy later in the chain replaces the upstream info and sets its
+  // downstream bytes meter when its callbacks are set, and the stream info asserts that no other
+  // downstream bytes meter exists.
+  bool new_connection_passed_to_module_ = false;
+
+  Event::TimerPtr access_log_flush_timer_;
 
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
@@ -235,7 +303,9 @@ private:
     std::string byte_value;
   };
 
-  std::vector<StoredSocketOption> socket_options_;
+  // A deque keeps element addresses stable as options are appended, so a byte value view handed to
+  // a module stays valid until the filter is destroyed as the ABI promises.
+  std::deque<StoredSocketOption> socket_options_;
 };
 
 /**

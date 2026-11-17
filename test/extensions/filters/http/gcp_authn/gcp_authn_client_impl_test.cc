@@ -24,7 +24,6 @@ using ::envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using Server::Configuration::MockFactoryContext;
 using ::testing::_;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Not;
 using ::testing::Return;
@@ -81,15 +80,15 @@ public:
     ON_CALL(context_.server_factory_context_, timeSource())
         .WillByDefault(ReturnRef(fake_time_source_));
     EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillRepeatedly(Invoke([&](Envoy::Http::RequestMessagePtr& message,
-                                   Envoy::Http::AsyncClient::Callbacks& callback,
-                                   const Envoy::Http::AsyncClient::RequestOptions& options)
-                                   -> Http::AsyncClient::Request* {
+        .WillRepeatedly([&](Envoy::Http::RequestMessagePtr& message,
+                            Envoy::Http::AsyncClient::Callbacks& callback,
+                            const Envoy::Http::AsyncClient::RequestOptions& options)
+                            -> Http::AsyncClient::Request* {
           message_.swap(message);
           client_callback_ = &callback;
           options_ = options;
           return &client_request_;
-        }));
+        });
   }
 
   void createClient() {
@@ -172,6 +171,55 @@ TEST_F(GcpAuthnClientImplTest, SuccessAccessToken) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
+TEST_F(GcpAuthnClientImplTest, SuccessAccessTokenWithScopes) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token()->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+  audience.mutable_access_token()->add_scopes("openid");
+  client_->fetchUnboundAccessToken(audience, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
+
+  EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
+  EXPECT_EQ(options_.retry_policy->retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(options_.retry_policy->retry_back_off().max_interval().seconds(), 10);
+  EXPECT_EQ(options_.retry_policy->retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  uint64_t current_time = DateUtil::nowToSeconds(context_.server_factory_context_.timeSource());
+  uint64_t expected_exp_time = current_time + 3600;
+  GcpToken expected_token{"mock_access_token", expected_exp_time, audience};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, SuccessAccessTokenWithReservedCharScopes) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_access_token()->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+  audience.mutable_access_token()->add_scopes("custom:scope/read");
+  audience.mutable_access_token()->add_scopes("foo&bar=baz#qux");
+  client_->fetchUnboundAccessToken(audience, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,"
+            "custom%3Ascope%2Fread,foo%26bar%3Dbaz%23qux");
+}
+
 TEST_F(GcpAuthnClientImplTest, AccessTokenParsingFailure) {
   setupMockObjects();
   createClient();
@@ -190,9 +238,9 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenParsingFailure) {
 
   // Assert that callbacks are notified with an error since JSON parsing failed.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Failed to parse access token response as JSON."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -215,10 +263,10 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenMissing) {
 
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(
             token, HasStatusMessage("Failed to extract access_token or expires_in from response."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -241,10 +289,10 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInMissing) {
 
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(
             token, HasStatusMessage("Failed to extract access_token or expires_in from response."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -267,9 +315,9 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenEmptyInResponse) {
 
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Extracted access_token is empty."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -293,9 +341,9 @@ TEST_F(GcpAuthnClientImplTest, AccessTokenExpiresInNonPositive) {
 
   // Assert that callbacks are notified with an error.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Extracted expires_in is non-positive."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -451,9 +499,9 @@ TEST_F(GcpAuthnClientImplTest, JwtParsingFailure) {
 
   // Assert that callbacks are notified with an error since JWT parsing failed.
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Failed to parse identity token/JWT."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -497,6 +545,39 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessToken) {
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
             "/computeMetadata/v1/instance/service-accounts/default/"
             "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D");
+
+  EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"access_token": "mock_access_token", "expires_in": 3600, "token_type": "Bearer"})");
+
+  uint64_t current_time = DateUtil::nowToSeconds(context_.server_factory_context_.timeSource());
+  uint64_t expected_exp_time = current_time + 3600;
+  GcpToken expected_token{"mock_access_token", expected_exp_time, audience, fingerprint};
+  EXPECT_CALL(request_callbacks_, onComplete(absl::StatusOr<GcpToken>(expected_token)));
+  client_callback_->onSuccess(client_request_, std::move(response));
+}
+
+TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessTokenWithScopes) {
+  setupMockObjects();
+  createClient();
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_access_token()->add_scopes(
+      "https://www.googleapis.com/auth/cloud-platform");
+  audience.mutable_bound_access_token()->add_scopes("openid");
+  const std::string fingerprint = "abc+def/ghi=";
+  client_->fetchBoundAccessToken(audience, fingerprint, request_callbacks_);
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/"
+            "token?bindCertificateFingerprint=abc%252Bdef%252Fghi%253D"
+            "&scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
 
@@ -607,9 +688,9 @@ TEST_F(GcpAuthnClientImplTest, IamAccessTokenParsingFailure) {
   response->body().add("invalid_json");
 
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Failed to parse IAM access token response as JSON."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -632,10 +713,10 @@ TEST_F(GcpAuthnClientImplTest, IamAccessTokenMissingAccessToken) {
   response->body().add(R"({"expireTime": "2033-05-29T13:36:41Z"})");
 
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token,
                     HasStatusMessage("Failed to extract accessToken or expireTime from response."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -658,10 +739,10 @@ TEST_F(GcpAuthnClientImplTest, IamAccessTokenMissingExpireTime) {
   response->body().add(R"({"accessToken": "mock_iam_access_token"})");
 
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token,
                     HasStatusMessage("Failed to extract accessToken or expireTime from response."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -684,9 +765,9 @@ TEST_F(GcpAuthnClientImplTest, IamAccessTokenEmptyAccessToken) {
   response->body().add(R"({"accessToken": "", "expireTime": "2033-05-29T13:36:41Z"})");
 
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Extracted accessToken is empty."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }
@@ -709,9 +790,9 @@ TEST_F(GcpAuthnClientImplTest, IamAccessTokenInvalidExpireTime) {
   response->body().add(R"({"accessToken": "mock_iam_token", "expireTime": "invalid_time_format"})");
 
   EXPECT_CALL(request_callbacks_, onComplete(testing::Matcher<absl::StatusOr<GcpToken>>(_)))
-      .WillOnce(Invoke([](absl::StatusOr<GcpToken> token) {
+      .WillOnce([](absl::StatusOr<GcpToken> token) {
         EXPECT_THAT(token, HasStatusMessage("Failed to parse expireTime timestamp."));
-      }));
+      });
 
   client_callback_->onSuccess(client_request_, std::move(response));
 }

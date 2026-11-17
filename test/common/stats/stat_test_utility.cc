@@ -230,8 +230,7 @@ TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 
 TestStore::TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
-template <class StatType>
-using StatTypeOptConstRef = std::optional<std::reference_wrapper<const StatType>>;
+template <class StatType> using StatTypeOptConstRef = OptRef<const StatType>;
 
 template <class StatType>
 static StatTypeOptConstRef<StatType>

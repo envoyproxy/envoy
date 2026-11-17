@@ -49,6 +49,7 @@ public:
   // Http::ConnectionCallbacks
   MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
   MOCK_METHOD(void, onSettings, (ReceivedSettings & settings));
+  MOCK_METHOD(void, onMetadata, (MetadataMapPtr && metadata_map));
 };
 
 class MockFilterManagerCallbacks : public FilterManagerCallbacks {
@@ -159,6 +160,7 @@ public:
   MOCK_METHOD(void, goAway, ());
   MOCK_METHOD(Protocol, protocol, ());
   MOCK_METHOD(void, shutdownNotice, ());
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
   MOCK_METHOD(bool, wantsToWrite, ());
   MOCK_METHOD(void, onUnderlyingConnectionAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onUnderlyingConnectionBelowWriteBufferLowWatermark, ());
@@ -232,8 +234,10 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteConfigSnapshot, ());
   MOCK_METHOD(void, refreshRouteCluster, ());
   MOCK_METHOD(void, recreateClusterInfo, ());
+  MOCK_METHOD(void, enableHalfClose, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -322,6 +326,7 @@ public:
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, addDecodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectDecodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, injectDecodedHeadersToFilterChain, (bool end_stream));
   MOCK_METHOD(RequestTrailerMap&, addDecodedTrailers, ());
   MOCK_METHOD(MetadataMapVector&, addDecodedMetadata, ());
   MOCK_METHOD(const Buffer::Instance*, decodingBuffer, ());
@@ -396,6 +401,7 @@ public:
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, injectEncodedHeadersToFilterChain, (bool end_stream));
   MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
   MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr&&));
   MOCK_METHOD(void, continueEncoding, ());
@@ -567,6 +573,7 @@ public:
   ~MockAsyncClientRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(OptRef<AsyncClient::RequestContext>, context, (), (const));
 
   MockAsyncClient* client_;
 };
@@ -704,6 +711,7 @@ public:
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
   MOCK_METHOD(bool, shouldStripTrailingHostDot, (), (const));
+  MOCK_METHOD(bool, recordRouteResolutionStats, (), (const));
   MOCK_METHOD(Http::StripPortType, stripPortType, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));

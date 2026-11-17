@@ -114,6 +114,11 @@ ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_heade
       is_public_ = true;
     } else if (lowercase_directive == "s-maxage") {
       max_age_ = parseDuration(argument);
+      // RFC 9111: s-maxage also implies the semantics of proxy-revalidate.
+      // See: https://httpwg.org/specs/rfc9111.html#rfc.section.5.2.2.10
+      if (max_age_.has_value()) {
+        no_stale_ = true;
+      }
     } else if (!max_age_.has_value() && lowercase_directive == "max-age") {
       max_age_ = parseDuration(argument);
     }
@@ -397,7 +402,7 @@ VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
     // be used as an inspiration for some bucketing configuration. The config
     // should enable and control the bucketing wanted.
     const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-        request_headers, Http::LowerCaseString(std::string(value)), inValueSeparator);
+        request_headers, Http::LowerCaseString(value), inValueSeparator);
     absl::StrAppend(&vary_identifier, value, inValueSeparator,
                     all_values.result().has_value() ? all_values.result().value() : "",
                     headerSeparator);

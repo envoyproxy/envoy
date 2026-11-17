@@ -1,5 +1,6 @@
 #include "test/integration/http_integration.h"
 
+#include <algorithm>
 #include <functional>
 #include <list>
 #include <memory>
@@ -20,12 +21,15 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -96,7 +100,14 @@ IntegrationCodecClient::IntegrationCodecClient(
   setCodecConnectionCallbacks(codec_callbacks_);
   setCodecClientCallbacks(codec_client_callbacks_);
   if (wait_till_connected) {
-    dispatcher.run(Event::Dispatcher::RunType::Block);
+    Event::GlobalTimeSystem time_system;
+    if (time_system.ioDispatcher() != nullptr) {
+      const auto result = IntegrationUtil::runDispatcherUntilWithTimeAdvance(
+          dispatcher, [this] { return connected_ || disconnected_; }, "connection establishment");
+      RELEASE_ASSERT(result, result.message());
+    } else {
+      dispatcher.run(Event::Dispatcher::RunType::Block);
+    }
   }
 }
 
@@ -185,35 +196,8 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
 }
 
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
-  if (disconnected_) {
-    return AssertionSuccess();
-  }
-  Event::TimerPtr wait_timer;
-  bool wait_timer_triggered = false;
-  if (time_to_wait.count()) {
-    wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
-      connection_->dispatcher().exit();
-      wait_timer_triggered = true;
-    });
-    wait_timer->enableTimer(time_to_wait);
-  }
-
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-
-  // Disable the timer if it was created. This call is harmless if the timer already triggered.
-  if (wait_timer) {
-    wait_timer->disableTimer();
-  }
-
-  if (wait_timer_triggered && !disconnected_) {
-    if (time_to_wait == TestUtility::DefaultTimeout) {
-      ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
-    }
-    return AssertionFailure() << "Timed out waiting for disconnect";
-  }
-  EXPECT_TRUE(disconnected_);
-
-  return AssertionSuccess();
+  return IntegrationUtil::runDispatcherUntil(
+      dispatcher_, [this] { return disconnected_; }, "downstream disconnect", time_to_wait);
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -385,6 +369,7 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  timeSystem().setIoDispatcher(nullptr);
   // Reset last, once the connections are torn down. The server's workers outlive this destructor
   // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
   // that reason.
@@ -393,6 +378,10 @@ HttpIntegrationTest::~HttpIntegrationTest() {
 }
 
 void HttpIntegrationTest::initialize() {
+  if (downstream_protocol_ == Http::CodecType::HTTP3 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    timeSystem().setIoDispatcher(dispatcher_.get());
+  }
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
     return BaseIntegrationTest::initialize();
   }
@@ -784,6 +773,26 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
             "envoy; error=destination_not_found; details=\"route_not_found; NR\"");
 }
 
+void HttpIntegrationTest::expectStatTags(
+    const std::string& name, const std::string& tag_extracted_name,
+    const std::vector<std::pair<std::string, std::string>>& tags) {
+  Stats::CounterSharedPtr counter = test_server_->counter(name);
+  ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+
+  EXPECT_EQ(counter->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+
+  // Tag order is not part of a stat's identity: the explicit tags are attached in a different
+  // order than the tag extraction rules happen to produce them in.
+  std::vector<std::pair<std::string, std::string>> actual_tags;
+  for (const Stats::Tag& tag : counter->tags()) {
+    actual_tags.emplace_back(tag.name_, tag.value_);
+  }
+  std::sort(actual_tags.begin(), actual_tags.end());
+  std::vector<std::pair<std::string, std::string>> expected_tags = tags;
+  std::sort(expected_tags.begin(), expected_tags.end());
+  EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
+}
+
 // Make sure virtual cluster stats are charged to the appropriate virtual cluster.
 void HttpIntegrationTest::testRouterVirtualClusters() {
   const std::string matching_header = "x-use-test-vcluster";
@@ -802,7 +811,19 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
           headers->set_present_match(true);
         }
       });
+
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                useExplicitStatsTags());
   initialize();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), useExplicitStatsTags());
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -823,6 +844,26 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 
   test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
   test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(1));
+
+  // Both the stats created through the virtual cluster's scope (upstream_rq_total) and the ones
+  // charged by the code-stats path (upstream_rq_completed, upstream_rq_200) carry the virtual
+  // host and the virtual cluster as tags.
+  const std::string& vhost_tag = Config::TagNames::get().VIRTUAL_HOST;
+  const std::string& vcluster_tag = Config::TagNames::get().VIRTUAL_CLUSTER;
+  expectStatTags("vhost.integration.vcluster.test_vcluster.upstream_rq_total",
+                 "vhost.vcluster.upstream_rq_total",
+                 {{vhost_tag, "integration"}, {vcluster_tag, "test_vcluster"}});
+  expectStatTags("vhost.integration.vcluster.other.upstream_rq_total",
+                 "vhost.vcluster.upstream_rq_total",
+                 {{vhost_tag, "integration"}, {vcluster_tag, "other"}});
+  expectStatTags("vhost.integration.vcluster.test_vcluster.upstream_rq_completed",
+                 "vhost.vcluster.upstream_rq_completed",
+                 {{vhost_tag, "integration"}, {vcluster_tag, "test_vcluster"}});
+  expectStatTags("vhost.integration.vcluster.test_vcluster.upstream_rq_200",
+                 "vhost.vcluster.upstream_rq",
+                 {{vhost_tag, "integration"},
+                  {vcluster_tag, "test_vcluster"},
+                  {Config::TagNames::get().RESPONSE_CODE, "200"}});
 }
 
 // Make sure route level stats are generated correctly.
@@ -836,7 +877,19 @@ void HttpIntegrationTest::testRouteStats() {
         auto* route = virtual_host->mutable_routes(0);
         route->set_stat_prefix("test_route");
       });
+
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                useExplicitStatsTags());
   initialize();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), useExplicitStatsTags());
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -849,6 +902,22 @@ void HttpIntegrationTest::testRouteStats() {
 
   test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_total", Eq(1));
   test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_completed", Eq(1));
+
+  // Both the stats created through the route's scope (upstream_rq_total) and the ones charged by
+  // the code-stats path (upstream_rq_completed, upstream_rq_200) carry the virtual host and the
+  // route stat prefix as tags.
+  const std::string& vhost_tag = Config::TagNames::get().VIRTUAL_HOST;
+  const std::string& route_tag = Config::TagNames::get().ROUTE;
+  expectStatTags("vhost.integration.route.test_route.upstream_rq_total",
+                 "vhost.route.upstream_rq_total",
+                 {{vhost_tag, "integration"}, {route_tag, "test_route"}});
+  expectStatTags("vhost.integration.route.test_route.upstream_rq_completed",
+                 "vhost.route.upstream_rq_completed",
+                 {{vhost_tag, "integration"}, {route_tag, "test_route"}});
+  expectStatTags("vhost.integration.route.test_route.upstream_rq_200", "vhost.route.upstream_rq",
+                 {{vhost_tag, "integration"},
+                  {route_tag, "test_route"},
+                  {Config::TagNames::get().RESPONSE_CODE, "200"}});
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {

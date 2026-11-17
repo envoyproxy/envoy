@@ -25,11 +25,15 @@ RouteSpecificConfig::~RouteSpecificConfig() = default;
 
 Scheduler::~Scheduler() = default;
 
+LoadShedPoint::~LoadShedPoint() = default;
+
 DownstreamWatermarkCallbacks::~DownstreamWatermarkCallbacks() = default;
 
 HttpFilterHandle::~HttpFilterHandle() = default;
 
 HttpFilterConfigHandle::~HttpFilterConfigHandle() = default;
+
+CommonHandle::~CommonHandle() = default;
 
 namespace Utility {
 

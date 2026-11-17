@@ -2,7 +2,10 @@
 
 #include "test/mocks/network/mocks.h"
 
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch_record_converter.h"
 #include "contrib/kafka/filters/network/source/mesh/filter.h"
+#include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -208,6 +211,46 @@ TEST(Filter, ShouldBeConstructable) {
       KafkaMeshFilter(configuration, upstream_kafka_facade, record_callback_processor);
 
   // then - no exceptions.
+}
+
+// A Fetch answered from records that were already stored finishes inside onData, and its answer
+// is delivered through the dispatcher. If the downstream connection closes before that callback
+// runs (the client sent the request and its FIN together), the request and the filter are both
+// gone by then, and the callback must not touch either of them (a regression shows up under ASan).
+TEST(FilterLifetimeTest, ShouldNotNotifyFilterOfFetchFinishedBeforeConnectionClosed) {
+  // given
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(filter_callbacks.connection_.dispatcher_, post(_))
+      .WillByDefault([&posted](Event::PostCb cb) { posted.push_back(std::move(cb)); });
+  EXPECT_CALL(filter_callbacks.connection_, write(_, _)).Times(0);
+
+  PartitionMap<InboundRecordSharedPtr> stored_records;
+  for (int64_t offset = 0; offset < 3; ++offset) {
+    stored_records[{"aaa", 0}].push_back(
+        std::make_shared<InboundRecord>("aaa", 0, offset, std::nullopt, std::nullopt));
+  }
+  RecordDistributor distributor{{}, stored_records};
+
+  auto filter = std::make_unique<KafkaMeshFilter>(std::make_shared<MockRequestDecoder>());
+  filter->initializeReadFilterCallbacks(filter_callbacks);
+  {
+    const RequestHeader header = {FETCH_REQUEST_API_KEY, 0, 1, std::nullopt};
+    const FetchRequest data = {0, 0, 0, {{"aaa", {{0, 0, 0}}}}};
+    const auto request = std::make_shared<Kafka::Request<FetchRequest>>(header, data);
+    filter->onRequest(std::make_shared<FetchRequestHolder>(
+        *filter, distributor, request, FetchRecordConverterImpl::getDefaultInstance()));
+  }
+  ASSERT_EQ(posted.size(), 1);
+
+  // when
+  filter->onEvent(Network::ConnectionEvent::RemoteClose);
+  filter.reset();
+  for (auto& cb : posted) {
+    cb();
+  }
+
+  // then - nothing was touched after it had been destroyed.
 }
 
 } // namespace

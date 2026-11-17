@@ -10,6 +10,7 @@
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
+#include "source/common/version/version.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
@@ -163,8 +164,10 @@ MetadataFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_i
 Protobuf::Value MetadataFormatter::formatValue(const Context&,
                                                const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
-  return formatMetadataValue((metadata != nullptr) ? *metadata
-                                                   : envoy::config::core::v3::Metadata());
+  if (metadata == nullptr) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return formatMetadataValue(*metadata);
 }
 
 bool MetadataFormatter::formatTo(std::string& sink, const Context& context,
@@ -1070,60 +1073,71 @@ public:
   using FieldExtractor =
       std::function<std::optional<std::chrono::nanoseconds>(const StreamInfo::StreamInfo&)>;
 
-  StreamInfoDurationFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
+  StreamInfoDurationFormatterProvider(FieldExtractor f,
+                                      DurationPrecision precision = DurationPrecision::Milliseconds)
+      : field_extractor_(f), precision_(precision) {}
 
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&,
                                     const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return std::nullopt;
     }
 
-    return fmt::format_int(millis.value()).str();
+    return fmt::format_int(duration.value()).str();
   }
   bool formatTo(std::string& sink, const Context&,
                 const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return false;
     }
 
-    const fmt::format_int formatted(millis.value());
+    const fmt::format_int formatted(duration.value());
     sink.append(formatted.data(), formatted.size());
     return true;
   }
   Protobuf::Value formatValue(const Context&,
                               const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
 
-    return ValueUtil::numberValue(millis.value());
+    return ValueUtil::numberValue(duration.value());
   }
   void formatValueTo(ValueSink& sink, const Context&,
                      const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
       // handle the missing value.
       return;
     }
 
-    sink.addNumber(millis.value());
+    sink.addNumber(duration.value());
   }
 
 private:
-  std::optional<int64_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
+  std::optional<int64_t> extractDuration(const StreamInfo::StreamInfo& stream_info) const {
     const auto time = field_extractor_(stream_info);
-    if (time) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    if (!time) {
+      return std::nullopt;
     }
-    return std::nullopt;
+    switch (precision_) {
+    case DurationPrecision::Milliseconds:
+      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    case DurationPrecision::Microseconds:
+      return std::chrono::duration_cast<std::chrono::microseconds>(time.value()).count();
+    case DurationPrecision::Nanoseconds:
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value()).count();
+    }
+    PANIC("Invalid duration precision");
   }
 
   FieldExtractor field_extractor_;
+  DurationPrecision precision_;
 };
 
 // StreamInfo uint64_t field extractor.
@@ -1723,6 +1737,27 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoDurationFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        return stream_info.currentDuration();
+                                     });
+                               }}},
+                             {"ROUTE_RESOLUTION_TIME_US",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<std::chrono::nanoseconds> {
+                                       if (stream_info.routeResolutionCount() == 0) {
+                                         return std::nullopt;
+                                       }
+                                       return stream_info.routeResolutionTime();
+                                     },
+                                     DurationPrecision::Microseconds);
+                               }}},
+                             {"ROUTE_RESOLUTION_COUNT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) -> uint64_t {
+                                       return stream_info.routeResolutionCount();
                                      });
                                }}},
                              {"COMMON_DURATION",
@@ -2666,6 +2701,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return info.urlEncodedPemEncodedPeerCertificate();
                                      });
                                }}},
+                             {"DOWNSTREAM_PEER_CERT_CHAIN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.urlEncodedPemEncodedPeerCertificateChain();
+                                     });
+                               }}},
                              {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
@@ -2769,6 +2813,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                          return std::nullopt;
                                        }
                                        return absl::string_view(*hostname);
+                                     });
+                               }}},
+                             {"ENVOY_VERSION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo&)
+                                         -> std::optional<absl::string_view> {
+                                       // Static storage that lives for the process lifetime.
+                                       return absl::string_view(VersionInfo::version());
                                      });
                                }}},
                              {"FILTER_CHAIN_NAME",

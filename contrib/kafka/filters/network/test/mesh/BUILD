@@ -12,7 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:config_lib",
@@ -24,10 +24,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:filter_lib",
+        "//contrib/kafka/filters/network/source/mesh:shared_consumer_manager_impl_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:fetch_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:fetch_record_converter_lib",
         "//test/mocks/network:network_mocks",
     ],
 )

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
+#include <optional>
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -92,8 +94,12 @@ protected:
   Event::Dispatcher& dispatcher_;
   Api::Api& api_;
 
-  // Invoked for filesystem watches on update. Protected so subclasses can set up the callback.
-  void onWatchUpdate();
+  // Invoked when a filesystem event fires or the polling timer expires. Protected so subclasses
+  // can set up filesystem event callbacks.
+  void onFilesystemUpdate();
+
+  // Whether filesystem-backed secret data is refreshed by polling rather than filesystem events.
+  bool filesystemPollingEnabled() const { return poll_timer_ != nullptr; }
 
   // Initializes the SDS API.
   void initialize(bool warm);
@@ -111,6 +117,8 @@ private:
       resource_type_helper_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;
+  const std::optional<std::chrono::milliseconds> poll_interval_;
+  Event::TimerPtr poll_timer_;
   Config::SubscriptionPtr subscription_;
   const std::string sds_config_name_;
 

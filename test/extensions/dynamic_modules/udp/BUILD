@@ -1,14 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -20,6 +24,11 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
     ],
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -31,29 +40,44 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
     ],
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/udp/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:udp_null_config",
     ],
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/udp/dynamic_modules:config",
@@ -65,17 +89,28 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "udp_dynamic_modules_integration_test",
-    srcs = ["udp_dynamic_modules_integration_test.cc"],
+envoy_extension_cc_dyn_module_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
+        "//test/extensions/dynamic_modules/test_data/go:udp_listener_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/extensions/dynamic_modules:util",
+        "//test/integration:base_overload_integration_test_lib",
         "//test/integration:integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",

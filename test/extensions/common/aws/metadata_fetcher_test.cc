@@ -144,7 +144,7 @@ TEST_F(MetadataFetcherTest, TestRequestMatchAndSpanPassedDown) {
   EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
                   .async_client_,
               send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [this, &httpClientRequest](
               Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
@@ -165,7 +165,7 @@ TEST_F(MetadataFetcherTest, TestRequestMatchAndSpanPassedDown) {
             // onMetadataError.
             cb.onFailure(httpClientRequest, Http::AsyncClient::FailureReason::Reset);
             return &httpClientRequest;
-          }));
+          });
   EXPECT_CALL(receiver, onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network));
   // Act
   fetcher_->fetch(message, parent_span_, receiver);
@@ -344,13 +344,12 @@ TEST_F(MetadataFetcherTest, TestCallbacksSafeAfterDestruction) {
   EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
                   .async_client_,
               send_(_, _, _))
-      .WillOnce(
-          Invoke([&captured_callback, &request](
-                     Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured_callback = &cb;
-            return &request;
-          }));
+      .WillOnce([&captured_callback, &request](
+                    Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured_callback = &cb;
+        return &request;
+      });
 
   // Start fetch to capture callback
   fetcher_->fetch(message, parent_span_, receiver);
@@ -382,13 +381,12 @@ TEST_F(MetadataFetcherTest, TestRaceConditionWithThreadedCallbacks) {
   EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
                   .async_client_,
               send_(_, _, _))
-      .WillOnce(
-          Invoke([&captured_callback, &request](
-                     Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured_callback = &cb;
-            return &request;
-          }));
+      .WillOnce([&captured_callback, &request](
+                    Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured_callback = &cb;
+        return &request;
+      });
 
   fetcher_->fetch(message, parent_span_, receiver);
   ASSERT_NE(captured_callback, nullptr);

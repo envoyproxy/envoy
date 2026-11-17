@@ -118,7 +118,7 @@ public:
 
   // Executes the parser.
   // @return the number of parsed bytes.
-  virtual size_t execute(const char* slice, int len) PURE;
+  virtual size_t execute(const char* slice, size_t len) PURE;
 
   // Unpauses the parser.
   virtual void resume() PURE;

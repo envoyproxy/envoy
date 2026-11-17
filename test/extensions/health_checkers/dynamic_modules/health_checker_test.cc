@@ -70,7 +70,8 @@ public:
 
     health_checker_ = std::make_shared<DynamicModuleHealthChecker>(
         *cluster_, health_check_config, std::move(config_or_error.value()), *dispatcher_, runtime_,
-        random_, Upstream::HealthCheckEventLoggerPtr(event_logger_));
+        random_, Upstream::HealthCheckEventLoggerPtr(event_logger_),
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   // Builds the checker for the given Rust-module mode ("healthy"/"degraded"/"unhealthy"/"timeout"/
@@ -222,6 +223,44 @@ TEST_F(DynamicModuleHealthCheckerTest, ReadsUnhealthyHostHealth) {
   setHosts(host);
 
   EXPECT_TRUE(runUntilFirstResult());
+}
+
+// Metadata set by the module during a check is applied to the host when the check resolves. The
+// reserved ``http_status_code`` key is rejected and stale metadata from an earlier check is
+// replaced.
+TEST_F(DynamicModuleHealthCheckerTest, SetsHealthMetadataOnResult) {
+  setup("metadata");
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  host->setHealthCheckMetadata({{"stale", "x"}});
+  setHosts(host);
+
+  EXPECT_TRUE(runUntilFirstResult());
+  EXPECT_THAT(host->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("probe", "ok")));
+  EXPECT_FALSE(host->lastHealthCheckHttpStatus().has_value());
+}
+
+// When the check times out, the metadata staged during that check is still applied.
+TEST_F(DynamicModuleHealthCheckerTest, SetsHealthMetadataOnTimeout) {
+  setup("metadata_timeout");
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  setHosts(host);
+
+  EXPECT_TRUE(runUntilFirstResult());
+  EXPECT_TRUE(host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_THAT(host->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("probe", "timed_out")));
+}
+
+// A check during which the module sets no metadata clears the host's previous metadata.
+TEST_F(DynamicModuleHealthCheckerTest, ClearsHealthMetadataWhenNoneSet) {
+  setup("healthy");
+  auto host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80");
+  host->setHealthCheckMetadata({{"stale", "x"}});
+  setHosts(host);
+
+  EXPECT_TRUE(runUntilFirstResult());
+  EXPECT_TRUE(host->healthCheckMetadata().empty());
 }
 
 // A module whose session_new returns null yields a session with no in-module counterpart:

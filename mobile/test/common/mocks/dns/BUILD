@@ -19,7 +19,6 @@ envoy_cc_library(
     name = "mock_dns_resolver_lib",
     srcs = ["mock_dns_resolver.cc"],
     hdrs = ["mock_dns_resolver.h"],
-    repository = "@envoy",
     deps = [
         ":mock_dns_resolver_proto_cc_proto",
         "@abseil-cpp//absl/strings",

@@ -1,19 +1,27 @@
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/http/message.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/string_accessor.h"
 
+#include "source/common/common/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/common/logical_host.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
+#include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
@@ -21,6 +29,8 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace NetworkFilters {
+
+using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 namespace {
 
@@ -67,6 +77,58 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_network_filter_envoy_ptr f
     metadata_namespace = metadata->emplace(namespace_view, Protobuf::Struct{}).first;
   }
   return &metadata_namespace->second;
+}
+
+// Returns the filter, or nullptr until the filter passes the new connection to the module, so that
+// reports made earlier have no effect.
+DynamicModuleNetworkFilter*
+filterAcceptingReports(envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->newConnectionPassedToModule() ? filter : nullptr;
+}
+
+StreamInfo::UpstreamInfo& getOrCreateUpstreamInfo(DynamicModuleNetworkFilter& filter) {
+  StreamInfo::StreamInfo& stream_info = filter.connection().streamInfo();
+  std::shared_ptr<StreamInfo::UpstreamInfo> upstream_info = stream_info.upstreamInfo();
+  if (upstream_info == nullptr) {
+    upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+  }
+  return *upstream_info;
+}
+
+Upstream::ThreadLocalCluster*
+getThreadLocalCluster(DynamicModuleNetworkFilter& filter,
+                      envoy_dynamic_module_type_module_buffer cluster_name) {
+  if (!isValidModuleBuffer(cluster_name)) {
+    return nullptr;
+  }
+  return filter.getFilterConfig().cluster_manager_.getThreadLocalCluster(
+      absl::string_view(cluster_name.ptr, cluster_name.length));
+}
+
+// Returns nullptr if the port is above 65535 or the address buffer does not hold an IP address
+// written without brackets.
+Network::Address::InstanceConstSharedPtr
+parseIpAddressAndPort(envoy_dynamic_module_type_module_buffer address, uint32_t port) {
+  if (!isValidModuleBuffer(address) || port > std::numeric_limits<uint16_t>::max()) {
+    return nullptr;
+  }
+  return Network::Utility::parseInternetAddressNoThrow(std::string(address.ptr, address.length),
+                                                       static_cast<uint16_t>(port));
+}
+
+std::optional<StreamInfo::DetectedCloseType>
+toEnvoyDetectedCloseType(envoy_dynamic_module_type_detected_close_type close_type) {
+  switch (close_type) {
+  case envoy_dynamic_module_type_detected_close_type_Normal:
+    return StreamInfo::DetectedCloseType::Normal;
+  case envoy_dynamic_module_type_detected_close_type_LocalReset:
+    return StreamInfo::DetectedCloseType::LocalReset;
+  case envoy_dynamic_module_type_detected_close_type_RemoteReset:
+    return StreamInfo::DetectedCloseType::RemoteReset;
+  }
+  return std::nullopt;
 }
 
 } // namespace
@@ -508,10 +570,12 @@ bool envoy_dynamic_module_callback_network_get_filter_state_typed(
     return false;
   }
 
-  // Store the serialized string on the filter to ensure it outlives the current event hook.
-  filter->last_serialized_filter_state_ = std::move(serialized.value());
-  value_out->ptr = const_cast<char*>(filter->last_serialized_filter_state_->data());
-  value_out->length = filter->last_serialized_filter_state_->size();
+  // Append to the scratch so consecutive getter calls in the same hook stay valid until the hook
+  // returns.
+  filter->filter_state_scratch_.push_back(std::move(serialized.value()));
+  const std::string& stored = filter->filter_state_scratch_.back();
+  value_out->ptr = const_cast<char*>(stored.data());
+  value_out->length = stored.size();
   return true;
 }
 
@@ -661,6 +725,34 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
   metadata_namespace->MergeFrom(metadata_value);
 }
 
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (!isValidModuleBuffer(filter_namespace) || !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicMetadataStruct(
+      filter->connection().streamInfo(),
+      absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_struct.ptr, serialized_struct.length));
+}
+
+bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (!isValidModuleBuffer(filter_namespace) || !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicTypedMetadata(
+      filter->connection().streamInfo(),
+      absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_any.ptr, serialized_any.length));
+}
+
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_network_filter_http_callout(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
@@ -740,12 +832,17 @@ void envoy_dynamic_module_callback_network_set_socket_option_int(
   ASSERT(validateSocketState(state));
 
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  const auto value_int = narrowToInt(value);
+  if (!level_int.has_value() || !name_int.has_value() || !value_int.has_value()) {
+    return;
+  }
+
+  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
   auto option = std::make_shared<Network::SocketOptionImpl>(
-      mapSocketState(state),
-      Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
-      static_cast<int>(value));
+      mapSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""), *value_int);
   Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
   option_list->push_back(option);
   upstream_options->addOption(option_list);
@@ -760,12 +857,17 @@ void envoy_dynamic_module_callback_network_set_socket_option_bytes(
   ASSERT(validateSocketState(state));
 
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
 
+  const auto level_int = narrowToInt(level);
+  const auto name_int = narrowToInt(name);
+  if (!level_int.has_value() || !name_int.has_value()) {
+    return;
+  }
+
+  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
   absl::string_view value_view(value.ptr, value.length);
   auto option = std::make_shared<Network::SocketOptionImpl>(
-      mapSocketState(state),
-      Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+      mapSocketState(state), Network::SocketOptionName(*level_int, *name_int, ""), value_view);
   Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
   option_list->push_back(option);
   upstream_options->addOption(option_list);
@@ -827,9 +929,10 @@ envoy_dynamic_module_callback_network_filter_config_define_counter(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   Stats::StatName main_stat_name =
-      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
-  Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
-  *counter_id_ptr = config->addCounter({c});
+      config->metrics().statNamePool().add(absl::string_view(name.ptr, name.length));
+  Stats::Counter& c =
+      Stats::Utility::counterFromStatNames(config->metrics().scope(), {main_stat_name});
+  *counter_id_ptr = config->metrics().addCounter(MetricRegistry::CounterHandle(c));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -838,7 +941,7 @@ envoy_dynamic_module_callback_network_filter_increment_counter(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto counter = filter->getFilterConfig().getCounterById(id);
+  auto counter = filter->getFilterConfig().metrics().getCounterById(id);
   if (!counter.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -855,10 +958,10 @@ envoy_dynamic_module_callback_network_filter_config_define_gauge(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   Stats::StatName main_stat_name =
-      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
-  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
+      config->metrics().statNamePool().add(absl::string_view(name.ptr, name.length));
+  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(config->metrics().scope(), {main_stat_name},
                                                        Stats::Gauge::ImportMode::Accumulate);
-  *gauge_id_ptr = config->addGauge({g});
+  *gauge_id_ptr = config->metrics().addGauge(MetricRegistry::GaugeHandle(g));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -866,7 +969,7 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_network_f
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  auto gauge = filter->getFilterConfig().metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -879,11 +982,11 @@ envoy_dynamic_module_callback_network_filter_increment_gauge(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  auto gauge = filter->getFilterConfig().metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->add(value);
+  gauge->increase(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -892,11 +995,11 @@ envoy_dynamic_module_callback_network_filter_decrement_gauge(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  auto gauge = filter->getFilterConfig().metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->sub(value);
+  gauge->decrease(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -909,10 +1012,10 @@ envoy_dynamic_module_callback_network_filter_config_define_histogram(
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
   Stats::StatName main_stat_name =
-      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+      config->metrics().statNamePool().add(absl::string_view(name.ptr, name.length));
   Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
-      *config->stats_scope_, {main_stat_name}, Stats::Histogram::Unit::Unspecified);
-  *histogram_id_ptr = config->addHistogram({h});
+      config->metrics().scope(), {main_stat_name}, Stats::Histogram::Unit::Unspecified);
+  *histogram_id_ptr = config->metrics().addHistogram(MetricRegistry::HistogramHandle(h));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -921,7 +1024,7 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto histogram = filter->getFilterConfig().getHistogramById(id);
+  auto histogram = filter->getFilterConfig().metrics().getHistogramById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -934,7 +1037,7 @@ envoy_dynamic_module_callback_network_filter_config_increment_counter(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto counter = config->getCounterById(id);
+  auto counter = config->metrics().getCounterById(id);
   if (!counter.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -947,11 +1050,11 @@ envoy_dynamic_module_callback_network_filter_config_increment_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto gauge = config->getGaugeById(id);
+  auto gauge = config->metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->add(value);
+  gauge->increase(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -960,11 +1063,11 @@ envoy_dynamic_module_callback_network_filter_config_decrement_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto gauge = config->getGaugeById(id);
+  auto gauge = config->metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauge->sub(value);
+  gauge->decrease(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -973,7 +1076,7 @@ envoy_dynamic_module_callback_network_filter_config_set_gauge(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto gauge = config->getGaugeById(id);
+  auto gauge = config->metrics().getGaugeById(id);
   if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -986,7 +1089,7 @@ envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value) {
   auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
-  auto histogram = config->getHistogramById(id);
+  auto histogram = config->metrics().getHistogramById(id);
   if (!histogram.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
@@ -1135,6 +1238,274 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id
     return 0;
   }
   return upstream->upstreamConnectionId().value();
+}
+
+// -----------------------------------------------------------------------------
+// Stream Info Reporting Callbacks
+// -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_host(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  Upstream::ThreadLocalCluster* cluster = getThreadLocalCluster(*filter, cluster_name);
+  if (cluster == nullptr) {
+    return false;
+  }
+  Network::Address::InstanceConstSharedPtr host_address = parseIpAddressAndPort(address, port);
+  if (host_address == nullptr) {
+    return false;
+  }
+
+  Upstream::HostDescriptionConstSharedPtr host;
+  // The member reference is valid only while this snapshot is held.
+  const Upstream::HostLookupMapConstSharedPtr hosts = cluster->prioritySet().crossPriorityHostMap();
+  if (const Upstream::HostSharedPtr& member = hosts->findHost(host_address->asString());
+      member != nullptr) {
+    // A logical host can change its address, so the host is pinned to the given one.
+    host = std::make_shared<Upstream::RealHostDescription>(host_address, member);
+  } else {
+    auto created = Upstream::HostDescriptionImpl::create(
+        cluster->info(), "", host_address, nullptr, nullptr,
+        std::make_shared<const envoy::config::core::v3::Locality>(),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0);
+    if (!created.ok()) {
+      // LCOV_EXCL_START
+      IS_ENVOY_BUG(
+          absl::StrCat("Failed to create the upstream host: ", created.status().message()));
+      return false;
+      // LCOV_EXCL_STOP
+    }
+    host = std::move(created.value());
+  }
+
+  filter->readCallbacks()->upstreamHost(host);
+  StreamInfo::UpstreamInfo& upstream_info = getOrCreateUpstreamInfo(*filter);
+  upstream_info.addUpstreamHostAttempted(host);
+  upstream_info.setUpstreamHost(std::move(host));
+  upstream_info.setUpstreamRemoteAddress(host_address);
+  filter->connection().streamInfo().setUpstreamClusterInfo(cluster->info());
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_cluster(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  Upstream::ThreadLocalCluster* cluster = getThreadLocalCluster(*filter, cluster_name);
+  if (cluster == nullptr) {
+    return false;
+  }
+  filter->connection().streamInfo().setUpstreamClusterInfo(cluster->info());
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  Network::Address::InstanceConstSharedPtr local_address = parseIpAddressAndPort(address, port);
+  if (local_address == nullptr) {
+    return false;
+  }
+  getOrCreateUpstreamInfo(*filter).setUpstreamLocalAddress(local_address);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  if (!isValidModuleBuffer(reason)) {
+    return false;
+  }
+  getOrCreateUpstreamInfo(*filter).setUpstreamTransportFailureReason(
+      absl::string_view(reason.ptr, reason.length));
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  if (!isValidModuleBuffer(reason)) {
+    return false;
+  }
+  getOrCreateUpstreamInfo(*filter).setUpstreamLocalCloseReason(
+      absl::string_view(reason.ptr, reason.length));
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_detected_close_type close_type) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  const std::optional<StreamInfo::DetectedCloseType> detected_close_type =
+      toEnvoyDetectedCloseType(close_type);
+  if (!detected_close_type.has_value()) {
+    return false;
+  }
+  getOrCreateUpstreamInfo(*filter).setUpstreamDetectedCloseType(*detected_close_type);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t attempt_count) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  filter->connection().streamInfo().setAttemptCount(attempt_count);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_upstream_timing_event event) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  const MonotonicTime now = filter->connection().dispatcher().timeSource().monotonicTime();
+  // Most UpstreamTiming setters assert that they run once, so the fields are written directly.
+  const auto timing = [filter]() -> StreamInfo::UpstreamTiming& {
+    return getOrCreateUpstreamInfo(*filter).upstreamTiming();
+  };
+  switch (event) {
+  case envoy_dynamic_module_type_upstream_timing_event_ConnectStart:
+    timing().upstream_connect_start_ = now;
+    return true;
+  case envoy_dynamic_module_type_upstream_timing_event_ConnectComplete:
+    timing().upstream_connect_complete_ = now;
+    return true;
+  case envoy_dynamic_module_type_upstream_timing_event_HandshakeComplete:
+    timing().upstream_handshake_complete_ = now;
+    return true;
+  case envoy_dynamic_module_type_upstream_timing_event_FirstByteSent:
+    timing().first_upstream_tx_byte_sent_ = now;
+    return true;
+  case envoy_dynamic_module_type_upstream_timing_event_LastByteSent:
+    timing().last_upstream_tx_byte_sent_ = now;
+    return true;
+  case envoy_dynamic_module_type_upstream_timing_event_FirstByteReceived:
+    timing().first_upstream_rx_byte_received_ = now;
+    return true;
+  case envoy_dynamic_module_type_upstream_timing_event_LastByteReceived:
+    timing().last_upstream_rx_byte_received_ = now;
+    return true;
+  }
+  return false;
+}
+
+bool envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t bytes_received,
+    uint64_t bytes_sent) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  const StreamInfo::BytesMeterSharedPtr& meter =
+      filter->connection().streamInfo().getUpstreamBytesMeter();
+  if (meter == nullptr) {
+    return false;
+  }
+  meter->addWireBytesReceived(bytes_received);
+  meter->addWireBytesSent(bytes_sent);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t bytes_received,
+    uint64_t bytes_sent) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  StreamInfo::StreamInfo& stream_info = filter->connection().streamInfo();
+  if (stream_info.getDownstreamBytesMeter() == nullptr) {
+    stream_info.setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
+  }
+  const StreamInfo::BytesMeterSharedPtr& meter = stream_info.getDownstreamBytesMeter();
+  meter->addWireBytesReceived(bytes_received);
+  meter->addWireBytesSent(bytes_sent);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_set_response_flag(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_response_flag flag) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  if (static_cast<uint32_t>(flag) > StreamInfo::CoreResponseFlag::LastFlag) {
+    return false;
+  }
+  filter->connection().streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag(static_cast<StreamInfo::CoreResponseFlag>(flag)));
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_add_custom_flag(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer flag) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  if (!isValidModuleBuffer(flag)) {
+    return false;
+  }
+  const absl::string_view flag_view(flag.ptr, flag.length);
+  // The stream info asserts that a custom flag has no whitespace and is not a response flag.
+  if (flag_view.empty() || StringUtil::hasEmptySpace(flag_view) ||
+      StreamInfo::ResponseFlagUtils::responseFlagsMap().contains(flag_view)) {
+    return false;
+  }
+  filter->connection().streamInfo().addCustomFlag(flag_view);
+  return true;
+}
+
+// -----------------------------------------------------------------------------
+// Access Log Callbacks
+// -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_network_filter_flush_access_log(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_access_log_type access_log_type) {
+  DynamicModuleNetworkFilter* filter = filterAcceptingReports(filter_envoy_ptr);
+  if (filter == nullptr) {
+    return false;
+  }
+  switch (access_log_type) {
+  case envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected:
+    filter->flushAccessLog(AccessLog::AccessLogType::TcpUpstreamConnected);
+    return true;
+  case envoy_dynamic_module_type_access_log_type_TcpPeriodic:
+    filter->flushAccessLog(AccessLog::AccessLogType::TcpPeriodic);
+    return true;
+  default:
+    return false;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -1288,6 +1659,22 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
     uint64_t event_id) {
   auto* scheduler = static_cast<DynamicModuleNetworkFilterConfigScheduler*>(scheduler_module_ptr);
   scheduler->commit(event_id);
+}
+
+// -----------------------------------------------------------------------------
+// Load Shed Point ABI Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_load_shed_point_envoy_ptr
+envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name) {
+  auto* filter_config = static_cast<DynamicModuleNetworkFilterConfig*>(filter_config_envoy_ptr);
+  if (!filter_config->load_shed_point_provider_.has_value()) {
+    return nullptr;
+  }
+  return filter_config->load_shed_point_provider_->getLoadShedPoint(
+      absl::string_view(name.ptr, name.length));
 }
 
 // -----------------------------------------------------------------------------

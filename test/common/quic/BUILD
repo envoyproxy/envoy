@@ -16,7 +16,6 @@ envoy_package()
 envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = envoy_select_enable_http3(["envoy_quic_alarm_test.cc"]),
-    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_alarm_lib",
@@ -30,7 +29,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_clock_test",
     srcs = envoy_select_enable_http3(["envoy_quic_clock_test.cc"]),
-    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -42,7 +40,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = envoy_select_enable_http3(["envoy_quic_writer_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         "//source/common/network:io_socket_error_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
@@ -65,7 +63,18 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
         ":test_utils_lib",
@@ -87,7 +96,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_filter_manager_connection_impl_test",
     srcs = envoy_select_enable_http3(["quic_filter_manager_connection_impl_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/mocks/event:event_mocks",
@@ -98,9 +110,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_ssl_connection_info_test",
+    srcs = envoy_select_enable_http3(["quic_ssl_connection_info_test.cc"]),
+    data = ["//test/common/tls/test_data:certs"],
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:quic_ssl_connection_info_lib",
+        "//test/common/tls:ssl_test_utils",
+        "//test/common/tls/test_data:cert_infos",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
+    ]),
+)
+
+envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = envoy_select_enable_http3(["quic_stat_names_test.cc"]),
-    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/stats:stats_lib",
@@ -112,7 +137,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_verifier_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
@@ -134,7 +166,13 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:envoy_quic_downstream_cert_verifier_lib",
@@ -153,7 +191,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_stream_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//source/common/http:headers_lib",
@@ -177,7 +221,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_client_stream_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
         ":test_utils_lib",
@@ -203,7 +253,18 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
         ":test_utils_lib",
@@ -230,6 +291,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_config_peer_lib",
+        "@quiche//:quic_test_tools_session_peer_lib",
         "@quiche//:quic_test_tools_stream_peer_lib",
         "@quiche//:quic_test_tools_server_session_base_peer",
         "@quiche//:quic_test_tools_test_utils_lib",
@@ -239,7 +301,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_session_test",
     srcs = envoy_select_enable_http3(["envoy_quic_client_session_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
@@ -268,10 +336,22 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = envoy_select_enable_http3(["active_quic_listener_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":fake_quic_packet_writer_lib",
         ":test_proof_source_lib",
+        ":mock_quic_connection_id_generator_factory_lib",
         ":test_utils_lib",
         "//source/common/http:utility_lib",
         "//source/common/listener_manager:connection_handler_lib",
@@ -286,8 +366,11 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -297,7 +380,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_dispatcher_test",
     srcs = envoy_select_enable_http3(["envoy_quic_dispatcher_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
         ":test_utils_lib",
@@ -342,6 +431,16 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "mock_quic_connection_id_generator_factory_lib",
+    hdrs = envoy_select_enable_http3(["mock_quic_connection_id_generator_factory.h"]),
+    deps = envoy_select_enable_http3([
+        "//source/common/protobuf:utility_lib",
+        "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+        "//test/common/config:dummy_config_proto_cc_proto",
+    ]),
+)
+
+envoy_cc_test_library(
     name = "fake_quic_packet_writer_lib",
     hdrs = envoy_select_enable_http3(["fake_quic_packet_writer.h"]),
     deps = envoy_select_enable_http3([
@@ -352,7 +451,13 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "client_connection_factory_impl_test",
     srcs = envoy_select_enable_http3(["client_connection_factory_impl_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
@@ -376,7 +481,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = envoy_select_enable_http3(["quic_io_handle_wrapper_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//test/mocks/api:api_mocks",
@@ -389,7 +497,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_utils_test",
     srcs = envoy_select_enable_http3(["envoy_quic_utils_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/runtime:runtime_lib",
@@ -402,7 +510,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_simulated_watermark_buffer_test",
     srcs = envoy_select_enable_http3(["envoy_quic_simulated_watermark_buffer_test.cc"]),
-    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3(["//source/common/quic:envoy_quic_simulated_watermark_buffer_lib"]),
 )
 
@@ -435,7 +542,13 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
@@ -448,13 +561,14 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_test_certificates_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
 )
 
 envoy_cc_test(
     name = "http_datagram_handler_test",
     srcs = envoy_select_enable_http3(["http_datagram_handler_test.cc"]),
-    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:http_datagram_handler",
         "//test/mocks/buffer:buffer_mocks",
@@ -466,7 +580,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "web_transport_session_bridge_test",
     srcs = envoy_select_enable_http3(["web_transport_session_bridge_test.cc"]),
-    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:web_transport_session_bridge_lib",
         "//test/mocks/http:webtransport_mocks",
@@ -487,6 +600,7 @@ envoy_cc_test_library(
     name = "connection_id_matchers",
     srcs = envoy_select_enable_http3(["connection_id_matchers.cc"]),
     hdrs = envoy_select_enable_http3(["connection_id_matchers.h"]),
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
         "//test/mocks/network:network_mocks",
@@ -500,7 +614,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "envoy_deterministic_connection_id_generator_test",
     srcs = envoy_select_enable_http3(["envoy_deterministic_connection_id_generator_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         ":connection_id_matchers",
         "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
@@ -529,7 +643,13 @@ envoy_cc_fuzz_test(
     name = "envoy_quic_h3_fuzz_test",
     srcs = ["envoy_quic_h3_fuzz_test.cc"],
     corpus = "envoy_quic_h3_fuzz_test_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["nofips"],
     deps = [
         ":envoy_quic_h3_fuzz_helper_lib",

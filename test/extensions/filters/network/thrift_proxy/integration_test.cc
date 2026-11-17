@@ -1,6 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
@@ -141,7 +144,45 @@ public:
 
     tryInitializePassthrough();
 
+    // Exercise both stats modes without doubling the test matrix: these tests only run on IPv4, so
+    // the multiplexed and non-multiplexed variants run the server in different modes. The mode is
+    // read during server initialization, before the runtime loader exists, so it has to be set
+    // directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
     BaseThriftIntegrationTest::initialize();
+
+    // Sanity check that the parameterized mode really took effect; otherwise both variants would
+    // silently be exercising the same thing.
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
+  }
+
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat names,
+  // tag-extracted names and tags for the connection manager stats.
+  bool explicitTags() const { return std::get<2>(GetParam()); }
+
+  // Checks a stat's flat name, the name it is tag-extracted to, and the tags attached to it.
+  void expectStat(const std::string& name, const std::string& tag_extracted_name,
+                  const std::vector<std::pair<std::string, std::string>>& tags) {
+    Stats::CounterSharedPtr counter = test_server_->counter(name);
+    Stats::GaugeSharedPtr gauge = test_server_->gauge(name);
+    const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
+                                                     : static_cast<Stats::Metric*>(gauge.get());
+    ASSERT_NE(metric, nullptr) << "no counter or gauge named '" << name << "'";
+
+    EXPECT_EQ(metric->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+
+    std::vector<std::pair<std::string, std::string>> actual_tags;
+    for (const Stats::Tag& tag : metric->tags()) {
+      actual_tags.emplace_back(tag.name_, tag.value_);
+    }
+    std::sort(actual_tags.begin(), actual_tags.end());
+    std::vector<std::pair<std::string, std::string>> expected_tags = tags;
+    std::sort(expected_tags.begin(), expected_tags.end());
+    EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
   }
 
 protected:
@@ -521,6 +562,22 @@ TEST_P(ThriftConnManagerIntegrationTest, NegativeVarIntCrashRepro) {
   tcp_client->waitForDisconnect();
 
   test_server_->waitForCounter("thrift.thrift_stats.request_decoding_error", Ge(1));
+}
+
+// The connection manager's stats have the same flat names, tag-extracted names and tags whether the
+// tags are derived by the legacy tag-extraction rules (non-multiplexed variants) or supplied
+// explicitly (multiplexed variants).
+TEST_P(ThriftConnManagerIntegrationTest, StatsTagsAndNamesAreIdenticalInBothModes) {
+  initializeCall(DriverMode::Success);
+
+  const std::vector<std::pair<std::string, std::string>> tags{
+      {Config::TagNames::get().THRIFT_PREFIX, "thrift_stats"}};
+  expectStat("thrift.thrift_stats.request", "thrift.request", tags);
+  expectStat("thrift.thrift_stats.request_call", "thrift.request_call", tags);
+  expectStat("thrift.thrift_stats.response_success", "thrift.response_success", tags);
+  expectStat("thrift.thrift_stats.request_active", "thrift.request_active", tags);
+  // The router filter's stats are tagged the same way.
+  expectStat("thrift.thrift_stats.route_missing", "thrift.route_missing", tags);
 }
 
 } // namespace ThriftProxy

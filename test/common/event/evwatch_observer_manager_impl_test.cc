@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::InvokeWithoutArgs;
 using testing::StrictMock;
 
 namespace Envoy {
@@ -86,9 +85,7 @@ TEST_F(EvwatchObserverManagerImplTest, DestructorCallsOnCloseForAllActiveObserve
 TEST_F(EvwatchObserverManagerImplTest, UnregisterSelfDuringCallback) {
   StrictMock<MockEvwatchObserver> observer;
 
-  EXPECT_CALL(observer, onPrepare(_, _)).WillOnce(InvokeWithoutArgs([&]() {
-    manager_.unregisterObserver(observer);
-  }));
+  EXPECT_CALL(observer, onPrepare(_, _)).WillOnce([&]() { manager_.unregisterObserver(observer); });
   EXPECT_CALL(observer, onClose());
   // onCheck should NOT be called since observer unregistered during onPrepare
 
@@ -104,9 +101,9 @@ TEST_F(EvwatchObserverManagerImplTest, UnregisterOtherObserverDuringCallback) {
   StrictMock<MockEvwatchObserver> observer1;
   StrictMock<MockEvwatchObserver> observer2;
 
-  EXPECT_CALL(observer1, onPrepare(_, _)).WillRepeatedly(InvokeWithoutArgs([&]() {
+  EXPECT_CALL(observer1, onPrepare(_, _)).WillRepeatedly([&]() {
     manager_.unregisterObserver(observer2);
-  }));
+  });
   EXPECT_CALL(observer1, onCheck(_)).Times(testing::AtLeast(1));
   EXPECT_CALL(observer1, onClose());
 
@@ -127,9 +124,7 @@ TEST_F(EvwatchObserverManagerImplTest, DestructorWithObserverUnregisteringSelfIn
 
   {
     EvwatchObserverManagerImpl manager(scheduler_.base(), time_source_);
-    EXPECT_CALL(observer, onClose()).WillOnce(InvokeWithoutArgs([&]() {
-      manager.unregisterObserver(observer);
-    }));
+    EXPECT_CALL(observer, onClose()).WillOnce([&]() { manager.unregisterObserver(observer); });
     manager.registerObserver(observer);
   }
 }

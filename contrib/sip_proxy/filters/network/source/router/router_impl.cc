@@ -116,16 +116,23 @@ RouteConstSharedPtr RouteMatcher::route(MessageMetadata& metadata) const {
 }
 
 void Router::onDestroy() {
-  if (!callbacks_->transactionId().empty()) {
-    for (auto& kv : *transaction_infos_) {
-      auto transaction_info = kv.second;
-      transaction_info->deleteTransaction(callbacks_->transactionId());
-    }
+  for (auto& kv : *transaction_infos_) {
+    auto transaction_info = kv.second;
+    transaction_info->deleteTransaction(callbacks_->transactionId(), *callbacks_);
   }
 
   if (upstream_request_) {
     upstream_request_->delDecoderFilterCallbacks(*callbacks_);
   }
+}
+
+void Router::useUpstreamRequest(std::shared_ptr<UpstreamRequest> upstream_request) {
+  // The upstream request this transaction leaves must not keep a pointer to it.
+  if (upstream_request_ && upstream_request_ != upstream_request) {
+    upstream_request_->delDecoderFilterCallbacks(*callbacks_);
+  }
+  upstream_request_ = std::move(upstream_request);
+  upstream_request_->setDecoderFilterCallbacks(*callbacks_);
 }
 
 void Router::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -366,8 +373,7 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
           transaction_info->getUpstreamRequest(host->address()->ip()->addressAsString());
       upstream_request != nullptr) {
     // There is action connection, reuse it.
-    upstream_request_ = upstream_request;
-    upstream_request_->setDecoderFilterCallbacks(*callbacks_);
+    useUpstreamRequest(upstream_request);
     upstream_request_->setMetadata(metadata);
     ENVOY_STREAM_LOG(debug, "reuse upstream request for {}", *callbacks_,
                      host->address()->ip()->addressAsString());
@@ -375,9 +381,8 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     transaction_info->insertTransaction(std::string(metadata->transactionId().value()), callbacks_,
                                         upstream_request_);
   } else {
-    upstream_request_ = std::make_shared<UpstreamRequest>(
-        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
-    upstream_request_->setDecoderFilterCallbacks(*callbacks_);
+    useUpstreamRequest(std::make_shared<UpstreamRequest>(
+        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info));
     upstream_request_->setMetadata(metadata);
     transaction_info->insertUpstreamRequest(host->address()->ip()->addressAsString(),
                                             upstream_request_);
@@ -447,9 +452,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
         upstream_request != nullptr) {
       // There is action connection, reuse it.
       ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
-      upstream_request_ = upstream_request;
+      useUpstreamRequest(upstream_request);
       upstream_request_->setMetadata(metadata);
-      upstream_request_->setDecoderFilterCallbacks(*callbacks_);
 
       transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
                                           callbacks_, upstream_request_);
@@ -662,12 +666,9 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   }
 }
 
-SipFilters::DecoderFilterCallbacks* UpstreamRequest::getTransaction(std::string&& transaction_id) {
-  if (transaction_info_->hasTransaction(transaction_id)) {
-    return transaction_info_->getTransaction(std::move(transaction_id)).activeTrans();
-  } else {
-    return nullptr;
-  }
+SipFilters::DecoderFilterCallbacks*
+UpstreamRequest::getTransaction(const std::string& transaction_id) {
+  return transaction_info_->getTransaction(transaction_id);
 }
 
 // Tcp::ConnectionPool::UpstreamCallbacks
@@ -703,6 +704,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
 
 void UpstreamRequest::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  settings_ = callbacks.settings();
 }
 
 void UpstreamRequest::delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {
@@ -723,6 +725,9 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 
     auto active_trans = parent_.getTransaction(std::string(transaction_id));
     if (active_trans) {
+      active_trans->stats()
+          .sipMethodCounter(metadata->methodType(), SipMethodStatsSuffix::ResponseReceived)
+          .inc();
       // ONLY used for NOKIA P-Cookie-IP-Mapping
       if (metadata->pCookieIpMap().has_value()) {
         auto [key, val] = metadata->pCookieIpMap().value();
@@ -744,11 +749,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
   return FilterStatus::Continue;
 }
 
-DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  parent_.decoderFilterCallbacks()
-      .stats()
-      .sipMethodCounter(metadata->methodType(), SipMethodStatsSuffix::ResponseReceived)
-      .inc();
+DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataSharedPtr) {
   return *this;
 }
 

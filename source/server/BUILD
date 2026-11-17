@@ -17,6 +17,7 @@ envoy_cc_library(
     tags = ["backtrace"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stderr_writer_lib",
         "//source/common/version:version_lib",
         "@abseil-cpp//absl/debugging:stacktrace",
         "@abseil-cpp//absl/debugging:symbolize",
@@ -80,7 +81,10 @@ envoy_cc_library(
         "//envoy/network:connection_handler_interface",
         "//envoy/network:listener_interface",
         "//envoy/stats:timespan_interface",
+        "//source/common/stats:prefix_utility_lib",
         "//source/common/stats:timespan_lib",
+        "//source/common/stats:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -140,6 +144,7 @@ envoy_cc_library(
         "//envoy/server:guarddog_interface",
         "//envoy/server:watchdog_interface",
         "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -147,7 +152,9 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/event:libevent_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
@@ -320,7 +327,26 @@ envoy_cc_library(
     hdrs = ["null_overload_manager.h"],
     deps = [
         "//envoy/server/overload:overload_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/event:scaled_range_timer_manager_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "trigger_lib",
+    hdrs = ["trigger.h"],
+    deps = [
+        "//envoy/server/overload:overload_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "synchronous_feedback_trigger_lib",
+    hdrs = ["synchronous_feedback_trigger.h"],
+    deps = [
+        ":trigger_lib",
+        "//envoy/server:resource_monitor_interface",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -329,6 +355,8 @@ envoy_cc_library(
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
+        ":synchronous_feedback_trigger_lib",
+        ":trigger_lib",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -337,7 +365,7 @@ envoy_cc_library(
         "//source/common/event:scaled_range_timer_manager_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
-        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
@@ -395,7 +423,6 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":cgroup_cpu_util_lib",
         ":configuration_lib",
@@ -427,6 +454,7 @@ envoy_cc_library(
         "//source/common/common:notification_lib",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:dependent_type_urls_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_manager_lib",
         "//source/common/config:xds_resource_lib",
@@ -440,6 +468,7 @@ envoy_cc_library(
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
+        "//source/common/runtime:breaking_changes",
         "//source/common/runtime:runtime_keys_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",
@@ -452,8 +481,10 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "//source/server/admin:admin_lib",
         "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/flags:flag",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

@@ -12,7 +12,10 @@ namespace Tracing {
 
 class CustomTagBase : public CustomTag {
 public:
-  explicit CustomTagBase(const std::string& tag) : tag_(tag) {}
+  explicit CustomTagBase(const std::string& tag,
+                         envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                             envoy::type::tracing::v3::CustomTag::STRING)
+      : tag_(tag), value_type_(value_type) {}
   absl::string_view tag() const override { return tag_; }
   void applySpan(Span& span, const CustomTagContext& ctx) const override;
   void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
@@ -21,13 +24,16 @@ public:
 
 protected:
   const std::string tag_;
+  const envoy::type::tracing::v3::CustomTag::ValueType value_type_;
 };
 
 class LiteralCustomTag : public CustomTagBase {
 public:
   LiteralCustomTag(const std::string& tag,
-                   const envoy::type::tracing::v3::CustomTag::Literal& literal)
-      : CustomTagBase(tag), value_(literal.value()) {}
+                   const envoy::type::tracing::v3::CustomTag::Literal& literal,
+                   envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                       envoy::type::tracing::v3::CustomTag::STRING)
+      : CustomTagBase(tag, value_type), value_(literal.value()) {}
   absl::string_view value(const CustomTagContext&) const override { return value_; }
 
 private:
@@ -37,7 +43,9 @@ private:
 class EnvironmentCustomTag : public CustomTagBase {
 public:
   EnvironmentCustomTag(const std::string& tag,
-                       const envoy::type::tracing::v3::CustomTag::Environment& environment);
+                       const envoy::type::tracing::v3::CustomTag::Environment& environment,
+                       envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                           envoy::type::tracing::v3::CustomTag::STRING);
   absl::string_view value(const CustomTagContext&) const override { return final_value_; }
 
 private:
@@ -49,7 +57,9 @@ private:
 class RequestHeaderCustomTag : public CustomTagBase {
 public:
   RequestHeaderCustomTag(const std::string& tag,
-                         const envoy::type::tracing::v3::CustomTag::Header& request_header);
+                         const envoy::type::tracing::v3::CustomTag::Header& request_header,
+                         envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                             envoy::type::tracing::v3::CustomTag::STRING);
   absl::string_view value(const CustomTagContext& ctx) const override;
 
 private:
@@ -61,7 +71,9 @@ private:
 class MetadataCustomTag : public CustomTagBase {
 public:
   MetadataCustomTag(const std::string& tag,
-                    const envoy::type::tracing::v3::CustomTag::Metadata& metadata);
+                    const envoy::type::tracing::v3::CustomTag::Metadata& metadata,
+                    envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                        envoy::type::tracing::v3::CustomTag::STRING);
   void applySpan(Span& span, const CustomTagContext& ctx) const override;
   void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
                 const CustomTagContext& ctx) const override;
@@ -80,6 +92,8 @@ protected:
 class FormatterCustomTag : public CustomTag {
 public:
   FormatterCustomTag(absl::string_view tag, absl::string_view value,
+                     envoy::type::tracing::v3::CustomTag::ValueType value_type =
+                         envoy::type::tracing::v3::CustomTag::STRING,
                      const Formatter::CommandParserPtrVector& command_parsers = {});
 
   absl::string_view tag() const override { return tag_; }
@@ -89,6 +103,7 @@ public:
 
 private:
   const std::string tag_;
+  const envoy::type::tracing::v3::CustomTag::ValueType value_type_;
   Formatter::FormatterPtr formatter_;
 };
 

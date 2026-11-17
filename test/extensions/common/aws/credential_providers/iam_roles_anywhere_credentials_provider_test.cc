@@ -31,7 +31,6 @@ using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::Eq;
-using testing::InvokeWithoutArgs;
 using testing::MockFunction;
 using testing::NiceMock;
 using ::testing::Not;
@@ -257,16 +256,15 @@ public:
 
   Event::DispatcherPtr setupDispatcher() {
     auto dispatcher = std::make_unique<Event::MockDispatcher>();
-    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
+    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillRepeatedly([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::Modified, _))
-          .WillRepeatedly(
-              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                watch_cbs_.push_back(cb);
-                return absl::OkStatus();
-              }));
+          .WillRepeatedly([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+            watch_cbs_.push_back(cb);
+            return absl::OkStatus();
+          });
       return mock_watcher;
-    }));
+    });
 
     return dispatcher;
   }
@@ -275,9 +273,9 @@ public:
                       Http::RequestMessage& message) {
 
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(message), _, _))
-        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, document = std::move(document)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK) ||
               status_code == enumToInt(Http::Code::Created)) {
             if (!document.empty()) {
@@ -295,7 +293,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   Http::TestRequestHeaderMapImpl rsa_headers_nochain_{

@@ -78,17 +78,25 @@ public:
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
                absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
-    // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
-    // timer is created and running.
-    auto shared_ptr_wrapper =
-        std::make_shared<std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
-            std::move(rate_limiter_));
-    dispatcher_.post([shared_ptr_wrapper]() { shared_ptr_wrapper->reset(); });
+    // Ensure that the rate limiter and the share provider manager are destroyed on the main
+    // thread. The rate limiter owns a fill timer created on that thread. The share provider
+    // manager is an unpinned singleton, so the singleton manager only holds a weak reference to it
+    // and this configuration may own the last strong one; it in turn owns a cluster membership
+    // callback handle that must be de-registered on the main thread. A route level configuration
+    // can be released on a worker thread when an RDS update replaces the route configuration.
+    dispatcher_.post([rate_limiter = std::move(rate_limiter_),
+                      share_provider_manager = std::move(share_provider_manager_)]() mutable {
+      rate_limiter.reset();
+      share_provider_manager.reset();
+    });
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
+  void consumeDescriptors(absl::Span<const RateLimit::Descriptor> descriptors) const {
+    rate_limiter_->consumeDescriptors(descriptors);
+  }
   bool enabled() const;
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
@@ -97,6 +105,7 @@ public:
   Http::Code status() const { return status_; }
   uint64_t stage() const { return stage_; }
   bool hasDescriptors() const { return has_descriptors_; }
+  bool hasStreamDoneActions() const { return has_stream_done_actions_; }
   const std::chrono::milliseconds& fillInterval() const { return fill_interval_; }
   uint32_t maxTokens() const { return max_tokens_; }
   uint32_t tokensPerFill() const { return tokens_per_fill_; }
@@ -123,10 +132,13 @@ public:
   }
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
-                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
+    rate_limit_config_->populateDescriptors(headers, response_headers, info,
+                                            local_info_.clusterName(), descriptors, on_stream_done);
   }
 
 private:
@@ -164,6 +176,7 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
+  const bool has_stream_done_actions_;
   const bool enable_x_rate_limit_headers_;
   const bool enable_retry_after_header_ = false;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
@@ -179,7 +192,10 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(config), used_config_(config_.get()) {}
+  Filter(FilterConfigSharedPtr config);
+
+  // Http::StreamFilterBase
+  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -216,6 +232,8 @@ private:
   const FilterConfig* used_config_{};
   std::shared_ptr<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
   RateLimit::XRateLimitOption x_ratelimit_option_{};
+  // Whether decodeHeaders() ran with the filter enabled. Completion accounting respects it.
+  bool rate_limit_enabled_{false};
 
   VhRateLimitOptions vh_rate_limits_;
 };

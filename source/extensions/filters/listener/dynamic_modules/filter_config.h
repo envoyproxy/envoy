@@ -1,15 +1,14 @@
 #pragma once
 
-#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/statusor.h"
-#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,6 +61,8 @@ public:
    * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
    * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
+   * @param load_shed_point_provider the provider of the load shed points the module can check, if
+   * any.
    */
   DynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                     const absl::string_view filter_config,
@@ -69,7 +70,8 @@ public:
                                     DynamicModulePtr dynamic_module,
                                     Envoy::Upstream::ClusterManager& cluster_manager,
                                     Stats::Scope& stats_scope,
-                                    Event::Dispatcher& main_thread_dispatcher);
+                                    Event::Dispatcher& main_thread_dispatcher,
+                                    OptRef<Server::LoadShedPointProvider> load_shed_point_provider);
 
   ~DynamicModuleListenerFilterConfig();
 
@@ -102,99 +104,32 @@ public:
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
 
+  // The provider of the load shed points that the module can check. It is empty when the factory
+  // context of the filter bypasses the overload manager.
+  const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
+
   // ----------------------------- Metrics Support -----------------------------
-  // Handle classes for storing defined metrics.
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
+  const Extensions::DynamicModules::MetricRegistry& metrics() const { return metrics_; }
 
-  class ModuleCounterHandle {
-  public:
-    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
-    void add(uint64_t value) const { counter_.add(value); }
-
-  private:
-    Stats::Counter& counter_;
-  };
-
-  class ModuleGaugeHandle {
-  public:
-    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-    void add(uint64_t value) const { gauge_.add(value); }
-    void sub(uint64_t value) const { gauge_.sub(value); }
-    void set(uint64_t value) const { gauge_.set(value); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
-  class ModuleHistogramHandle {
-  public:
-    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
-    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
-
-  private:
-    Stats::Histogram& histogram_;
-  };
-
-// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
-// for our internal storage. These helper functions do that conversion.
-#define ID_TO_INDEX(id) ((id) - 1)
-
-  // Methods for adding metrics during configuration.
-  size_t addCounter(ModuleCounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-
-  size_t addGauge(ModuleGaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-
-  size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    histograms_.push_back(std::move(histogram));
-    return histograms_.size();
-  }
-
-  // Methods for getting metrics by ID.
-  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id == 0 || id > counters_.size()) {
-      return {};
-    }
-    return counters_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id == 0 || id > gauges_.size()) {
-      return {};
-    }
-    return gauges_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id == 0 || id > histograms_.size()) {
-      return {};
-    }
-    return histograms_[ID_TO_INDEX(id)];
-  }
-
-#undef ID_TO_INDEX
-
-  // Stats scope for metric creation.
+  // Owns the scope the registry references. Must precede metrics_ so it initializes first.
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // We only allow the module to create stats during the in-module config_new, and not later from
-  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock.
+  // worker threads, so that we don't have to wrap the metrics registry pool in a lock.
   bool stat_creation_frozen_ = false;
 
 private:
   // Allow the factory function to access private members for initialization.
   friend absl::StatusOr<std::shared_ptr<DynamicModuleListenerFilterConfig>>
-  newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
-                                       const absl::string_view filter_config,
-                                       const absl::string_view metrics_namespace,
-                                       DynamicModulePtr dynamic_module,
-                                       Envoy::Upstream::ClusterManager& cluster_manager,
-                                       Stats::Scope& stats_scope,
-                                       Event::Dispatcher& main_thread_dispatcher);
+  newDynamicModuleListenerFilterConfig(
+      const absl::string_view filter_name, const absl::string_view filter_config,
+      const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+      Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+      Event::Dispatcher& main_thread_dispatcher,
+      OptRef<Server::LoadShedPointProvider> load_shed_point_provider);
 
   // The name of the filter passed in the constructor.
   const std::string filter_name_;
@@ -204,11 +139,6 @@ private:
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
-
-  // Metric storage.
-  std::vector<ModuleCounterHandle> counters_;
-  std::vector<ModuleGaugeHandle> gauges_;
-  std::vector<ModuleHistogramHandle> histograms_;
 };
 
 /**
@@ -249,6 +179,8 @@ private:
  * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
  * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
+ * @param load_shed_point_provider the provider of the load shed points the module can check, if
+ * any.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListenerFilterConfig(
@@ -256,7 +188,8 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
-    Event::Dispatcher& main_thread_dispatcher);
+    Event::Dispatcher& main_thread_dispatcher,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider = {});
 
 } // namespace ListenerFilters
 } // namespace DynamicModules

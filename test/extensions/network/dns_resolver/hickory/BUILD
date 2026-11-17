@@ -35,13 +35,16 @@ envoy_extension_cc_dyn_module_test(
         # Failure-path stubs loaded via ENVOY_DYNAMIC_MODULES_SEARCH_PATH:
         #   - ``dns_resolver_config_new_fail``: exports all 7 DNS resolver ABI symbols, returns null
         #     from ``on_dns_resolver_config_new`` to exercise the Rust-rejection path.
+        #   - ``dns_resolver_new_fail``: loads its configuration but returns null from
+        #     ``on_dns_resolver_new`` to exercise the resolver-creation failure path.
         #   - ``matcher_no_op``: exports ``program_init`` but no DNS resolver symbols, exercising the
         #     ABI-symbol-resolution failure path.
         "//test/extensions/dynamic_modules/test_data/c:dns_resolver_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:dns_resolver_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     extension_names = ["envoy.network.dns_resolver.hickory"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = [
         # It is a known issue that TSAN detects a false positive in uninstrumented Rust code:
         # https://github.com/rust-lang/rust/issues/39608
@@ -67,7 +70,13 @@ envoy_extension_cc_dyn_module_test(
     name = "hickory_dns_integration_test",
     srcs = ["hickory_dns_integration_test.cc"],
     extension_names = ["envoy.network.dns_resolver.hickory"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "asan": {"link": "linux_x64_small"},
+    },
     tags = [
         # See comment on hickory_dns_impl_test above.
         "no_tsan",

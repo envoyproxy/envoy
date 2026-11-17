@@ -1,6 +1,6 @@
 --- a/
 +++ b/
-@@ -87,13 +87,19 @@
+@@ -93,13 +93,19 @@
  static const size_t kTicketKeyLen = 48;
  
  static const VersionParam kAllVersions[] = {
@@ -20,7 +20,7 @@
  };
  
  struct ExpectedCipher {
-@@ -1324,6 +1330,7 @@
+@@ -1470,6 +1476,7 @@
      int auth_nid;
      int prf_nid;
    } kTests[] = {
@@ -28,7 +28,7 @@
        {
            SSL_CIPHER_RSA_WITH_3DES_EDE_CBC_SHA,
            "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
-@@ -1333,6 +1340,7 @@
+@@ -1479,6 +1486,7 @@
            NID_auth_rsa,
            NID_md5_sha1,
        },
@@ -36,7 +36,7 @@
        {
            SSL_CIPHER_RSA_WITH_AES_128_CBC_SHA,
            "TLS_RSA_WITH_AES_128_CBC_SHA",
-@@ -1880,7 +1888,11 @@
+@@ -2033,7 +2041,11 @@
      if (client_err != SSL_ERROR_NONE &&        //
          client_err != SSL_ERROR_WANT_READ &&   //
          client_err != SSL_ERROR_WANT_WRITE &&  //
@@ -48,7 +48,7 @@
        fprintf(stderr, "Client error: %s\n", SSL_error_description(client_err));
        return false;
      }
-@@ -1890,7 +1902,11 @@
+@@ -2043,7 +2055,11 @@
      if (server_err != SSL_ERROR_NONE &&        //
          server_err != SSL_ERROR_WANT_READ &&   //
          server_err != SSL_ERROR_WANT_WRITE &&  //
@@ -60,7 +60,7 @@
        fprintf(stderr, "Server error: %s\n", SSL_error_description(server_err));
        return false;
      }
-@@ -1979,7 +1995,12 @@
+@@ -2132,7 +2148,12 @@
      return false;
    }
    if (config.early_data) {
@@ -73,7 +73,7 @@
    }
    if (config.session) {
      SSL_set_session(client.get(), config.session);
-@@ -1989,18 +2010,29 @@
+@@ -2142,18 +2163,29 @@
      return false;
    }
    if (!config.verify_hostname.empty()) {
@@ -103,7 +103,7 @@
  
    if (!CompleteHandshakes(client.get(), server.get())) {
      return false;
-@@ -3858,12 +3890,16 @@
+@@ -4139,12 +4171,16 @@
    // However, for historical reasons, the X509 chain includes the leaf on the
    // client, but does not on the server.
    EXPECT_EQ(sk_X509_num(SSL_get_peer_cert_chain(client_.get())), 1u);
@@ -120,7 +120,7 @@
  }
  
  TEST_P(SSLVersionTest, NoPeerCertificate) {
-@@ -3876,7 +3912,9 @@
+@@ -4157,7 +4193,9 @@
    // Server should not see a peer certificate.
    bssl::UniquePtr<X509> peer(SSL_get_peer_certificate(server_.get()));
    ASSERT_FALSE(peer);
@@ -130,10 +130,10 @@
  }
  
  TEST_P(SSLVersionTest, RetainOnlySHA256OfCerts) {
-@@ -4569,7 +4607,11 @@
+@@ -4852,7 +4890,11 @@
    ASSERT_TRUE(CreateClientAndServer(&client_, &server_, client_ctx_.get(),
                                      server_ctx_.get()));
-   // Before the handshake, |SSL_version| reports some placeholder value.
+   // Before the handshake, `SSL_version` reports some placeholder value.
 +#ifdef BSSL_COMPAT // Default versions are different when running on OpenSSL
 +  const uint16_t placeholder = is_dtls() ? DTLS1_2_VERSION : TLS1_3_VERSION;
 +#else
@@ -142,7 +142,7 @@
    EXPECT_EQ(SSL_version(client_.get()), placeholder);
    EXPECT_EQ(SSL_version(server_.get()), placeholder);
  
-@@ -6217,8 +6259,13 @@
+@@ -6595,8 +6637,13 @@
    int ret = SSL_do_handshake(ssl.get());
    EXPECT_EQ(-1, ret);
    EXPECT_EQ(SSL_ERROR_SSL, SSL_get_error(ssl.get(), ret));

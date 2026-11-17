@@ -35,6 +35,7 @@ envoy_cc_library(
     ],
     deps = [
         ":action_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -49,6 +50,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        "//envoy/event:dispatcher_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:factory_base_lib",

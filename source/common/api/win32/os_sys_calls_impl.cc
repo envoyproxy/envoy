@@ -372,7 +372,7 @@ SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, 
     return {SOCKET_ERROR, SOCKET_ERROR_INVAL};
   }
 
-  auto onErr = [this, listener, sv]() -> void {
+  auto onErr = [listener, sv]() -> void {
     ::closesocket(listener);
     ::closesocket(sv[0]);
     ::closesocket(sv[1]);

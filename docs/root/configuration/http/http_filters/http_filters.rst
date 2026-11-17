@@ -22,6 +22,7 @@ HTTP filters
   cache_v2_filter
   cdn_loop_filter
   checksum_filter
+  client_cert_filter
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter
@@ -63,6 +64,7 @@ HTTP filters
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
+  priority_load_shed_filter
   proto_api_scrubber_filter
   proto_message_extraction_filter
   rate_limit_filter

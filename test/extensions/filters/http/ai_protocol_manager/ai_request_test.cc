@@ -49,6 +49,15 @@ TEST(AiRequestTest, AssigningJsonReplacesTheDocument) {
   EXPECT_FALSE(request.request_index().json().contains("temperature"));
 }
 
+TEST(AiRequestTest, TakeRequestIndexHandsOverTheDocument) {
+  JsonWithExtBuf index;
+  index.setJson(nlohmann::json{{"model", "gpt-4"}});
+  AiRequest request(std::move(index));
+
+  JsonWithExtBuf taken = request.takeRequestIndex();
+  EXPECT_EQ(taken.json()["model"], "gpt-4");
+}
+
 // Offloaded values reach a filter as reference nodes, not as bytes.
 TEST(AiRequestTest, ExternalRefsSurviveTheWrapper) {
   const JsonWithExtBuf::ExternalRef ref{/*offset=*/64, /*length=*/4096};

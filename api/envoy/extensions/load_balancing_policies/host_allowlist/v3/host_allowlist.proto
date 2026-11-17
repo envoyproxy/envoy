@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.host_allowlist.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.host_allowlist.v3";
+option java_outer_classname = "HostAllowlistProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/host_allowlist/v3;host_allowlistv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Host Allowlist Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.host_allowlist]
+
+// Configuration for the Host Allowlist load balancing policy.
+//
+// This policy does not implement weight or priority itself. For every attempt it
+// wraps ``child_policy`` and excludes hosts whose metadata is absent from the
+// request DynamicMetadata allowlist. HostSet membership is not mutated.
+//
+// Typical configuration:
+//
+// .. code-block:: yaml
+//
+//    metadata_namespace: envoy.filters.http.ratelimit
+//    metadata_key: candidates
+//    host_metadata_namespace: envoy.lb
+//    host_metadata_keys:
+//    - id
+//    - secondary_id
+//    child_policy:
+//      policies:
+//      - typed_extension_config:
+//          name: envoy.load_balancing_policies.round_robin
+//          typed_config:
+//            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+//
+// The value at ``metadata_namespace`` / ``metadata_key`` must be a protobuf
+// ListValue of Structs. Each struct uses the same field names as
+// ``host_metadata_keys``.
+//
+// Identities are opaque strings. The first key is matched hierarchically: a host
+// matches if the values are equal, or if the host value is a ``/``-delimited
+// child of the candidate (``svc-a`` matches ``svc-a/shard/0/member/1``, not
+// ``svc-a-west/...``). Later keys are an exact pair match when the host has
+// that metadata; a host missing a later key matches any candidate value for it.
+//
+// If the list is missing or not a list, selection fail-opens to
+// ``child_policy`` unless ``fail_closed_on_missing_metadata`` is set.
+//
+// See the :ref:`load balancing architecture
+// overview<arch_overview_load_balancing_types>` for more information.
+// [#next-free-field: 7]
+message HostAllowlist {
+  // DynamicMetadata filter name that holds the candidate list. Required.
+  string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Key under ``metadata_namespace`` for the candidate list. Required.
+  string metadata_key = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Host metadata filter name. Empty uses ``envoy.lb``.
+  string host_metadata_namespace = 3;
+
+  // Host metadata keys, in order, used both to read host metadata and as field
+  // names on each candidate struct. Must contain at least one key. The first
+  // key is the hierarchical identity; later keys are exact-match attributes.
+  repeated string host_metadata_keys = 4 [(validate.rules).repeated = {min_items: 1}];
+
+  // If true, missing or non-list candidate metadata fails host selection with
+  // HTTP 429. Proto3 default false is fail-open: the child policy runs with no
+  // exclusion.
+  bool fail_closed_on_missing_metadata = 5;
+
+  // Child load balancing policy used for weight, priority, locality, and
+  // health. Required. Used for every host selection attempt, not only as a
+  // fallback.
+  config.cluster.v3.LoadBalancingPolicy child_policy = 6
+      [(validate.rules).message = {required: true}];
+}

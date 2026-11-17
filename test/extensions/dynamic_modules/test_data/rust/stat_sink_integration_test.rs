@@ -32,11 +32,15 @@ fn new_stat_sink(
   let scheduler = envoy_config.new_config_scheduler();
 
   // Aggregate snapshots on a dedicated worker thread to model a module that offloads work from the
-  // main thread, for example onto a Tokio runtime. The worker owns the scheduler and commits the
-  // aggregated total as the event id, which the main thread then publishes into the gauge.
-  let (sender, receiver) = channel::<OwnedMetricSnapshot>();
+  // main thread, for example onto a Tokio runtime. The worker receives retained snapshots, decodes
+  // every name and value off the main thread, and drops each snapshot there, which releases it. It
+  // owns the scheduler and commits the aggregated total as the event id, which the main thread then
+  // publishes into the gauge.
+  let (sender, receiver) = channel::<RetainedMetricSnapshot>();
   let worker = std::thread::spawn(move || {
-    while let Ok(snapshot) = receiver.recv() {
+    while let Ok(retained) = receiver.recv() {
+      let snapshot = retained.to_owned();
+      drop(retained);
       let total: u64 = snapshot.counters.iter().map(|counter| counter.value).sum();
       scheduler.commit(total);
     }
@@ -51,7 +55,7 @@ fn new_stat_sink(
 
 struct TestStatSink {
   gauge_id: EnvoyGaugeId,
-  sender: Mutex<Option<Sender<OwnedMetricSnapshot>>>,
+  sender: Mutex<Option<Sender<RetainedMetricSnapshot>>>,
   worker: Mutex<Option<JoinHandle<()>>>,
 }
 
@@ -69,7 +73,7 @@ impl StatSink for TestStatSink {
     // index the count reports must resolve; a mismatch means the count and the per-tag reader
     // disagree.
     let mut counter_tags_consistent = true;
-    for index in 0..snapshot.counter_count() {
+    for index in 0 .. snapshot.counter_count() {
       let _ = snapshot.counter(index, &mut name);
       if !snapshot.counter_tag_extracted_name(index, &mut name) {
         counter_tags_consistent = false;
@@ -79,7 +83,7 @@ impl StatSink for TestStatSink {
         counter_tags_consistent = false;
         continue;
       };
-      for tag_index in 0..tag_count {
+      for tag_index in 0 .. tag_count {
         if !snapshot.counter_tag(index, tag_index, &mut tag_name, &mut tag_value) {
           counter_tags_consistent = false;
         }
@@ -93,7 +97,7 @@ impl StatSink for TestStatSink {
     // "envoy.cluster_name" tag whose value is the cluster name, so the tag callbacks must yield
     // tag-extracted name "cluster.membership_total" and tag ("envoy.cluster_name", "cluster_0").
     let mut found_tagged_gauge = false;
-    for index in 0..snapshot.gauge_count() {
+    for index in 0 .. snapshot.gauge_count() {
       if snapshot.gauge(index, &mut name).is_some() && name.as_slice() == b"server.uptime" {
         found_uptime = true;
       }
@@ -107,7 +111,7 @@ impl StatSink for TestStatSink {
         found_tagged_gauge = true;
       }
     }
-    for index in 0..snapshot.text_readout_count() {
+    for index in 0 .. snapshot.text_readout_count() {
       let _ = snapshot.text_readout(index, &mut name, &mut value);
     }
     if found_uptime {
@@ -117,10 +121,10 @@ impl StatSink for TestStatSink {
     // snapshot callbacks decode the name plus the resolved (upper_bound, cumulative_count) buckets.
     // A monotonic bucket count with the last bucket equal to sample_count confirms the cumulative
     // form matches what Envoy produces.
-    for index in 0..snapshot.histogram_count() {
+    for index in 0 .. snapshot.histogram_count() {
       if let Some(histogram) = snapshot.histogram(index, &mut name) {
         let bucket_count = snapshot.histogram_bucket_count(index);
-        let last_cumulative = (0..bucket_count)
+        let last_cumulative = (0 .. bucket_count)
           .filter_map(|bucket_index| snapshot.histogram_bucket(index, bucket_index))
           .map(|bucket| bucket.cumulative_count)
           .next_back()
@@ -136,7 +140,10 @@ impl StatSink for TestStatSink {
     // A tagged gauge reconstructed from the tag callbacks, and every counter's tag count agreed
     // with its per-tag reads: the tag ABI round-trips end to end against a live snapshot.
     if found_tagged_gauge && counter_tags_consistent {
-      envoy_log_info!("stat sink integration test: reconstructed tagged gauge cluster.membership_total envoy.cluster_name=cluster_0");
+      envoy_log_info!(
+        "stat sink integration test: reconstructed tagged gauge cluster.membership_total \
+         envoy.cluster_name=cluster_0"
+      );
     }
     envoy_log_info!(
       "stat sink integration test: flush called counters={} gauges={} histograms={}",
@@ -144,9 +151,10 @@ impl StatSink for TestStatSink {
       snapshot.gauge_count(),
       snapshot.histogram_count()
     );
-    // Copy the snapshot so it outlives this call, then hand it to the worker thread to aggregate.
+    // Retain the snapshot so it outlives this call, then hand it to the worker thread to decode and
+    // aggregate.
     if let Some(sender) = self.sender.lock().unwrap().as_ref() {
-      let _ = sender.send(snapshot.to_owned());
+      let _ = sender.send(snapshot.retain());
     }
   }
 
@@ -169,7 +177,9 @@ impl StatSink for TestStatSink {
 
 impl Drop for TestStatSink {
   fn drop(&mut self) {
-    // Close the channel so the worker thread exits, then wait for it to finish.
+    // Close the channel so the worker thread exits, then wait for it to finish. The worker drops
+    // every retained snapshot it receives, so joining it also releases them all before the sink is
+    // destroyed, as the retain contract requires.
     self.sender.lock().unwrap().take();
     if let Some(worker) = self.worker.lock().unwrap().take() {
       let _ = worker.join();

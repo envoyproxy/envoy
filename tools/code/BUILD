@@ -64,32 +64,28 @@ py_console_script_binary(
     script = "envoy.code.check",
 )
 
-genrule(
-    name = "checked",
-    outs = ["checked.txt"],
-    cmd = """
-    $(location :check) \
-        --fix \
-        -l warn \
-        -v warn \
-        -x mobile/dist/envoy-pom.xml \
-        -x bazel/repo.bzl \
-        --codeowners=$(location //:CODEOWNERS) \
-        --owners=$(location //:OWNERS.md) \
-        --extensions_build_config=$(location :extensions_build_config) \
-        --extensions_fuzzed_count=%s \
-        --path=%s \
-        -c %s \
-        -b shellcheck:$(location @shellcheck) \
-        -b gofmt:$(location @go_sdk//:bin/gofmt) \
-      > $@ 2>&1 || :
-    """ % (
-        FUZZ_FILTER_COUNT,
-        PATH,
-        " ".join(CODE_CHECKS),
-    ),
-    tags = ["no-remote-exec"],
-    tools = [
+sh_test(
+    name = "check_test",
+    srcs = [":check_test.sh"],
+    args = [
+        "$(location :check)",
+        "--fix",
+        "-l warn",
+        "-v warn",
+        "-x mobile/dist/envoy-pom.xml",
+        "-x bazel/repo.bzl",
+        "--codeowners=$(location //:CODEOWNERS)",
+        "--owners=$(location //:OWNERS.md)",
+        "--extensions_build_config=$(location :extensions_build_config)",
+        "--extensions_fuzzed_count=%s" % FUZZ_FILTER_COUNT,
+        "--path=%s" % PATH,
+        "-c %s" % " ".join(CODE_CHECKS),
+        "-b shellcheck:$(location @shellcheck)",
+        "-b gofmt:$(location @go_sdk//:bin/gofmt)",
+    ],
+    # The check reads the source tree through `--path`, so the scm hash is
+    # what invalidates a cached result when the tree changes.
+    data = [
         ":check",
         ":extensions_build_config",
         "//:CODEOWNERS",
@@ -98,12 +94,5 @@ genrule(
         "@go_sdk//:bin/gofmt",
         "@shellcheck",
     ],
-)
-
-sh_test(
-    name = "check_test",
-    srcs = [":check_test.sh"],
-    args = ["$(location :checked)"],
-    data = [":checked"],
     tags = ["no-remote-exec"],
 )

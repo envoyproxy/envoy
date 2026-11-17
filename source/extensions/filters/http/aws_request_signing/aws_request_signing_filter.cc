@@ -13,9 +13,20 @@ namespace AwsRequestSigningFilter {
 
 FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
                                    const std::string& stats_prefix, Stats::Scope& scope,
-                                   const std::string& host_rewrite, bool use_unsigned_payload)
-    : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)),
-      host_rewrite_(host_rewrite), use_unsigned_payload_{use_unsigned_payload} {}
+                                   const std::string& host_rewrite, bool use_unsigned_payload,
+                                   Event::Dispatcher& main_dispatcher)
+    : main_dispatcher_(main_dispatcher), signer_(std::move(signer)),
+      stats_(Filter::generateStats(stats_prefix, scope)), host_rewrite_(host_rewrite),
+      use_unsigned_payload_{use_unsigned_payload} {}
+
+FilterConfigImpl::~FilterConfigImpl() {
+  if (signer_ == nullptr || main_dispatcher_.isThreadSafe()) {
+    return;
+  }
+  // A route level configuration builds its own signer, and therefore its own credentials provider
+  // chain, so releasing it may drop the last reference to a metadata based credentials provider.
+  main_dispatcher_.post([signer = std::move(signer_)]() mutable { signer.reset(); });
+}
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 

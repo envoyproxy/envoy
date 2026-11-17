@@ -81,6 +81,15 @@ public:
   // Returns a status if conversion failed.
   absl::StatusOr<Envoy::Buffer::InstancePtr> convertBackToBuffer(StreamMessagePtr message);
 
+  // Moves any leftover buffered bytes (an incomplete trailing message) into
+  // `data`.
+  //
+  // A caller that stops invoking `accumulateMessages` before the
+  // stream ends must drain these bytes otherwise they will remain
+  // in this `MessageConverter` while the remainder of that message
+  // flows on without them.
+  void drainLeftoverData(Envoy::Buffer::Instance& data);
+
   // Returns the total number of bytes stored across all internal buffers.
   // Callers are not expected to explicitly check this, as we internally ensure
   // we do not go over buffer limits. But callers may use this for their own

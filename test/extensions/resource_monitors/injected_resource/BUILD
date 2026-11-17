@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -12,11 +11,17 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "injected_resource_monitor_integration_test",
     size = "large",
     srcs = ["injected_resource_monitor_integration_test.cc"],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.resource_monitors.injected_resource"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
@@ -30,10 +35,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.resource_monitors.injected_resource"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
@@ -51,7 +56,6 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.injected_resource"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/event:dispatcher_lib",

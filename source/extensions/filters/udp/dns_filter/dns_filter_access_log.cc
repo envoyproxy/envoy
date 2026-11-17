@@ -107,7 +107,7 @@ public:
   parse(absl::string_view command, absl::string_view command_arg,
         std::optional<size_t> max_length) const override {
     const auto& provider_table = providerFuncTable();
-    const auto func_it = provider_table.find(std::string(command));
+    const auto func_it = provider_table.find(command);
     if (func_it == provider_table.end()) {
       return absl::InvalidArgumentError(absl::StrCat("Invalid format substitution: ", command));
     }

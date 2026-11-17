@@ -38,15 +38,15 @@ void UberFilterFuzzer::fuzzerSetup() {
   // Get the pointer of read_filter when the read_filter is being added to connection_.
   read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
   ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
-      .WillByDefault(Invoke([&](Network::ReadFilterSharedPtr read_filter) -> void {
+      .WillByDefault([&](Network::ReadFilterSharedPtr read_filter) -> void {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
-      }));
+      });
   ON_CALL(read_filter_callbacks_->connection_, addFilter(_))
-      .WillByDefault(Invoke([&](Network::FilterSharedPtr read_filter) -> void {
+      .WillByDefault([&](Network::FilterSharedPtr read_filter) -> void {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
-      }));
+      });
   ON_CALL(read_filter_callbacks_->connection_, localCloseReason())
       .WillByDefault(Return(kLocalCloseReason));
 

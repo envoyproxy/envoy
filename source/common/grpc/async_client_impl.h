@@ -50,6 +50,7 @@ protected:
 private:
   const uint32_t max_recv_message_length_;
   const bool skip_envoy_headers_;
+  const std::optional<uint32_t> per_stream_buffer_limit_bytes_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
@@ -120,6 +121,7 @@ private:
 
   // Deliver notification and update span when the connection closes.
   void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+  bool checkWaitingToDeletedOnRemoteClose();
 
 protected:
   Event::Dispatcher* dispatcher_{};

@@ -24,12 +24,12 @@ SINGLETON_MANAGER_REGISTRATION(open_telemetry_access_logger_cache);
 SINGLETON_MANAGER_REGISTRATION(open_telemetry_http_access_logger_cache);
 
 std::shared_ptr<GrpcAccessLoggerCacheImpl>
-getGrpcAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context) {
+getGrpcAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<GrpcAccessLoggerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_access_logger_cache), [&context] {
         return std::make_shared<GrpcAccessLoggerCacheImpl>(
             context.clusterManager().grpcAsyncClientManager(), context.serverScope(),
-            context.threadLocal(), context.localInfo());
+            context.threadLocal(), context);
       });
 }
 

@@ -33,6 +33,9 @@ class SetFilterStateConfig : public Common::UnifiedFactoryBase<
 public:
   SetFilterStateConfig() : UnifiedFactoryBase("envoy.filters.http.set_filter_state") {}
 
+  static absl::StatusOr<StreamInfo::FilterState::LifeSpan> toFilterStateLifeSpan(
+      envoy::extensions::filters::http::set_filter_state::v3::Config::LifeSpan life_span);
+
 private:
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

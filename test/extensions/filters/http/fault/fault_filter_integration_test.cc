@@ -1,4 +1,7 @@
+#include "source/common/config/well_known_names.h"
+
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/tagged_stats_test_util.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
@@ -13,6 +16,25 @@ namespace {
 class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 public:
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat names,
+  // tag-extracted names and tags for the filter stats asserted below.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v4; }
+
+  void initialize() override {
+    // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+    // server in different modes.
+    Stats::TestUtil::setExplicitStatsTags(explicitTags());
+    HttpProtocolIntegrationTest::initialize();
+    Stats::TestUtil::verifyExplicitStatsTags(*test_server_, explicitTags());
+  }
+
+  // Checks a stat's flat name, the name it is tag-extracted to, and the tags attached to it.
+  void expectStat(const std::string& name, const std::string& tag_extracted_name,
+                  const std::vector<std::pair<std::string, std::string>>& tags) {
+    Stats::TestUtil::expectStatTags(*test_server_, name, tag_extracted_name, tags);
+  }
+
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();
@@ -105,10 +127,25 @@ typed_config:
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_dry_run")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+
+  // The filter's stats live in the connection manager's scope, so they carry its prefix in both
+  // their flat name and its tag.
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  expectStat("http.config_test.fault.aborts_dry_run", "http.fault.aborts_dry_run",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.aborts_injected", "http.fault.aborts_injected",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.delays_injected", "http.fault.delays_injected",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.response_rl_injected", "http.fault.response_rl_injected",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.active_faults", "http.fault.active_faults",
+             {{hcm_prefix, "config_test"}});
 }
 
 // Response rate limited with no trailers.
@@ -220,6 +257,13 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableDownstreamS
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.superman.aborts_injected")->value());
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
+
+  // The per-downstream-cluster stat drops the cluster segment from its tag-extracted name and
+  // carries the cluster as a tag, identically in both stats modes.
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  expectStat("http.config_test.fault.superman.aborts_injected", "http.fault.aborts_injected",
+             {{hcm_prefix, "config_test"},
+              {Config::TagNames::get().FAULT_DOWNSTREAM_CLUSTER, "superman"}});
 }
 
 // Request abort controlled via header configuration and disable downstream server stats.
@@ -391,6 +435,50 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+}
+
+// Request abort with dry_run enabled forwards the request upstream and records dry_run stats.
+TEST_P(FaultIntegrationTestAllProtocols, FaultAbortDryRunConfig) {
+  const std::string filter_config =
+      R"EOF(
+name: fault
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+  abort:
+    http_status: 429
+    dry_run: true
+    percentage:
+      numerator: 100
+)EOF";
+
+  initializeFilter(filter_config);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-downstream-service-cluster", "superman"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_dry_run")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.superman.aborts_dry_run")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.aborts_injected"));
+
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  expectStat("http.config_test.fault.superman.aborts_dry_run", "http.fault.aborts_dry_run",
+             {{hcm_prefix, "config_test"},
+              {Config::TagNames::get().FAULT_DOWNSTREAM_CLUSTER, "superman"}});
 }
 
 // Fault integration tests that run with HTTP/2 only, used for fully testing trailers.

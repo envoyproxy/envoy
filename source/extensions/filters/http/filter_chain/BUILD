@@ -17,6 +17,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         "//envoy/common:optref_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//envoy/init:manager_interface",
         "//envoy/registry",

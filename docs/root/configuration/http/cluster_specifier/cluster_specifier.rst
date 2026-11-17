@@ -10,3 +10,4 @@ HTTP cluster specifier
   golang
   lua
   matcher
+  priority_group

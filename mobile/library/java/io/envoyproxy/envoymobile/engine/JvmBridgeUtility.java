@@ -41,7 +41,7 @@ class JvmBridgeUtility {
     // Ensure list is present in dictionary value
     List<String> values = headerAccumulator.get(headerKey);
     if (values == null) {
-      values = new ArrayList(1);
+      values = new ArrayList<>(1);
       headerAccumulator.put(headerKey, values);
     }
     values.add(headerValue);

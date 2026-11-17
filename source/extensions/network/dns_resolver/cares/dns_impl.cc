@@ -23,7 +23,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "ares.h"
 
@@ -228,6 +227,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     parent_.chargeGetAddrInfoErrorStats(status, timeouts);
 
     if (!isResponseWithNoRecords(status)) {
+      // A family deliberately skipped by filter_unroutable_families is not a DNS failure.
+      if (status != ARES_EBADFAMILY) {
+        had_resolution_failure_ = true;
+      }
       ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                       "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
                       status, ares_strerror(status));
@@ -361,6 +364,12 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
+  if (had_resolution_failure_ && pending_response_.address_list_.empty() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.cares_dual_resolution_preserve_failure")) {
+    pending_response_.status_ = ResolutionStatus::Failure;
+  }
+
   ENVOY_LOG_EVENT(trace, "cares_dns_resolution_complete",
                   "dns resolution for {} completed with status {:#06x}: \"{}\"", dns_name_,
                   static_cast<int>(pending_response_.status_), pending_response_.details_);
@@ -681,18 +690,6 @@ public:
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
     RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
-    std::size_t key = 0;
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.shared_cares_dns_resolver")) {
-      key = MessageUtil::hash(cares);
-      const auto it = resolver_map_.find(key);
-      if (it != resolver_map_.end()) {
-        auto resolver = it->second.lock();
-        if (resolver) {
-          ENVOY_LOG(trace, "found existing resolvers: {}", key);
-          return resolver;
-        }
-      }
-    }
 
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
@@ -706,24 +703,8 @@ public:
     auto csv_or_error = DnsResolverImpl::maybeBuildResolversCsv(resolvers);
     RETURN_IF_NOT_OK(csv_or_error.status());
 
-    auto resolver = std::make_shared<Network::DnsResolverImpl>(
-        cares, dispatcher, csv_or_error.value(), api.rootScope());
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.shared_cares_dns_resolver")) {
-      // clean up any nil resolver in the map so it doesn't keep growing
-      auto original_size = resolver_map_.size();
-      absl::erase_if(
-          resolver_map_,
-          [](const std::pair<const std::size_t, std::weak_ptr<Network::DnsResolver>>& entry) {
-            return entry.second.lock() == nullptr;
-          });
-      if (resolver_map_.size() < original_size) {
-        ENVOY_LOG(trace, "cleaned up {} entries in resolver_map_",
-                  original_size - resolver_map_.size());
-      }
-      resolver_map_[key] = resolver;
-      ENVOY_LOG(trace, "resolver_map_ size after adding: {}", resolver_map_.size());
-    }
-    return resolver;
+    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, csv_or_error.value(),
+                                                      api.rootScope());
   }
 
   void initialize() override {
@@ -748,7 +729,6 @@ public:
 private:
   bool ares_library_initialized_ ABSL_GUARDED_BY(mutex_){false};
   absl::Mutex mutex_;
-  mutable absl::flat_hash_map<std::size_t, std::weak_ptr<Network::DnsResolver>> resolver_map_;
 };
 
 // Register the CaresDnsResolverFactory

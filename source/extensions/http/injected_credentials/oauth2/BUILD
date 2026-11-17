@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = ["token_provider.h"],
     deps = [
         ":oauth_client",
+        "//source/common/common:empty_string",
         "//source/extensions/http/injected_credentials/common:credential_interface",
         "//source/extensions/http/injected_credentials/common:secret_reader_lib",
         "@envoy_api//envoy/extensions/http/injected_credentials/oauth2/v3:pkg_cc_proto",
@@ -59,6 +60,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/injected_credentials/oauth2/v3:pkg_cc_proto",
     ],
 )
 

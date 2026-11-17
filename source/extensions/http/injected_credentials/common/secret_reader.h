@@ -19,14 +19,16 @@ using SecretReaderConstSharedPtr = std::shared_ptr<const SecretReader>;
 class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr secret_provider,
-                  ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : credential_(THROW_OR_RETURN_VALUE(
-            Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
-            std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+                  ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                  Event::Dispatcher& main_dispatcher)
+      : credential_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(secret_provider), tls, api, main_dispatcher),
+                                  Secret::ThreadLocalGenericSecretProviderPtr)) {}
   const std::string& credential() const override { return credential_->secret(); }
 
 private:
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> credential_;
+  Secret::ThreadLocalGenericSecretProviderPtr credential_;
 };
 
 } // namespace Common

@@ -64,6 +64,7 @@ using CgroupDetectorSingleton = ThreadSafeSingleton<CgroupDetectorImpl>;
  */
 struct CgroupMount {
   std::string mount_point;
+  std::string root;
   std::string filesystem_type;
   std::string mount_options;
   bool has_cpu_controller = false;
@@ -116,6 +117,15 @@ public:
   static std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs,
                                              CgroupDetectionDiagnostic* diag = nullptr);
 
+  /**
+   * Resolves the calling process's own `cgroup` directory by combining the `cgroup` mount from
+   * `/proc/self/mountinfo` with the path from `/proc/self/cgroup`. The mount point alone is the
+   * `cgroup` root when the process shares the host `cgroup` namespace.
+   * @param fs Filesystem instance for file operations.
+   * @return CgroupInfo with the directory and version, nullopt if it cannot be determined.
+   */
+  static std::optional<CgroupInfo> getCurrentCgroupInfo(Filesystem::Instance& fs);
+
 private:
   /**
    * Reads CPU limit from specific `cgroup` `v1` paths.
@@ -145,14 +155,14 @@ private:
    * Discovers cgroup filesystem mounts by parsing `/proc/self/mountinfo`.
    * Priority handling: `cgroup` `v1` with CPU controller wins over `cgroup` `v2`.
    * @param fs Filesystem instance.
-   * @return Mount point string on success, nullopt if no suitable `cgroup` found.
+   * @return Cgroup mount metadata on success, nullopt if no suitable `cgroup` found.
    */
-  static std::optional<std::string> discoverCgroupMount(Filesystem::Instance& fs);
+  static std::optional<CgroupMount> discoverCgroupMount(Filesystem::Instance& fs);
 
   /**
    * Parses a single line from `/proc/self/mountinfo` to extract cgroup mount point.
    * Format: `mountID parentID major:minor root mountPoint options - fsType source superOptions`
-   * We extract field 5 (mount point) for `cgroup`/`cgroup2` filesystem only.
+   * This helper extracts field 5 (mount point) for `cgroup`/`cgroup2` file systems.
    * @param line Single line from `/proc/self/mountinfo`
    * @return Mount point string if line contains `cgroup` filesystem, nullopt if not a `cgroup`
    * line.
@@ -169,15 +179,15 @@ private:
   static std::string unescapePath(absl::string_view path);
 
   /**
-   * Constructs complete `cgroup` path by combining mount point and process assignment.
-   * Logic: Use provided mount point (already discovered)
+   * Constructs complete `cgroup` path by combining mount metadata and process assignment.
+   * Logic: Use the cgroup path relative to the mount root and append it to the mount point.
    *        Call process assignment → Get relative path
    *        Combine mount point and relative path
-   * @param mount_point The `cgroup` mount point (from discoverCgroupMount).
+   * @param mount The `cgroup` mount metadata (from discoverCgroupMount).
    * @param fs Filesystem instance.
    * @return CgroupInfo with combined path + final version, nullopt if not found.
    */
-  static std::optional<CgroupInfo> constructCgroupPath(const std::string& mount_point,
+  static std::optional<CgroupInfo> constructCgroupPath(const CgroupMount& mount,
                                                        Filesystem::Instance& fs);
 
   /**
@@ -269,8 +279,13 @@ public:
     return CgroupCpuUtil::getCurrentCgroupPath(fs);
   }
 
-  static std::optional<std::string> discoverCgroupMount(Filesystem::Instance& fs) {
+  static std::optional<CgroupMount> discoverCgroupMount(Filesystem::Instance& fs) {
     return CgroupCpuUtil::discoverCgroupMount(fs);
+  }
+
+  static std::optional<CgroupInfo> constructCgroupPath(const CgroupMount& mount,
+                                                       Filesystem::Instance& fs) {
+    return CgroupCpuUtil::constructCgroupPath(mount, fs);
   }
 
   static std::optional<std::string> parseMountInfoLine(const std::string& line) {

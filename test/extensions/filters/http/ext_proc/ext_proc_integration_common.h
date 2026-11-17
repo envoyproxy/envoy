@@ -166,6 +166,12 @@ protected:
   void
   processResponseBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
                              std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
+  // Answers STREAMED response body messages on the open processor stream until one carries
+  // end_of_stream, replacing the first chunk with `body` and emptying any later ones. An HTTP/1
+  // upstream delivers the body and the end of stream as separate frames, which reach the
+  // processor in one message or two depending on whether they arrive before the response
+  // headers reply.
+  void processStreamedResponseBodyAs(absl::string_view body);
   void processResponseTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
       std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
@@ -205,6 +211,9 @@ protected:
   void testSendDynamicMetadata();
   void testSendTypedDynamicMetadata();
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control);
+  void performStandAloneModeOverrideNormal(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode,
+      bool delay_header_response = false);
   void initializeConfigDuplexStreamed(bool both_direction = false);
 
   IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
@@ -251,6 +260,7 @@ protected:
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
   bool two_ext_proc_filters_ = false;
+  bool per_try_timeout_enabled_ = false;
 };
 
 } // namespace ExternalProcessing

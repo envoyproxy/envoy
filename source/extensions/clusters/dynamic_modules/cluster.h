@@ -8,23 +8,23 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/stats/utility.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -36,6 +36,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
+
+class PersistentHostSet;
 
 class DynamicModuleCluster;
 class DynamicModuleClusterScheduler;
@@ -78,11 +80,14 @@ public:
    * @param cluster_config the configuration bytes to pass to the module.
    * @param module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
+   * @param persistent_host_partitions_allowed whether the module may opt the cluster into
+   * persistent host partitions, which requires lb_policy CLUSTER_PROVIDED.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
-         Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope);
+         Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+         bool persistent_host_partitions_allowed);
 
   ~DynamicModuleClusterConfig();
 
@@ -109,206 +114,36 @@ public:
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
 
+  // Whether the cluster's host sets are PersistentHostSet. Set by the module during
+  // on_cluster_config_new or from ClusterConfig.
+  bool use_persistent_host_partitions_ = false;
+  // Whether the module may set use_persistent_host_partitions_, which requires CLUSTER_PROVIDED.
+  const bool persistent_host_partitions_allowed_;
+  // Set when the module asked for persistent host partitions and was refused.
+  bool persistent_host_partitions_refused_ = false;
+
   // ----------------------------- Metrics Support -----------------------------
-
-  class ModuleCounterHandle {
-  public:
-    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
-    void add(uint64_t value) const { counter_.add(value); }
-
-  private:
-    Stats::Counter& counter_;
-  };
-
-  class ModuleCounterVecHandle {
-  public:
-    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
-        : name_(name), label_names_(label_names) {}
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
-    }
-    // Resolves one label-value tuple to its child counter. The reference is stable for the life of
-    // the scope, so a module holds it and skips the per-call name build that `add` pays.
-    Stats::Counter& resolve(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags) const {
-      ASSERT(tags.has_value());
-      return Stats::Utility::counterFromElements(scope, {name_}, tags);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-  };
-
-  class ModuleGaugeHandle {
-  public:
-    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-    void add(uint64_t value) const { gauge_.add(value); }
-    void sub(uint64_t value) const { gauge_.sub(value); }
-    void set(uint64_t value) const { gauge_.set(value); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
-  class ModuleGaugeVecHandle {
-  public:
-    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                         Stats::Gauge::ImportMode import_mode)
-        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
-    }
-    void sub(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
-    }
-    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
-    }
-    // See ModuleCounterVecHandle::resolve.
-    Stats::Gauge& resolve(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags) const {
-      ASSERT(tags.has_value());
-      return Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Gauge::ImportMode import_mode_;
-  };
-
-  class ModuleHistogramHandle {
-  public:
-    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
-    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
-
-  private:
-    Stats::Histogram& histogram_;
-  };
-
-  class ModuleHistogramVecHandle {
-  public:
-    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
-                             Stats::Histogram::Unit unit)
-        : name_(name), label_names_(label_names), unit_(unit) {}
-    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
-    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t value) const {
-      ASSERT(tags.has_value());
-      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
-    }
-    // See ModuleCounterVecHandle::resolve.
-    Stats::Histogram& resolve(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags) const {
-      ASSERT(tags.has_value());
-      return Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags);
-    }
-
-  private:
-    Stats::StatName name_;
-    Stats::StatNameVec label_names_;
-    Stats::Histogram::Unit unit_;
-  };
-
-// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
-// for our internal storage. These helper functions do that conversion.
-#define ID_TO_INDEX(id) ((id) - 1)
-
-  size_t addCounter(ModuleCounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-  size_t addCounterVec(ModuleCounterVecHandle&& counter) {
-    counter_vecs_.push_back(std::move(counter));
-    return counter_vecs_.size();
-  }
-
-  size_t addGauge(ModuleGaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge) {
-    gauge_vecs_.push_back(std::move(gauge));
-    return gauge_vecs_.size();
-  }
-
-  size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    histograms_.push_back(std::move(histogram));
-    return histograms_.size();
-  }
-  size_t addHistogramVec(ModuleHistogramVecHandle&& histogram) {
-    histogram_vecs_.push_back(std::move(histogram));
-    return histogram_vecs_.size();
-  }
-
-  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id == 0 || id > counters_.size()) {
-      return {};
-    }
-    return counters_[ID_TO_INDEX(id)];
-  }
-  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id == 0 || id > counter_vecs_.size()) {
-      return {};
-    }
-    return counter_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id == 0 || id > gauges_.size()) {
-      return {};
-    }
-    return gauges_[ID_TO_INDEX(id)];
-  }
-  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id == 0 || id > gauge_vecs_.size()) {
-      return {};
-    }
-    return gauge_vecs_[ID_TO_INDEX(id)];
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id == 0 || id > histograms_.size()) {
-      return {};
-    }
-    return histograms_[ID_TO_INDEX(id)];
-  }
-  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id == 0 || id > histogram_vecs_.size()) {
-      return {};
-    }
-    return histogram_vecs_[ID_TO_INDEX(id)];
-  }
-
-#undef ID_TO_INDEX
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
+  const Extensions::DynamicModules::MetricRegistry& metrics() const { return metrics_; }
 
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // We only allow the module to create stats during on_cluster_config_new, and not later from
-  // worker threads, so that we don't have to wrap stat_name_pool_ in a lock. Per-request label
-  // values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
+  // worker threads, so that we don't have to wrap the metrics registry pool in a lock. Per-request
+  // label values use a stack-local Stats::StatNameDynamicPool in the increment callbacks (see
   // abi_impl.cc).
   bool stat_creation_frozen_ = false;
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
                              Envoy::Extensions::DynamicModules::DynamicModulePtr module,
-                             Stats::Scope& stats_scope);
+                             Stats::Scope& stats_scope, bool persistent_host_partitions_allowed);
 
   const std::string cluster_name_;
   const std::string cluster_config_;
   Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
-
-  std::vector<ModuleCounterHandle> counters_;
-  std::vector<ModuleCounterVecHandle> counter_vecs_;
-  std::vector<ModuleGaugeHandle> gauges_;
-  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
-  std::vector<ModuleHistogramHandle> histograms_;
-  std::vector<ModuleHistogramVecHandle> histogram_vecs_;
 };
 
 using DynamicModuleClusterConfigSharedPtr = std::shared_ptr<DynamicModuleClusterConfig>;
@@ -339,6 +174,7 @@ using DynamicModuleClusterHandleSharedPtr = std::shared_ptr<DynamicModuleCluster
  * The module manages hosts via add/remove callbacks and provides its own load balancer.
  */
 class DynamicModuleCluster : public Upstream::ClusterImplBase,
+                             public Event::DispatcherThreadDeletable,
                              public std::enable_shared_from_this<DynamicModuleCluster> {
 public:
   ~DynamicModuleCluster() override;
@@ -347,6 +183,7 @@ public:
   Upstream::Cluster::InitializePhase initializePhase() const override {
     return Upstream::Cluster::InitializePhase::Primary;
   }
+  void initialize(std::function<absl::Status()> callback) override;
 
   // Methods called by the dynamic module via ABI callbacks.
   bool addHosts(
@@ -367,6 +204,7 @@ public:
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
+  void usePersistentHostMap();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
@@ -421,12 +259,36 @@ protected:
 
   // Upstream::ClusterImplBase.
   void startPreInit() override;
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
 private:
+  /**
+   * Creates the in-module cluster. The factory calls this once a shared_ptr owns the cluster so
+   * that schedulers and callouts created in on_cluster_new can reach it.
+   */
+  absl::Status initializeInModuleCluster();
+
   /**
    * Registers server lifecycle callbacks (server_initialized, drain, shutdown).
    */
   void registerLifecycleCallbacks();
+
+  /**
+   * Finishes the pre-init phase unless the cluster manager released this cluster.
+   */
+  void completePreInit();
+
+  // The PersistentHostSet at `priority`, created if missing. Only valid with persistent partitions.
+  PersistentHostSet& persistentHostSet(uint32_t priority);
+  // Whether the host sets are PersistentHostSet. The factory is fixed once a host set exists.
+  bool usesPersistentHostSets() const;
+  // Hands `snapshot`, returned by a PersistentHostSet change, to the priority set with its delta.
+  void updateHostsFromSnapshot(uint32_t priority, Upstream::HostSetSnapshotConstSharedPtr snapshot,
+                               const Upstream::HostVector& hosts_added,
+                               const Upstream::HostVector& hosts_removed);
+  // Re-partitions `host` in its persistent host set. Returns false, changing nothing, if the
+  // cluster has no persistent host sets or the set does not hold `host`.
+  bool applyPersistentHealthChange(const Upstream::HostSharedPtr& host);
 
   friend class DynamicModuleClusterFactory;
   friend class DynamicModuleClusterScheduler;
@@ -439,8 +301,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleCluster> cluster, uint64_t id)
-        : cluster_(std::move(cluster)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleCluster& cluster, uint64_t id)
+        : cluster_(cluster), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -453,7 +315,9 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    const std::shared_ptr<DynamicModuleCluster> cluster_;
+    // Not owning, so that a callout in flight does not keep a released cluster alive. The cluster
+    // cancels its callouts when it is destroyed.
+    DynamicModuleCluster& cluster_;
     const uint64_t callout_id_{};
   };
 
@@ -507,10 +371,19 @@ private:
 
   // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
   ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
+  // The worker events that on_cluster_new requested, posted once it returns.
+  std::vector<uint64_t> worker_event_ids_from_on_cluster_new_;
 
   // HTTP callout tracking.
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
   absl::flat_hash_map<uint64_t, std::unique_ptr<HttpCalloutCallback>> http_callouts_;
+
+  // Whether on_cluster_init has returned.
+  bool on_cluster_init_returned_ = false;
+  // Whether the module called pre_init_complete before on_cluster_init returned.
+  bool pre_init_complete_pending_ = false;
+  // Set once the cluster manager released this cluster.
+  bool released_ = false;
 };
 
 /**
@@ -660,6 +533,23 @@ private:
 };
 
 /**
+ * Bounds the lifetime of the filter state views returned by the cluster load balancer callbacks.
+ * The serialized values are cleared when the outermost host selection callback returns so a module
+ * can hold several views during a single callback. The backing storage lives in abi_impl.cc.
+ */
+class ClusterLbFilterStateScratchGuard {
+public:
+  ClusterLbFilterStateScratchGuard();
+  ~ClusterLbFilterStateScratchGuard();
+  ClusterLbFilterStateScratchGuard(const ClusterLbFilterStateScratchGuard&) = delete;
+  ClusterLbFilterStateScratchGuard& operator=(const ClusterLbFilterStateScratchGuard&) = delete;
+};
+
+// Returns the number of retained cluster load balancer filter state values on this thread. Test
+// only.
+size_t clusterLbFilterStateScratchSizeForTest();
+
+/**
  * Load balancer that delegates to the dynamic module.
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
@@ -725,6 +615,10 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Hosts whose health changed since the previous update this worker applied, or nullptr outside
+  // the callback or when unknown (a priority without persistent partitions, or a health refresh).
+  const Upstream::HostVector* healthChangedHosts();
+
   // Returns the priority set that this load balancer subscribes to for host membership updates.
   const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
 
@@ -763,6 +657,12 @@ private:
 
   // Membership update callback handle.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+  // Records the priorities each membership update touched, which fire before the member callback.
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
+  std::vector<uint32_t> updated_priorities_;
+  // Built on the first healthChangedHosts() call of a membership update callback.
+  std::optional<Upstream::HostVector> health_changed_hosts_;
+  bool health_changed_hosts_known_{false};
 
   friend class DynamicModuleClusterTestPeer;
 };

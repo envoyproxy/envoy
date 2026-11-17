@@ -28,7 +28,10 @@ absl::Status statusAfterFileError(int code) {
   case ETXTBSY:
   case EWOULDBLOCK:
     return absl::FailedPreconditionError(str);
+// `EDQUOT` (disk quota exceeded) is not defined by the Windows CRT.
+#ifdef EDQUOT
   case EDQUOT:
+#endif
   case EMFILE:
   case ENFILE:
   case ENOMEM:

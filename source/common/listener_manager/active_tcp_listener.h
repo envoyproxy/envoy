@@ -101,8 +101,11 @@ public:
   // when rebalancing. The accepted socket can't be used to get the listening address, since
   // the accepted socket's remote address can be another address than the listening address.
   Network::Address::InstanceConstSharedPtr listen_address_;
+  // This worker's own overload state handle, used to rebind accepted sockets in
+  // onAcceptWorker() (see exact_balance handoff via post()).
+  ThreadLocalOverloadStateOptRef overload_state_;
 };
 
-using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
+using ActiveTcpListenerOptRef = OptRef<ActiveTcpListener>;
 } // namespace Server
 } // namespace Envoy

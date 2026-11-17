@@ -25,10 +25,9 @@ std::string IAMRolesAnywhereSigV4Signer::createStringToSign(
     const X509Credentials& x509_credentials, const absl::string_view canonical_request,
     const absl::string_view long_date, const absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  return fmt::format(
-      IAMRolesAnywhereSigV4SignatureConstants::SigV4StringToSignFormat,
-      getAlgorithmName(x509_credentials), long_date, credential_scope,
-      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  return fmt::format(IAMRolesAnywhereSigV4SignatureConstants::SigV4StringToSignFormat,
+                     getAlgorithmName(x509_credentials), long_date, credential_scope,
+                     Hex::encode(crypto_util.getSha256Digest(canonical_request)));
 }
 
 absl::StatusOr<std::string>

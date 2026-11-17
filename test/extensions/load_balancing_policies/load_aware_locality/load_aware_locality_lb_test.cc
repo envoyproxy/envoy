@@ -17,6 +17,7 @@
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -185,7 +186,7 @@ private:
 
 uint64_t counterValue(NiceMock<Upstream::MockClusterInfo>& info, const std::string& name) {
   auto c = info.stats_store_.findCounterByString(name);
-  return c.has_value() ? c->get().value() : 0;
+  return c.has_value() ? c->value() : 0;
 }
 
 class LoadAwareLocalityLbTest : public Event::TestUsingSimulatedTime, public testing::Test {
@@ -197,8 +198,6 @@ protected:
   };
 
   void SetUp() override {
-    // Tests run from the simulated-time epoch (monotonic 0): "never reported" is tracked by an
-    // out-of-band sentinel, so a report stored at time 0 is a valid sample.
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(random_, random()).WillByDefault([this]() -> uint64_t {
       if (forced_random_index_ < forced_random_values_.size()) {
@@ -216,7 +215,8 @@ protected:
 
   void createLb(double variance_threshold = 0.1, double ewma_alpha = 1.0,
                 double remote_probe_fraction = 0.0,
-                std::chrono::milliseconds weight_expiration_period = std::chrono::milliseconds(0)) {
+                std::chrono::milliseconds weight_expiration_period = std::chrono::milliseconds(0),
+                TimeSource* time_source = nullptr) {
     auto weight_update_period = std::chrono::milliseconds(1000);
 
     envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin;
@@ -238,13 +238,14 @@ protected:
     auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
         round_robin_factory, std::move(round_robin_lb_config), weight_update_period,
         variance_threshold, ewma_alpha, remote_probe_fraction, weight_expiration_period,
-        std::vector<std::string>{}, dispatcher_, context_.thread_local_);
+        std::vector<std::string>{}, false, Common::OrcaOobManagerConfig{}, dispatcher_,
+        context_.thread_local_);
 
     timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     thread_aware_lb_ = std::make_unique<LoadAwareLocalityLoadBalancer>(
         *lb_config, cluster_info_, priority_set_, context_.runtime_loader_, random_,
-        context_.time_system_);
+        time_source != nullptr ? *time_source : context_.time_system_);
 
     ASSERT_TRUE(thread_aware_lb_->initialize().ok());
     factory_ = thread_aware_lb_->factory();
@@ -315,12 +316,13 @@ protected:
   }
 
   std::pair<Upstream::HostSharedPtr, Upstream::HostSharedPtr>
-  setupTwoLocalityLb(std::chrono::milliseconds weight_expiration_period, bool has_local = false) {
+  setupTwoLocalityLb(std::chrono::milliseconds weight_expiration_period, bool has_local = false,
+                     TimeSource* time_source = nullptr) {
     auto h1 = makeWeightTrackingMockHost();
     auto h2 = makeWeightTrackingMockHost();
     setupLocalities({{h1}, {h2}}, has_local);
     createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*remote_probe_fraction=*/0.0,
-             weight_expiration_period);
+             weight_expiration_period, time_source);
     return {h1, h2};
   }
 
@@ -767,18 +769,17 @@ TEST_F(LoadAwareLocalityLbTest, WeightExpirationDisabledUsesStaleData) {
   expectWeights(PriorityRoutingWeights::SelectionSource::Healthy, {0.1, 0.9});
 }
 
-// Regression: a report stored at monotonic time 0 (the simulated-time epoch) is a valid sample —
+// Regression: a report stored at monotonic time 0 is a valid sample —
 // "never reported" is tracked by an out-of-band sentinel, not timestamp 0.
 TEST_F(LoadAwareLocalityLbTest, ReportAtMonotonicTimeZeroIsValid) {
-  auto [h1, h2] = setupTwoLocalityLb(std::chrono::milliseconds(5000));
-
-  ASSERT_EQ(0, std::chrono::duration_cast<std::chrono::milliseconds>(
-                   simTime().monotonicTime().time_since_epoch())
-                   .count());
+  NiceMock<MockTimeSystem> time_source;
+  ON_CALL(time_source, monotonicTime()).WillByDefault(Return(MonotonicTime{}));
+  auto [h1, h2] = setupTwoLocalityLb(std::chrono::milliseconds(5000), false, &time_source);
   setHostUtilization(h1, 0.9);
   setHostUtilization(h2, 0.1);
   recomputeWeights();
   expectWeights(PriorityRoutingWeights::SelectionSource::Healthy, {0.1, 0.9});
+  thread_aware_lb_.reset();
 }
 
 TEST_F(LoadAwareLocalityLbTest, StaleRemoteCarriesPriorNotZero) {
@@ -1532,8 +1533,8 @@ TEST_F(LoadAwareLocalityLbTest, InitializePropagatesChildFactoryError) {
 
   auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
       null_child_factory, nullptr, std::chrono::milliseconds(1000), 0.1, 0.3, 0.03,
-      std::chrono::milliseconds(180000), std::vector<std::string>{}, dispatcher_,
-      context_.thread_local_);
+      std::chrono::milliseconds(180000), std::vector<std::string>{}, false,
+      Common::OrcaOobManagerConfig{}, dispatcher_, context_.thread_local_);
 
   LoadAwareLocalityLoadBalancer lb(*lb_config, cluster_info_, priority_set_,
                                    context_.runtime_loader_, random_, context_.time_system_);

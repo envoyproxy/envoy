@@ -13,6 +13,7 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/config/well_known_names.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
@@ -21,6 +22,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/tagged_stats_test_util.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/status_utility.h"
@@ -49,6 +51,7 @@ struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
+  bool read_raw_header_value = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
@@ -61,6 +64,8 @@ struct GrpcInitializeConfigOpts {
   bool enforce_response_header_limits = false;
   uint32_t status_on_error_code = 0;
   bool shadow_mode = false;
+  // When set, the filter's stats carry it as an extra name segment and tag.
+  std::string stat_prefix;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -73,6 +78,26 @@ struct WaitForSuccessfulUpstreamResponseOpts {
   bool failure_mode_allowed_header = false;
 };
 
+namespace {
+
+void cleanupExtAuthzConnection(FakeHttpConnectionPtr& connection) {
+  if (connection == nullptr) {
+    return;
+  }
+
+  AssertionResult result = connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  // The disconnect notification can run inside another fake-upstream event callback. Wait for
+  // that callback to unwind before destroying the connection wrapper it may still reference.
+  result = connection->waitForDispatcherBarrier();
+  RELEASE_ASSERT(result, result.message());
+  connection.reset();
+}
+
+} // namespace
+
 class ExtAuthzGrpcIntegrationTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
@@ -82,6 +107,22 @@ class ExtAuthzGrpcIntegrationTest
 public:
   ExtAuthzGrpcIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ExtAuthzGrpcIntegrationTest::ipVersion()) {}
+
+  // The stat names, tag-extracted names and tags asserted below must be the same whether or not
+  // the HTTP filters are created with the connection manager's prefixed scope, and whether tags
+  // are derived with the explicit-tags logic or extracted from the flat names with the legacy
+  // regexes. Exercise both modes of the two guards without doubling the test matrix: the v4 tests
+  // run the server with the new behavior and the v6 tests with the legacy one.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    Stats::TestUtil::setExplicitStatsTags(prefixedScope());
+    HttpIntegrationTest::initialize();
+    Stats::TestUtil::verifyExplicitStatsTags(*test_server_, prefixedScope());
+  }
 
   static std::string testParamsToString(
       const ::testing::TestParamInfo<
@@ -119,6 +160,9 @@ public:
       ConfigHelper::setHttp2(*ext_authz_cluster);
 
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
+      if (!opts.stat_prefix.empty()) {
+        proto_config_.set_stat_prefix(opts.stat_prefix);
+      }
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
 
@@ -150,6 +194,7 @@ public:
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+      proto_config_.set_read_raw_header_value(opts.read_raw_header_value);
       proto_config_.set_max_denied_response_body_bytes(opts.max_denied_response_body_bytes);
 
       if (emitFilterStateStats()) {
@@ -615,10 +660,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -682,6 +724,11 @@ attributes:
     };
     waitForSuccessfulUpstreamResponse("200", opts);
 
+    // The filter creates its stats in the connection manager's scope, so they carry its stat
+    // prefix. The per-cluster stats asserted elsewhere in this file live in the cluster's scope
+    // instead and are not prefixed by it.
+    test_server_->waitForCounter("http.config_test.ext_authz.ok", Eq(1));
+
     cleanup();
   }
 
@@ -699,6 +746,99 @@ attributes:
     if (!deny_at_disable) {
       waitForSuccessfulUpstreamResponse(expected_status);
     }
+    test_server_->waitForCounter("http.config_test.ext_authz.disabled", Eq(1));
+    cleanup();
+  }
+
+  // Runs an OK authorization response that sets x-route-key and asserts which route the request
+  // resolves to. The route table has a route that only matches when x-route-key is present, so the
+  // resolved route is observable through the request header it adds to the upstream request. The
+  // keyed route is only reached when the route cache is cleared after the header mutation.
+  void runClearRouteCacheHeadersScenario(const std::vector<std::string>& clear_route_cache_headers,
+                                         const std::string& expected_route_selection) {
+    config_helper_.addConfigModifier([this, clear_route_cache_headers](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ext_authz_cluster->set_name("ext_authz_cluster");
+      ConfigHelper::setHttp2(*ext_authz_cluster);
+
+      envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+      setGrpcService(*ext_authz_config.mutable_grpc_service(), "ext_authz_cluster",
+                     fake_upstreams_.back()->localAddress());
+      ext_authz_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      ext_authz_config.set_clear_route_cache(true);
+      for (const auto& header : clear_route_cache_headers) {
+        ext_authz_config.add_clear_route_cache_headers(header);
+      }
+
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+      ext_authz_filter.set_name(ExtAuthzFilterName);
+      std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(ext_authz_config);
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+    });
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          virtual_host->clear_routes();
+
+          auto* keyed_route = virtual_host->add_routes();
+          keyed_route->mutable_match()->set_prefix("/");
+          auto* header_matcher = keyed_route->mutable_match()->add_headers();
+          header_matcher->set_name("x-route-key");
+          header_matcher->mutable_string_match()->set_exact("cleared");
+          keyed_route->mutable_route()->set_cluster("cluster_0");
+          auto* keyed_header = keyed_route->add_request_headers_to_add()->mutable_header();
+          keyed_header->set_key("x-route-selected");
+          keyed_header->set_value("by-key");
+
+          auto* default_route = virtual_host->add_routes();
+          default_route->mutable_match()->set_prefix("/");
+          default_route->mutable_route()->set_cluster("cluster_0");
+          auto* default_header = default_route->add_request_headers_to_add()->mutable_header();
+          default_header->set_key("x-route-selected");
+          default_header->set_value("default");
+        });
+
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    HttpIntegrationTest::initialize();
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+
+    AssertionResult result =
+        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+    RELEASE_ASSERT(result, result.message());
+    envoy::service::auth::v3::CheckRequest check_request;
+    result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+    RELEASE_ASSERT(result, result.message());
+
+    ext_authz_request_->startGrpcStream();
+    envoy::service::auth::v3::CheckResponse check_response;
+    check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+    auto* mutation = check_response.mutable_ok_response()->mutable_headers()->Add();
+    mutation->mutable_append()->set_value(false);
+    mutation->mutable_header()->set_key("x-route-key");
+    mutation->mutable_header()->set_value("cleared");
+    ext_authz_request_->sendGrpcMessage(check_response);
+    ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+    waitForNextUpstreamRequest();
+    // The mutation is always applied and only the route decision differs between scenarios.
+    EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-route-key", "cleared"));
+    EXPECT_THAT(upstream_request_->headers(),
+                ContainsHeader("x-route-selected", expected_route_selection));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ("200", response_->headers().getStatusValue());
+
     cleanup();
   }
 
@@ -740,6 +880,22 @@ class ExtAuthzHttpIntegrationTest
 public:
   ExtAuthzHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  // The stat names, tag-extracted names and tags asserted below must be the same whether or not
+  // the HTTP filters are created with the connection manager's prefixed scope, and whether tags
+  // are derived with the explicit-tags logic or extracted from the flat names with the legacy
+  // regexes. Exercise both modes of the two guards without doubling the test matrix: the v4 tests
+  // run the server with the new behavior and the v6 tests with the legacy one.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    Stats::TestUtil::setExplicitStatsTags(prefixedScope());
+    HttpIntegrationTest::initialize();
+    Stats::TestUtil::verifyExplicitStatsTags(*test_server_, prefixedScope());
+  }
 
   static std::string testParamsToString(
       const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
@@ -851,12 +1007,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -1056,8 +1207,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, PerRouteGrpcServiceConfigurationParsing) {
 
   // Verify the configuration was parsed correctly
   ASSERT_TRUE(config_per_route.grpcService().has_value());
-  EXPECT_TRUE(config_per_route.grpcService().value().has_envoy_grpc());
-  EXPECT_EQ(config_per_route.grpcService().value().envoy_grpc().cluster_name(),
+  EXPECT_TRUE(config_per_route.grpcService()->config().has_envoy_grpc());
+  EXPECT_EQ(config_per_route.grpcService()->config().envoy_grpc().cluster_name(),
             "per_route_cluster");
 
   // Verify context extensions are present
@@ -1474,6 +1625,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   upstream_opts.failure_mode_allowed_header = true;
   waitForSuccessfulUpstreamResponse("200", upstream_opts);
 
+  test_server_->waitForCounter("http.config_test.ext_authz.error", Eq(1));
+  test_server_->waitForCounter("http.config_test.ext_authz.failure_mode_allowed", Eq(1));
+
   cleanup();
 }
 
@@ -1541,6 +1695,55 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
                                                  {"downstream2", "downstream-should-see-me"},
                                                  {"replaceable", "by-ext-authz"}},
                  expected_body);
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, FilterStatsAreTagged) {
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {});
+  waitForSuccessfulUpstreamResponse("200");
+  test_server_->waitForCounter("http.config_test.ext_authz.ok", Eq(1));
+
+  // The filter's own stats live in the connection manager's scope and carry its prefix as a tag;
+  // the stats charged to the upstream cluster carry the cluster's name instead.
+  Stats::TestUtil::expectStatTags(
+      *test_server_, "http.config_test.ext_authz.ok", "http.ext_authz.ok",
+      {{Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, "config_test"}});
+  Stats::TestUtil::expectStatTags(*test_server_, "cluster.cluster_0.ext_authz.ok",
+                                  "cluster.ext_authz.ok",
+                                  {{Config::TagNames::get().CLUSTER_NAME, "cluster_0"}});
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, FilterStatsWithStatPrefixAreTagged) {
+  GrpcInitializeConfigOpts opts;
+  opts.stat_prefix = "waf";
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {});
+  waitForSuccessfulUpstreamResponse("200");
+  test_server_->waitForCounter("http.config_test.ext_authz.waf.ok", Eq(1));
+
+  // The filter's optional stat prefix stays a segment of the flat names and is a tag of its own.
+  Stats::TestUtil::expectStatTags(
+      *test_server_, "http.config_test.ext_authz.waf.ok", "http.ext_authz.ok",
+      {{Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, "config_test"},
+       {Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf"}});
+  Stats::TestUtil::expectStatTags(*test_server_, "cluster.cluster_0.ext_authz.waf.ok",
+                                  "cluster.ext_authz.ok",
+                                  {{Config::TagNames::get().CLUSTER_NAME, "cluster_0"},
+                                   {Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf"}});
+
   cleanup();
 }
 
@@ -1871,6 +2074,8 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseHeadersForwarding) {
 
   // Verify the body is forwarded.
   EXPECT_EQ("Found", response_->body());
+
+  test_server_->waitForCounter("http.config_test.ext_authz.denied", Eq(1));
 
   cleanup();
 }
@@ -2606,12 +2811,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -3412,6 +3612,18 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
   }
 }
 
+// Verifies that when clear_route_cache_headers lists the header the authorization response mutates,
+// the route cache is cleared and the request re-resolves to the route that matches on that header.
+TEST_P(ExtAuthzGrpcIntegrationTest, ClearRouteCacheHeadersClearsOnListedHeader) {
+  runClearRouteCacheHeadersScenario({"x-route-key"}, "by-key");
+}
+
+// Verifies that when clear_route_cache_headers does not list the header the authorization response
+// mutates, the route cache is not cleared and the request keeps its originally resolved route.
+TEST_P(ExtAuthzGrpcIntegrationTest, ClearRouteCacheHeadersKeepsRouteOnUnlistedHeader) {
+  runClearRouteCacheHeadersScenario({"x-unrelated-header"}, "default");
+}
+
 // Verify that in shadow mode a denied response does not terminate the request — the request
 // reaches the upstream and the client gets a 200 — and that the ShadowDecision is readable
 // via %FILTER_STATE(<filter name>)% in access logs.
@@ -3445,6 +3657,395 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
   const std::string log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(log, testing::HasSubstr("DENIED"));
   EXPECT_THAT(log, testing::HasSubstr("403"));
+
+  cleanup();
+}
+
+// Verify that gRPC CheckResponse OK headers read raw_value (including non-UTF-8 bytes) and fall
+// back to value when raw_value is empty when read_raw_header_value is enabled.
+TEST_P(ExtAuthzGrpcIntegrationTest, OkResponseWithRawValueAndValueFallback) {
+  GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0, {}, {{"x-append-target", "initial"}});
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  std::string non_utf8_bytes("raw_");
+  non_utf8_bytes.append(1, char(0xc3));
+  non_utf8_bytes.append(1, char(0x28));
+  non_utf8_bytes.append("_end");
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* ok_response = check_response.mutable_ok_response();
+
+  auto* upstream_raw = ok_response->add_headers();
+  upstream_raw->mutable_append()->set_value(false);
+  upstream_raw->mutable_header()->set_key("x-upstream-raw");
+  upstream_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* upstream_append_raw = ok_response->add_headers();
+  upstream_append_raw->mutable_append()->set_value(true);
+  upstream_append_raw->mutable_header()->set_key("x-append-target");
+  upstream_append_raw->mutable_header()->set_raw_value("raw-appended");
+
+  auto* upstream_fallback = ok_response->add_headers();
+  upstream_fallback->mutable_append()->set_value(false);
+  upstream_fallback->mutable_header()->set_key("x-upstream-fallback");
+  upstream_fallback->mutable_header()->set_value("legacy-upstream");
+
+  auto* upstream_both = ok_response->add_headers();
+  upstream_both->mutable_append()->set_value(false);
+  upstream_both->mutable_header()->set_key("x-upstream-both");
+  upstream_both->mutable_header()->set_value("legacy-ignored");
+  upstream_both->mutable_header()->set_raw_value("raw-preferred");
+
+  auto* downstream_raw = ok_response->add_response_headers_to_add();
+  downstream_raw->mutable_append()->set_value(false);
+  downstream_raw->mutable_header()->set_key("x-downstream-raw");
+  downstream_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* downstream_fallback = ok_response->add_response_headers_to_add();
+  downstream_fallback->mutable_append()->set_value(false);
+  downstream_fallback->mutable_header()->set_key("x-downstream-fallback");
+  downstream_fallback->mutable_header()->set_value("legacy-downstream");
+
+  auto* downstream_both = ok_response->add_response_headers_to_add();
+  downstream_both->mutable_append()->set_value(false);
+  downstream_both->mutable_header()->set_key("x-downstream-both");
+  downstream_both->mutable_header()->set_value("legacy-downstream-ignored");
+  downstream_both->mutable_header()->set_raw_value("raw-downstream-preferred");
+
+  auto* downstream_action_raw = ok_response->add_response_headers_to_add();
+  downstream_action_raw->set_append_action(
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  downstream_action_raw->mutable_header()->set_key("replaceable2");
+  downstream_action_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse("200");
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-upstream-raw", non_utf8_bytes));
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader("x-append-target", "initial,raw-appended"));
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader("x-upstream-fallback", "legacy-upstream"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-upstream-both", "raw-preferred"));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-downstream-raw", non_utf8_bytes));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-downstream-fallback", "legacy-downstream"));
+  EXPECT_THAT(response_->headers(),
+              ContainsHeader("x-downstream-both", "raw-downstream-preferred"));
+  EXPECT_THAT(response_->headers(), ContainsHeader("replaceable2", non_utf8_bytes));
+
+  cleanup();
+}
+
+// Verify that non-UTF-8 obs-text raw_value headers flow end-to-end over HTTP/2 downstream.
+TEST_P(ExtAuthzGrpcIntegrationTest, OkResponseWithRawValueHttp2Downstream) {
+  GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP2));
+
+  std::string non_utf8_bytes("h2_raw_");
+  non_utf8_bytes.append(1, char(0xc3));
+  non_utf8_bytes.append(1, char(0x28));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* ok_response = check_response.mutable_ok_response();
+
+  auto* upstream_raw = ok_response->add_headers();
+  upstream_raw->mutable_append()->set_value(false);
+  upstream_raw->mutable_header()->set_key("x-upstream-raw");
+  upstream_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* downstream_raw = ok_response->add_response_headers_to_add();
+  downstream_raw->mutable_append()->set_value(false);
+  downstream_raw->mutable_header()->set_key("x-downstream-raw");
+  downstream_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* downstream_fallback = ok_response->add_response_headers_to_add();
+  downstream_fallback->mutable_append()->set_value(false);
+  downstream_fallback->mutable_header()->set_key("x-downstream-fallback");
+  downstream_fallback->mutable_header()->set_value("legacy-downstream");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse("200");
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-upstream-raw", non_utf8_bytes));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-downstream-raw", non_utf8_bytes));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-downstream-fallback", "legacy-downstream"));
+
+  cleanup();
+}
+
+// Verify that gRPC CheckResponse denied headers read raw_value (including non-UTF-8 bytes) and
+// fall back to value when raw_value is empty when read_raw_header_value is enabled.
+TEST_P(ExtAuthzGrpcIntegrationTest, DeniedResponseWithRawValueAndValueFallback) {
+  GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
+  opts.validate_mutations = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  std::string non_utf8_bytes("denied_");
+  non_utf8_bytes.append(1, char(0xc3));
+  non_utf8_bytes.append(1, char(0x28));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  auto* denied_response = check_response.mutable_denied_response();
+  denied_response->set_body("denied");
+
+  auto* denied_raw = denied_response->add_headers();
+  denied_raw->mutable_header()->set_key("x-denied-raw");
+  denied_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* denied_fallback = denied_response->add_headers();
+  denied_fallback->mutable_header()->set_key("x-denied-fallback");
+  denied_fallback->mutable_header()->set_value("legacy-denied");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("403", response_->headers().getStatusValue());
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-denied-raw", non_utf8_bytes));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-denied-fallback", "legacy-denied"));
+
+  cleanup();
+}
+
+// Verify that gRPC CheckResponse error_response headers read raw_value (including non-UTF-8 bytes)
+// and fall back to value when raw_value is empty for both append=false and append=true when
+// read_raw_header_value is enabled.
+TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithRawValueAndValueFallback) {
+  GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
+  opts.validate_mutations = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::INTERNAL;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  std::string non_utf8_bytes("error_");
+  non_utf8_bytes.append(1, char(0xc3));
+  non_utf8_bytes.append(1, char(0x28));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = check_response.mutable_error_response();
+  error_response->mutable_status()->set_code(envoy::type::v3::ServiceUnavailable);
+  error_response->set_body("error");
+
+  auto* error_raw_set = error_response->add_headers();
+  error_raw_set->mutable_append()->set_value(false);
+  error_raw_set->mutable_header()->set_key("x-error-raw-set");
+  error_raw_set->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* error_raw_append = error_response->add_headers();
+  error_raw_append->mutable_append()->set_value(true);
+  error_raw_append->mutable_header()->set_key("x-error-raw-append");
+  error_raw_append->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* error_fallback_set = error_response->add_headers();
+  error_fallback_set->mutable_append()->set_value(false);
+  error_fallback_set->mutable_header()->set_key("x-error-fallback-set");
+  error_fallback_set->mutable_header()->set_value("legacy-error-set");
+
+  auto* error_fallback_append = error_response->add_headers();
+  error_fallback_append->mutable_append()->set_value(true);
+  error_fallback_append->mutable_header()->set_key("x-error-fallback-append");
+  error_fallback_append->mutable_header()->set_value("legacy-error-append");
+
+  auto* error_both = error_response->add_headers();
+  error_both->mutable_append()->set_value(false);
+  error_both->mutable_header()->set_key("x-error-both");
+  error_both->mutable_header()->set_value("legacy-ignored");
+  error_both->mutable_header()->set_raw_value("raw-error-preferred");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+  EXPECT_EQ("error", response_->body());
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-error-raw-set", non_utf8_bytes));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-error-raw-append", non_utf8_bytes));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-error-fallback-set", "legacy-error-set"));
+  EXPECT_THAT(response_->headers(),
+              ContainsHeader("x-error-fallback-append", "legacy-error-append"));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-error-both", "raw-error-preferred"));
+
+  cleanup();
+}
+
+// Verify that disallowed bytes (e.g. \r) in raw_value are rejected with 500 when
+// read_raw_header_value and validate_mutations are enabled.
+TEST_P(ExtAuthzGrpcIntegrationTest, InvalidRawValueRejectedWhenValidateMutationsEnabled) {
+  GrpcInitializeConfigOpts opts;
+  opts.read_raw_header_value = true;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* invalid_raw = check_response.mutable_ok_response()->add_headers();
+  invalid_raw->mutable_append()->set_value(false);
+  invalid_raw->mutable_header()->set_key("x-invalid-raw");
+  invalid_raw->mutable_header()->set_raw_value("bad\rvalue");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.ext_authz.invalid", Eq(1));
+
+  cleanup();
+}
+
+// Verify that by default (read_raw_header_value = false), raw_value is ignored and only value is
+// read.
+TEST_P(ExtAuthzGrpcIntegrationTest, ReadRawHeaderValueDisabledByDefault) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* ok_response = check_response.mutable_ok_response();
+
+  auto* upstream_raw_only = ok_response->add_headers();
+  upstream_raw_only->mutable_append()->set_value(false);
+  upstream_raw_only->mutable_header()->set_key("x-raw-only");
+  upstream_raw_only->mutable_header()->set_raw_value("ignored-raw");
+
+  auto* upstream_both = ok_response->add_headers();
+  upstream_both->mutable_append()->set_value(false);
+  upstream_both->mutable_header()->set_key("x-both");
+  upstream_both->mutable_header()->set_value("legacy-upstream");
+  upstream_both->mutable_header()->set_raw_value("ignored-raw");
+
+  auto* downstream_raw_only = ok_response->add_response_headers_to_add();
+  downstream_raw_only->mutable_append()->set_value(false);
+  downstream_raw_only->mutable_header()->set_key("x-downstream-raw-only");
+  downstream_raw_only->mutable_header()->set_raw_value("ignored-raw");
+
+  auto* downstream_both = ok_response->add_response_headers_to_add();
+  downstream_both->mutable_append()->set_value(false);
+  downstream_both->mutable_header()->set_key("x-downstream-both");
+  downstream_both->mutable_header()->set_value("legacy-downstream");
+  downstream_both->mutable_header()->set_raw_value("ignored-raw");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse("200");
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-raw-only", ""));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-both", "legacy-upstream"));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-downstream-raw-only", ""));
+  EXPECT_THAT(response_->headers(), ContainsHeader("x-downstream-both", "legacy-downstream"));
+
+  cleanup();
+}
+
+// Verify that in shadow mode, a denied response with non-UTF-8 raw_value headers allows the
+// request to reach upstream and emits valid ShadowDecision JSON in the access log.
+TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedWithRawValue) {
+  GrpcInitializeConfigOpts opts;
+  opts.shadow_mode = true;
+  opts.read_raw_header_value = true;
+  opts.validate_mutations = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  useAccessLog("%FILTER_STATE(envoy.filters.http.ext_authz.shadow:PLAIN)%");
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  std::string non_utf8_bytes("denied_");
+  non_utf8_bytes.append(1, char(0xc3));
+  non_utf8_bytes.append(1, char(0x28));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  auto* denied_response = check_response.mutable_denied_response();
+  denied_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Forbidden);
+
+  auto* denied_raw = denied_response->add_headers();
+  denied_raw->mutable_header()->set_key("x-denied-raw");
+  denied_raw->mutable_header()->set_raw_value(non_utf8_bytes);
+
+  auto* denied_utf8 = denied_response->add_headers();
+  denied_utf8->mutable_header()->set_key("x-denied-utf8");
+  denied_utf8->mutable_header()->set_value("legacy-denied");
+
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse("200");
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, Not(testing::HasSubstr("Failed to convert")));
+  EXPECT_THAT(log, testing::HasSubstr("DENIED"));
+  EXPECT_THAT(log, testing::HasSubstr("403"));
+
+  envoy::extensions::filters::http::ext_authz::v3::ShadowDecision shadow_decision;
+  TestUtility::loadFromJson(log, shadow_decision);
+  EXPECT_EQ(shadow_decision.check_result(),
+            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
+  EXPECT_EQ(shadow_decision.status_code(), 403);
+  ASSERT_EQ(shadow_decision.response_headers().size(), 2);
+  EXPECT_EQ(shadow_decision.response_headers()[0].key(), "x-denied-raw");
+  EXPECT_TRUE(shadow_decision.response_headers()[0].value().empty());
+  EXPECT_EQ(shadow_decision.response_headers()[0].raw_value(), non_utf8_bytes);
+  EXPECT_EQ(shadow_decision.response_headers()[1].key(), "x-denied-utf8");
+  EXPECT_EQ(shadow_decision.response_headers()[1].value(), "legacy-denied");
+  EXPECT_TRUE(shadow_decision.response_headers()[1].raw_value().empty());
 
   cleanup();
 }
@@ -3522,12 +4123,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 

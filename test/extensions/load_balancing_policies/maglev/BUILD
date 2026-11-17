@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -17,7 +17,13 @@ envoy_extension_cc_test(
     name = "maglev_lb_test",
     srcs = ["maglev_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.maglev"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_lib",
         "//test/common/upstream:utility_lib",
@@ -41,7 +47,13 @@ envoy_extension_cc_test(
     name = "maglev_lb_force_original_impl_test",
     srcs = ["maglev_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.maglev"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_force_original_impl_lib",
         "//test/common/upstream:utility_lib",
@@ -63,7 +75,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.maglev"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/maglev:config",
         "//test/mocks/server:server_factory_context_mocks",
@@ -80,7 +98,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.maglev"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/maglev:config",
@@ -90,19 +113,21 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "maglev_lb_benchmark",
     srcs = ["maglev_lb_benchmark.cc"],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.load_balancing_policies.maglev"],
     deps = [
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
         "//test/test_common:status_utility_lib",
+        "@benchmark",
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "maglev_lb_benchmark_test",
     timeout = "long",
     benchmark_binary = "maglev_lb_benchmark",
+    extension_names = ["envoy.load_balancing_policies.maglev"],
 )

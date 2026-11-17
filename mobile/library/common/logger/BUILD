@@ -8,7 +8,6 @@ envoy_cc_library(
     name = "logger_delegate_lib",
     srcs = ["logger_delegate.cc"],
     hdrs = ["logger_delegate.h"],
-    repository = "@envoy",
     deps = [
         "//library/common:engine_types_lib",
         "//library/common/api:external_api_lib",

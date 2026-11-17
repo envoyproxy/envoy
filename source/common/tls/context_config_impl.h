@@ -57,6 +57,9 @@ public:
   certificateValidationContext() const override {
     return validation_context_config_.get();
   }
+  bool validationContextConfigured() const override {
+    return certificate_validation_context_provider_.provider_ != nullptr;
+  }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
   const Network::Address::IpList& tlsKeyLogLocal() const override { return *tls_keylog_local_; };
@@ -144,7 +147,9 @@ public:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CIPHER_SUITES_FIPS;
   static const std::string DEFAULT_CURVES;
+  static const std::string DEFAULT_CURVES_NO_PQC;
   static const std::string DEFAULT_CURVES_FIPS;
+  static const std::string DEFAULT_CURVES_FIPS_NO_PQC;
 
   static absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -172,6 +177,7 @@ private:
 
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
+  static const unsigned DEFAULT_MAX_VERSION_LEGACY;
 
   const std::string server_name_indication_;
   const bool auto_host_sni_ : 1;

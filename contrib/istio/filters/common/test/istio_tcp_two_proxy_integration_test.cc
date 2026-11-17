@@ -86,9 +86,13 @@ typed_config:
     return MessageUtil::getJsonStringFromMessageOrError(filter);
   }
 
+  // `app_qualified` / `version_qualified` set app.kubernetes.io/name and
+  // app.kubernetes.io/version when non-empty.
   static void setNode(ConfigHelper& helper, const std::string& workload, const std::string& ns,
                       const std::string& cluster, const std::string& canonical_name,
-                      const std::string& app) {
+                      const std::string& app, const std::string& version = "v1",
+                      const std::string& app_qualified = "",
+                      const std::string& version_qualified = "") {
     helper.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& node = *bootstrap.mutable_node();
       node.set_id(absl::StrCat(workload, "-id"));
@@ -102,7 +106,14 @@ typed_config:
       labels[std::string(Istio::Common::CanonicalNameLabel)].set_string_value(canonical_name);
       labels[std::string(Istio::Common::CanonicalRevisionLabel)].set_string_value("v1");
       labels[std::string(Istio::Common::AppNameLabel)].set_string_value(app);
-      labels[std::string(Istio::Common::AppVersionLabel)].set_string_value("v1");
+      labels[std::string(Istio::Common::AppVersionLabel)].set_string_value(version);
+      if (!app_qualified.empty()) {
+        labels[std::string(Istio::Common::AppNameQualifiedLabel)].set_string_value(app_qualified);
+      }
+      if (!version_qualified.empty()) {
+        labels[std::string(Istio::Common::AppVersionQualifiedLabel)].set_string_value(
+            version_qualified);
+      }
     });
   }
 
@@ -148,8 +159,8 @@ typed_config:
     // 2. SERVER sidecar (INBOUND): TLS+ALPN istio2 listener with
     //    [metadata_exchange(downstream), istio.stats, tcp_proxy] -> app.
     server_config_ = std::make_unique<ConfigHelper>(version_, config_helper_.bootstrap());
-    setNode(*server_config_, "server-v1", "server-ns", "server-cluster", "server-svc",
-            "server-app");
+    setNode(*server_config_, "server-v1", "server-ns", "server-cluster", "server-svc", "server-app",
+            server_version_, server_app_qualified_, server_version_qualified_);
     const std::string downstream_mx =
         metadataExchangeYaml("envoy.filters.network.metadata_exchange", mx_protocol_);
     const std::string server_stats = statsFilterYaml(server_stats_extra_);
@@ -189,7 +200,8 @@ typed_config:
 
     // 3. CLIENT sidecar (OUTBOUND): plaintext listener with [istio.stats, tcp_proxy];
     //    cluster -> SERVER sidecar over TLS+ALPN istio2 with an upstream MX filter.
-    setNode(config_helper_, "client-v1", "client-ns", "client-cluster", "client-svc", "client-app");
+    setNode(config_helper_, "client-v1", "client-ns", "client-cluster", "client-svc", "client-app",
+            client_version_, client_app_qualified_, client_version_qualified_);
     if (!client_role_.empty()) {
       const std::string role = client_role_;
       config_helper_.addConfigModifier([role](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -282,6 +294,16 @@ typed_config:
   std::vector<std::string> mx_additional_labels_;
   std::string server_stats_extra_;
   std::string client_role_;
+  // Raw version node label per side. Tests set it apart from the canonical revision
+  // ("v1") to check which label a peer's version comes from.
+  std::string client_version_{"v1"};
+  std::string server_version_{"v1"};
+  // Optional app.kubernetes.io/name and app.kubernetes.io/version node labels per
+  // side, set alongside the raw app/version labels. Empty means not set.
+  std::string client_app_qualified_;
+  std::string client_version_qualified_;
+  std::string server_app_qualified_;
+  std::string server_version_qualified_;
   // For TestTCPMetadataExchange/true (WDS fallback): enable metadata_exchange
   // discovery and the workload_discovery bootstrap extension reading this file.
   bool enable_metadata_discovery_{false};
@@ -460,6 +482,35 @@ TEST_P(IstioTcpTwoProxyIntegrationTest, MetadataExchangeAdditionalLabels) {
       waitForIstioCounter(server_sidecar_->statStore(), "istio_tcp_connections_opened_total");
   ASSERT_NE(server, nullptr);
   EXPECT_EQ("ingress", tagValue(*server, "role").value_or(""));
+}
+
+// Both sidecars carry app.kubernetes.io/name and app.kubernetes.io/version labels
+// that differ from their raw app/version labels. The peer identity exchanged over
+// the istio2 handshake must use the raw labels, matching what each sidecar reports
+// for itself. The raw version also differs from the canonical revision, so the
+// version assertions show that it comes from the raw label.
+TEST_P(IstioTcpTwoProxyIntegrationTest, MetadataExchangeAppLabelPrecedence) {
+  client_version_ = "client-raw-version";
+  server_version_ = "server-raw-version";
+  client_app_qualified_ = "client-qualified-app";
+  client_version_qualified_ = "client-qualified-version";
+  server_app_qualified_ = "server-qualified-app";
+  server_version_qualified_ = "server-qualified-version";
+  initializeTcpProxies();
+  driveTcpConnection();
+
+  for (auto* store : {&test_server_->statStore(), &server_sidecar_->statStore()}) {
+    for (const absl::string_view metric :
+         {"istio_tcp_connections_opened_total", "istio_tcp_connections_closed_total"}) {
+      auto counter = waitForIstioCounter(*store, metric);
+      ASSERT_NE(counter, nullptr) << metric;
+      SCOPED_TRACE(absl::StrCat(metric, " ", tagValue(*counter, "reporter").value_or("")));
+      EXPECT_EQ("client-app", tagValue(*counter, "source_app").value_or(""));
+      EXPECT_EQ("client-raw-version", tagValue(*counter, "source_version").value_or(""));
+      EXPECT_EQ("server-app", tagValue(*counter, "destination_app").value_or(""));
+      EXPECT_EQ("server-raw-version", tagValue(*counter, "destination_version").value_or(""));
+    }
+  }
 }
 
 // Related upstream e2e: tcp_metadata_exchange/TestTCPMetadataExchange (WDS-discovery branch).

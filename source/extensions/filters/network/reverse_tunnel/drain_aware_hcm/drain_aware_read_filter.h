@@ -7,7 +7,6 @@
 
 #include "source/common/network/drain_close_util.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_listener.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -85,9 +84,6 @@ private:
   void checkForDrain() {
     if (http_started_ || connection_->state() != Network::Connection::State::Open) {
       return;
-    }
-    if (use_connection_event_drain_ && connection_drain_event_.has_value()) {
-      stopInitiatingReverseConnections(*connection_);
     }
     const bool draining =
         use_connection_event_drain_

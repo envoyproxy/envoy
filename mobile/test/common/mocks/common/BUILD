@@ -12,7 +12,6 @@ envoy_cc_mock(
     name = "common_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    repository = "@envoy",
     deps = [
         "//library/cc:network_change_monitor_interface",
         "//library/common/system:system_helper_lib",

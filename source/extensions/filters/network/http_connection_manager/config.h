@@ -15,6 +15,7 @@
 #include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
+#include "envoy/http/http_filter_factory_context.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -167,6 +168,9 @@ public:
                                         Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override;
+  // The configured drain_timeout before drain_timeout_jitter is applied, for static config checks.
+  // drainTimeout() returns a freshly jittered value on every call.
+  std::chrono::milliseconds baseDrainTimeout() const { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
@@ -238,6 +242,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
+  bool recordRouteResolutionStats() const override { return record_route_resolution_stats_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -302,6 +307,11 @@ private:
   const std::string stats_prefix_;
   // The 'http.<stat_prefix>.' scope in which this connection manager creates its stats.
   const Stats::ScopeSharedPtr http_scope_;
+  // The factory context that the HTTP filters are created with. Only created when the
+  // 'use_stats_prefix_scope_for_http_filter' runtime feature is enabled, the network filter chain's
+  // own factory context is used otherwise. Declared before the filter factories because the filter
+  // config providers keep a reference to it and it must outlive them.
+  const Http::HttpFilterFactoryContextPtr http_filter_factory_context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   AccessLog::InstanceSharedPtrVector access_logs_;
@@ -380,6 +390,7 @@ private:
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
   const bool strip_trailing_host_dot_;
+  const bool record_route_resolution_stats_;
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;

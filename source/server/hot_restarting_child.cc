@@ -1,5 +1,7 @@
 #include "source/server/hot_restarting_child.h"
 
+#include <chrono>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
@@ -10,18 +12,41 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+std::string HotRestartingChild::UdpForwardingContext::key(absl::string_view network_namespace,
+                                                          absl::string_view address) {
+  return absl::StrCat(network_namespace, "|", address);
+}
+
 void HotRestartingChild::UdpForwardingContext::registerListener(
     Network::Address::InstanceConstSharedPtr address,
     std::shared_ptr<Network::UdpListenerConfig> listener_config) {
+  // TODO(filipcacky): A listener replaced by a non-filter-chain-only LDS update isn't registered,
+  // as the old entry keeps its address. It can't replace the entry here, as addSocketFactory()
+  // registers before update failures and warming. Maybe register when it is added to the workers
+  // instead.
   const bool inserted =
-      listener_map_.try_emplace(address->asString(), ForwardEntry{address, listener_config}).second;
+      listener_map_
+          .try_emplace(key(address->networkNamespace().value_or(""), address->asString()),
+                       WeakForwardEntry{address, listener_config})
+          .second;
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
+}
+
+HotRestartingChild::UdpForwardingContext::ListenerMap::iterator
+HotRestartingChild::UdpForwardingContext::findListener(const std::string& map_key) {
+  auto it = listener_map_.find(map_key);
+  if (it != listener_map_.end() && it->second.second.expired()) {
+    listener_map_.erase(it);
+    return listener_map_.end();
+  }
+  return it;
 }
 
 std::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
 HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     const Network::Address::Instance& address) {
-  auto it = listener_map_.find(address.asString());
+  const std::string ns = address.networkNamespace().value_or("");
+  auto it = findListener(key(ns, address.asString()));
   if (it == listener_map_.end()) {
     // If no listener on the specific address was found, check for a default route.
     // If the address is IPv6, check default route IPv6 only, otherwise check default
@@ -29,11 +54,11 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     // packet.
     uint32_t port = address.ip()->port();
     if (address.ip()->version() == Network::Address::IpVersion::v6) {
-      it = listener_map_.find(absl::StrCat("[::]:", port));
+      it = findListener(key(ns, absl::StrCat("[::]:", port)));
     } else {
-      it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
+      it = findListener(key(ns, absl::StrCat("0.0.0.0:", port)));
       if (it == listener_map_.end()) {
-        it = listener_map_.find(absl::StrCat("[::]:", port));
+        it = findListener(key(ns, absl::StrCat("[::]:", port)));
         if (it != listener_map_.end() && it->second.first->ip()->ipv6()->v6only()) {
           // If there is a default IPv6 route but it's set v6only, don't use it.
           it = listener_map_.end();
@@ -44,7 +69,7 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
   if (it == listener_map_.end()) {
     return std::nullopt;
   }
-  return it->second;
+  return ForwardEntry{it->second.first, it->second.second.lock()};
 }
 
 // If restart_epoch is 0 there is no parent, so it's effectively already
@@ -83,6 +108,7 @@ bool HotRestartingChild::abortDueToFailedParentConnection() {
 }
 
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
+  time_source_ = &dispatcher.timeSource();
   if (abortDueToFailedParentConnection()) {
     ENVOY_LOG(warn, "hot restart sendmsg() connection refused, falling back to regular restart");
     absl::MutexLock lock(registry_mu_);
@@ -100,9 +126,10 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
 
 void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
 
-void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data) {
-  auto addr_and_listener =
-      udp_forwarding_context_.getListenerForDestination(*data.addresses_.local_);
+void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
+                                              const Network::Address::Instance& listener_address,
+                                              Network::UdpRecvData&& data) {
+  auto addr_and_listener = udp_forwarding_context_.getListenerForDestination(listener_address);
   if (addr_and_listener.has_value()) {
     auto [addr, listener_config] = *addr_and_listener;
     // We send to the worker index from the parent instance.
@@ -128,7 +155,7 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::Ud
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
                                                     uint32_t worker_index,
                                                     absl::string_view network_namespace) {
-  if (parent_terminated_) {
+  if (parent_terminated_ || parent_unresponsive_) {
     return -1;
   }
 
@@ -137,10 +164,12 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_worker_index(worker_index);
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_network_namespace(
       network_namespace);
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request)) {
+    onParentUnreachable("the listen socket request could not be sent");
+    return -1;
+  }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
   if (!main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                             HotRestartMessage::Reply::kPassListenSocket)) {
     return -1;
@@ -148,17 +177,93 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
   return wrapped_reply->reply().pass_listen_socket().fd();
 }
 
+std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
+  // A monotonic clock, so that a step of the wall clock cannot move the deadline.
+  ASSERT(time_source_ != nullptr);
+  const MonotonicTime start = time_source_->monotonicTime();
+  auto next_probe = start + parent_probe_interval_;
+  while (true) {
+    // Returns after RECEIVE_TIMEOUT_SLICE without data, so the loop below runs regularly.
+    std::unique_ptr<HotRestartMessage> reply =
+        main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+    if (reply != nullptr) {
+      return reply;
+    }
+    // Keep the parent's UDP forwarding flowing while we wait, so the parent never stalls on us.
+    const absl::Status status = onSocketEventUdpForwarding();
+    if (!status.ok()) {
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(5),
+                         "error servicing forwarded udp packets while waiting for the hot restart "
+                         "parent: {}",
+                         status.message());
+    }
+    const MonotonicTime now = time_source_->monotonicTime();
+    if (now - start >= parent_reply_timeout_) {
+      onParentUnreachable(fmt::format("no reply within {}ms", parent_reply_timeout_.count()));
+      return nullptr;
+    }
+    if (now >= next_probe) {
+      // The parent ignores this request; sending it only tells us whether its socket still
+      // exists. It cannot block us for longer than the stream's send timeout.
+      HotRestartMessage probe;
+      probe.mutable_request()->mutable_test_connection();
+      switch (main_rpc_stream_.trySendHotRestartMessage(parent_address_, probe)) {
+      case RpcStream::SendResult::Sent:
+        next_probe = now + parent_probe_interval_;
+        break;
+      case RpcStream::SendResult::ConnectionRefused:
+        onParentGone("its socket refused a liveness probe while a reply was pending");
+        return nullptr;
+      case RpcStream::SendResult::TimedOut:
+        onParentUnreachable("its socket is full and not being drained while a reply is pending");
+        return nullptr;
+      }
+    }
+  }
+}
+
+void HotRestartingChild::onParentUnreachable(absl::string_view reason) {
+  if (parent_unresponsive_) {
+    return;
+  }
+  parent_unresponsive_ = true;
+  ENVOY_LOG(error,
+            "hot restart parent is unresponsive ({}); continuing without it: parent stats will not "
+            "be merged and new listeners will bind their own sockets. The parent will still be "
+            "asked to terminate at the end of the drain period.",
+            reason);
+}
+
+void HotRestartingChild::onParentGone(absl::string_view reason) {
+  ENVOY_LOG(error, "hot restart parent is gone ({}); completing the drain from it", reason);
+  onParentUnreachable(reason);
+  if (parent_terminated_) {
+    return;
+  }
+  allDrainsImplicitlyComplete();
+  parent_terminated_ = true;
+  if (stat_merger_ != nullptr) {
+    stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
+    stat_merger_.reset();
+  }
+}
+
 std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
-  if (parent_terminated_ || skip_parent_stats_) {
+  if (parent_terminated_ || parent_unresponsive_ || skip_parent_stats_) {
     return nullptr;
   }
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_stats();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request)) {
+    onParentUnreachable("the stats request could not be sent");
+    return nullptr;
+  }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  if (wrapped_reply == nullptr) {
+    return nullptr;
+  }
   RELEASE_ASSERT(
       main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
       "Hot restart parent did not respond as expected to get stats request.");
@@ -167,10 +272,11 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 
 void HotRestartingChild::drainParentListeners() {
   if (!parent_terminated_) {
-    // No reply expected.
+    // No reply expected. A parent that is gone or wedged has nothing to drain for us.
     HotRestartMessage wrapped_request;
     wrapped_request.mutable_request()->mutable_drain_listeners();
-    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request,
+                                           /*allow_failure=*/true);
   }
 
   // Latch that the drain-listeners request was sent. The parent stops its listeners synchronously
@@ -208,16 +314,21 @@ void HotRestartingChild::allDrainsImplicitlyComplete() {
 
 std::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
-  if (parent_terminated_) {
+  if (parent_terminated_ || parent_unresponsive_) {
     return std::nullopt;
   }
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_shutdown_admin();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request)) {
+    onParentUnreachable("the admin shutdown request could not be sent");
+    return std::nullopt;
+  }
 
-  std::unique_ptr<HotRestartMessage> wrapped_reply =
-      main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  std::unique_ptr<HotRestartMessage> wrapped_reply = waitForParentReply();
+  if (wrapped_reply == nullptr) {
+    return std::nullopt;
+  }
   RELEASE_ASSERT(main_rpc_stream_.replyIsExpectedType(wrapped_reply.get(),
                                                       HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
@@ -235,7 +346,9 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_terminate();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+  // A parent that is already gone cannot be told, and one that is wedged will not listen.
+  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request,
+                                         /*allow_failure=*/true);
   parent_terminated_ = true;
 
   // Note that the 'generation' counter needs to retain the contribution from
@@ -327,7 +440,17 @@ absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
       packet.receive_time_ =
           MonotonicTime(std::chrono::microseconds{req.receive_time_epoch_microseconds()});
       packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.payload());
-      onForwardedUdpPacket(req.worker_index(), std::move(packet));
+      // Parents that predate the listener address fields only send the packet's destination.
+      Network::Address::InstanceConstSharedPtr listener_address = packet.addresses_.local_;
+      if (!req.listener_addr().empty()) {
+        auto listener_or_error = Network::Utility::resolveUrl(req.listener_addr());
+        RETURN_IF_NOT_OK(listener_or_error.status());
+        listener_address = *listener_or_error;
+        if (!req.network_namespace().empty() && listener_address->ip() != nullptr) {
+          listener_address = listener_address->withNetworkNamespace(req.network_namespace());
+        }
+      }
+      onForwardedUdpPacket(req.worker_index(), *listener_address, std::move(packet));
       break;
     }
     default: {

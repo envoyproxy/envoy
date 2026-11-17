@@ -1,10 +1,15 @@
 #include "source/common/memory/stats.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#if defined(GPERFTOOLS_TCMALLOC)
+#include "gperftools/malloc_extension.h"
+#endif
 
 namespace Envoy {
 namespace Memory {
@@ -21,15 +26,30 @@ public:
   static size_t backgroundReleaseRateBytesPerSecond(const AllocatorManager& allocator_manager) {
     return allocator_manager.background_release_rate_bytes_per_second_;
   }
+  static bool hasBackgroundThread(const AllocatorManager& allocator_manager) {
+    return allocator_manager.tcmalloc_thread_ != nullptr;
+  }
 };
 
 namespace {
 
 static const int MB = 1048576;
 
+#if defined(GPERFTOOLS_TCMALLOC)
+class CountingMallocExtension : public MallocExtension {
+public:
+  void ReleaseToSystem(size_t bytes) override {
+    calls_++;
+    bytes_released_ += bytes;
+  }
+  int calls_ = 0;
+  size_t bytes_released_ = 0;
+};
+#endif
+
 class MemoryReleaseTest : public testing::Test {
 protected:
-  MemoryReleaseTest() : api_(Api::createApiForTest()) {}
+  MemoryReleaseTest() : api_(Api::createApiForTest(time_system_)) {}
 
   void initialiseAllocatorManager(uint64_t bytes_to_release, float release_interval_s) {
     const std::string yaml_config = (release_interval_s > 0)
@@ -42,11 +62,18 @@ protected:
   bytes_to_release: {}
 )EOF",
                                                       bytes_to_release);
+    initialiseAllocatorManager(yaml_config);
+  }
+
+  void initialiseAllocatorManager(const std::string& yaml_config) {
     const auto proto_config =
         TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
     allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, proto_config);
   }
 
+  void step(std::chrono::milliseconds duration) { time_system_.advanceTimeWait(duration); }
+
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   std::unique_ptr<Memory::AllocatorManager> allocator_manager_;
 };
@@ -58,12 +85,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   if (Stats::totalCurrentlyAllocated() <= initial_allocated_bytes) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
-#if defined(GPERFTOOLS_TCMALLOC)
-  EXPECT_LOG_CONTAINS("error",
-                      "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
-                      "will be configured.",
-                      initialiseAllocatorManager(MB /*bytes per second*/, 0));
-#elif defined(TCMALLOC)
+#if defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LOG_CONTAINS("info",
                       "Configured tcmalloc with background release rate: 1048576 bytes per second.",
@@ -83,9 +105,8 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
 }
 
 TEST_F(MemoryReleaseTest, ReleaseRateZeroNoBackgroundThread) {
-  EXPECT_LOG_NOT_CONTAINS("info",
-                          "Configured tcmalloc with background release rate: 0 bytes per second.",
-                          initialiseAllocatorManager(0 /*bytes per second*/, 0));
+  EXPECT_LOG_NOT_CONTAINS("info", "Configured", initialiseAllocatorManager(0 /*bytes*/, 0));
+  EXPECT_FALSE(AllocatorManagerPeer::hasBackgroundThread(*allocator_manager_));
 }
 
 TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
@@ -95,12 +116,7 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   if (Stats::totalCurrentlyAllocated() <= initial_allocated_bytes) {
     GTEST_SKIP() << "Skipping test, cannot measure memory usage precisely on this platform.";
   }
-#if defined(GPERFTOOLS_TCMALLOC)
-  EXPECT_LOG_CONTAINS("error",
-                      "Memory releasing is not supported for gperf tcmalloc, no memory releasing "
-                      "will be configured.",
-                      initialiseAllocatorManager(MB /*bytes per second*/, 0));
-#elif defined(TCMALLOC)
+#if defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
   // 16 MB every 2 seconds = 8 MB/s.
   EXPECT_LOG_CONTAINS("info",
@@ -122,7 +138,6 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
 }
 
 TEST_F(MemoryReleaseTest, BackgroundReleaseRateComputedCorrectly) {
-#if defined(TCMALLOC)
   // 4 MB every 500ms = 8 MB/s.
   initialiseAllocatorManager(4 * MB, 0.5);
   EXPECT_EQ(static_cast<size_t>(8 * MB),
@@ -139,8 +154,42 @@ TEST_F(MemoryReleaseTest, BackgroundReleaseRateComputedCorrectly) {
   initialiseAllocatorManager(10 * MB, 5);
   EXPECT_EQ(static_cast<size_t>(2 * MB),
             AllocatorManagerPeer::backgroundReleaseRateBytesPerSecond(*allocator_manager_));
-#endif
+  allocator_manager_.reset();
 }
+
+#if defined(GPERFTOOLS_TCMALLOC)
+TEST_F(MemoryReleaseTest, GperftoolsReleasesConfiguredBytesEveryInterval) {
+  initialiseAllocatorManager(MB, 2);
+  EXPECT_EQ(MB, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
+  EXPECT_EQ(std::chrono::milliseconds(2000),
+            AllocatorManagerPeer::memoryReleaseInterval(*allocator_manager_));
+  EXPECT_TRUE(AllocatorManagerPeer::hasBackgroundThread(*allocator_manager_));
+  // Register the counter after the dispatcher is created.
+  CountingMallocExtension counter;
+  MallocExtension* original = MallocExtension::instance();
+  MallocExtension::Register(&counter);
+  step(std::chrono::milliseconds(1999));
+  EXPECT_EQ(0, counter.calls_);
+  step(std::chrono::milliseconds(1)); // t = 2000ms: first interval elapses.
+  EXPECT_EQ(1, counter.calls_);
+  step(std::chrono::milliseconds(1000)); // t = 3000ms: nothing before the next interval.
+  EXPECT_EQ(1, counter.calls_);
+  step(std::chrono::milliseconds(1000)); // t = 4000ms: second interval elapses.
+  EXPECT_EQ(2, counter.calls_);
+  step(std::chrono::milliseconds(2000)); // t = 6000ms: keeps firing.
+  EXPECT_EQ(3, counter.calls_);
+  EXPECT_EQ(static_cast<size_t>(3 * MB), counter.bytes_released_);
+  MallocExtension::Register(original);
+}
+
+TEST_F(MemoryReleaseTest, GperftoolsNoReleaseWhenDisabled) {
+  // A zero interval, or one that truncates to zero milliseconds, disables release.
+  initialiseAllocatorManager(0, 0);
+  EXPECT_FALSE(AllocatorManagerPeer::hasBackgroundThread(*allocator_manager_));
+  initialiseAllocatorManager(MB, 0.0005);
+  EXPECT_FALSE(AllocatorManagerPeer::hasBackgroundThread(*allocator_manager_));
+}
+#endif
 
 TEST_F(MemoryReleaseTest, MaxUnfreedMemoryBytesConfigured) {
   EXPECT_EQ(DEFAULT_MAX_UNFREED_MEMORY_BYTES, maxUnfreedMemoryBytes());

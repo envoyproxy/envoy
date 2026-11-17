@@ -233,7 +233,7 @@ void UpstreamRequest::cleanUp() {
     const std::chrono::milliseconds response_time =
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_);
     Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = parent_.cluster()->timeoutBudgetStats();
-    tb_stats->get().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, parent_.timeout().per_try_timeout_));
   }
 
@@ -241,7 +241,7 @@ void UpstreamRequest::cleanUp() {
   Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
       parent_.cluster()->requestResponseSizeStats();
   if (req_resp_stats_opt.has_value() && parent_.downstreamHeaders()) {
-    auto& req_resp_stats = req_resp_stats_opt->get();
+    auto& req_resp_stats = req_resp_stats_opt.ref();
     req_resp_stats.upstream_rq_headers_size_.recordValue(parent_.downstreamHeaders()->byteSize());
     req_resp_stats.upstream_rq_headers_count_.recordValue(parent_.downstreamHeaders()->size());
     req_resp_stats.upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
@@ -268,11 +268,14 @@ void UpstreamRequest::cleanUp() {
 }
 
 void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
-  const Formatter::Context log_context{parent_.downstreamHeaders(),
-                                       upstream_headers_.get(),
-                                       upstream_trailers_.get(),
-                                       {},
-                                       access_log_type};
+  Formatter::Context log_context{parent_.downstreamHeaders(),
+                                 upstream_headers_.get(),
+                                 upstream_trailers_.get(),
+                                 {},
+                                 access_log_type};
+  if (parent_.downstreamTrailers() != nullptr) {
+    log_context.setRequestTrailers(*parent_.downstreamTrailers());
+  }
 
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
     upstream_log->log(log_context, stream_info_);
@@ -453,6 +456,16 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   }
 
   conn_pool_->newStream(this);
+
+  // The connection pool can fail synchronously, e.g. when a circuit breaker overflows,
+  // which resets this request and schedules it for deferred deletion before newStream()
+  // returns. Deferred deletion synchronously runs deleteIsPending() -> cleanUp(), destroying
+  // the upstream HTTP filter chain. Do not drive the destroyed filter chain any further.
+  if (cleaned_up_) {
+    ENVOY_STREAM_LOG(debug, "upstream request aborted during connection pool newStream",
+                     *parent_.callbacks());
+    return;
+  }
 
   if (parent_.config().upstream_log_flush_interval_.has_value()) {
     upstream_log_flush_timer_ = parent_.callbacks()->dispatcher().createTimer([this]() -> void {

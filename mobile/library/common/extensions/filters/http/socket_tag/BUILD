@@ -18,7 +18,6 @@ envoy_cc_extension(
     name = "socket_tag_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    repository = "@envoy",
     deps = [
         ":filter_cc_proto",
         "//library/common/network:socket_tag_socket_option_lib",
@@ -33,7 +32,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":socket_tag_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

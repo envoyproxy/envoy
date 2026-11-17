@@ -24,18 +24,19 @@ public:
   virtual ~CertificateValidationContextConfig() = default;
 
   /**
-   * @return The CA certificate to use for peer validation.
+   * @return The CA certificate(s) to use for peer validation (PEM may contain multiple
+   * certificates).
    */
   virtual const std::string& caCert() const PURE;
 
   /**
-   * @return Path of the CA certificate to use for peer validation or "<inline>"
+   * @return Path of the CA certificate(s) to use for peer validation or "<inline>"
    * if the CA certificate was inlined.
    */
   virtual const std::string& caCertPath() const PURE;
 
   /**
-   * @return the name of the CA certificate.
+   * @return the name of the CA certificate bundle.
    */
   virtual const std::string& caCertName() const PURE;
 

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <functional>
-#include <optional>
 #include <vector>
 
 #include "envoy/common/conn_pool.h"
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -22,7 +22,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> class ConnPoolMap {
 public:
   using PoolFactory = std::function<std::unique_ptr<POOL_TYPE>()>;
   using IdleCb = typename POOL_TYPE::IdleCb;
-  using PoolOptRef = std::optional<std::reference_wrapper<POOL_TYPE>>;
+  using PoolOptRef = OptRef<POOL_TYPE>;
 
   ConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
               ResourcePriority priority);

@@ -31,9 +31,14 @@ fi
     export ENVOY_BUILD_ARCH
 }
 
-read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
-read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
-read -ra BAZEL_STARTUP_EXTRA_OPTIONS <<< "${BAZEL_STARTUP_EXTRA_OPTIONS:-}"
+# The options can span lines (eg from a folded YAML block), and `read` only reads the first, so
+# lines are joined.
+BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS:-}"
+BAZEL_EXTRA_TEST_OPTIONS="${BAZEL_EXTRA_TEST_OPTIONS:-}"
+BAZEL_STARTUP_EXTRA_OPTIONS="${BAZEL_STARTUP_EXTRA_OPTIONS:-}"
+read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS//$'\n'/ }"
+read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS//$'\n'/ }"
+read -ra BAZEL_STARTUP_EXTRA_OPTIONS <<< "${BAZEL_STARTUP_EXTRA_OPTIONS//$'\n'/ }"
 read -ra BAZEL_OPTIONS <<< "${BAZEL_OPTIONS:-}"
 
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
@@ -137,12 +142,21 @@ if [[ -z "$SKIP_REMOTE_DETECTION" ]]; then
     fi
 fi
 
+BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}")
+if grep -q "config definition.*--config=mobile-rbe" <<<"${rc_output:-}"; then
+    BAZEL_QUERY_OPTIONS+=("--config=mobile-rbe")
+elif grep -q "remote_cache" <<<"${rc_output:-}"; then
+    BAZEL_QUERY_OPTIONS+=("--config=remote-cache")
+fi
+
 BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
 BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
 BAZEL_GLOBAL_OPTION_LIST="${BAZEL_GLOBAL_OPTIONS[*]}"
+BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
 export BAZEL_STARTUP_OPTION_LIST
 export BAZEL_BUILD_OPTION_LIST
 export BAZEL_GLOBAL_OPTION_LIST
+export BAZEL_QUERY_OPTION_LIST
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 

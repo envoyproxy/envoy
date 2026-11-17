@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
@@ -26,11 +27,15 @@ namespace OpenTelemetry {
 #define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
   COUNTER(spans_sent)                                                                              \
   COUNTER(timer_flushed)                                                                           \
-  COUNTER(spans_dropped)
+  COUNTER(spans_dropped)                                                                           \
+  COUNTER(spans_export_failed)
 
 struct OpenTelemetryTracerStats {
   OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
+
+using TraceContextFormat = envoy::config::trace::v3::OpenTelemetryConfig::TraceContextFormat;
+using TraceContextFormats = std::vector<TraceContextFormat>;
 
 /**
  * OpenTelemetry Tracer. It is stored in TLS and contains the exporter.
@@ -40,9 +45,16 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true);
+         SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true,
+         TraceContextFormats outgoing_trace_context = {
+             envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT});
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
+
+  /**
+   * @return the trace context formats injected into upstream requests.
+   */
+  const TraceContextFormats& outgoingTraceContext() const { return outgoing_trace_context_; }
 
   Tracing::SpanPtr startSpan(const std::string& operation_name,
                              const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
@@ -77,6 +89,7 @@ private:
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
   const bool set_instrumentation_scope_{true};
+  const TraceContextFormats outgoing_trace_context_;
 };
 
 /**
@@ -92,6 +105,9 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
+  void setTypedTag(absl::string_view name, absl::string_view value,
+                   Tracing::TagValueType type) override;
+  void reserveTags(size_t size) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,

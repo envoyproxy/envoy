@@ -108,6 +108,7 @@ public:
   // Set up the upstream extension components (socket interface and extension).
   void setupUpstreamExtension() {
     // Create the socket interface.
+    extension_.reset();
     socket_interface_ =
         std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
 
@@ -161,9 +162,7 @@ public:
           membership_updated_.ready();
           return absl::OkStatus();
         });
-    ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
-      init_complete_ = true;
-    }));
+    ON_CALL(initialized_, ready()).WillByDefault([this] { init_complete_ = true; });
     cluster_->initialize([&]() {
       initialized_.ready();
       return absl::OkStatus();
@@ -207,8 +206,7 @@ public:
 
     // Let the extension create and own its TLS slot and manager to avoid duplicate timer/file
     // event creation.
-    NiceMock<Server::MockInstance> instance;
-    extension_->onServerInitialized(instance);
+    extension_->onWorkerThreadInitialized();
   }
 
   // Helper to add a socket to the manager for testing.
@@ -583,7 +581,7 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceWrongType) {
       return "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
     }
 
-    Server::BootstrapExtensionPtr
+    Server::BootstrapExtensionCreationResult
     createBootstrapExtension(const Protobuf::Message&,
                              Server::Configuration::ServerFactoryContext&) override {
       return nullptr;
@@ -823,7 +821,7 @@ TEST_F(ReverseConnectionClusterTest, DrainingNodeCannotReuseCachedHost) {
   auto original_host = lb.chooseHost(&lb_context).host;
   ASSERT_NE(original_host, nullptr);
 
-  socket_manager->onGoAway(123);
+  socket_manager->markSocketDraining(123);
   EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node"}}};
@@ -1191,6 +1189,7 @@ public:
   // Set up the upstream extension components (socket interface and extension).
   void setupUpstreamExtension() {
     // Create the socket interface.
+    extension_.reset();
     socket_interface_ =
         std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
 
@@ -1207,8 +1206,7 @@ public:
     }
 
     // Let the extension create and manage its own TLS slot and timer.
-    NiceMock<Server::MockInstance> instance;
-    extension_->onServerInitialized(instance);
+    extension_->onWorkerThreadInitialized();
 
     // Get the registered socket interface from the global registry and set up its extension.
     auto* registered_socket_interface =
@@ -2176,8 +2174,9 @@ TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
 
   // Capture the callback posted to the dispatcher by chooseHost().
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
@@ -2224,8 +2223,9 @@ TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
 
   Event::PostCb post_cb;
   // Expect exactly one post (for the first chooseHost only).
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;
@@ -2275,8 +2275,7 @@ TEST_F(ReverseConnectionClusterTest, MultipleHostsMembershipUpdate) {
   std::vector<Event::PostCb> post_cbs;
   EXPECT_CALL(server_context_.dispatcher_, post(_))
       .Times(2)
-      .WillRepeatedly(
-          testing::Invoke([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); }));
+      .WillRepeatedly([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); });
 
   RevConCluster::LoadBalancer lb(cluster_);
 
@@ -2332,8 +2331,9 @@ TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   addTestSocket("stale-node", "stale-cluster");
 
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;

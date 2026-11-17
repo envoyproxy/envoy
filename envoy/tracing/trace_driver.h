@@ -2,17 +2,26 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
+#include "envoy/tracing/trace_context.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Tracing {
 
 class Span;
 using SpanPtr = std::unique_ptr<Span>;
+
+/**
+ * The desired value type for a typed span tag. Tracers that support typed span
+ * attributes (e.g. OpenTelemetry) may emit the tag as a native attribute of this
+ * type; tracers without such support keep treating the value as a string.
+ */
+enum class TagValueType { String, Int, Double, Bool };
 
 /**
  * The upstream service type.
@@ -74,6 +83,30 @@ public:
    * @param value the value to associate with the tag
    */
   virtual void setTag(absl::string_view name, absl::string_view value) PURE;
+
+  /**
+   * Attach a typed tag to a Span.
+   *
+   * The value is provided as its string representation together with the desired
+   * type. The default implementation ignores the type and records the original
+   * string via setTag(), so tracers without typed-attribute support keep their
+   * existing behavior and never rewrite the value. Tracers such as OpenTelemetry
+   * override this to emit a native typed span attribute when the value parses,
+   * falling back to a string tag otherwise.
+   * @param name the name of the tag
+   * @param value the string representation of the tag value
+   * @param type the desired value type
+   */
+  virtual void setTypedTag(absl::string_view name, absl::string_view value,
+                           TagValueType /* type */) {
+    setTag(name, value);
+  }
+
+  /**
+   * Reserve capacity for additional tags.
+   * @param size number of tags that will be set
+   */
+  virtual void reserveTags(size_t /* size */) {}
 
   /**
    * Record an event associated with a span, to be handled in an implementation-dependent fashion.
@@ -177,6 +210,12 @@ public:
    * @return span ID as a hex string
    */
   virtual std::string getSpanId() const PURE;
+
+  /**
+   * Reparent this span based on the given trace context.
+   */
+  virtual void updateParent([[maybe_unused]] const TraceContext& context,
+                            [[maybe_unused]] bool preserve_headers) {}
 };
 
 /**

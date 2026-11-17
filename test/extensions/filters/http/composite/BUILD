@@ -15,8 +15,15 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.composite"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
+        "//source/common/common:cleanup_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
@@ -26,6 +33,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/fault:fault_filter_lib",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -39,7 +47,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["composite_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.composite"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     shard_count = 6,
     deps = [
         "//source/common/http:header_map_lib",
@@ -55,7 +68,9 @@ envoy_extension_cc_test(
         "//test/integration/filters:server_factory_context_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

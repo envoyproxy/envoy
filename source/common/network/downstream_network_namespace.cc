@@ -5,6 +5,8 @@
 
 #include "source/common/common/macros.h"
 
+// NOLINT: cache-bust for corrupt RBE artifact, remove this on any change to this file.
+
 namespace Envoy {
 namespace Network {
 

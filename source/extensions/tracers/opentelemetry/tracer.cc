@@ -12,8 +12,10 @@
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/common/version/version.h"
+#include "source/extensions/tracers/opentelemetry/b3_span_context.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
+#include "absl/strings/numbers.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
 
@@ -102,8 +104,14 @@ void Span::finishSpan() {
     flags |= TraceFlagsSampledMask;
   }
   span_.set_flags(flags);
+  ENVOY_LOG(trace, "Span finished: name={}, trace_id={}, span_id={}, sampled={}, duration_us={}",
+            span_.name(), getTraceId(), getSpanId(), sampled(),
+            (span_.end_time_unix_nano() - span_.start_time_unix_nano()) / 1000);
   if (sampled()) {
     parent_tracer_.sendSpan(span_);
+  } else {
+    ENVOY_LOG(debug, "Span not sampled, skipping export: trace_id={}, span_id={}", getTraceId(),
+              getSpanId());
   }
 }
 
@@ -112,14 +120,29 @@ void Span::setOperation(absl::string_view operation) { span_.set_name(operation)
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
-  std::vector<uint8_t> trace_flags_vec{sampled()};
-  std::string trace_flags_hex = Hex::encode(trace_flags_vec);
-  std::string traceparent_header_value =
-      absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
-  // Set the traceparent in the trace_context.
-  traceParentHeader().setRefKey(trace_context, traceparent_header_value);
-  // Also set the tracestate.
-  traceStateHeader().setRefKey(trace_context, span_.trace_state());
+  for (const TraceContextFormat format : parent_tracer_.outgoingTraceContext()) {
+    switch (format) {
+    case envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT: {
+      std::vector<uint8_t> trace_flags_vec{sampled()};
+      std::string trace_flags_hex = Hex::encode(trace_flags_vec);
+      std::string traceparent_header_value =
+          absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
+      // Set the traceparent in the trace_context.
+      traceParentHeader().setRefKey(trace_context, traceparent_header_value);
+      // Also set the tracestate.
+      traceStateHeader().setRefKey(trace_context, span_.trace_state());
+      break;
+    }
+    case envoy::config::trace::v3::OpenTelemetryConfig::B3:
+      injectB3SingleHeader(trace_context, trace_id_hex, span_id_hex, sampled());
+      break;
+    case envoy::config::trace::v3::OpenTelemetryConfig::B3_MULTI:
+      injectB3MultiHeaders(trace_context, trace_id_hex, span_id_hex, sampled());
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
+  }
 }
 
 void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_value) {
@@ -208,6 +231,44 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   setAttribute(name, value);
 }
 
+void Span::setTypedTag(absl::string_view name, absl::string_view value,
+                       Tracing::TagValueType type) {
+  switch (type) {
+  case Tracing::TagValueType::Int: {
+    int64_t int_value = 0;
+    if (absl::SimpleAtoi(value, &int_value)) {
+      setAttribute(name, int_value);
+      return;
+    }
+    break;
+  }
+  case Tracing::TagValueType::Double: {
+    double double_value = 0;
+    if (absl::SimpleAtod(value, &double_value)) {
+      setAttribute(name, double_value);
+      return;
+    }
+    break;
+  }
+  case Tracing::TagValueType::Bool: {
+    bool bool_value = false;
+    if (absl::SimpleAtob(value, &bool_value)) {
+      setAttribute(name, bool_value);
+      return;
+    }
+    break;
+  }
+  case Tracing::TagValueType::String:
+    break;
+  }
+  setTag(name, value);
+}
+
+void Span::reserveTags(size_t size) {
+  auto* attributes = span_.mutable_attributes();
+  attributes->Reserve(attributes->size() + size);
+}
+
 void Span::log(SystemTime timestamp, const std::string& event) {
   if (event.empty()) {
     return;
@@ -225,10 +286,12 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size, bool set_instrumentation_scope)
+               uint64_t max_cache_size, bool set_instrumentation_scope,
+               TraceContextFormats outgoing_trace_context)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope) {
+      max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope),
+      outgoing_trace_context_(std::move(outgoing_trace_context)) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -287,9 +350,12 @@ void Tracer::flushSpans() {
     (*scope_span->add_spans()) = pending_span;
   }
   tracing_stats_.spans_sent_.add(span_buffer_.size());
+  ENVOY_LOG(debug, "Exporting {} span(s) to OpenTelemetry trace collector", span_buffer_.size());
   if (!exporter_->log(request)) {
-    // TODO: should there be any sort of retry or reporting here?
-    ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
+    // TODO: should there be any sort of retry here?
+    tracing_stats_.spans_export_failed_.add(span_buffer_.size());
+    ENVOY_LOG(debug, "Unsuccessful log request to OpenTelemetry trace collector; {} span(s) lost",
+              span_buffer_.size());
   }
   span_buffer_.clear();
 }
@@ -307,6 +373,8 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   span_buffer_.push_back(span);
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
+  ENVOY_LOG(trace, "Span buffered for export: name={}, buffered={}, min_flush_spans={}",
+            span.name(), span_buffer_.size(), min_flush_spans);
   if (span_buffer_.size() >= min_flush_spans) {
     flushSpans();
   }
@@ -335,6 +403,11 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   } else {
     new_span->setSampled(tracing_decision.traced);
   }
+  ENVOY_LOG(trace,
+            "Span created (new trace): name={}, trace_id={}, span_id={}, kind={}, sampled={}, "
+            "sampler={}",
+            operation_name, new_span->getTraceId(), new_span->getSpanId(),
+            static_cast<int>(span_kind), new_span->sampled(), sampler_ ? "custom" : "local");
   return new_span;
 }
 
@@ -367,6 +440,12 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
       new_span->setTracestate(parent_context.tracestate());
     }
   }
+  ENVOY_LOG(trace,
+            "Span created (from parent context): name={}, trace_id={}, span_id={}, "
+            "parent_span_id={}, parent_is_remote={}, kind={}, sampled={}, sampler={}",
+            operation_name, new_span->getTraceId(), new_span->getSpanId(), parent_context.spanId(),
+            parent_context.isRemote(), static_cast<int>(span_kind), new_span->sampled(),
+            sampler_ ? "custom" : "local");
   return new_span;
 }
 

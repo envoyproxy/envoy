@@ -600,6 +600,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "persistent_hash_map_lib",
+    hdrs = ["persistent_hash_map.h"],
+    deps = [
+        "@abseil-cpp//absl/hash",
+    ],
+)
+
+envoy_cc_library(
     name = "scalar_to_byte_vector_lib",
     hdrs = ["scalar_to_byte_vector.h"],
 )
@@ -641,6 +649,14 @@ envoy_cc_library(
     hdrs = ["statusor.h"],
     deps = [
         "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "stderr_writer_lib",
+    hdrs = ["stderr_writer.h"],
+    deps = [
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 

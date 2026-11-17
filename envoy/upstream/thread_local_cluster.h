@@ -188,7 +188,7 @@ public:
   virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
-using ThreadLocalClusterOptRef = std::optional<std::reference_wrapper<ThreadLocalCluster>>;
+using ThreadLocalClusterOptRef = OptRef<ThreadLocalCluster>;
 
 } // namespace Upstream
 } // namespace Envoy

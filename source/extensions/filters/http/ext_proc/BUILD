@@ -19,7 +19,6 @@ envoy_cc_library(
         "ext_proc.h",
         "processor_state.h",
     ],
-    tags = ["skip_on_windows"],
     deps = [
         ":allowed_override_modes_set_lib",
         ":client_lib",
@@ -55,7 +54,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "allowed_override_modes_set_lib",
     hdrs = ["allowed_override_modes_set.h"],
-    tags = ["skip_on_windows"],
     deps = [
         "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
@@ -79,7 +77,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    tags = ["skip_on_windows"],
     deps = [
         ":allowed_override_modes_set_lib",
         ":client_lib",
@@ -118,7 +115,6 @@ envoy_cc_library(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/protobuf",
@@ -137,7 +133,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "processing_request_modifier_interface",
     hdrs = ["processing_request_modifier.h"],
-    tags = ["skip_on_windows"],
     deps = [
         ":matching_utils_lib",
         "//envoy/config:typed_config_interface",
@@ -150,7 +145,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "on_processing_response_interface",
     hdrs = ["on_processing_response.h"],
-    tags = ["skip_on_windows"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",

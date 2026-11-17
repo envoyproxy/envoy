@@ -19,6 +19,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "http_filter_factory_context_interface",
+    hdrs = ["http_filter_factory_context.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
     deps = [":codec_interface"],
@@ -30,6 +40,7 @@ envoy_cc_library(
     deps = [
         ":filter_interface",
         ":message_interface",
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:tracer_interface",

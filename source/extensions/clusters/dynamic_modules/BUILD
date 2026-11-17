@@ -19,9 +19,12 @@ envoy_cc_library(
         "cluster.h",
     ],
     deps = [
+        ":persistent_host_set_lib",
+        "//envoy/event:dispatcher_thread_deletable",
         "//envoy/http:async_client_interface",
         "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -32,6 +35,7 @@ envoy_cc_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/types:span",
@@ -39,6 +43,25 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)
+
+# Only the dynamic modules cluster and its tests can use the persistent host set.
+envoy_cc_library(
+    name = "persistent_host_set_lib",
+    srcs = ["persistent_host_set.cc"],
+    hdrs = ["persistent_host_set.h"],
+    visibility = [
+        "//source/extensions/clusters/dynamic_modules:__pkg__",
+        "//test/extensions/clusters/dynamic_modules:__pkg__",
+    ],
+    deps = [
+        "//envoy/upstream:locality_lib",
+        "//source/common/common:persistent_hash_map_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:function_ref",
     ],
 )
 

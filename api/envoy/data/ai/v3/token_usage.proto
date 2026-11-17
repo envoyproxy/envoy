@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.data.ai.v3;
 
-import "envoy/type/ai/v3/api_protocol.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -32,7 +32,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // provider-reported and is not independently verified by Envoy.
 //
 // Every count is optional: wire APIs report different subsets, and a
-// status-only record (``api_protocol``, ``model`` when captured, and
+// status-only record (``llm_protocol``, ``model`` when captured, and
 // ``extraction_status: FAILED``) is published when extraction failed
 // outright, distinguishing that from a response that supplied no usage
 // (which publishes nothing).
@@ -51,14 +51,14 @@ message TokenUsage {
     PARTIAL = 2;
 
     // Usage-bearing input was observed but no usable canonical count could
-    // be extracted; only ``api_protocol`` and ``model`` may be populated.
+    // be extracted; only ``llm_protocol`` and ``model`` may be populated.
     FAILED = 3;
   }
 
   // The wire API the usage was extracted from. This names an API contract,
   // not a provider identity: any OpenAI-compatible backend reports an OpenAI
   // protocol here.
-  type.ai.v3.ApiProtocol api_protocol = 1;
+  type.ai.v3.LLMProtocol llm_protocol = 1;
 
   // The model reported by the response, when present.
   string model = 2;

@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "envoy/network/transport_socket.h"
-#include "envoy/singleton/instance.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -24,6 +23,7 @@
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/stats.h"
+#include "source/common/tls/utility.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -63,6 +63,10 @@ struct TlsContext {
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_;
+  // The parsed certificate chain and private key, held for this context's lifetime so that cached
+  // entries stay reusable by sibling contexts and the next xDS generation.
+  Extensions::TransportSockets::Tls::CertChainSharedPtr shared_cert_chain_;
+  Extensions::TransportSockets::Tls::PrivateKeySharedPtr shared_private_key_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -74,43 +78,21 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
-  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
+  // When non-null, the cache shares the parsed material across contexts with
+  // identical PEM; null selects a per-context parse.
+  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path,
+                                    Extensions::TransportSockets::Tls::CertChainCache* cache);
   absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
-                              const std::string& password, bool fips_mode);
+                              const std::string& password, bool fips_mode,
+                              Extensions::TransportSockets::Tls::PrivateKeyCache* cache);
   absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
                           const std::string& password, bool fips_mode);
-  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
-                               bool fips_mode);
 };
 } // namespace Ssl
 
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-// The TLS stat name builtins (BoringSSL cipher/curve/signature algorithm/version names, plus the
-// fixed prefixes and "unknown" fallbacks) are identical for every TLS context. Interning
-// them into a per-context StatNameSet duplicated ~150 locked symbol-table encodes and a
-// builtin map per context, and repeated it on every SDS certificate rotation. Instead we
-// build the set once per server and share it via the singleton manager. The set is fully
-// populated at construction and immutable thereafter, so the lock-free getBuiltin() reads
-// performed on worker threads remain safe.
-class TlsBuiltinStatNames : public Singleton::Instance {
-public:
-  explicit TlsBuiltinStatNames(Stats::SymbolTable& symbol_table);
-
-  Stats::StatNameSet& statNameSet() const { return *stat_name_set_; }
-
-  const Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName unknown_ssl_cipher_;
-  const Stats::StatName unknown_ssl_curve_;
-  const Stats::StatName unknown_ssl_algorithm_;
-  const Stats::StatName unknown_ssl_version_;
-  const Stats::StatName ssl_ciphers_;
-  const Stats::StatName ssl_versions_;
-  const Stats::StatName ssl_curves_;
-  const Stats::StatName ssl_sigalgs_;
-};
 
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
@@ -136,7 +118,7 @@ public:
   static int sslSocketIndex();
   // Ssl::Context
   std::optional<uint32_t> daysUntilFirstCertExpires() const override;
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
 
@@ -180,8 +162,9 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
                                           absl::Status& parse_status);
 
-  void incCounter(const Stats::StatName name, absl::string_view value,
-                  const Stats::StatName fallback) const;
+  // Increments the "<name>.<value>" counter of the scope, with the value as its tag_name tag.
+  void incCounter(const Stats::StatName name, const Stats::StatName tag_name,
+                  absl::string_view value, const Stats::StatName fallback) const;
 
   // Helper function to validate cert for TCP connections asynchronously.
   ValidationResults customVerifyCertChain(

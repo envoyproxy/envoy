@@ -16,6 +16,7 @@ namespace Crypto {
 class UtilityImpl : public Envoy::Common::Crypto::Utility {
 public:
   std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) override;
+  std::vector<uint8_t> getSha256Digest(absl::string_view text) override;
   std::vector<uint8_t> getSha256Hmac(absl::Span<const uint8_t> key,
                                      absl::string_view message) override;
   absl::Status verifySignature(absl::string_view hash_function, PKeyObject& key,

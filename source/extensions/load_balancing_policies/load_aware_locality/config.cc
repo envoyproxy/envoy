@@ -59,6 +59,14 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
   std::vector<std::string> metric_names(lb_config.metric_names_for_computing_utilization().begin(),
                                         lb_config.metric_names_for_computing_utilization().end());
 
+  const bool enable_oob_load_report = lb_config.enable_oob_load_report().value();
+  Common::OrcaOobManagerConfig oob_manager_config;
+  oob_manager_config.reporting_period = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+      lb_config, oob_reporting_period, Common::kDefaultOobReportingPeriodMs));
+  if (lb_config.has_oob_reporting_config()) {
+    Common::applyOrcaOobConnectionOverrides(lb_config.oob_reporting_config(), oob_manager_config);
+  }
+
   // Resolve the endpoint-picking child policy.
   Upstream::TypedLoadBalancerFactory* endpoint_picking_policy_factory = nullptr;
   for (const auto& endpoint_picking_policy : lb_config.endpoint_picking_policy().policies()) {
@@ -87,8 +95,8 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
           *endpoint_picking_policy_factory,
           LoadBalancerConfigSharedPtr(std::move(lb_config_or_error.value())), weight_update_period,
           utilization_variance_threshold, ewma_alpha, remote_probe_fraction,
-          weight_expiration_period, std::move(metric_names), context.mainThreadDispatcher(),
-          context.threadLocal());
+          weight_expiration_period, std::move(metric_names), enable_oob_load_report,
+          std::move(oob_manager_config), context.mainThreadDispatcher(), context.threadLocal());
     }
   }
 

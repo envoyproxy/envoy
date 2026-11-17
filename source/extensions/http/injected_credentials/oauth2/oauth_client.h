@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -32,10 +33,10 @@ public:
     NotDispatchedAlreadyInFlight,
     DispatchedRequest,
   };
-  virtual GetTokenResult
-  asyncGetAccessToken(const std::string& client_id, const std::string& secret,
-                      const std::string& scopes,
-                      const std::map<std::string, std::string>& endpoint_params) PURE;
+  virtual GetTokenResult asyncGetAccessToken(
+      const std::string& client_id, const std::string& secret, const std::string& scopes,
+      const std::map<std::string, std::string>& endpoint_params,
+      envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::AuthType auth_type) PURE;
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -60,10 +61,11 @@ public:
   /**
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
-  GetTokenResult
-  asyncGetAccessToken(const std::string& client_id, const std::string& secret,
-                      const std::string& scopes,
-                      const std::map<std::string, std::string>& endpoint_params) override;
+  GetTokenResult asyncGetAccessToken(
+      const std::string& client_id, const std::string& secret, const std::string& scopes,
+      const std::map<std::string, std::string>& endpoint_params,
+      envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::AuthType auth_type)
+      override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 

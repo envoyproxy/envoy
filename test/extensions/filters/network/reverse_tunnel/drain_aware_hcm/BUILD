@@ -34,7 +34,17 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
@@ -54,7 +64,17 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
@@ -70,6 +90,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

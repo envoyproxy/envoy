@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.load_aware_locality"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/load_aware_locality:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -33,7 +39,13 @@ envoy_extension_cc_test(
     name = "load_aware_locality_lb_test",
     srcs = ["load_aware_locality_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.load_aware_locality"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
@@ -41,6 +53,7 @@ envoy_extension_cc_test(
         "//source/extensions/load_balancing_policies/load_aware_locality:load_aware_locality_lb_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
@@ -58,18 +71,26 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
-    size = "large",
     srcs = ["integration_test.cc"],
     extension_names = [
+        "envoy.load_balancing_policies.client_side_weighted_round_robin",
         "envoy.load_balancing_policies.load_aware_locality",
         "envoy.load_balancing_policies.round_robin",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
+        "//source/common/grpc:common_lib",
         "//source/common/protobuf",
+        "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
         "//source/extensions/load_balancing_policies/load_aware_locality:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],

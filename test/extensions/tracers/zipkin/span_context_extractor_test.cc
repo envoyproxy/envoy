@@ -628,6 +628,32 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithMalformedTraceparent) {
   EXPECT_FALSE(context3.second);
 }
 
+TEST(ZipkinSpanContextExtractorTest, B3SingleFormatUsed) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"b3", fmt::format("{}-{}-1-{}", trace_id, span_id, parent_id)}};
+  SpanContextExtractor extractor(request_headers);
+  EXPECT_FALSE(extractor.b3SingleFormatUsed());
+  auto context = extractor.extractSpanContext(true);
+  EXPECT_TRUE(context.second);
+  EXPECT_TRUE(extractor.b3SingleFormatUsed());
+
+  // Sampling state only: no span context, but the B3 single format is still used.
+  Tracing::TestTraceContextImpl request_headers2{{"b3", "0"}};
+  SpanContextExtractor extractor2(request_headers2);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second);
+  EXPECT_TRUE(extractor2.b3SingleFormatUsed());
+}
+
+TEST(ZipkinSpanContextExtractorTest, B3SingleFormatNotUsedForMultipleHeaders) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"x-b3-traceid", trace_id}, {"x-b3-spanid", span_id}, {"x-b3-sampled", "1"}};
+  SpanContextExtractor extractor(request_headers);
+  auto context = extractor.extractSpanContext(true);
+  EXPECT_TRUE(context.second);
+  EXPECT_FALSE(extractor.b3SingleFormatUsed());
+}
+
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions
