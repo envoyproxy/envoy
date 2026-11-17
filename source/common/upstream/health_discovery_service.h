@@ -39,6 +39,9 @@ using HealthCheckerMap =
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
 
+class HdsCluster;
+using HdsClusterPtr = std::shared_ptr<HdsCluster>;
+
 /**
  * Implementation of Upstream::Cluster for hds clusters, clusters that are used
  * by HdsDelegates
@@ -46,11 +49,13 @@ using HealthCheckerMap =
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
-  HdsCluster(Server::Configuration::ServerFactoryContext& server_context,
-             envoy::config::cluster::v3::Cluster cluster,
-             const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
-             Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-             ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
+  // Creates an HdsCluster, resolving the endpoints in `cluster`.
+  static absl::StatusOr<HdsClusterPtr>
+  create(Server::Configuration::ServerFactoryContext& server_context,
+         envoy::config::cluster::v3::Cluster cluster,
+         const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
+         Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+         ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -82,6 +87,10 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
+  HdsCluster(Server::Configuration::ServerFactoryContext& server_context,
+             envoy::config::cluster::v3::Cluster cluster, Stats::Store& stats,
+             Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+
   std::function<absl::Status()> initialization_complete_callback_;
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -109,8 +118,6 @@ private:
                   locality_endpoints,
               bool update_socket_matches);
 };
-
-using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 
 /**
  * All hds stats. @see stats_macros.h
