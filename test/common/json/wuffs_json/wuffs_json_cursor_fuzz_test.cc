@@ -238,10 +238,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // boundaries at other offsets within multi-byte tokens.
   for (const size_t chunk_size : {size_t{1}, size_t{3}, size_t{7}}) {
     const PassResult chunked = runPass(body, chunk_size, pattern, HandlerBehavior{});
-    // A body that parses only one way is not a mismatch: splitting a number
-    // across chunks routes it through the pending-bytes cap, which rejects
-    // over-long numbers that a single feed accepts.
-    if (reference.status.ok() && chunked.status.ok()) {
+    RELEASE_ASSERT(reference.status.ok() == chunked.status.ok(),
+                   absl::StrCat("chunked status diverged at chunk size ", chunk_size));
+    if (reference.status.ok()) {
       RELEASE_ASSERT(reference.trace == chunked.trace,
                      absl::StrCat("chunked parse diverged at chunk size ", chunk_size));
     }

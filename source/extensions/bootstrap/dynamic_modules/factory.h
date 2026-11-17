@@ -17,7 +17,7 @@ class DynamicModuleBootstrapExtensionFactory
 public:
   std::string name() const override { return "envoy.bootstrap.dynamic_modules"; }
 
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
 

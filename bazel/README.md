@@ -81,7 +81,6 @@ for how to update or override dependencies.
     On Fedora (maybe also other red hat distros), run the following:
     ```console
     dnf install \
-        aspell-en \
         libatomic \
         libstdc++ \
         libstdc++-static \
@@ -128,7 +127,7 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget libtool go bazelisk clang-format autoconf aspell
+    brew install coreutils wget libtool go bazelisk clang-format autoconf
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
@@ -914,8 +913,10 @@ tools/gen_compilation_database.py --exclude_contrib
 
 # Running format linting without docker
 
-Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
-Prefer to run it via bazel as the environment will contain the dictionary used.
+Prefer to run the spelling check via bazel (`//tools/spelling:check_spelling_pedantic`), which uses
+the hermetic `hunspell` and `en_US` dictionary from `envoy_toolshed`. Running
+`tools/spelling/check_spelling_pedantic.py` directly needs `hunspell` and its `en_US` dictionary
+installed, or `HUNSPELL` and `HUNSPELL_DICT` set to a binary and a dictionary path.
 
 You can run clang-format directly, without docker:
 

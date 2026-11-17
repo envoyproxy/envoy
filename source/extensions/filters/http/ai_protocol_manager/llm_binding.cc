@@ -330,7 +330,7 @@ absl::StatusOr<LlmBindingConstSharedPtr> LlmBinding::parse(absl::string_view tex
   text = absl::StripAsciiWhitespace(text);
   envoy::type::ai::v3::LLMBinding proto;
   if (absl::StartsWith(text, "/")) {
-    proto.set_uri_pattern(std::string(text));
+    proto.set_uri_pattern(text);
   } else if (absl::StartsWith(text, "{")) {
     bool has_unknown_field;
     if (const absl::Status status =

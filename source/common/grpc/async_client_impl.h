@@ -121,6 +121,7 @@ private:
 
   // Deliver notification and update span when the connection closes.
   void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+  bool checkWaitingToDeletedOnRemoteClose();
 
 protected:
   Event::Dispatcher* dispatcher_{};

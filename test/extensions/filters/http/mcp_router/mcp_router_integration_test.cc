@@ -263,7 +263,28 @@ public:
     initialize();
   }
 
-  void TearDown() override { cleanupUpstreamAndDownstream(); }
+  void TearDown() override {
+    // The backend connections are held here rather than in fake_upstream_connection_, so
+    // cleanupUpstreamAndDownstream() does not close them. Destroying one while its fake upstream
+    // is still flushing a response frees the HTTP/1 codec under the write: the codec's
+    // flood-tracking sentinel fragment then calls back into freed memory when the write buffer
+    // drains. Close them, wait for the upstream side to finish and for anything the test posted
+    // to its thread to run, then release them, as cleanupUpstreamAndDownstream() does for
+    // fake_upstream_connection_.
+    for (FakeHttpConnectionPtr* connection :
+         {&time_backend_connection_, &tools_backend_connection_}) {
+      if (*connection != nullptr) {
+        auto result = (*connection)->close();
+        RELEASE_ASSERT(result, result.message());
+        result = (*connection)->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+        result = (*connection)->waitForNoPost();
+        RELEASE_ASSERT(result, result.message());
+        connection->reset();
+      }
+    }
+    cleanupUpstreamAndDownstream();
+  }
 
   FakeHttpConnectionPtr time_backend_connection_;
   FakeHttpConnectionPtr tools_backend_connection_;

@@ -19,20 +19,26 @@ fn new_tls_certificate_selector_config(
   is_upstream: bool,
   envoy_config: Arc<dyn EnvoyTlsCertificateSelectorConfig>,
 ) -> Option<Box<dyn TlsCertificateSelectorConfig>> {
-  match (name, is_upstream) {
-    ("downstream", false) | ("upstream", true) => Some(Box::new(ServerNameSelectorConfig {
+  let selector_config: Box<dyn TlsCertificateSelectorConfig> = match (name, is_upstream) {
+    ("downstream", false) | ("upstream", true) => Box::new(ServerNameSelectorConfig {
       server_name: config.to_vec(),
-    })),
-    ("filter_state", true) => Some(Box::new(FilterStateSelectorConfig {
+    }),
+    ("filter_state", true) => Box::new(FilterStateSelectorConfig {
       tenant: config.to_vec(),
-    })),
-    ("fail", _) => Some(Box::new(FailSelectorConfig)),
-    ("dynamic", _) => Some(Box::new(DynamicSelectorConfig::new(
-      std::str::from_utf8(config).ok()?,
-      envoy_config,
-    )?)),
-    _ => None,
-  }
+    }),
+    ("fail", _) => Box::new(FailSelectorConfig),
+    // The dynamic selector signals once it provides its "init" certificates.
+    ("dynamic", _) => {
+      return Some(Box::new(DynamicSelectorConfig::new(
+        std::str::from_utf8(config).ok()?,
+        envoy_config,
+      )?))
+    },
+    _ => return None,
+  };
+  // The other selectors have nothing to wait for.
+  envoy_config.signal_init_complete();
+  Some(selector_config)
 }
 
 /// Returns whether the certificate is a whole DER encoded SEQUENCE with a two byte length, which
@@ -154,22 +160,29 @@ impl Certificate {
 /// requested, and a "fetch" certificate is provided from another thread when it is requested. A
 /// "hold" certificate is not provided when it is requested, but when a name with the "release."
 /// prefix is requested, which is then declined. A requested name with the "remove." prefix removes
-/// the certificate named by the rest of it, and is then declined. Other names are declined.
+/// the certificate named by the rest of it, and is then declined. Other names are declined. The
+/// "init" certificates are provided from another thread after a delay, and then the module signals
+/// that its initialization is complete, which it otherwise does when the config is created.
 struct DynamicSelectorConfig {
   envoy_config: Arc<dyn EnvoyTlsCertificateSelectorConfig>,
   scheduler: Arc<dyn EnvoyTlsCertificateSelectorConfigScheduler>,
   synced: Vec<Certificate>,
   fetched: Vec<Certificate>,
   held: Vec<Certificate>,
+  initialized: Vec<Certificate>,
   selected: EnvoyCounterVecId,
   requested: EnvoyCounterId,
 }
+
+/// The scheduled event that provides the "init" certificates.
+const INIT_EVENT_ID: u64 = u64::MAX;
 
 impl DynamicSelectorConfig {
   fn new(config: &str, envoy_config: Arc<dyn EnvoyTlsCertificateSelectorConfig>) -> Option<Self> {
     let mut synced = Vec::new();
     let mut fetched = Vec::new();
     let mut held = Vec::new();
+    let mut initialized = Vec::new();
     for line in config.lines() {
       let fields: Vec<&str> = line.split_whitespace().collect();
       let [mode, name, certificate_path, private_key_path, ocsp_staple_path @ ..] =
@@ -197,10 +210,11 @@ impl DynamicSelectorConfig {
         "sync" => synced.push(certificate),
         "fetch" => fetched.push(certificate),
         "hold" => held.push(certificate),
+        "init" => initialized.push(certificate),
         _ => return None,
       }
     }
-    Some(Self {
+    let selector_config = Self {
       selected: envoy_config
         .define_counter_vec("selected", &["outcome"])
         .ok()?,
@@ -210,7 +224,19 @@ impl DynamicSelectorConfig {
       synced,
       fetched,
       held,
-    })
+      initialized,
+    };
+    if selector_config.initialized.is_empty() {
+      selector_config.envoy_config.signal_init_complete();
+    } else {
+      // The certificates arrive after a delay, so the TLS context waits for them.
+      let scheduler = selector_config.scheduler.clone();
+      std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        scheduler.commit(INIT_EVENT_ID);
+      });
+    }
+    Some(selector_config)
   }
 }
 
@@ -249,7 +275,14 @@ impl TlsCertificateSelectorConfig for DynamicSelectorConfig {
   }
 
   fn on_scheduled(&self, envoy_config: &dyn EnvoyTlsCertificateSelectorConfig, event_id: u64) {
-    self.fetched[event_id as usize].provide(envoy_config);
+    if event_id == INIT_EVENT_ID {
+      for certificate in &self.initialized {
+        certificate.provide(envoy_config);
+      }
+      envoy_config.signal_init_complete();
+    } else {
+      self.fetched[event_id as usize].provide(envoy_config);
+    }
   }
 }
 

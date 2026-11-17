@@ -168,6 +168,9 @@ public:
                                         Server::OverloadManager& overload_manager) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override;
+  // The configured drain_timeout before drain_timeout_jitter is applied, for static config checks.
+  // drainTimeout() returns a freshly jittered value on every call.
+  std::chrono::milliseconds baseDrainTimeout() const { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() const override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }

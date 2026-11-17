@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.extensions.filters.http.mcp;
+
+import "envoy/extensions/filters/http/mcp/v3/mcp.proto";
+import "test/fuzz/common.proto";
+
+import "validate/validate.proto";
+
+message McpFilterFuzzTestCase {
+  envoy.extensions.filters.http.mcp.v3.Mcp config = 1 [(validate.rules).message = {required: true}];
+
+  // Downstream request. Each http_body.data entry is delivered in a separate decodeData() call.
+  test.fuzz.HttpData request = 2 [(validate.rules).message = {required: true}];
+}

@@ -64,6 +64,8 @@ private:
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   bool do_framing_{};
+  // Whether the request body is being buffered by this filter to be framed at the end of stream.
+  bool buffering_request_{};
   Grpc::Context& context_;
   bool upgrade_protobuf_{};
   bool ignore_query_parameters_{};

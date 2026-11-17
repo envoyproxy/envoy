@@ -25,7 +25,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
 #include "absl/log/log.h"
@@ -300,7 +299,7 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
     }
 
     // Get the hash id value from BucketId in the response.
-    const size_t bucket_id = MessageUtil::hash(action.bucket_id());
+    const size_t bucket_id = hashBucketId(action.bucket_id());
     auto bucket_it = buckets_cache_.find(bucket_id);
     if (bucket_it == buckets_cache_.end()) {
       // The response should be matched to the report we sent.

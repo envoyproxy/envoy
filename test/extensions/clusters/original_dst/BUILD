@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "original_dst_cluster_test",
     srcs = ["original_dst_cluster_test.cc"],
     extension_names = ["envoy.clusters.original_dst"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:filter_state_dst_address_lib",

@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -24,7 +25,9 @@
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/private_key/private_key_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
+#include "source/common/tls/ssl_handshaker.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/mocks/buffer/mocks.h"
@@ -63,8 +66,9 @@ class TestTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                    public Ssl::UpstreamTlsCertificateSelector {
 public:
   TestTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx,
-                             Ssl::SelectionResult::SelectionStatus mode)
-      : selector_ctx_(selector_ctx), mod_(mode) {
+                             Ssl::SelectionResult::SelectionStatus mode,
+                             OptRef<const Ssl::TlsContext> selected_context)
+      : selector_ctx_(selector_ctx), mod_(mode), selected_context_(selected_context) {
     ENVOY_LOG_MISC(info, "debug: init provider");
   }
 
@@ -112,11 +116,14 @@ public:
     cb_->onCertificateSelectionResult(getTlsContext(), false);
   }
 
-  const Ssl::TlsContext& getTlsContext() { return selector_ctx_.getTlsContexts()[0]; }
+  const Ssl::TlsContext& getTlsContext() {
+    return selected_context_.has_value() ? *selected_context_ : selector_ctx_.getTlsContexts()[0];
+  }
 
 private:
   Ssl::TlsCertificateSelectorContext& selector_ctx_;
   const Ssl::SelectionResult::SelectionStatus mod_;
+  const OptRef<const Ssl::TlsContext> selected_context_;
   Ssl::CertificateSelectionCallbackPtr cb_;
 };
 
@@ -167,16 +174,19 @@ public:
 
   CreateProviderHook selector_cb_;
   Ssl::SelectionResult::SelectionStatus mod_;
+  OptRef<const Ssl::TlsContext> selected_context_;
 };
 
 Ssl::TlsCertificateSelectorPtr
 TestTlsSelectorFactory::create(Ssl::TlsCertificateSelectorContext& selector_ctx) {
-  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_);
+  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_,
+                                                      parent_.selected_context_);
 };
 
 Ssl::UpstreamTlsCertificateSelectorPtr TestTlsSelectorFactory::createUpstreamTlsCertificateSelector(
     Ssl::TlsCertificateSelectorContext& selector_ctx) {
-  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_);
+  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_,
+                                                      parent_.selected_context_);
 }
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
@@ -395,6 +405,147 @@ TEST_P(TlsCertificateSelectorFactoryTest, Run) { runTest(); }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsSelectorType, TlsCertificateSelectorFactoryTest,
                          testing::ValuesIn(testParams()), testParamsToString);
+
+using TlsParameters = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+
+class TlsCertificateSelectorSessionTicketTest
+    : public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, TlsParameters::TlsProtocol>> {
+protected:
+  TlsCertificateSelectorSessionTicketTest() : registered_factory_(provider_factory_) {}
+
+  // Runs a handshake that starts on a TLS context with session ticket keys, which the selector
+  // switches to a separately built TLS context, and returns whether the next connection of the
+  // client offers a session.
+  bool nextConnectionOffersSession(bool selected_context_has_keys) {
+    const auto [ip_version, tls_version] = GetParam();
+    // Stateful resumption is disabled, so a session can only resume from a ticket.
+    const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+  disable_stateful_session_resumption: true
+)EOF";
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext listener_tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), listener_tls_context);
+    listener_tls_context.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(
+        std::string(80, 'k'));
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext selected_tls_context =
+        listener_tls_context;
+    selected_tls_context.mutable_common_tls_context()->clear_custom_tls_certificate_selector();
+    if (!selected_context_has_keys) {
+      selected_tls_context.clear_session_ticket_keys();
+    }
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+    Event::SimulatedTimeSystem time_system;
+    Stats::TestUtil::TestStore stats_store(server_factory_context.serverScope().symbolTable());
+    Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+    ON_CALL(factory_context.server_context_, api()).WillByDefault(ReturnRef(*api));
+    ContextManagerImpl manager(server_factory_context);
+
+    auto selected_context_config = *ServerContextConfigImpl::create(
+        selected_tls_context, factory_context, /*server_names=*/{}, /*for_quic=*/false);
+    const std::unique_ptr<ServerContextImpl> selected_context = *ServerContextImpl::create(
+        *stats_store.rootScope(), *selected_context_config, server_factory_context, nullptr);
+    provider_factory_.mod_ = SelectionStatus::Success;
+    provider_factory_.selected_context_ = makeOptRef(selected_context->getTlsContexts()[0]);
+    auto listener_context_config = *ServerContextConfigImpl::create(
+        listener_tls_context, factory_context, /*server_names=*/{}, /*for_quic=*/false);
+    auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
+        std::move(listener_context_config), manager, *stats_store.rootScope());
+
+    Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(ip_version));
+    Network::MockTcpListenerCallbacks listener_callbacks;
+    NiceMock<Network::MockListenerConfig> listener_config;
+    NiceMock<Runtime::MockLoader> runtime;
+    Network::ListenerPtr listener = createListener(
+        socket, listener_callbacks, runtime, listener_config,
+        Server::ThreadLocalOverloadStateOptRef(), api->randomGenerator(), *dispatcher);
+
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+    auto* client_tls_params = client_tls_context.mutable_common_tls_context()->mutable_tls_params();
+    client_tls_params->set_tls_minimum_protocol_version(tls_version);
+    client_tls_params->set_tls_maximum_protocol_version(tls_version);
+    auto client_config = *ClientContextConfigImpl::create(client_tls_context, factory_context);
+    auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
+        std::move(client_config), manager, *stats_store.rootScope());
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+    Network::MockConnectionCallbacks client_connection_callbacks;
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    Network::ConnectionPtr server_connection;
+    Network::MockConnectionCallbacks server_connection_callbacks;
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_CALL(listener_callbacks, onAccept_(_))
+        .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) {
+          server_connection = dispatcher->createServerConnection(
+              std::move(accepted_socket),
+              server_ssl_socket_factory->createDownstreamTransportSocket(), stream_info);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        });
+    EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+    // The server closes once both sides are connected, so that the client reads the TLS 1.3
+    // session tickets, if any, before it sees the close.
+    size_t connected_count = 0;
+    const auto close_when_connected = [&](Network::ConnectionEvent) {
+      if (++connected_count == 2) {
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+      }
+    };
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(close_when_connected);
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(close_when_connected);
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce([&](Network::ConnectionEvent) { dispatcher->exit(); });
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+
+    // A new transport socket of the client starts with the session that the client cached.
+    const Network::TransportSocketPtr next_transport_socket =
+        client_ssl_socket_factory->createTransportSocket(nullptr, nullptr);
+    const SSL_SESSION* offered_session = SSL_get_session(
+        dynamic_cast<const SslHandshakerImpl&>(*next_transport_socket->ssl()).ssl());
+    return offered_session != nullptr && SSL_SESSION_is_resumable(offered_session);
+  }
+
+  TestTlsCertificateSelectorFactory provider_factory_;
+  Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsTlsVersions, TlsCertificateSelectorSessionTicketTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(TlsParameters::TLSv1_2, TlsParameters::TLSv1_3)),
+    [](const testing::TestParamInfo<TlsCertificateSelectorSessionTicketTest::ParamType>& info) {
+      return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(info.param)), "_",
+                          TlsParameters::TlsProtocol_Name(std::get<1>(info.param)));
+    });
+
+// A selector can switch a handshake from a TLS context with session ticket keys to one without
+// them, which completes the handshake without a session ticket.
+TEST_P(TlsCertificateSelectorSessionTicketTest, SelectedContextWithoutKeysSendsNoTicket) {
+  EXPECT_FALSE(nextConnectionOffersSession(/*selected_context_has_keys=*/false));
+}
+
+TEST_P(TlsCertificateSelectorSessionTicketTest, SelectedContextWithKeysSendsTicket) {
+  EXPECT_TRUE(nextConnectionOffersSession(/*selected_context_has_keys=*/true));
+}
 
 TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
   TestTlsCertificateSelectorFactory provider_factory;

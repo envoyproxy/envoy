@@ -19,6 +19,13 @@ envoy_extension_cc_test(
         "//conditions:default": [],
     }),
     extension_names = ["envoy.clusters.reverse_connection"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -53,7 +60,12 @@ envoy_extension_cc_test(
         "envoy.resolvers.reverse_connection",
         "envoy.transport_sockets.tls",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",

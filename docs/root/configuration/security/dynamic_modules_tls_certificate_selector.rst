@@ -39,5 +39,6 @@ or *cluster.<alt_stat_name>.dynamic_certificates.* if :ref:`alt_stat_name
   provided, Counter, Total number of dynamic certificates that the module provided and Envoy accepted
   rejected, Counter, Total number of dynamic certificates that the module provided and Envoy rejected
   removed, Counter, Total number of dynamic certificates removed by the module or because they failed with an updated TLS context
+  request_timeout, Counter, Total number of dynamic certificate requests that the module did not answer in time
   active, Gauge, Number of dynamic certificates that are served
   pending, Gauge, Number of dynamic certificate requests that wait for the module

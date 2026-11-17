@@ -1,4 +1,5 @@
 #include <array>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <thread>
@@ -26,6 +27,7 @@
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -75,6 +77,9 @@ constexpr uint8_t StatusRequestExtension[] = {0x00, 0x05, 0x00, 0x05, 0x01, 0x00
 
 // The ALPN extension of a ClientHello that offers h2.
 constexpr uint8_t AlpnExtension[] = {0x00, 0x10, 0x00, 0x05, 0x00, 0x03, 0x02, 'h', '2'};
+
+// The certificate request timeout of useTimingOutConfig().
+constexpr std::chrono::milliseconds CertificateRequestTimeout{5000};
 
 std::string certificatePath(absl::string_view name) {
   return TestEnvironment::substitute(
@@ -265,13 +270,14 @@ protected:
   DynamicModuleTlsCertificateSelectorConfigSharedPtr
   createConfig(const std::string& module_name, const Ssl::ContextConfig& tls_config,
                AsyncContextFactory dynamic_context_factory, bool is_upstream = false,
-               absl::string_view selector_config = "") {
+               absl::string_view selector_config = "",
+               std::chrono::milliseconds certificate_request_timeout = {}) {
     auto module =
         Envoy::Extensions::DynamicModules::newDynamicModuleByName(module_name, false, false);
     EXPECT_TRUE(module.ok()) << module.status();
     auto config = newDynamicModuleTlsCertificateSelectorConfig(
         "selector", selector_config, is_upstream, DefaultMetricsNamespace,
-        std::move(module.value()), factory_context_, tls_config,
+        certificate_request_timeout, std::move(module.value()), factory_context_, tls_config,
         std::move(dynamic_context_factory));
     EXPECT_TRUE(config.ok()) << config.status();
     return config.ok() ? *config : nullptr;
@@ -326,6 +332,40 @@ protected:
   void removeCertificate(absl::string_view name) {
     envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(
         config_.get(), moduleBuffer(name));
+  }
+
+  void signalInitComplete() {
+    envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+        config_.get());
+  }
+
+  // Replaces the downstream selector, and returns the handle of the init target that its TLS
+  // context waits for.
+  Init::TargetHandlePtr useWaitingConfig() {
+    Init::TargetHandlePtr init_target_handle;
+    EXPECT_CALL(factory_context_.init_manager_, add(_))
+        .WillOnce([&init_target_handle](const Init::Target& target) {
+          init_target_handle = target.createHandle("test");
+        });
+    useDownstreamConfig(createConfig("tls_certificate_selector_dynamic", *server_config_,
+                                     /*dynamic_context_factory=*/nullptr));
+    RELEASE_ASSERT(init_target_handle != nullptr, "the TLS context must add its init target");
+    return init_target_handle;
+  }
+
+  // Replaces the downstream selector with one whose certificate requests time out.
+  void useTimingOutConfig() {
+    useDownstreamConfig(createConfig("tls_certificate_selector_dynamic", *server_config_,
+                                     serverContextFactory(), /*is_upstream=*/false,
+                                     /*selector_config=*/"", CertificateRequestTimeout));
+  }
+
+  // Returns the timer that the next certificate request starts with the given timeout.
+  Event::MockTimer*
+  expectRequestTimer(std::chrono::milliseconds timeout = CertificateRequestTimeout) {
+    auto* timer = new Event::MockTimer(&factory_context_.server_context_.dispatcher_);
+    EXPECT_CALL(*timer, enableTimer(timeout, nullptr));
+    return timer;
   }
 
   // The module metrics are in the server scope.
@@ -1115,6 +1155,178 @@ TEST_F(DynamicModuleTlsCertificateSelectorTest, DynamicCertificateStatsCountEver
   EXPECT_EQ(0U, dynamicCertificateGauge("pending"));
 }
 
+// The TLS context waits until the module signals that its initialization is complete, and later
+// signals do nothing.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, TlsContextWaitsForModuleInitialization) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  const Init::TargetHandlePtr init_target_handle = useWaitingConfig();
+  Init::ExpectableWatcherImpl watcher;
+  ASSERT_TRUE(init_target_handle->initialize(watcher));
+  watcher.expectReady();
+  // Only the first signal posts an event.
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_));
+  signalInitComplete();
+  signalInitComplete();
+}
+
+// A module that signals before the TLS context starts waiting does not make it wait.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, ModuleInitializationCompletesBeforeWaiting) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  const Init::TargetHandlePtr init_target_handle = useWaitingConfig();
+  signalInitComplete();
+  Init::ExpectableWatcherImpl watcher;
+  EXPECT_FALSE(init_target_handle->initialize(watcher));
+}
+
+TEST_F(DynamicModuleTlsCertificateSelectorTest, RemovedTlsContextStopsWaitingForModule) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  const Init::TargetHandlePtr init_target_handle = useWaitingConfig();
+  factory_.reset();
+  Init::ExpectableWatcherImpl watcher;
+  EXPECT_FALSE(init_target_handle->initialize(watcher));
+  signalInitComplete();
+}
+
+// A selector hook can signal while a TLS context of the listener is built, so the init target is
+// marked ready in a separate event.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, InitTargetIsReadyInSeparateEvent) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  const Init::TargetHandlePtr init_target_handle = useWaitingConfig();
+  Init::ExpectableWatcherImpl watcher;
+  ASSERT_TRUE(init_target_handle->initialize(watcher));
+  Event::PostCb ready;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .WillOnce([&ready](Event::PostCb cb) { ready = std::move(cb); });
+  signalInitComplete();
+  ASSERT_TRUE(ready != nullptr);
+  watcher.expectReady();
+  ready();
+}
+
+// A listener that fails to start removes its TLS context while the init target is marked ready.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, TlsContextRemovedWhileInitCompletes) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  const Init::TargetHandlePtr init_target_handle = useWaitingConfig();
+  Init::WatcherImpl watcher("listener", [this] { factory_.reset(); });
+  ASSERT_TRUE(init_target_handle->initialize(watcher));
+  signalInitComplete();
+  EXPECT_EQ(nullptr, factory_);
+  signalInitComplete();
+}
+
+// The event that marks the init target ready does nothing once the TLS context is removed or the
+// configuration is destroyed, which a module that signals and then fails its configuration causes.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, InitCompleteIsDroppedWhenTlsContextOrConfigIsGone) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .Times(2)
+      .WillRepeatedly([&posted](Event::PostCb cb) { posted.push_back(std::move(cb)); });
+
+  // The TLS context is removed before the event runs.
+  const Init::TargetHandlePtr removed_target_handle = useWaitingConfig();
+  Init::ExpectableWatcherImpl watcher;
+  ASSERT_TRUE(removed_target_handle->initialize(watcher));
+  signalInitComplete();
+  ASSERT_EQ(1U, posted.size());
+  factory_.reset();
+  posted[0]();
+
+  // The configuration is destroyed before the event runs.
+  useWaitingConfig();
+  signalInitComplete();
+  ASSERT_EQ(2U, posted.size());
+  selector_.reset();
+  factory_.reset();
+  config_.reset();
+  posted[1]();
+}
+
+TEST_F(DynamicModuleTlsCertificateSelectorTest, InitCompleteRequiresMainThread) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread thread([this] { signalInitComplete(); });
+        thread.join();
+      },
+      "envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete must be "
+      "called on the main thread");
+}
+
+// A request that the module does not answer in time fails its handshakes, and the next handshake
+// requests the certificate again.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, CertificateRequestTimesOut) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  useTimingOutConfig();
+  Event::MockTimer* timer = expectRequestTimer();
+  auto callback = newCallback();
+  EXPECT_CALL(*callback, onCertificateSelectionResult(_, false))
+      .WillOnce([](OptRef<const Ssl::TlsContext> tls_context, bool) {
+        EXPECT_FALSE(tls_context.has_value());
+      });
+  const Ssl::SelectionResult result = selectDownstream("dynamic.lyft.com", {}, std::move(callback));
+  ASSERT_EQ(SelectionStatus::Pending, result.status);
+  EXPECT_LOG_CONTAINS(
+      "debug",
+      "dynamic module did not answer the request for TLS certificate 'dynamic.lyft.com' in time",
+      timer->invokeCallback());
+  EXPECT_EQ(1U, dynamicCertificateCounter("request_timeout"));
+  EXPECT_EQ(0U, dynamicCertificateGauge("pending"));
+
+  expectRequestTimer();
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.lyft.com", {}, newCallback()).status);
+  EXPECT_EQ(2U, counterValue("dynamicmodulescustom.requested"));
+}
+
+TEST_F(DynamicModuleTlsCertificateSelectorTest, AnsweredCertificateRequestStopsTimer) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  useTimingOutConfig();
+  bool timer_destroyed = false;
+  expectRequestTimer()->timer_destroyed_ = &timer_destroyed;
+  auto callback = newCallback();
+  EXPECT_CALL(*callback, onCertificateSelectionResult(_, false));
+  const Ssl::SelectionResult result = selectDownstream("dynamic.lyft.com", {}, std::move(callback));
+  ASSERT_EQ(SelectionStatus::Pending, result.status);
+  ASSERT_TRUE(setCertificate("dynamic.lyft.com", "server2"));
+  EXPECT_TRUE(timer_destroyed);
+}
+
+// The module can still answer a request after it timed out, and the certificate then serves later
+// handshakes without a new request.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, LateAnswerAfterRequestTimeoutIsServed) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  useTimingOutConfig();
+  Event::MockTimer* timer = expectRequestTimer();
+  auto callback = newCallback();
+  EXPECT_CALL(*callback, onCertificateSelectionResult(_, false));
+  const Ssl::SelectionResult result = selectDownstream("dynamic.lyft.com", {}, std::move(callback));
+  ASSERT_EQ(SelectionStatus::Pending, result.status);
+  timer->invokeCallback();
+
+  ASSERT_TRUE(setCertificate("dynamic.lyft.com", "server2"));
+  EXPECT_EQ(0U, dynamicCertificateGauge("pending"));
+  EXPECT_TRUE(servesCertificate(selectDownstream("dynamic.lyft.com").selected_ctx, "server2"));
+  EXPECT_EQ(1U, counterValue("dynamicmodulescustom.requested"));
+}
+
+// The request timers end with the TLS context, which starts no timer once it is removed.
+TEST_F(DynamicModuleTlsCertificateSelectorTest, RemovedTlsContextStopsRequestTimers) {
+  initializeDownstream("tls_certificate_selector_dynamic");
+  useTimingOutConfig();
+  bool timer_destroyed = false;
+  expectRequestTimer()->timer_destroyed_ = &timer_destroyed;
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.lyft.com", {}, newCallback()).status);
+  EXPECT_FALSE(timer_destroyed);
+  factory_.reset();
+  EXPECT_TRUE(timer_destroyed);
+
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.example.com", {}, newCallback()).status);
+}
+
 TEST_F(DynamicModuleTlsCertificateSelectorTest, UpstreamSelectsCertificateByServerName) {
   UpstreamTlsContext tls_context;
   addCertificate(*tls_context.mutable_common_tls_context(), "server");
@@ -1419,6 +1631,19 @@ protected:
         factory_context_.server_context_.scope(), leaf, "selector");
   }
 
+  // Creates the factory of a downstream selector with dynamic certificates, and the selector that
+  // selectDownstream() uses. Callers keep the factory, since destroying it detaches the TLS context
+  // configuration.
+  Ssl::TlsCertificateSelectorFactoryPtr
+  createDynamicSelectorFactory(DynamicModuleTlsCertificateSelectorProto proto_config) {
+    initializeDownstream("tls_certificate_selector_by_server_name");
+    proto_config.set_allow_dynamic_certificates(true);
+    auto factory = createDownstreamFactory(proto_config, *server_config_);
+    RELEASE_ASSERT(factory.ok(), std::string(factory.status().message()));
+    selector_ = (*factory)->create(*server_context_);
+    return std::move(*factory);
+  }
+
   StrictMock<Ssl::MockServerContextConfig> server_tls_config_;
   StrictMock<Ssl::MockClientContextConfig> client_tls_config_;
 };
@@ -1459,8 +1684,6 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, ServesOnlyDynamicCe
       selectorProto("tls_certificate_selector_dynamic", certificateAndKeyPem("server2"));
   proto_config.set_allow_dynamic_certificates(true);
   DownstreamTlsContext tls_context;
-  tls_context.set_disable_stateless_session_resumption(true);
-  tls_context.set_disable_stateful_session_resumption(true);
   auto* selector_config =
       tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector();
   selector_config->set_name("envoy.tls.certificate_selectors.dynamic_modules");
@@ -1489,28 +1712,6 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, DownstreamFactoryRe
                               server_tls_config_, true)
           .status(),
       HasStatusMessage("Dynamic module TLS certificate selector does not support QUIC listeners"));
-}
-
-TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
-       DownstreamDynamicCertificatesRequireDisabledSessionResumption) {
-  DynamicModuleTlsCertificateSelectorProto proto_config =
-      selectorProto("tls_certificate_selector_dynamic");
-  proto_config.set_allow_dynamic_certificates(true);
-  const std::string error = "Dynamic certificates require both stateless and stateful session "
-                            "resumption to be disabled";
-
-  EXPECT_CALL(server_tls_config_, disableStatelessSessionResumption())
-      .WillRepeatedly(Return(false));
-  EXPECT_CALL(server_tls_config_, disableStatefulSessionResumption()).WillRepeatedly(Return(true));
-  EXPECT_THAT(createDownstreamFactory(proto_config, server_tls_config_).status(),
-              HasStatusMessage(error));
-  EXPECT_CALL(server_tls_config_, disableStatelessSessionResumption()).WillRepeatedly(Return(true));
-  EXPECT_CALL(server_tls_config_, disableStatefulSessionResumption()).WillRepeatedly(Return(false));
-  EXPECT_THAT(createDownstreamFactory(proto_config, server_tls_config_).status(),
-              HasStatusMessage(error));
-  EXPECT_CALL(server_tls_config_, disableStatefulSessionResumption()).WillRepeatedly(Return(true));
-  EXPECT_CALL(server_tls_config_, isReady()).WillRepeatedly(Return(true));
-  EXPECT_TRUE(createDownstreamFactory(proto_config, server_tls_config_).ok());
 }
 
 TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
@@ -1573,6 +1774,56 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
   EXPECT_EQ(0U, dynamicCertificateGauge("active"));
 }
 
+TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
+       CertificateRequestTimeoutDefaultsTo15Seconds) {
+  const auto factory =
+      createDynamicSelectorFactory(selectorProto("tls_certificate_selector_dynamic"));
+  expectRequestTimer(std::chrono::milliseconds(15000));
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.lyft.com", {}, newCallback()).status);
+}
+
+TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
+       CertificateRequestTimeoutIsConfigured) {
+  DynamicModuleTlsCertificateSelectorProto proto_config =
+      selectorProto("tls_certificate_selector_dynamic");
+  proto_config.mutable_dynamic_certificate_request_timeout()->set_seconds(2);
+  const auto factory = createDynamicSelectorFactory(proto_config);
+  expectRequestTimer(std::chrono::milliseconds(2000));
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.lyft.com", {}, newCallback()).status);
+}
+
+// A positive timeout below 1 ms does not disable the timeout like 0 does.
+TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
+       CertificateRequestTimeoutBelowOneMillisecondIsRoundedUp) {
+  DynamicModuleTlsCertificateSelectorProto proto_config =
+      selectorProto("tls_certificate_selector_dynamic");
+  proto_config.mutable_dynamic_certificate_request_timeout()->set_nanos(500 * 1000);
+  const auto factory = createDynamicSelectorFactory(proto_config);
+  expectRequestTimer(std::chrono::milliseconds(1));
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.lyft.com", {}, newCallback()).status);
+}
+
+TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
+       ZeroCertificateRequestTimeoutDisablesTimeout) {
+  DynamicModuleTlsCertificateSelectorProto proto_config =
+      selectorProto("tls_certificate_selector_dynamic");
+  proto_config.mutable_dynamic_certificate_request_timeout();
+  const auto factory = createDynamicSelectorFactory(proto_config);
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_EQ(SelectionStatus::Pending,
+            selectDownstream("dynamic.lyft.com", {}, newCallback()).status);
+}
+
+TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, AddsInitTarget) {
+  EXPECT_CALL(factory_context_.init_manager_, add(_));
+  EXPECT_TRUE(
+      createDownstreamFactory(selectorProto("tls_certificate_selector_dynamic"), server_tls_config_)
+          .ok());
+}
+
 TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, ModuleLoadFailureIsAnError) {
   EXPECT_FALSE(createDownstreamFactory(selectorProto("does_not_exist"), server_tls_config_).ok());
   EXPECT_EQ(1U, failureCounter(Envoy::Extensions::DynamicModules::ModuleLoadErrorStat));
@@ -1613,8 +1864,10 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, MissingSymbolIsAnEr
         Envoy::Extensions::DynamicModules::newDynamicModuleByName(module_name, false, false);
     EXPECT_TRUE(module.ok());
     return newDynamicModuleTlsCertificateSelectorConfig(
-               "selector", "", false, DefaultMetricsNamespace, std::move(module.value()),
-               factory_context_, server_tls_config_, nullptr)
+               "selector", /*selector_config=*/"", /*is_upstream=*/false, DefaultMetricsNamespace,
+               /*certificate_request_timeout=*/{}, std::move(module.value()), factory_context_,
+               server_tls_config_,
+               /*dynamic_context_factory=*/nullptr)
         .status();
   };
   // The no_op module implements the HTTP filter ABI, not the certificate selector ABI.
