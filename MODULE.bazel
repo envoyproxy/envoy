@@ -638,10 +638,12 @@ use_repo(envoy_build_config_ext, "envoy_build_config")
 envoy_module_graph_ext = use_extension("//bazel:extensions.bzl", "envoy_module_graph_extension")
 use_repo(envoy_module_graph_ext, "envoy_mod_graph")
 
-# Base images for the container images (`//distribution/docker`).
+# Base images for the container images (`//distribution/docker`). Each digest is that of the tag in
+# its `# tag:` comment, and is updated from it by `ci/dependency/release_images.sh`.
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "distroless_base_nossl",
+    # tag: nonroot
     digest = "sha256:e6b0f82595aa1edde72c8054de7a9dca30f0f8f54820c37a167c0ddfc21c5c67",
     image = "gcr.io/distroless/base-nossl-debian13",
     platforms = [
@@ -651,6 +653,7 @@ oci.pull(
 )
 oci.pull(
     name = "ubuntu_base",
+    # tag: 22.04
     digest = "sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11",
     image = "mirror.gcr.io/library/ubuntu",
     platforms = [
