@@ -32,6 +32,7 @@ public:
   }
 
   BodySizeLimitFilterTest() : config_(setupConfig()), filter_(config_) {
+    ON_CALL(callbacks_, filterConfigName()).WillByDefault(Return(filter_config_name_));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -40,6 +41,19 @@ public:
     ON_CALL(callbacks_, requestHeaders())
         .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   }
+
+  // Returns the "details" metadata stored under the given namespace, or an empty string.
+  std::string detailsMetadata(const std::string& name) {
+    const auto& filter_metadata = callbacks_.stream_info_.dynamicMetadata().filter_metadata();
+    const auto it = filter_metadata.find(name);
+    if (it == filter_metadata.end()) {
+      return "";
+    }
+    return it->second.fields().at("details").string_value();
+  }
+
+  // The name of the filter in the filter chain, which is the dynamic metadata namespace.
+  const std::string filter_config_name_{"my_body_limit"};
 
   Stats::TestUtil::TestStore store_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -107,6 +121,8 @@ TEST_F(BodySizeLimitFilterTest, ContentLengthTooLarge) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, small_filter.decodeHeaders(headers, false));
   EXPECT_EQ(1, counter("rq_content_length_too_large"));
   EXPECT_EQ(0, counter("rq_body_too_large"));
+  EXPECT_EQ("length=1233, limit=123", detailsMetadata(filter_config_name_));
+  EXPECT_EQ("", detailsMetadata("envoy.filters.http.body_size_limit"));
 }
 
 TEST_F(BodySizeLimitFilterTest, DataTooLong) {
@@ -122,6 +138,8 @@ TEST_F(BodySizeLimitFilterTest, DataTooLong) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, small_filter.decodeData(data2, false));
   EXPECT_EQ(0, counter("rq_content_length_too_large"));
   EXPECT_EQ(1, counter("rq_body_too_large"));
+  EXPECT_EQ("length=13, limit=5", detailsMetadata(filter_config_name_));
+  EXPECT_EQ("", detailsMetadata("envoy.filters.http.body_size_limit"));
 }
 
 TEST_F(BodySizeLimitFilterTest, UpgradeNotLimitedAfterAccepted) {
