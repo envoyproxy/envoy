@@ -39,14 +39,15 @@ ROOT_EXECUTABLE = pkg_attributes(
     user = "root",
 )
 
-# Binaries, built as for the release (`//distribution/binary:envoy`).
+# Binaries, built as for the release (`//distribution/binary:envoy`): the `.dwp`s with their debug
+# sections compressed (`-joined`).
 BINARIES = {
     "envoy": "//distribution:envoy-binary-stripped",
     "envoy-contrib": "//distribution:envoy-contrib-binary-stripped",
     "envoy-contrib-debug": "//distribution:envoy-contrib-binary",
-    "envoy-contrib-dwarf": "//distribution:envoy-contrib-dwarf",
+    "envoy-contrib-dwarf": "//distribution:envoy-contrib-dwarf-joined",
     "envoy-debug": "//distribution:envoy-binary",
-    "envoy-dwarf": "//distribution:envoy-dwarf",
+    "envoy-dwarf": "//distribution:envoy-dwarf-joined",
     "su-exec": "@com_github_ncopa_suexec//:su-exec",
     "config_load_check_tool": "//tools/config_load_check:config_load_check_tool.stripped",
     "router_check_tool": "//tools/router_check:router_check_tool.stripped",
