@@ -129,13 +129,14 @@ uint64_t statusCodeToConnectUnaryStatus(const Grpc::Status::GrpcStatus status) {
 
   switch (status) {
   case WellKnownGrpcStatus::Canceled:
+    return 499;
   case WellKnownGrpcStatus::DeadlineExceeded:
-    return 408;
+    return 504;
   case WellKnownGrpcStatus::InvalidArgument:
+  case WellKnownGrpcStatus::FailedPrecondition:
   case WellKnownGrpcStatus::OutOfRange:
     return 400;
   case WellKnownGrpcStatus::NotFound:
-  case WellKnownGrpcStatus::Unimplemented:
     return 404;
   case WellKnownGrpcStatus::AlreadyExists:
   case WellKnownGrpcStatus::Aborted:
@@ -144,8 +145,8 @@ uint64_t statusCodeToConnectUnaryStatus(const Grpc::Status::GrpcStatus status) {
     return 403;
   case WellKnownGrpcStatus::ResourceExhausted:
     return 429;
-  case WellKnownGrpcStatus::FailedPrecondition:
-    return 412;
+  case WellKnownGrpcStatus::Unimplemented:
+    return 501;
   case WellKnownGrpcStatus::Unavailable:
     return 503;
   case WellKnownGrpcStatus::Unauthenticated:

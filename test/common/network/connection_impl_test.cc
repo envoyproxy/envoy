@@ -2044,7 +2044,6 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
 
   InSequence s1;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
@@ -2065,7 +2064,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   EXPECT_CALL(*client_read_filter, onData(BufferString("data"), false))
       .Times(1)
       .WillOnce([&]() -> FilterStatus {
-        time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+        time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(50));
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       });
@@ -2089,7 +2088,6 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 
   InSequence s1;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
@@ -2105,7 +2103,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
       .Times(1)
       .WillOnce([&]() -> FilterStatus {
         // Advance time by 50ms; delayed close timer should _not_ trigger.
-        time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+        time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(50));
         client_connection_->close(ConnectionCloseType::NoFlush);
         return FilterStatus::StopIteration;
       });
@@ -2130,7 +2128,6 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayRemoteCloseNotWithFilterManager) {
 
   InSequence s1;
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   // We expect onData to be called when we send data.
@@ -2160,7 +2157,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayRemoteCloseNotWithFilterManager) {
       .WillOnce([&]() -> FilterStatus {
         // Advance time by 1000ms; delayed close timer should _not_ trigger
         // since the close() is gated by the filter manager.
-        time_system_.setMonotonicTime(std::chrono::milliseconds(1000));
+        time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(1000));
         client_connection_->close(ConnectionCloseType::NoFlush);
         return FilterStatus::StopIteration;
       });
@@ -2202,14 +2199,12 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   Buffer::OwnedImpl data("Connection: Close");
   server_connection_->write(data, false);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
-
   // The client _will not_ close the connection. Instead, expect the delayed close timer to
   // trigger on the server connection.
   EXPECT_CALL(*client_read_filter, onData(BufferString("Connection: Close"), false))
       .Times(1)
       .WillOnce([&]() -> FilterStatus {
-        time_system_.setMonotonicTime(std::chrono::milliseconds(100));
+        time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(100));
         return FilterStatus::StopIteration;
       });
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
@@ -2240,8 +2235,6 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithPendingWrite) {
   Buffer::OwnedImpl data("Connection: Close");
   server_connection_->write(data, false);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
-
   // The delayed close timer will be enabled by this call. Data in the write buffer hasn't been
   // flushed yet since the dispatcher has not run.
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
@@ -2256,7 +2249,7 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithPendingWrite) {
   EXPECT_CALL(*client_read_filter, onData(BufferString("Connection: Close"), false))
       .Times(1)
       .WillOnce([&]() -> FilterStatus {
-        time_system_.setMonotonicTime(std::chrono::milliseconds(100));
+        time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(100));
         return FilterStatus::StopIteration;
       });
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -2323,8 +2316,6 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::make_unique<NiceMock<MockTransportSocket>>(), stream_info_, true));
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
-
   // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is
   // set to 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(0));
@@ -2337,7 +2328,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   // Advance time by a value larger than the delayed close timeout default (1000ms). This would
   // trigger the delayed close timer callback if set.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(10000));
 
   // Since the delayed close timer never triggers, the connection never closes. Close it here to
   // end the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
@@ -2934,7 +2925,6 @@ TEST_P(ConnectionImplCloseTest, FlushWriteAndDelayThroughFilterManager) {
   bool filter_invoked = false;
 
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(1000));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
   // We'll disable close and return StopIteration.
@@ -2960,7 +2950,7 @@ TEST_P(ConnectionImplCloseTest, FlushWriteAndDelayThroughFilterManager) {
   // Now allow the filter to continue, which should allow the delayed close to progress
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
   read_filter_->callbacks_->disableClose(false);
-  time_system_.setMonotonicTime(std::chrono::milliseconds(1100));
+  time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(1100));
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&]() -> void {
     dispatcher_->exit();
@@ -2976,8 +2966,6 @@ TEST_P(ConnectionImplCloseTest, RemoteCloseThroughFilterManagerNoMoreWrite) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
-
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
   // We'll disable close and return StopIteration.
@@ -3018,7 +3006,6 @@ TEST_P(ConnectionImplCloseTest, RemoteCloseThroughFilterManagerWithRawWrite) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
   // We'll disable close and return StopIteration.
@@ -3057,7 +3044,6 @@ TEST_P(ConnectionImplCloseTest, LocalCloseThroughFilterManagerWithRawWrite) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
   // We'll disable close and return StopIteration.

@@ -11,6 +11,7 @@ func init() {
 		"write_to_socket":  &writeToSocketConfigFactory{},
 		"buffer_read":      &bufferReadConfigFactory{},
 		"dynamic_metadata": &dynamicMetadataConfigFactory{},
+		"load_shed_point":  &loadShedPointConfigFactory{},
 	})
 }
 
@@ -136,4 +137,40 @@ func (f *dynamicMetadataFilter) OnAccept() shared.ListenerFilterStatus {
 		panic("expected the invalid buffers to be rejected")
 	}
 	return shared.ListenerFilterStatusContinue
+}
+
+// loadShedPointConfigFactory creates filters that close an accepted socket when the load shed
+// point named in the filter config sheds it.
+type loadShedPointConfigFactory struct {
+	shared.EmptyListenerFilterConfigFactory
+}
+
+func (f *loadShedPointConfigFactory) Create(handle shared.ListenerFilterConfigHandle, config []byte) (shared.ListenerFilterFactory, error) {
+	return &loadShedPointFactory{loadShedPoint: handle.GetLoadShedPoint(string(config))}, nil
+}
+
+type loadShedPointFactory struct {
+	shared.EmptyListenerFilterFactory
+	loadShedPoint shared.LoadShedPoint
+}
+
+func (f *loadShedPointFactory) Create(handle shared.ListenerFilterHandle) shared.ListenerFilter {
+	return &loadShedPointFilter{
+		handle:   handle,
+		shedLoad: f.loadShedPoint != nil && f.loadShedPoint.ShouldShedLoad(),
+	}
+}
+
+type loadShedPointFilter struct {
+	handle   shared.ListenerFilterHandle
+	shedLoad bool
+	shared.EmptyListenerFilter
+}
+
+func (f *loadShedPointFilter) OnAccept() shared.ListenerFilterStatus {
+	if !f.shedLoad {
+		return shared.ListenerFilterStatusContinue
+	}
+	f.handle.CloseSocket("load_shed")
+	return shared.ListenerFilterStatusStop
 }

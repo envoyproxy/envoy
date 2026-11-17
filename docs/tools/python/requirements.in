@@ -13,7 +13,7 @@ sphinx-rtd-theme>=3.0.2
 aio.run.runner
 envoy.base.utils>=0.6.12
 envoy.code.check>=0.6.10
-frozendict>=2.3.7
+frozendict>=2.5.1
 jinja2
 packaging
 pyyaml

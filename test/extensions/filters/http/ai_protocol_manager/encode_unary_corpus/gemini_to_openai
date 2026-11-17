@@ -1,0 +1,5 @@
+body: "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Candidate one\"},{\"text\":\" continuation.\"}]},\"finishReason\":\"MAX_TOKENS\"},{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Candidate two.\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":40,\"toolUsePromptTokenCount\":10,\"candidatesTokenCount\":30,\"thoughtsTokenCount\":5,\"totalTokenCount\":85},\"modelVersion\":\"gemini-2.5-pro\",\"responseId\":\"gem_resp_002\"}"
+fragmentation_seed: 1393753992385309921
+request_protocol: OPENAI_CHAT_COMPLETIONS
+response_protocol: GEMINI_GENERATE_CONTENT
+max_json_body_size: 4095

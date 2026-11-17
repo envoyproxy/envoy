@@ -9,6 +9,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
+#include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/dubbo_proxy/active_message.h"
 #include "source/extensions/filters/network/dubbo_proxy/decoder.h"
@@ -79,14 +80,14 @@ public:
                       bool end_stream);
 
   // This function is for testing only.
-  std::list<ActiveMessagePtr>& getActiveMessagesForTest() { return active_message_list_; }
+  IntrusiveList<ActiveMessage>& getActiveMessagesForTest() { return active_message_list_; }
 
 private:
   void dispatch();
   void resetAllMessages(bool local_reset);
 
   Buffer::OwnedImpl request_buffer_;
-  std::list<ActiveMessagePtr> active_message_list_;
+  IntrusiveList<ActiveMessage> active_message_list_;
 
   ConfigSharedPtr config_;
   TimeSource& time_system_;

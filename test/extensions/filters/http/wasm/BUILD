@@ -35,7 +35,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
@@ -63,7 +69,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     shard_count = 2,
     tags = ["skip_on_windows"],
     deps = [
@@ -97,7 +109,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -134,7 +152,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -157,7 +181,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     shard_count = 4,
     tags = ["skip_on_windows"],
     deps = [
@@ -178,7 +208,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "wasm_filter_integration_test",
-    size = "enormous",
     srcs = ["wasm_filter_integration_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:body_cpp.wasm",
@@ -189,8 +218,13 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:deferred_data_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_large",
-    shard_count = 16,
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "gcc": {"build": "linux_x64_large"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":wasm_test_filters_proto_cc_proto",

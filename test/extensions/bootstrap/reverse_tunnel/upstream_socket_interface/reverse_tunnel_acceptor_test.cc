@@ -8,6 +8,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -158,7 +159,8 @@ TEST_F(TestReverseTunnelAcceptor, GetLocalRegistryWithExtension) {
 
 TEST_F(TestReverseTunnelAcceptor, CreateBootstrapExtension) {
   auto extension = socket_interface_->createBootstrapExtension(config_, context_);
-  EXPECT_NE(extension, nullptr);
+  ASSERT_OK(extension);
+  EXPECT_NE(*extension, nullptr);
 }
 
 TEST_F(TestReverseTunnelAcceptor, CreateEmptyConfigProto) {

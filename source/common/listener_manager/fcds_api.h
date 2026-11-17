@@ -84,7 +84,8 @@ public:
 using FcdsApiPtr = std::unique_ptr<FcdsApi>;
 
 /**
- * FCDS API implementation that fetches via Config::Subscription.
+ * FCDS API implementation that fetches via Config::Subscription, or that a local caller updates
+ * without a subscription.
  */
 class FcdsApiImpl : public FcdsApi, Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -93,6 +94,7 @@ public:
               Upstream::ClusterManager& cm, Stats::Scope& scope,
               const Config::ResourceTypeHelper<FilterChainProto>& resource_type_helper,
               absl::Status& creation_status);
+  FcdsApiImpl(const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks);
   ~FcdsApiImpl() override;
 
   // FcdsApi
@@ -103,6 +105,22 @@ public:
   const Network::DrainableFilterChainSharedPtr& filterChain() const override {
     return filter_chain_;
   }
+
+  /**
+   * Updates the filter chain as an FCDS update does.
+   * @return false when the filter chain is unchanged, or an error when it cannot be built.
+   */
+  absl::StatusOr<bool> update(const FilterChainProto& filter_chain);
+
+  /**
+   * Removes the filter chain as an FCDS update does.
+   */
+  void remove();
+
+  /**
+   * @return whether the filter chain comes from an FCDS subscription.
+   */
+  bool hasSubscription() const { return subscription_ != nullptr; }
 
 private:
   // Config::SubscriptionCallbacks

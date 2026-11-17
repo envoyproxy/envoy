@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "thread_local_impl_test",
     srcs = ["thread_local_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",

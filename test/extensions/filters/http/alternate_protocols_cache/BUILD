@@ -15,6 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/event:event_mocks",
@@ -28,7 +32,10 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/http:http_mocks",
@@ -47,7 +54,13 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
-    rbe_pool = "linux_x64_medium",
+    rbe_pool = {
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_small"},
+    },
     shard_count = 2,
     tags = [
         "cpu:3",

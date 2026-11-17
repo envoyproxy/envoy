@@ -141,10 +141,12 @@ datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tra
     // error occurred during extraction.
     //
     // Either way, we're going to create a new root span, but if an error
-    // occurred we're going to log the error.
+    // occurred we're going to count it. Clients control the trace context
+    // headers, so the error is only logged at debug level.
     if (error->code != datadog::tracing::Error::NO_SPAN_TO_EXTRACT) {
+      tracer_stats_.extraction_errors_.inc();
       ENVOY_LOG(
-          error,
+          debug,
           "Unable to extract span context. Creating a new trace instead. Error [error {}]: {}",
           int(error->code), error->message);
     }

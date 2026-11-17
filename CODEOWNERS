@@ -114,7 +114,7 @@
 # AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
-/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
+/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123 @wbpcode
 # admission control extension.
 /*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
@@ -166,6 +166,7 @@
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo @nix1n
 /*/extensions/resource_monitors/cgroup_memory @botengyao @kbaichoo @alesabater
+/*/extensions/resource_monitors/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/retry/priority @ravenblackx @mattklein123
 /*/extensions/retry/priority/previous_priorities @ravenblackx @mattklein123
 /*/extensions/retry/host @ravenblackx @mattklein123
@@ -460,7 +461,9 @@
 /*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
 # AI filters (run by the AI Protocol Manager)
 /*/extensions/http/ai_filters/common @botengyao @penguingao
+/*/extensions/http/ai_filters/model_router @botengyao @penguingao @rblaze
 /*/extensions/http/ai_filters/request_info @botengyao @penguingao
+/*/extensions/http/ai_filters/route_selector @botengyao @penguingao @rblaze
 /*/extensions/http/ai_filters/schema_validation @botengyao @penguingao
 /*/extensions/http/ai_filters/transcoder @botengyao @penguingao @ginama18
 # HTTP body size limit filter

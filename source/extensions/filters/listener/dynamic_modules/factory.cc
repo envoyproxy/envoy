@@ -57,7 +57,10 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
           proto_config.filter_name(), filter_config_str, metrics_namespace,
           std::move(dynamic_module), server_context.clusterManager(), context.listenerScope(),
-          server_context.mainThreadDispatcher());
+          server_context.mainThreadDispatcher(),
+          context.shouldBypassOverloadManager()
+              ? OptRef<Server::LoadShedPointProvider>()
+              : makeOptRef<Server::LoadShedPointProvider>(server_context.overloadManager()));
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(

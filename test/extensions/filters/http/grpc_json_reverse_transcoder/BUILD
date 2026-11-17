@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "utils_test",
     srcs = ["utils_test.cc"],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:utils",
@@ -32,7 +31,10 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:filter",
@@ -51,7 +53,10 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "link": "linux_x64_small",
+    },
     deps = [
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:config",
         "//test/mocks/server:factory_context_mocks",
@@ -71,7 +76,13 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "gcc": {"build": "linux_x64_small"},
+    },
     tags = [
         "cpu:3",
     ],
