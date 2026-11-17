@@ -20,6 +20,17 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     extension_names = ["envoy.filters.http.dynamic_modules"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
@@ -65,7 +76,13 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.dynamic_modules"],
     # factory_context_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -97,7 +114,14 @@ envoy_extension_cc_dyn_module_test(
     },
     extension_names = ["envoy.filters.http.dynamic_modules"],
     # http_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/network:utility_lib",
@@ -126,7 +150,14 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.dynamic_modules"],
     # http_mocks needs this.
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/common:logger",
         "//envoy/registry",
@@ -174,7 +205,12 @@ envoy_extension_cc_dyn_module_test(
         "GODEBUG": "cgocheck=0",
     },
     extension_names = ["envoy.filters.http.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/registry",
         "//envoy/server:tracer_config_interface",

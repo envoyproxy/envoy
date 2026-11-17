@@ -27,7 +27,13 @@ envoy_extension_cc_dyn_module_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.listener.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
@@ -52,7 +58,13 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     extension_names = ["envoy.filters.listener.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -71,7 +83,13 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
     ],
     extension_names = ["envoy.filters.listener.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/http:message_lib",
@@ -103,7 +121,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.listener.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",

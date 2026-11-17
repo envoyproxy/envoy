@@ -1545,6 +1545,7 @@ DialectTranscodePack createOpenAiChatTranscodePack() {
                                             TranscodingEngine::kIrProtocol, {}),
                   .from_ir = TranscodeRuleSet(TranscodingEngine::kIrProtocol,
                                               LLMProtocol::OpenAiChatCompletions, {})},
+      .binding = builtInBinding("/v1/chat/completions", {}),
   };
 }
 

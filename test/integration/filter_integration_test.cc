@@ -488,7 +488,7 @@ typed_config:
 // filter is still paused on headers and buffers that data. The added trailers must still reach the
 // buffering filter so its default encodeTrailers() continues the chain and the client sees the
 // body, the trailers, and the end of the stream. Without
-// envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration the trailers are
+// envoy.reloadable_features.filter_manager_forward_held_trailers the trailers are
 // dropped and the response never completes.
 TEST_P(MultiProtocolFilterIntegrationTest, AddedEncodedTrailersReachStoppedEncoderFilter) {
   // prependFilter() inserts at the front of the chain, so add-trailers-filter ends up closest to
@@ -531,7 +531,7 @@ TEST_P(FilterIntegrationTest, AddedEncodedTrailersDroppedOnStoppedEncoderFilterW
     return;
   }
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.filter_manager_encode_trailers_on_stop_iteration", "false");
+      "envoy.reloadable_features.filter_manager_forward_held_trailers", "false");
   prependFilter(R"EOF(
 name: add-trailers-filter
 typed_config:
@@ -649,12 +649,11 @@ static Registry::RegisterFactory<StopAllRebufferDecoderFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_stop_all_rebuffer_decoder_filter_;
 
-// End-to-end request-path counterpart distinguishing clearing iterate_from_current_filter_ in
-// commonHandleAfterTrailersCallback() vs. only in FilterManager::encodeTrailers(): a decoder filter
-// pausing headers with StopAllIterationAndBuffer, resuming once request body + trailers arrive,
-// re-buffering body in decodeData(false) with StopIterationAndBuffer, and returning Continue from
-// decodeTrailers() must forward the body and trailers once rather than dropping the request body
-// and invoking decodeTrailers()/decodeComplete() twice.
+// End-to-end request-path coverage for a decoder filter pausing headers with
+// StopAllIterationAndBuffer, resuming once request body + trailers arrive, re-buffering body in
+// decodeData(false) with StopIterationAndBuffer, and returning Continue from decodeTrailers():
+// commonHandleAfterTrailersCallback() clears iterate_from_current_filter_ so the nested
+// continuation forwards the body and trailers once.
 TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
   if (!testing_downstream_filter_) {
     return;
@@ -1936,6 +1935,36 @@ TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
     auto it = response->metadataMap().find(key);
     ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
     EXPECT_EQ(response->metadataMap().find(key)->second, key);
+  }
+}
+
+TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
+  // Encoding order: add-trailers-filter, wait-for-whole-request-and-response-filter.
+  prependFilter(R"EOF(
+  name: add-trailers-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+  )EOF");
+  prependFilter(R"EOF(
+  name: wait-for-whole-request-and-response-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.WaitForWholeRequestAndResponseFilterConfig
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  // The buffering filter waits for the end of the stream, which the added trailers now carry.
+  upstream_request_->encodeData(128, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(128, response->body().size());
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
 }
 

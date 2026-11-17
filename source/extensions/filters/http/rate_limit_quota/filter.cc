@@ -123,7 +123,7 @@ RateLimitQuotaFilter::recordBucketUsage(const Matcher::ActionConstSharedPtr& mat
   }
 
   const BucketId& bucket_id_proto = *ret;
-  const size_t bucket_id = MessageUtil::hash(bucket_id_proto);
+  const size_t bucket_id = hashBucketId(bucket_id_proto);
   ENVOY_LOG(trace, "Generated the associated hashed bucket id: {} for bucket id proto:\n {}",
             bucket_id, bucket_id_proto.DebugString());
 

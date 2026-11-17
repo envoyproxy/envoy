@@ -154,6 +154,50 @@ matcher_tree:
   }
 }
 
+TEST_F(DomainMatcherTest, CaseInsensitiveMatching) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: domain_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
+      domain_matchers:
+      - domains:
+        - "API.Example.com"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: exact_match
+      - domains:
+        - "*.example.com"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: wildcard_match
+  )EOF";
+  loadConfig(yaml);
+
+  // Test mixed-case configured domain matches lower-case input.
+  {
+    auto input = TestDataInputStringFactory("api.example.com");
+    validateMatch("exact_match");
+  }
+
+  // Test mixed-case input matches lower-case configured domain.
+  {
+    auto input = TestDataInputStringFactory("Foo.EXAMPLE.com");
+    validateMatch("wildcard_match");
+  }
+}
+
 TEST_F(DomainMatcherTest, WildcardPrecedenceOrder) {
   const std::string yaml = R"EOF(
 matcher_tree:
@@ -580,6 +624,34 @@ TEST_F(DomainMatcherTest, InvalidDomainFormats) {
     loadConfig(yaml);
     EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher_), EnvoyException,
                               "Duplicate domain in ServerNameMatcher: example.com");
+  }
+
+  // Test duplicate domain with different letter case.
+  {
+    const std::string yaml = R"EOF(
+    matcher_tree:
+      input:
+        name: input
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+      custom_match:
+        name: domain_matcher
+        typed_config:
+          "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
+          domain_matchers:
+          - domains:
+            - "example.com"
+            - "Example.COM"
+            on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: duplicate
+    )EOF";
+    loadConfig(yaml);
+    EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher_), EnvoyException,
+                              "Duplicate domain in ServerNameMatcher: Example.COM");
   }
 }
 

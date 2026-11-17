@@ -79,6 +79,13 @@ public:
   virtual bool wasConnected() const PURE;
 
   /**
+   * Return true if the peer has fully closed its handle (e.g. close(), not shutdown(SHUT_WR)),
+   * when observable out of band (such as for in-process user-space sockets). OS sockets cannot
+   * distinguish a graceful peer close() from shutdown(SHUT_WR) on the read side and return false.
+   */
+  virtual bool wasPeerFullyClosed() const { return false; }
+
+  /**
    * Read data into given slices.
    * @param max_length supplies the maximum length to read.
    * @param slices points to the output location.

@@ -310,8 +310,10 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
                 {"messages", {{{"role", "user"}, {"content", Question}}}},
             }));
 
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
+  // `connection: close` makes Envoy drop the connection as the 503 completes, before the retry
+  // backoff can hand the idle connection to attempt 2 and waste that attempt on a reset.
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
