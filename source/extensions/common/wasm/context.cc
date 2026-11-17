@@ -363,7 +363,8 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
 WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* result,
                           bool swap_bytes) {
   using Filters::Common::Expr::CelValue;
-#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) &&                                    \
+    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
   using proxy_wasm::bswap;
 #endif
   int64_t out_int64;
