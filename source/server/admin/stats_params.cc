@@ -7,6 +7,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
   query_ = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(url);
   used_only_ = query_.getFirstValue("usedonly").has_value();
   pretty_ = query_.getFirstValue("pretty").has_value();
+  unordered_ = query_.getFirstValue("unordered").has_value();
   prometheus_text_readouts_ = query_.getFirstValue("text_readouts").has_value();
 
   auto filter_val = query_.getFirstValue("filter");

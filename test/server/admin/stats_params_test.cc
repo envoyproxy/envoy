@@ -128,5 +128,19 @@ TEST(StatsParamsTest, ShouldShowMetric) {
   }
 }
 
+TEST(StatsParamsTest, ParseParamsUnordered) {
+  Buffer::OwnedImpl response;
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("", response));
+    EXPECT_FALSE(params.unordered_);
+  }
+  {
+    StatsParams params;
+    ASSERT_EQ(Http::Code::OK, params.parse("?unordered", response));
+    EXPECT_TRUE(params.unordered_);
+  }
+}
+
 } // namespace Server
 } // namespace Envoy
