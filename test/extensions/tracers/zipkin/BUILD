@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         "zipkin_tracer_impl_test.cc",
     ],
     extension_names = ["envoy.tracers.zipkin"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -50,7 +50,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.zipkin"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/zipkin:config",
         "//test/mocks/server:tracer_factory_context_mocks",

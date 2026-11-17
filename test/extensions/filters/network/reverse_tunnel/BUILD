@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/reverse_tunnel:config",
         "//test/mocks/server:factory_context_mocks",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/common/stream_info:uint64_accessor_lib",
@@ -60,7 +60,7 @@ envoy_extension_cc_test(
         "envoy.resolvers.reverse_connection",
         "envoy.filters.network.echo",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",

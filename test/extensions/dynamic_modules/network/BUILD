@@ -17,7 +17,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/network/dynamic_modules:config",
@@ -36,7 +36,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
@@ -52,7 +52,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stats:isolated_store_lib",
@@ -72,7 +72,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/dynamic_modules:config",
         "//source/extensions/filters/network/tcp_proxy:config",
