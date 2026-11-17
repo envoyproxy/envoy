@@ -11,7 +11,20 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "msan": {"build": "default"},
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -35,7 +48,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_tcp_client_impl_test",
     srcs = ["async_tcp_client_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/tcp:async_tcp_client_lib",

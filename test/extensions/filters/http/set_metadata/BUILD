@@ -17,7 +17,16 @@ envoy_extension_cc_test(
         "set_metadata_filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.set_metadata"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15787MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
         "//test/integration:http_integration_lib",
@@ -30,7 +39,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.set_metadata"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
         "//test/mocks/server:factory_context_mocks",

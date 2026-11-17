@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "tcp_stats_test",
     srcs = ["tcp_stats_test.cc"],
     extension_names = ["envoy.transport_sockets.tcp_stats"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tcp_stats:config",
@@ -36,7 +46,31 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["tcp_stats_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.tcp_stats"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15909MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",

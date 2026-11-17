@@ -18,7 +18,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -37,7 +47,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -55,7 +75,17 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
@@ -82,7 +112,31 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15601MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

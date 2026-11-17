@@ -17,6 +17,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "istio_stats_integration_test",
     srcs = ["istio_stats_integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/common/test:istio_two_proxy_integration_lib",
         "//contrib/istio/filters/http/istio_stats/source:istio_stats",

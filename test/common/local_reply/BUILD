@@ -11,7 +11,17 @@ envoy_package()
 envoy_cc_test(
     name = "local_reply_test",
     srcs = ["local_reply_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/local_reply:local_reply_lib",

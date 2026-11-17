@@ -17,7 +17,17 @@ envoy_package()
 envoy_cc_test(
     name = "od_cds_api_impl_test",
     srcs = ["od_cds_api_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
@@ -34,7 +44,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xdstp_od_cds_api_impl_test",
     srcs = ["xdstp_od_cds_api_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
@@ -53,7 +73,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cds_api_impl_test",
     srcs = ["cds_api_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
@@ -73,7 +103,20 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_discovery_manager_test",
     srcs = ["cluster_discovery_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "msan": {"build": "default"},
+    },
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
@@ -85,7 +128,23 @@ envoy_cc_test(
 envoy_cc_test(
     name = "deferred_cluster_initialization_test",
     srcs = ["deferred_cluster_initialization_test.cc"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 12136MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":test_cluster_manager",
         "//envoy/upstream:cluster_manager_interface",
@@ -113,6 +172,7 @@ envoy_cc_test_library(
     hdrs = [
         "cluster_manager_impl_test_common.h",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":test_cluster_manager",
         "//envoy/common:matchers_interface",
@@ -137,7 +197,43 @@ envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
-    rbe_pool = "4core",
+    # linux_x64_xlarge: the coverage link peaks at 13947MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "gcc": {
+            "build": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     deps = [
         ":cluster_manager_impl_test_common",
         ":test_cluster_manager",
@@ -179,6 +275,23 @@ envoy_cc_test(
 envoy_cc_test(
     name = "odcd_test",
     srcs = ["odcd_test.cc"],
+    # linux_x64_xlarge: the coverage link peaks at 12075MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":cluster_manager_impl_test_common",
         "//envoy/upstream:cluster_manager_interface",
@@ -191,6 +304,27 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
+    # linux_x64_xlarge: the coverage link peaks at 12352MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -209,6 +343,27 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_misc_test",
     srcs = ["cluster_manager_misc_test.cc"],
+    # linux_x64_xlarge: the coverage link peaks at 12397MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":cluster_manager_impl_test_common",
         ":metadata_writer_lb_proto_cc_proto",
@@ -228,7 +383,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_update_tracker_test",
     srcs = ["cluster_update_tracker_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/upstream:cluster_update_tracker_lib",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -239,7 +404,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_map_impl_test",
     srcs = ["conn_pool_map_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:conn_pool_interface",
         "//source/common/upstream:conn_pool_map_impl_lib",
@@ -254,7 +422,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wrsq_scheduler_test",
     srcs = ["wrsq_scheduler_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/upstream:scheduler_lib",
         "//test/mocks:common_lib",
@@ -264,7 +432,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/upstream:scheduler_lib",
         "//test/test_common:utility_lib",
@@ -279,7 +447,7 @@ envoy_cc_test_library(
     hdrs = [
         "health_check_fuzz_test_utils.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":utility_lib",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
@@ -300,7 +468,25 @@ envoy_cc_test(
     srcs = [
         "health_checker_impl_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -342,7 +528,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "host_stats_test",
     srcs = ["host_stats_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/upstream:host_description_interface",
     ],
@@ -351,7 +537,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "host_utility_test",
     srcs = ["host_utility_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//source/common/network:utility_lib",
@@ -370,7 +566,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_balancer_context_base_test",
     srcs = ["load_balancer_context_base_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/upstream:load_balancer_context_base_lib",
         "//test/mocks/upstream:host_mocks",
@@ -381,7 +580,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_balancer_simulation_test",
     srcs = ["load_balancer_simulation_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         ":utility_lib",
         "//source/common/common:random_generator_lib",
@@ -406,7 +608,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
@@ -428,7 +640,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/tls:context_lib",
         "//source/common/upstream:health_discovery_service_lib",
@@ -460,7 +682,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         ":utility_lib",
         "//envoy/common:time_interface",
@@ -487,7 +713,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "priority_conn_pool_map_impl_test",
     srcs = ["priority_conn_pool_map_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:conn_pool_interface",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
@@ -502,7 +731,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
@@ -518,6 +747,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "transport_socket_input_test",
     srcs = ["transport_socket_input_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/stream_info:filter_state_lib",
@@ -532,7 +762,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "transport_socket_matcher_test",
     srcs = ["transport_socket_matcher_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/api:api_interface",
         "//envoy/matcher:matcher_interface",
@@ -562,7 +802,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "prod_cluster_info_factory_test",
     srcs = ["prod_cluster_info_factory_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//source/common/upstream:prod_cluster_info_factory_lib",
@@ -580,7 +830,21 @@ envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
+    },
     deps = [
         ":test_local_address_selector",
         ":utility_lib",
@@ -697,7 +961,17 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -734,7 +1008,7 @@ envoy_cc_test_library(
     name = "health_check_fuzz_lib",
     srcs = ["health_check_fuzz.cc"],
     hdrs = ["health_check_fuzz.h"],
-    rbe_pool = "6gig",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":health_check_fuzz_proto_cc_proto",
         ":health_check_fuzz_utils_lib",
@@ -756,7 +1030,19 @@ envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
     srcs = ["health_check_fuzz_test.cc"],
     corpus = "health_check_corpus",
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 12861MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     deps = [
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
@@ -789,7 +1075,7 @@ envoy_cc_test(
     name = "default_local_address_selector_test",
     size = "small",
     srcs = ["default_local_address_selector_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/common:base_includes",
         "//envoy/network:socket_interface",
@@ -805,7 +1091,31 @@ envoy_cc_test(
     name = "local_address_selector_integration_test",
     size = "large",
     srcs = ["local_address_selector_integration_test.cc"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15766MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "test_local_address_selector",
         "//source/extensions/load_balancing_policies/round_robin:config",

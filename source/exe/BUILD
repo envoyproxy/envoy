@@ -29,7 +29,14 @@ envoy_cc_binary(
         "//bazel:windows_opt_build": ["generate_pdb_file"],
         "//conditions:default": [],
     }),
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the tsan link peaks at 12574MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"link": "linux_x64_small"},
+        "cto": {"link": "linux_x64_large"},
+        "openssl": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_xlarge"},
+    },
     stamped = True,
     deps = [":envoy_main_entry_lib"],
 )
@@ -61,7 +68,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":envoy_main_common_lib",
         ":platform_impl_lib",
@@ -75,7 +81,6 @@ envoy_cc_library(
     name = "stripped_main_base_lib",
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
-    rbe_pool = "6gig",
     deps = [
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -109,7 +114,6 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
-    rbe_pool = "6gig",
     deps = envoy_select_admin_functionality([":admin_response_lib"]) + [
         ":platform_impl_lib",
         ":process_wide_lib",

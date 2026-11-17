@@ -12,7 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/kafka/filters/network/source/broker:config_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -22,7 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":mock_request_lib",
         "//contrib/kafka/filters/network/source/broker:filter_lib",
@@ -47,6 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "request_handler_unit_test",
     srcs = ["request_handler_unit_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":mock_filter_config_test_lib",
         ":mock_request_lib",

@@ -25,7 +25,17 @@ envoy_extension_cc_test(
     name = "tap_filter_test",
     srcs = envoy_select_admin_functionality(["tap_filter_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":common",
         "//source/extensions/filters/http/tap:config",
@@ -41,7 +51,18 @@ envoy_extension_cc_test(
     name = "tap_config_impl_test",
     srcs = envoy_select_admin_functionality(["tap_config_impl_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":common",
         "//source/extensions/filters/http/tap:tap_config_impl",
@@ -59,7 +80,31 @@ envoy_extension_cc_test(
     size = "large",
     srcs = envoy_select_admin_functionality(["tap_filter_integration_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15911MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/tap:config",
         "//test/extensions/common/tap:common",

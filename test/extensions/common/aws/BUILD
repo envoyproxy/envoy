@@ -13,7 +13,6 @@ envoy_cc_mock(
     name = "aws_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "6gig",
     deps = [
         "//envoy/http:message_interface",
         "//source/common/http:message_lib",
@@ -32,7 +31,17 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "credential_provider_chains_test",
     srcs = ["credential_provider_chains_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
@@ -47,7 +56,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "aws_cluster_manager_test",
     srcs = ["aws_cluster_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//test/mocks/server:server_factory_context_mocks",
@@ -58,7 +77,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -70,7 +99,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "region_provider_impl_test",
     srcs = ["region_provider_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/common/aws:region_provider_impl_lib",
         "//test/test_common:environment_lib",
@@ -80,7 +109,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metadata_fetcher_test",
     srcs = ["metadata_fetcher_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -100,7 +139,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "credentials_provider_test",
     srcs = ["credentials_provider_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:utility_lib",

@@ -16,7 +16,17 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:message_lib",
@@ -34,7 +44,11 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["geoip_filter_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/geoip:config",
@@ -62,7 +76,31 @@ envoy_extension_cc_test(
         "envoy.filters.http.geoip",
         "envoy.geoip_providers.maxmind",
     ],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15830MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/geoip:config",

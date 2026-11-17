@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "wuffs_json_cursor_test",
     srcs = ["wuffs_json_cursor_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
     ],

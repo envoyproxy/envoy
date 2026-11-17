@@ -22,7 +22,31 @@ envoy_extension_cc_test(
         "//test/extensions/access_loggers/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.access_loggers.wasm"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 18059MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/access_loggers/wasm:config",

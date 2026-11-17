@@ -19,6 +19,17 @@ envoy_cc_test(
         "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
         "//conditions:default": [],
     }),
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -52,7 +63,7 @@ envoy_extension_cc_test(
         "envoy.resolvers.reverse_connection",
         "envoy.transport_sockets.tls",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # TODO(agrawroh): Temporarily disabled due to flakiness. Re-enable after stabilizing.
     tags = ["manual"],
     deps = [

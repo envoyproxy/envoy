@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "pass_through_filter_test",
     srcs = ["pass_through_filter_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters:pass_through_filter_lib",
         "//test/extensions/filters/network/thrift_proxy:mocks",

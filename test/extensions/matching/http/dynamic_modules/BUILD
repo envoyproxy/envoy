@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "data_input_test",
     srcs = ["data_input_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/common/http/matching:data_impl_lib",

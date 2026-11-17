@@ -25,6 +25,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "udp_sink_config_test",
     srcs = ["udp_sink_config_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/tap_sinks/udp_sink/source:config",
         "//source/common/network:utility_lib",
@@ -43,7 +44,7 @@ envoy_cc_test(
     name = "udp_sink_interation_test",
     size = "large",
     srcs = ["udp_sink_interation_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/tap_sinks/udp_sink/source:config",
         "//source/extensions/filters/http/tap:config",

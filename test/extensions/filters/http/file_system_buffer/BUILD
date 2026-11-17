@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:fragment",
@@ -32,7 +32,17 @@ envoy_extension_cc_test(
         "filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
@@ -52,7 +62,31 @@ envoy_extension_cc_test(
         "filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15900MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 4,
     tags = [
         "cpu:3",

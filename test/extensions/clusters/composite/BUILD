@@ -15,6 +15,17 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.composite"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/clusters/composite:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -43,7 +54,31 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.composite"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 16279MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

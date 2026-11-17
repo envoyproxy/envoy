@@ -19,7 +19,6 @@ envoy_cc_library(
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
-    rbe_pool = "6gig",
     deps = [
         ":active_raw_udp_listener_config",
         ":connection_handler_lib",

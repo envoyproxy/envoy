@@ -12,6 +12,11 @@ envoy_cc_test(
     name = "reverse_connection_utility_test",
     size = "medium",
     srcs = ["reverse_connection_utility_test.cc"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:connection_lib",
@@ -28,6 +33,7 @@ envoy_cc_test(
     name = "rping_interceptor_test",
     size = "medium",
     srcs = ["rping_interceptor_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",

@@ -11,7 +11,17 @@ envoy_package()
 envoy_cc_test(
     name = "alternate_protocols_cache_impl_test",
     srcs = ["alternate_protocols_cache_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:key_value_store_lib",
         "//source/common/http:http_server_properties_cache",
@@ -30,7 +40,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "key_value_store_test",
     srcs = ["key_value_store_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/common:key_value_store_lib",
         "//source/extensions/key_value/file_based:config_lib",

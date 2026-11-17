@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.retry_host_predicates.omit_canary_hosts"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/retry/host/omit_canary_hosts:config",
         "//test/mocks/upstream:host_mocks",

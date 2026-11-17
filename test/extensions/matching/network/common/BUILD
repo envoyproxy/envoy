@@ -12,7 +12,11 @@ envoy_package()
 envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/network:address_lib",
@@ -28,7 +32,17 @@ envoy_cc_test(
     name = "inputs_integration_test",
     size = "large",
     srcs = ["inputs_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network/matching:data_impl_lib",

@@ -15,7 +15,11 @@ envoy_extension_cc_test(
     name = "buffer_filter_test",
     srcs = ["buffer_filter_test.cc"],
     extension_names = ["envoy.filters.http.buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/event:dispatcher_interface",
         "//source/common/http:header_map_lib",
@@ -34,7 +38,31 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["buffer_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.buffer"],
-    rbe_pool = "6gig",
+    # linux_x64_xlarge: the coverage link peaks at 15764MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 4,
     deps = [
         "//source/extensions/filters/http/buffer:config",
@@ -49,7 +77,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/buffer:config",
         "//test/mocks/server:factory_context_mocks",

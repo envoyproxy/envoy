@@ -13,7 +13,7 @@ envoy_cc_mock(
     name = "connection_mocks",
     srcs = ["connection.cc"],
     hdrs = ["connection.h"],
-    rbe_pool = "6gig",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//envoy/network:connection_interface",
         "//source/common/network:filter_manager_lib",
@@ -53,7 +53,12 @@ envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "asan": {"build": "linux_x64_small"},
+        # Fuzz coverage is also an asan build, and compiles this within the default pool.
+        "fuzz_coverage": {"build": "default"},
+    },
     deps = [
         ":connection_mocks",
         ":io_handle_mocks",

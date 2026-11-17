@@ -39,7 +39,10 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = {
+        "build": "linux_x64_small",
+        "test": "linux_x64_medium",
+    },
     deps = [
         ":invalid_proto_kv_store_config_proto_cc_proto",
         "//contrib/config/source:kv_store_xds_delegate",

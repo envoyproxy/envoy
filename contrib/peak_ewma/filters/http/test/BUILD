@@ -23,6 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "peak_ewma_filter_config_test",
     srcs = ["peak_ewma_filter_config_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/peak_ewma/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",
@@ -33,6 +34,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/peak_ewma/filters/http/source:config",
         "//contrib/peak_ewma/load_balancing_policies/source:config",
