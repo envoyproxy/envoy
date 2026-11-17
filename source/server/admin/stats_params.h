@@ -64,6 +64,8 @@ struct StatsParams {
   bool used_only_{false};
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
+  // When set, the stats may be returned in any order. Only Prometheus output skips sorting now.
+  bool unordered_{false};
   StatsFormat format_{StatsFormat::Text};
   HiddenFlag hidden_{HiddenFlag::Exclude};
   std::string filter_string_;

@@ -23,6 +23,9 @@
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 using testing::NiceMock;
 using testing::Ref;
@@ -3167,6 +3170,53 @@ TEST_F(NativeHistogramBucketIndexTest, IntegerValuesMatchPrometheusClient) {
 // indices.
 TEST_F(NativeHistogramBucketIndexTest, PercentValuesMatchPrometheusClient) {
   verifyBucketIndices(Stats::Histogram::Unit::Percent, kPercentBucketIndexCases);
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputUnordered) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+  }
+  addClusterEndpoints("cluster1", 2, {{"a.tag-name", "a.tag-value"}});
+
+  Buffer::OwnedImpl sorted_response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, sorted_response,
+                                                  StatsParams(), custom_namespaces);
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_response;
+  ASSERT_EQ(Http::Code::OK, params.parse("?unordered", parse_response));
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, response, params,
+                                                  custom_namespaces);
+
+  // Same lines, in any order.
+  std::vector<std::string> sorted_lines = absl::StrSplit(sorted_response.toString(), '\n');
+  std::vector<std::string> lines = absl::StrSplit(response.toString(), '\n');
+  EXPECT_THAT(lines, testing::UnorderedElementsAreArray(sorted_lines));
+
+  // Each family is still one contiguous group led by its TYPE line.
+  absl::flat_hash_set<std::string> families;
+  std::string family;
+  for (const std::string& line : lines) {
+    if (line.empty()) {
+      continue;
+    }
+    if (absl::StartsWith(line, "# TYPE ")) {
+      std::vector<std::string> parts = absl::StrSplit(line, ' ');
+      ASSERT_EQ(4, parts.size());
+      family = parts[2];
+      EXPECT_TRUE(families.insert(family).second) << "family split: " << family;
+      continue;
+    }
+    EXPECT_TRUE(absl::StartsWith(line, family)) << line << " is outside of family " << family;
+  }
+  EXPECT_GT(families.size(), 3);
 }
 
 } // namespace Server
