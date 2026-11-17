@@ -73,8 +73,8 @@ void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* log_message,
   Protobuf::Struct metadata;
   (*metadata.mutable_fields())["details"].set_string_value(
       "length=" + std::to_string(length) + ", limit=" + std::to_string(config_->maxRequestBytes()));
-  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.body_size_limit",
-                                                      metadata);
+  decoder_callbacks_->streamInfo().setDynamicMetadata(
+      std::string(decoder_callbacks_->filterConfigName()), metadata);
   decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, reply_text, nullptr, std::nullopt,
                                      StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
 }
