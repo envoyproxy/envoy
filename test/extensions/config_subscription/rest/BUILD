@@ -12,7 +12,17 @@ envoy_package()
 envoy_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":http_subscription_test_harness",
     ],

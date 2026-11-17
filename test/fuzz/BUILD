@@ -59,7 +59,6 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -118,7 +117,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "random_test",
     srcs = ["random_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//test/fuzz:random_lib",
     ],

@@ -19,7 +19,19 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": "linux_x64_small",
+        "asan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
@@ -52,7 +64,19 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11338MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/network:address_lib",
@@ -75,7 +99,27 @@ envoy_extension_cc_test(
         "ext_authz.yaml",
     ],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15671MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
@@ -120,7 +164,19 @@ envoy_cc_fuzz_test(
     name = "ext_authz_grpc_fuzz_test",
     srcs = ["ext_authz_grpc_fuzz_test.cc"],
     corpus = "ext_authz_grpc_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 12182MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -138,7 +194,19 @@ envoy_cc_fuzz_test(
     name = "ext_authz_http_fuzz_test",
     srcs = ["ext_authz_http_fuzz_test.cc"],
     corpus = "ext_authz_http_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 12182MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -158,7 +226,7 @@ envoy_cc_test_library(
     name = "ext_authz_fuzz_lib",
     srcs = ["ext_authz_fuzz_lib.cc"],
     hdrs = ["ext_authz_fuzz_lib.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/http:context_lib",

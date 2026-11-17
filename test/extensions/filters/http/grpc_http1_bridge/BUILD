@@ -15,7 +15,11 @@ envoy_extension_cc_test(
     name = "http1_bridge_filter_test",
     srcs = ["http1_bridge_filter_test.cc"],
     extension_names = ["envoy.filters.http.grpc_http1_bridge"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -31,7 +35,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.grpc_http1_bridge"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//test/mocks/server:factory_context_mocks",
@@ -45,7 +59,27 @@ envoy_extension_cc_test(
         "grpc_http1_bridge_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.grpc_http1_bridge"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15103MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

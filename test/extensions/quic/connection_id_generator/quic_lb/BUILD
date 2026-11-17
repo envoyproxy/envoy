@@ -16,7 +16,17 @@ envoy_extension_cc_test(
     name = "quic_lb_test",
     srcs = envoy_select_enable_http3(["quic_lb_test.cc"]),
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
@@ -32,7 +42,29 @@ envoy_extension_cc_test(
     size = "large",
     srcs = envoy_select_enable_http3(["integration_test.cc"]),
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
-    rbe_pool = "linux_x64_large",
+    # linux_x64_xlarge: the coverage link peaks at 15486MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",
         "//test/integration:http_integration_lib",

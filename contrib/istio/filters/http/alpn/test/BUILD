@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = [
         "alpn_test.cc",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     repository = "@envoy",
     deps = [
         "//contrib/istio/filters/http/alpn/source:alpn_filter",
@@ -30,6 +31,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
+    rbe_pool = {"build": "linux_x64_small"},
     repository = "@envoy",
     deps = [
         "//contrib/istio/filters/http/alpn/source:config_lib",

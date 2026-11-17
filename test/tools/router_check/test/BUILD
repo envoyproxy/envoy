@@ -17,7 +17,6 @@ envoy_sh_test(
     data = [
         ":configs",
     ],
-    rbe_pool = "linux_x64_small",
     tags = ["nocoverage"],
 )
 
@@ -27,7 +26,17 @@ envoy_cc_test(
     data = [
         ":configs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//tools/router_check:router_check_main_lib",
     ],

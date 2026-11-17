@@ -18,7 +18,7 @@ envoy_cc_fuzz_test(
     name = "compressor_fuzz_test",
     srcs = ["compressor_fuzz_test.cc"],
     corpus = "compressor_corpus",
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         ":compressor_fuzz_input_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

@@ -11,7 +11,17 @@ envoy_package()
 envoy_cc_test(
     name = "sigv4_signer_impl_test",
     srcs = ["sigv4_signer_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -28,7 +38,17 @@ envoy_cc_test(
     name = "sigv4_signer_corpus_test",
     srcs = ["sigv4_signer_corpus_test.cc"],
     data = ["@com_github_awslabs_aws_c_auth//:sigv4_tests"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -45,7 +65,22 @@ envoy_cc_test(
     name = "sigv4a_signer_corpus_test",
     srcs = ["sigv4a_signer_corpus_test.cc"],
     data = ["@com_github_awslabs_aws_c_auth//:sigv4a_tests"],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -61,7 +96,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sigv4a_signer_impl_test",
     srcs = ["sigv4a_signer_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",

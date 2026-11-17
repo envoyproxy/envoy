@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/oauth2:config",
         "//test/mocks/server:factory_context_mocks",
@@ -28,7 +38,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15119MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/http:utility_lib",
@@ -44,7 +74,27 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 14977MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
         "//source/extensions/filters/http/oauth2:config",
@@ -63,7 +113,27 @@ envoy_extension_cc_test(
     name = "oauth_client_test",
     srcs = ["oauth_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15424MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/oauth2:oauth_client",
         "//test/integration:http_integration_lib",

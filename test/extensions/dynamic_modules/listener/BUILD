@@ -17,7 +17,11 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -35,7 +39,17 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/listener/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
@@ -51,7 +65,11 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",

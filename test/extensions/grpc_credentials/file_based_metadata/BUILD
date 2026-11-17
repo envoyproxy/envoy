@@ -14,7 +14,27 @@ envoy_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 14844MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/grpc_credentials/file_based_metadata:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",

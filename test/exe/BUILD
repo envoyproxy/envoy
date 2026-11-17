@@ -74,7 +74,6 @@ envoy_cc_test_library(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/stats:isolated_store_lib",
@@ -93,7 +92,12 @@ envoy_cc_test(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 13009MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -112,7 +116,12 @@ envoy_cc_test(
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 13031MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -129,7 +138,19 @@ envoy_cc_test(
     name = "extra_extensions_test",
     size = "large",
     srcs = ["extra_extensions_test.cc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 26690MB,
+    # over linux_x64_xlarge (28672MiB) with headroom: no pool fits it.
+    rbe_pool = {
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "cto": {"link": "linux_x64_large"},
+        "coverage": {
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_small",
+        },
+        "tsan": {"link": "linux_x64_large"},
+        "msan": {"link": "default"},
+    },
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
@@ -143,7 +164,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "terminate_handler_test",
     srcs = ["terminate_handler_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["backtrace"],
     deps = [
         "//source/exe:terminate_handler_lib",
@@ -167,7 +188,19 @@ envoy_cc_test(
         },
         "//conditions:default": {},
     }),
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 18697MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "cto": {"link": "linux_x64_large"},
+        "coverage": {
+            "link": "linux_x64_xlarge",
+            "test": "linux_x64_small",
+        },
+        "tsan": {"link": "linux_x64_large"},
+        "msan": {"link": "default"},
+    },
     deps = [
         "//source/common/version:version_lib",
         "//test/test_common:environment_lib",
@@ -226,7 +259,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "platform_impl_test",
     srcs = ["platform_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/exe:platform_impl_lib",
         "//test/mocks/runtime:runtime_mocks",

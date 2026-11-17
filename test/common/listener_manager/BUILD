@@ -25,7 +25,14 @@ envoy_cc_test(
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
     ],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15348MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "cto": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -74,7 +81,28 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11251MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
+    },
     shard_count = 5,
     deps = [
         ":listener_manager_impl_test_lib",
@@ -113,7 +141,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = envoy_select_enable_http3(["listener_manager_impl_quic_only_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -137,7 +175,17 @@ envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -173,7 +221,17 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
@@ -194,7 +252,13 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/test_common:environment_lib",

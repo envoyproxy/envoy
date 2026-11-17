@@ -16,7 +16,27 @@ envoy_cc_test(
     name = "injected_resource_monitor_integration_test",
     size = "large",
     srcs = ["injected_resource_monitor_integration_test.cc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15109MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
@@ -32,7 +52,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
@@ -49,7 +69,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.injected_resource"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/common/event:dispatcher_lib",

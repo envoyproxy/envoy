@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -39,7 +49,19 @@ envoy_extension_cc_test(
     name = "cluster_update_test",
     srcs = ["cluster_update_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11717MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/router:context_lib",
         "//source/common/upstream:cluster_factory_lib",
@@ -67,7 +89,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15749MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

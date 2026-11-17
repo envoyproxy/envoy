@@ -50,7 +50,7 @@ envoy_cc_test(
     data = [
         "//contrib/cryptomb/private_key_providers/test/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":test_fake_factory",
         "//source/common/common:random_generator_lib",

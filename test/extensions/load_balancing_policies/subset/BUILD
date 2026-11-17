@@ -17,7 +17,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",
@@ -34,7 +44,27 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15139MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/header_to_metadata:config",
@@ -50,7 +80,17 @@ envoy_extension_cc_test(
     name = "subset_test",
     srcs = ["subset_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:utility_lib",
@@ -85,7 +125,13 @@ envoy_extension_cc_benchmark_binary(
     name = "subset_benchmark",
     srcs = ["subset_benchmark.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",

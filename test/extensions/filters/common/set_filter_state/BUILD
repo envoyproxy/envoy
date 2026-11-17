@@ -11,7 +11,17 @@ envoy_package()
 envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",

@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/path/rewrite/uri_template:config",
         "//test/mocks/server:factory_context_mocks",
@@ -26,7 +36,17 @@ envoy_extension_cc_test(
     name = "library_test",
     srcs = ["library_test.cc"],
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
