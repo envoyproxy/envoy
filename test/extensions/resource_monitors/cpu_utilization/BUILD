@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "cpu_utilization_monitor_test",
     srcs = ["cpu_utilization_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:cpu_utilization_monitor",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
     name = "linux_cpu_stats_reader_test",
     srcs = ["linux_cpu_stats_reader_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
@@ -45,6 +47,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -64,6 +67,7 @@ envoy_extension_cc_test(
     name = "cpu_paths_test",
     srcs = ["cpu_paths_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:cpu_paths",

@@ -27,7 +27,10 @@ envoy_cc_fuzz_test(
         "substitution_formatter_fuzz_test.dict",
         "//test/fuzz:headers.dict",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
+    },
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
         "//source/common/formatter:formatter_extension_lib",
@@ -65,7 +68,13 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":command_extension_lib",
         ":formatter_test_utility_lib",
@@ -98,7 +107,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         ":command_extension_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -117,7 +132,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
@@ -136,6 +151,7 @@ envoy_cc_test(
     srcs = [
         "formatter_context_test.cc",
     ],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",

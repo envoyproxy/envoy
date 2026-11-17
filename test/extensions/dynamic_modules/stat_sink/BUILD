@@ -27,6 +27,13 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_histogram_complete",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/stat_sinks/dynamic_modules:config",
@@ -46,6 +53,13 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         ":test_util_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -62,6 +76,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         ":test_util_lib",
         "//source/common/stats:histogram_lib",
@@ -85,6 +106,12 @@ envoy_cc_dyn_module_test(
     ],
     env = {
         "GODEBUG": "cgocheck=0",
+    },
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

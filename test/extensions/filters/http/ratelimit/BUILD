@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
@@ -40,7 +46,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
         "//test/mocks/server:factory_context_mocks",
@@ -55,7 +67,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -77,7 +94,10 @@ envoy_extension_cc_test(
     name = "ratelimit_headers_test",
     srcs = ["ratelimit_headers_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/ratelimit:ratelimit_headers_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_utils",

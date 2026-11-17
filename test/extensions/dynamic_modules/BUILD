@@ -34,7 +34,13 @@ envoy_cc_dyn_module_test(
     ],
     # This is to test dlopen with the current working directory (rundir in Bazel).
     env = {"LD_LIBRARY_PATH": "."},
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         ":util",
         "//source/common/buffer:buffer_lib",
@@ -60,6 +66,13 @@ envoy_cc_dyn_module_test(
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     # ~780 cases, most of them death tests that each re-exec the binary: ~13 minutes serially
     # under asan on a single-core worker.
     shard_count = 8,
@@ -74,6 +87,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metric_registry_test",
     srcs = ["metric_registry_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:metric_registry",

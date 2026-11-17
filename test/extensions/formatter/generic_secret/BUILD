@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "generic_secret_test",
     srcs = ["generic_secret_test.cc"],
     extension_names = ["envoy.formatter.generic_secret"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/secret:secret_provider_impl_lib",
@@ -34,7 +40,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["generic_secret_integration_test.cc"],
     extension_names = ["envoy.formatter.generic_secret"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = [
         "cpu:3",
     ],

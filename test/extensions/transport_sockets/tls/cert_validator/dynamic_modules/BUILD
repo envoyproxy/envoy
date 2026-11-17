@@ -22,7 +22,13 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:cert_validator_not_validated",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",

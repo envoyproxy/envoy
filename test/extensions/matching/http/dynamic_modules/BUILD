@@ -15,6 +15,12 @@ envoy_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_string_input_echo",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/matching/http/dynamic_modules:string_data_input_lib",
         "//test/extensions/dynamic_modules:util",
@@ -27,6 +33,7 @@ envoy_cc_dyn_module_test(
 envoy_cc_test(
     name = "data_input_test",
     srcs = ["data_input_test.cc"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/common/http/matching:data_impl_lib",
@@ -49,6 +56,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_string_input_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:matcher_string_input_missing_get",
     ],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/common/http/matching:data_impl_lib",

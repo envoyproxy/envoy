@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
     extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -40,7 +46,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["proxy_protocol_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/network/tcp_proxy:config",

@@ -15,6 +15,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/ext_proc:config",
         "//test/mocks/server:factory_context_mocks",
@@ -32,6 +43,17 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.network.ext_proc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/common/expr:evaluator_lib",
@@ -46,6 +68,17 @@ envoy_extension_cc_test(
     name = "ext_proc_test",
     srcs = ["ext_proc_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
@@ -63,6 +96,14 @@ envoy_extension_cc_test(
     name = "ext_proc_integration_test",
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
+    # linux_x64_xlarge: the coverage link peaks at 11354MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:codec_interface",
         "//source/extensions/filters/network/ext_proc:config",

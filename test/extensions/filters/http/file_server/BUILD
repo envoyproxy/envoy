@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "absl_status_to_http_status_test",
     srcs = ["absl_status_to_http_status_test.cc"],
     extension_names = ["envoy.filters.http.file_server"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/file_server:absl_status_to_http_status",
         "//test/test_common:utility_lib",
@@ -28,7 +29,17 @@ envoy_extension_cc_test(
         "filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_server"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_server:config",
@@ -45,7 +56,12 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_server"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_server:config",

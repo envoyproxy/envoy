@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["health_checker_impl_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_large",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
     },
     deps = [
         "//envoy/registry",
@@ -40,7 +43,14 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["health_checker_integration_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 11389MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_xlarge"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = ["cpu:3"],
     deps = [
         "//source/extensions/health_checkers/udp:health_checker_lib",

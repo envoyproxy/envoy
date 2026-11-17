@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "custom_header_detection_test",
     srcs = ["custom_header_test.cc"],
     extension_names = ["envoy.http.original_ip_detection.custom_header"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
@@ -28,7 +28,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.original_ip_detection.custom_header"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/http/original_ip_detection/custom_header:config",

@@ -14,7 +14,7 @@ envoy_cc_test(
     data = [
         ":configs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//tools/schema_validator:schema_validator_lib",
     ],

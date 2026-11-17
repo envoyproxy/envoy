@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:fragment",
@@ -32,7 +32,13 @@ envoy_extension_cc_test(
         "filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
@@ -52,7 +58,12 @@ envoy_extension_cc_test(
         "filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     shard_count = 4,
     tags = [
         "cpu:3",
