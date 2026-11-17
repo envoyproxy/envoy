@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "session_codec_test",
     srcs = ["session_codec_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/mcp_router:session_codec_lib",
         "//test/test_common:utility_lib",
@@ -25,6 +26,17 @@ envoy_extension_cc_test(
     name = "mcp_router_test",
     srcs = ["mcp_router_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/http:async_client_interface",
         "//source/common/buffer:buffer_lib",
@@ -44,6 +56,11 @@ envoy_extension_cc_test(
     name = "mcp_router_sse_test",
     srcs = ["mcp_router_sse_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http/sse:sse_parser_lib",
@@ -57,7 +74,31 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["mcp_router_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15296MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/clusters/mcp_multicluster:cluster",
         "//source/extensions/filters/http/mcp:config",

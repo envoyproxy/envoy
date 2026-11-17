@@ -18,7 +18,12 @@ envoy_cc_fuzz_test(
     name = "compressor_fuzz_test",
     srcs = ["compressor_fuzz_test.cc"],
     corpus = "compressor_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11547MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
+    },
     deps = [
         ":compressor_fuzz_input_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

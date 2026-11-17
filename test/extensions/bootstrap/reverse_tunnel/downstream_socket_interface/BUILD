@@ -17,6 +17,17 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["reverse_tunnel_initiator_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -37,6 +48,17 @@ envoy_cc_test(
     name = "reverse_tunnel_initiator_extension_test",
     size = "medium",
     srcs = ["reverse_tunnel_initiator_extension_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
@@ -53,6 +75,17 @@ envoy_cc_test(
     name = "reverse_connection_io_handle_test",
     size = "large",
     srcs = ["reverse_connection_io_handle_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
@@ -74,6 +107,17 @@ envoy_cc_test(
     name = "downstream_reverse_connection_io_handle_test",
     size = "medium",
     srcs = ["downstream_reverse_connection_io_handle_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
@@ -92,6 +136,11 @@ envoy_cc_test(
     name = "reverse_connection_address_test",
     size = "medium",
     srcs = ["reverse_connection_address_test.cc"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
@@ -107,6 +156,10 @@ envoy_cc_test(
     name = "reverse_connection_resolver_test",
     size = "medium",
     srcs = ["reverse_connection_resolver_test.cc"],
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
@@ -120,6 +173,17 @@ envoy_cc_test(
     name = "rc_connection_wrapper_test",
     size = "large",
     srcs = ["rc_connection_wrapper_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",

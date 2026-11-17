@@ -28,6 +28,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "postgres_inspector_integration_test",
     srcs = ["postgres_inspector_integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     repository = "@envoy",
     deps = [
         ":postgres_test_utils_lib",
@@ -69,6 +70,7 @@ cc_library(
 envoy_cc_test(
     name = "postgres_inspector_sni_integration_test",
     srcs = ["postgres_inspector_sni_integration_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     repository = "@envoy",
     deps = [
         ":postgres_test_utils_lib",

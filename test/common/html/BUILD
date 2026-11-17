@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/html:utility_lib",
     ],

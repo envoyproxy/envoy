@@ -11,7 +11,11 @@ envoy_package()
 envoy_cc_test(
     name = "dns_factory_test",
     srcs = ["dns_factory_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/extensions/network/dns_resolver/cares:config",

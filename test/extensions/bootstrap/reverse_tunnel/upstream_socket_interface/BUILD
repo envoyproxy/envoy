@@ -17,6 +17,17 @@ envoy_extension_cc_test(
     size = "medium",
     srcs = ["reverse_tunnel_acceptor_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
@@ -32,6 +43,17 @@ envoy_cc_test(
     name = "reverse_tunnel_acceptor_extension_test",
     size = "medium",
     srcs = ["reverse_tunnel_acceptor_extension_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/event:event_mocks",
@@ -49,6 +71,17 @@ envoy_cc_test(
     name = "upstream_socket_manager_test",
     size = "large",
     srcs = ["upstream_socket_manager_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
@@ -67,6 +100,17 @@ envoy_cc_test(
     name = "upstream_reverse_connection_io_handle_test",
     size = "medium",
     srcs = ["upstream_reverse_connection_io_handle_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
@@ -83,6 +127,17 @@ envoy_cc_test(
     name = "config_validation_test",
     size = "small",
     srcs = ["config_validation_test.cc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/server:factory_context_mocks",

@@ -12,7 +12,17 @@ envoy_package()
 envoy_cc_test(
     name = "check_request_utils_test",
     srcs = ["check_request_utils_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/protobuf",
@@ -33,7 +43,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ext_authz_grpc_impl_test",
     srcs = ["ext_authz_grpc_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
@@ -46,7 +60,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ext_authz_http_impl_test",
     srcs = ["ext_authz_http_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",

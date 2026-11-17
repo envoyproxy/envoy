@@ -11,6 +11,7 @@ envoy_package()
 
 envoy_cc_binary(
     name = "wee8_compile_tool",
+    rbe_pool = {"coverage": {"link": "linux_x64_large"}},
     stamp = 0,
     deps = [":wee8_compile_lib"],
 )

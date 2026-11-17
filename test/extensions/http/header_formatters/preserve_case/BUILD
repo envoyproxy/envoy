@@ -17,7 +17,7 @@ envoy_extension_cc_test(
         "preserve_case_formatter_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/test_common:utility_lib",
@@ -31,7 +31,31 @@ envoy_extension_cc_test(
         "preserve_case_formatter_integration_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 15029MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
@@ -50,7 +74,31 @@ envoy_extension_cc_test(
         "preserve_case_formatter_reason_phrase_integration_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the coverage link peaks at 13622MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
@@ -66,7 +114,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/registry",
         "//source/common/common:utility_lib",

@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     # Posix signal tests are irrelevant to Windows
     tags = [
         "backtrace",
@@ -28,7 +28,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fatal_action_test",
     srcs = ["fatal_action_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/signal:fatal_error_handler_lib",
         "//test/mocks/server:instance_mocks",

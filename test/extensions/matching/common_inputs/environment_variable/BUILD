@@ -15,7 +15,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.matching.common_inputs.environment_variable"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/matching/common_inputs/environment_variable:config",
         "//test/mocks/server:factory_context_mocks",
@@ -26,7 +36,7 @@ envoy_extension_cc_test(
     name = "input_test",
     srcs = ["input_test.cc"],
     extension_names = ["envoy.matching.common_inputs.environment_variable"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/matching/common_inputs/environment_variable:input_lib",
     ],

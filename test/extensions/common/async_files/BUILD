@@ -12,7 +12,17 @@ envoy_package()
 envoy_cc_test(
     name = "async_file_handle_thread_pool_test",
     srcs = ["async_file_handle_thread_pool_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files",
@@ -29,7 +39,17 @@ envoy_cc_test(
         "async_file_manager_thread_pool_test.cc",
         "async_file_manager_thread_pool_with_mocks_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files",
@@ -45,7 +65,17 @@ envoy_cc_test(
     srcs = [
         "async_file_manager_factory_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files",
@@ -59,7 +89,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "status_after_file_error_test",
     srcs = ["status_after_file_error_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files:status_after_file_error",
