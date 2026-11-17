@@ -33,7 +33,17 @@ def envoy_dependencies_extra(
 
     compatibility_proxy_repo()
     bazel_toolchain_dependencies()
-    setup_libcxx_libs()
+
+    # The libc++ to cross-compile with (eg `ci/do_ci.sh release.multiarch`), of this branch's
+    # LLVM (`bazel/toolchains.bzl`): the bundles have that libc++'s `__config_site`, which has to
+    # match the toolchain's headers. From the last bins release that published them.
+    setup_libcxx_libs(
+        aarch64_sha256 = "9c900495dac5c214d135caab02cfcf01806916a8eeb994687b2815ed38a79831",
+        aarch64_version = "0.1.59",
+        llvm_version = "18.1.8",
+        x86_64_sha256 = "50c7385dd1c17fd3606fa8850cfb1c7d0166ab109e404964f55abd6b508560eb",
+        x86_64_version = "0.1.59",
+    )
     setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
     raze_fetch_remote_crates()
