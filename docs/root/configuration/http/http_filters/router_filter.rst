@@ -520,7 +520,9 @@ A mirror request retried by the policy :ref:`retry_policy
 ``rq_started``, and once in ``rq_success`` or ``rq_failure`` with the outcome of its last attempt.
 Its retries are counted in the ``upstream_rq_retry*`` statistics of the mirror cluster. A mirror
 request whose body exceeds the buffer limit is not retried and increments the
-``retry_or_shadow_abandoned`` statistic of the mirror cluster.
+``retry_or_shadow_abandoned`` statistic of the mirror cluster. Each mirror request with a retry
+policy buffers its own copy of the request body, up to the request buffer limit, in addition to any
+buffering of the primary request for its own retries or internal redirects.
 
 Runtime
 -------

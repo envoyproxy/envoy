@@ -987,6 +987,8 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
     if (shadow_policy.retryPolicy() != nullptr) {
+      // TODO(wdauchy): share the body with the primary's buffer, e.g. via ref-counted read-only
+      // slices, instead of a copy per mirror.
       options.setRetryPolicy(shadow_policy.retryPolicy()).setBufferBodyForRetry(true);
     }
 
@@ -1240,7 +1242,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
     }
 
-    // If we are potentially going to retry or buffer shadow this request we need to buffer.
+    // If we are potentially going to retry or redirect this request we need to buffer.
     // This will not cause the connection manager to 413 because before we hit the
     // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
     // so that all buffered data is available by the time we do request complete processing and
