@@ -704,7 +704,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyTlsCertificatesFails) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-  EXPECT_FALSE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyCertChainFails) {
@@ -748,7 +748,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyCertChainFails) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-  EXPECT_FALSE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtWithFingerprinterErrorFails) {
@@ -795,7 +795,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithFingerprinterErrorFails) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-  EXPECT_FALSE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtWithCertChainExtractionErrorFails) {
@@ -844,7 +844,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithCertChainExtractionErrorFails) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-  EXPECT_FALSE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtSendsSanitizedCertChain) {
@@ -933,6 +933,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheHit) {
 
   EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
       .WillOnce(testing::Return(expected_fingerprint));
+  EXPECT_CALL(*fingerprinter_, getCertChainFromPem(_)).Times(0);
 
   envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig cache_config;
   cache_config.mutable_cache_size()->set_value(100);
@@ -1023,6 +1024,7 @@ TEST_F(GcpAuthnFilterTest, BoundAccessTokenCacheHit) {
 
   EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
       .WillOnce(testing::Return(expected_fingerprint));
+  EXPECT_CALL(*fingerprinter_, getCertChainFromPem(_)).Times(0);
 
   envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig cache_config;
   cache_config.mutable_cache_size()->set_value(100);

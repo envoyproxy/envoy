@@ -123,16 +123,8 @@ GcpAuthnFilter::getClientCertData(Upstream::ThreadLocalCluster* cluster) {
     return std::nullopt;
   }
 
-  auto cert_chain_or_error = fingerprinter_->getCertChainFromPem(cert_pem);
-  if (!cert_chain_or_error.ok()) {
-    ENVOY_LOG(warn, "Failed to extract certificate chain: {}",
-              cert_chain_or_error.status().message());
-    return std::nullopt;
-  }
-
   filter_config_->stats().client_cert_fingerprint_calculated_.inc();
-  return ClientCertData{std::move(fingerprint_or_error).value(),
-                        std::move(cert_chain_or_error).value()};
+  return ClientCertData{std::move(fingerprint_or_error).value(), cert_pem};
 }
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
@@ -231,11 +223,26 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   // Execute token-type specific fetch calls.
   if (audience_.has_iam_access_token()) {
     client_->fetchIamAccessToken(audience_, resolved_authorization, *this);
-  } else if (audience_.has_bound_access_token()) {
-    client_->fetchBoundAccessToken(audience_, client_cert_data->fingerprint, client_cert_data->pem,
-                                   *this);
-  } else if (audience_.has_bound_jwt()) {
-    client_->fetchBoundJwt(audience_, client_cert_data->fingerprint, client_cert_data->pem, *this);
+  } else if (audience_.has_bound_access_token() || audience_.has_bound_jwt()) {
+    auto cert_chain_or_error = fingerprinter_->getCertChainFromPem(client_cert_data->pem);
+    if (!cert_chain_or_error.ok()) {
+      ENVOY_LOG(warn, "Failed to extract certificate chain: {}",
+                cert_chain_or_error.status().message());
+      filter_config_->stats().bound_token_fingerprint_unavailable_.inc();
+      state_ = State::Complete;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::InternalServerError,
+          "Failed to fetch bound token: client certificate is unavailable.", nullptr, std::nullopt,
+          "bound_token_fingerprint_unavailable");
+      return FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+    if (audience_.has_bound_access_token()) {
+      client_->fetchBoundAccessToken(audience_, client_cert_data->fingerprint,
+                                     cert_chain_or_error.value(), *this);
+    } else {
+      client_->fetchBoundJwt(audience_, client_cert_data->fingerprint, cert_chain_or_error.value(),
+                             *this);
+    }
   } else if (audience_.has_access_token()) {
     client_->fetchUnboundAccessToken(audience_, *this);
   } else if (!audience_.url().empty()) {
