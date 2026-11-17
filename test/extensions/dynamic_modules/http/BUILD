@@ -56,7 +56,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op_no_optional_abi",
     ],
     # factory_context_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -86,7 +86,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     # http_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -109,7 +109,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # http_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -149,7 +149,7 @@ envoy_cc_test(
     env = {
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

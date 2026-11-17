@@ -179,7 +179,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:panic_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",

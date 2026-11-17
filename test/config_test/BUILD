@@ -54,7 +54,7 @@ envoy_cc_test(
         "CONFIGS_TAR_PATH": "$(location :configs)",
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [":test_runner_lib"],
 )
 
@@ -62,7 +62,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",

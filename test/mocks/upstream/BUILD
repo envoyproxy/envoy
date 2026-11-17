@@ -38,7 +38,7 @@ envoy_cc_mock(
     name = "host_mocks",
     srcs = ["host.cc"],
     hdrs = ["host.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_info_mocks",
         "//envoy/upstream:upstream_interface",
@@ -210,7 +210,7 @@ envoy_cc_mock(
     name = "load_balancer_mocks",
     srcs = ["load_balancer.cc"],
     hdrs = ["load_balancer.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//test/mocks/upstream:host_mocks",
@@ -240,7 +240,7 @@ envoy_cc_mock(
     name = "thread_local_cluster_mocks",
     srcs = ["thread_local_cluster.cc"],
     hdrs = ["thread_local_cluster.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:thread_local_cluster_interface",
         "//test/mocks/http:conn_pool_mocks",
@@ -277,7 +277,7 @@ envoy_cc_mock(
     name = "cluster_manager_mocks",
     srcs = ["cluster_manager.cc"],
     hdrs = ["cluster_manager.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//test/mocks/config:config_mocks",

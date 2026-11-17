@@ -17,7 +17,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:message_lib",
@@ -49,7 +49,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/dynamic_modules:cluster",
         "//source/extensions/dynamic_modules:abi_impl",

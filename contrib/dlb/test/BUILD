@@ -19,7 +19,7 @@ envoy_cc_test(
         "//bazel:linux_x86_64": ["config_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["manual"],
     deps = [
         "//contrib/dlb/source:connection_balancer",
