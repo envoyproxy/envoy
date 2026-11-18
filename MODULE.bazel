@@ -27,7 +27,7 @@ bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.22.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.23.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
 bazel_dep(name = "fmt", version = "12.2.0.bcr.1")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -167,7 +167,6 @@ single_version_override(
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
-
 
 ####################################################################################
 # setup: Compilers
@@ -481,36 +480,34 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.repository_set(
     name = "rust_linux_s390x",
     edition = "2018",
-    exec_triple = "s390x-unknown-linux-gnu",
     exec_compatible_with = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",
     ],
-    versions = ["1.97.1"],
-    target_triple = "s390x-unknown-linux-gnu",
+    exec_triple = "s390x-unknown-linux-gnu",
     target_compatible_with = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",
     ],
+    target_triple = "s390x-unknown-linux-gnu",
+    versions = ["1.97.1"],
 )
-
 rust.repository_set(
     name = "rust_linux_s390x",
-    target_triple = "wasm32-unknown-unknown",
     target_compatible_with = [
         "@platforms//cpu:wasm32",
         "@rules_rust//rust/platform/os:unknown",
     ],
+    target_triple = "wasm32-unknown-unknown",
 )
-
 rust.repository_set(
     name = "rust_linux_s390x",
-    target_triple = "wasm32-wasip1",
     target_compatible_with = [
         "@platforms//cpu:wasm32",
         "@platforms//os:wasi",
         "@rules_rust//rust/platform:wasi_preview_1",
     ],
+    target_triple = "wasm32-wasip1",
 )
 rust.toolchain(
     edition = "2018",
