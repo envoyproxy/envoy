@@ -91,7 +91,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
 
   absl::string_view auth_value = auth_header[0]->value().getStringView();
 
-  if (!absl::StartsWith(auth_value, "Basic ")) {
+  // The authentication scheme is case-insensitive. See
+  // https://www.rfc-editor.org/rfc/rfc9110.html#section-11.1.
+  if (!absl::StartsWithIgnoreCase(auth_value, "Basic ")) {
     if (config_->allowMissing()) {
       return Http::FilterHeadersStatus::Continue;
     }
@@ -147,8 +149,7 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
 
 void BasicAuthFilter::setDynamicMetadata(absl::string_view username) {
   Protobuf::Struct metadata;
-  (*metadata.mutable_fields())[std::string(DynamicMetadataUsernameKey)].set_string_value(
-      std::string(username));
+  (*metadata.mutable_fields())[std::string(DynamicMetadataUsernameKey)].set_string_value(username);
   decoder_callbacks_->streamInfo().setDynamicMetadata(
       std::string(decoder_callbacks_->filterConfigName()), metadata);
 }

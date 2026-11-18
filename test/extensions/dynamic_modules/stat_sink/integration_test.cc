@@ -128,8 +128,9 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, FlushAfterTraffic) {
 // The Rust and Go modules aggregate each flush snapshot on a worker thread and commit the result
 // back to the main thread, where the scheduled hook publishes it into a gauge. Waiting for the
 // gauge to reach a non-zero value proves the full off-main-thread round trip works end to end. The
-// snapshot is copied on the main thread, aggregated on the worker, committed, then published on the
-// main thread via the scheduler and gauge callbacks.
+// Rust module retains the snapshot on the main thread, then decodes, aggregates, and releases it on
+// the worker. The Go module copies the snapshot on the main thread and aggregates the copy. Both
+// commit the result, which the main thread publishes via the scheduler and gauge callbacks.
 TEST_P(DynamicModulesStatsSinkIntegrationTest, OffThreadAggregationPublishesGauge) {
   if (language() == "c") {
     GTEST_SKIP() << "off-thread aggregation is only implemented in the Rust and Go test modules";

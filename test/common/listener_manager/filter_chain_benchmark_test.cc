@@ -200,6 +200,7 @@ const char YamlSingleDstPortBottom[] = R"EOF(
             - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
+// Fixtures are destroyed at exit in an unspecified order, so they must not hold a Logger::Context.
 class FilterChainBenchmarkFixture : public ::benchmark::Fixture {
 public:
   void initialize(::benchmark::State& state) {
@@ -216,9 +217,6 @@ public:
     filter_chains_ = listener_config_.filter_chains();
   }
 
-  Envoy::Thread::MutexBasicLockable lock_;
-  Logger::Context logging_state_{spdlog::level::warn, Logger::Logger::DEFAULT_LOG_FORMAT, lock_,
-                                 false};
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
@@ -343,17 +341,19 @@ struct FcdsTlsUpdateBenchmarkState {
     ON_CALL(server_context_.cluster_manager_.subscription_factory_,
             subscriptionFromConfigSource(testing::_, testing::_, testing::_, testing::_, testing::_,
                                          testing::_))
-        .WillByDefault(testing::Invoke(
+        .WillByDefault(
             [](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                Config::SubscriptionCallbacks&, Config::OpaqueResourceDecoderSharedPtr,
                const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
               return std::make_unique<NiceMock<Config::MockSubscription>>();
-            }));
+            });
 
     // The manager owns the returned callback. The raw pointer drives the coalesced publish.
     tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(&server_context_.dispatcher_);
-    manager_ = std::make_shared<FcdsSharedFilterChainManager>(server_context_,
-                                                              listener_component_factory_);
+    manager_ = std::make_shared<FcdsSharedFilterChainManager>(
+        server_context_, listener_component_factory_, dummy_listener_manager_callbacks_);
+    // Makes FCDS subscribe to the filter chains.
+    config_source_.mutable_ads();
     for (int64_t i = 0; i < chain_count; i++) {
       const std::string name = absl::StrCat("dynamic_filter_chain_", i);
       auto handle = manager_->subscribe(config_source_, name, dummy_fcds_callbacks_, init_manager_);
@@ -366,10 +366,14 @@ struct FcdsTlsUpdateBenchmarkState {
   struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
     void drainFilterChain(Network::DrainableFilterChainSharedPtr) override {}
   };
+  struct DummyFcdsListenerManagerCallbacks : public FcdsListenerManagerCallbacks {
+    void notifyFilterChainUpdateCallbacks(absl::string_view) override {}
+  };
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<MockListenerComponentFactory> listener_component_factory_;
   envoy::config::core::v3::ConfigSource config_source_;
   DummyFcdsClientCallbacks dummy_fcds_callbacks_;
+  DummyFcdsListenerManagerCallbacks dummy_listener_manager_callbacks_;
   Init::ManagerImpl init_manager_{"fcds_tls_update_benchmark"};
   Event::MockSchedulableCallback* tls_update_cb_{};
   std::shared_ptr<FcdsSharedFilterChainManager> manager_;

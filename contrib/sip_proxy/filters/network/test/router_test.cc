@@ -26,7 +26,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -183,16 +182,15 @@ public:
     EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                      .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
-        .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
-          upstream_callbacks_ = &cb;
-        }));
+        .WillOnce(
+            [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; });
 
     conn_state_.reset();
     EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                      .tcp_conn_pool_.connection_data_,
                 connectionState())
         .WillRepeatedly(
-            Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+            [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); });
     context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
         .poolReady(upstream_connection_);
 
@@ -239,12 +237,12 @@ public:
     initializeMetadata(msg_type, MethodType::Ok200, false);
 
     EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
-        .WillRepeatedly(
-            Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
-                       SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
-              host = "10.0.0.11";
-              return QueryStatus::Pending;
-            }));
+        .WillRepeatedly([&](const std::string&, const std::string&,
+                            const std::optional<TraContextMap>, SipFilters::DecoderFilterCallbacks&,
+                            std::string& host) -> QueryStatus {
+          host = "10.0.0.11";
+          return QueryStatus::Pending;
+        });
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
@@ -448,12 +446,12 @@ TEST_F(SipRouterTest, QueryPending) {
   metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
-                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
-            host = "10.0.0.11";
-            return QueryStatus::Pending;
-          }));
+      .WillRepeatedly([&](const std::string&, const std::string&,
+                          const std::optional<TraContextMap>, SipFilters::DecoderFilterCallbacks&,
+                          std::string& host) -> QueryStatus {
+        host = "10.0.0.11";
+        return QueryStatus::Pending;
+      });
   startRequest();
 }
 
@@ -466,12 +464,12 @@ TEST_F(SipRouterTest, QueryStop) {
   metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
-                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
-            host = "";
-            return QueryStatus::Stop;
-          }));
+      .WillRepeatedly([&](const std::string&, const std::string&,
+                          const std::optional<TraContextMap>, SipFilters::DecoderFilterCallbacks&,
+                          std::string& host) -> QueryStatus {
+        host = "";
+        return QueryStatus::Stop;
+      });
   startRequest(FilterStatus::Continue);
 }
 
@@ -614,14 +612,13 @@ TEST_F(SipRouterTest, CallWithExistingConnection) {
   EXPECT_CALL(
       context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
       newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .newConnectionImpl(cb);
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .poolReady(upstream_connection_);
-            return nullptr;
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .newConnectionImpl(cb);
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .poolReady(upstream_connection_);
+        return nullptr;
+      });
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
@@ -650,14 +647,13 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
   EXPECT_CALL(
       context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
       newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .newConnectionImpl(cb);
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .poolReady(upstream_connection_);
-            return nullptr;
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .newConnectionImpl(cb);
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .poolReady(upstream_connection_);
+        return nullptr;
+      });
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
@@ -691,14 +687,13 @@ TEST_F(SipRouterTest, NewConnectionFailure) {
   EXPECT_CALL(
       context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
       newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .newConnectionImpl(cb);
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .poolReady(upstream_connection_);
-            return nullptr;
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .newConnectionImpl(cb);
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .poolReady(upstream_connection_);
+        return nullptr;
+      });
   initializeMetadata(MsgType::Response);
   startRequest(FilterStatus::Continue);
 }

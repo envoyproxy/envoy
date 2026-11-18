@@ -614,8 +614,6 @@ protected:
     listeners_bound_timeout_ms_ = duration;
   }
 
-  std::unique_ptr<Stats::Store> upstream_stats_store_;
-
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and
   // fake upstream codecs and must outlast them.
@@ -661,6 +659,9 @@ protected:
 
   Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
+  // The scope for fake upstream TLS contexts, creating upstream_stats_store_ on first use. Call
+  // from the test thread (upstream creation); the store itself is safe to use from any thread.
+  Stats::Scope& upstreamStatsScope();
   std::unique_ptr<ThreadLocal::MockInstance> thread_local_storage_;
   std::unique_ptr<Server::Configuration::MockGenericFactoryContext> factory_context_storage_;
   std::unique_ptr<Server::Configuration::MockServerFactoryContext> server_factory_context_storage_;
@@ -669,6 +670,14 @@ protected:
   Server::Configuration::ServerFactoryContext& server_factory_context_;
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_storage_;
   Extensions::TransportSockets::Tls::ContextManagerImpl& context_manager_;
+
+  // Stats for the fake upstreams' TLS contexts. Each fake upstream's dispatcher thread creates
+  // stats in it lazily (eg the cipher and curve counters on handshake), so it has to be the
+  // locked test store rather than the unlocked mock server scope: see upstreamStatsScope().
+  // It borrows the mock server scope's symbol table, so it is declared after the factory
+  // context owners above (destroyed before them) and before the fake upstreams below (destroyed
+  // after them, as their TLS contexts hold stats in it).
+  std::unique_ptr<Stats::Store> upstream_stats_store_;
 
   // The fake upstreams_ are created using the context_manager, so make sure
   // they are destroyed before it is.

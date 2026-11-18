@@ -953,7 +953,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     const auto token_sv = StringUtil::trim(token);
 
     // Build the LowerCaseString for header lookup
-    const LowerCaseString lcs_header_to_remove{std::string(token_sv)};
+    const LowerCaseString lcs_header_to_remove{token_sv};
 
     // If the Connection token value is not a nominated header, ignore it here since
     // the connection header is removed elsewhere when the H1 request is upgraded to H2

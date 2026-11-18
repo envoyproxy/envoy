@@ -35,6 +35,8 @@ protected:
 
   std::unique_ptr<ZSTD_CCtx, decltype(&ZSTD_freeCCtx)> cctx_;
   const uint32_t compression_level_;
+  // Latched at construction: a compressor lives for a single stream.
+  const bool flush_on_flush_state_;
 };
 
 } // namespace Compressor

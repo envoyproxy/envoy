@@ -124,8 +124,10 @@ envoy_cc_library(
     hdrs = ["llm_binding.h"],
     deps = [
         ":uri_pattern_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",

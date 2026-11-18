@@ -389,9 +389,8 @@ uint64_t SymbolTable::getRecentLookups(const RecentLookupsFn& iter) const {
   // access recent_lookups_, so we buffer in name_count_map.
   {
     Thread::LockGuard lock(lock_);
-    recent_lookups_.forEach(
-        [&name_count_map](absl::string_view str, uint64_t count)
-            ABSL_NO_THREAD_SAFETY_ANALYSIS { name_count_map[std::string(str)] += count; });
+    recent_lookups_.forEach([&name_count_map](absl::string_view str, uint64_t count)
+                                ABSL_NO_THREAD_SAFETY_ANALYSIS { name_count_map[str] += count; });
     total += recent_lookups_.total();
   }
 

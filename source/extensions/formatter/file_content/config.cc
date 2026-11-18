@@ -96,9 +96,9 @@ public:
       throw EnvoyException(fmt::format(
           "FILE_CONTENT: expected format 'path' or 'path:watch_directory', got '{}'", subcommand));
     }
-    source.set_filename(std::string(parts[0]));
+    source.set_filename(parts[0]);
     if (parts.size() == 2) {
-      source.mutable_watched_directory()->set_path(std::string(parts[1]));
+      source.mutable_watched_directory()->set_path(parts[1]);
     }
     const Config::DataSource::ProviderOptions options{.allow_empty = true, .modify_watch = true};
 

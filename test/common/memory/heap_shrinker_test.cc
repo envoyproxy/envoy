@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -49,10 +48,10 @@ TEST_F(HeapShrinkerTest, DoNotShrinkWhenNotConfigured) {
 TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   Server::OverloadActionCb action_cb;
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 
@@ -94,10 +93,10 @@ TEST_F(HeapShrinkerTest, CustomTimerInterval) {
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
       .WillRepeatedly(Return(std::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 
@@ -123,10 +122,10 @@ TEST_F(HeapShrinkerTest, CustomMaxUnfreedMemoryBytes) {
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
       .WillRepeatedly(Return(std::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 
@@ -141,10 +140,10 @@ TEST_F(HeapShrinkerTest, NoConfigUsesDefaults) {
   Server::OverloadActionCb action_cb;
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig()).WillRepeatedly(Return(std::nullopt));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 

@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/9e987830a91b7611f2e6091697126c4a72c89cb8
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7b20891d54f90d5865fb5805f8488412ac5e770
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -57,8 +57,9 @@ common --repo_env=ANDROID_HOME=
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
+# dont suppress logs by default
+common --experimental_ui_max_stdouterr_bytes=-1
 test --test_verbose_timeout_warnings
-test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
 # Allow tags to influence execution requirements
 common --incompatible_allow_tags_propagation
@@ -80,6 +81,8 @@ common --@envoy//bazel:deprecated_repo_arg_allowed=false
 build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
 build --per_file_copt=external/c-ares.*@-Wno-unused-function
 build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+build --per_file_copt=external/highway.*@-Wno-ignored-attributes
+build --host_per_file_copt=external/highway.*@-Wno-ignored-attributes
 build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
 build --per_file_copt=external/librdkafka.*@-Wno-unused-variable,-Wno-unused-but-set-variable,-Wno-sometimes-uninitialized,-Wno-uninitialized,-Wno-implicit-enum-enum-cast
 build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
@@ -99,12 +102,14 @@ build --incompatible_default_to_explicit_init_py
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 common --@rules_rust//rust/settings:skip_fission_for_rust=true
+# rustc links with -nodefaultlibs; cc_toolchain unwinder/rtlib flags are inert for Rust
+build --@rules_rust//rust/settings:extra_rustc_flag=-Alinker_messages
+build --@rules_rust//rust/settings:extra_exec_rustc_flag=-Alinker_messages
 
 # kafka
 build --@librdkafka//:with_ssl=false
 build --@librdkafka//:with_zlib=false
 build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
-
 common --incompatible_enable_proto_toolchain_resolution
 
 # these are here to detect if the toolchain attempts to compile protoc
@@ -137,27 +142,33 @@ build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 # compiler
 #############################################################################
 
-# Use gold linker for gcc compiler.
-build:gcc --config=libstdc++
+# Select the opt-in GCC toolchain for target and execution configurations.
+build:gcc --@envoy//bazel:use_gcc
+build:gcc --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build:gcc --test_env=HEAPCHECK=
-build:gcc --action_env=BAZEL_COMPILER=gcc
-build:gcc --action_env=CC=gcc --action_env=CXX=g++
 # This is to work around a bug in GCC that makes debug-types-section
 # option not play well with fission:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
 build:gcc --copt=-fno-debug-types-section
+# With `--gc-sections` (`-c opt`), LLD drops the link array sections upb's GCC build registers
+# extensions in, and their `__start_`/`__stop_` symbols are then undefined. Keep sections referenced
+# by those symbols, as LLD did before 13.
+# TODO(phlax): move this to the toolshed GCC toolchain's link flags.
+build:gcc --linkopt=-Wl,-z,nostart-stop-gc
 # These trigger errors in multiple places both in Envoy dependecies
 # and in Envoy code itself when using GCC.
 # And in all cases the reports appear to be clear false positives.
 build:gcc --copt=-Wno-error=restrict
 build:gcc --copt=-Wno-error=uninitialized
+# With optimization (`-c opt`), GCC inlines through null checks and casts and reports the null
+# branch, eg a null source copied from in a death test, or a store through the result of a
+# `dynamic_cast` it cannot prove non-null.
+build:gcc --copt=-Wno-error=nonnull
+build:gcc --copt=-Wno-error=stringop-overflow
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --cxxopt=-Wno-trigraphs
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
-build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:gcc --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # libc++ - default for clang
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
@@ -166,10 +177,33 @@ common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 
-# libstdc++ - currently only used for gcc
-build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
+build:gcc --per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --host_per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --host_per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-overloaded-virtual
+build:gcc --per_file_copt=external/cel-cpp.*@-Wno-sign-compare,-Wno-return-type,-Wno-unused-function,-Wno-unused-but-set-variable
 
+# TODO(phlax): patch in registry
+build:gcc --per_file_copt=external/proto-processing.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/grpc\+.*@-Wno-attributes,-Wno-return-type,-Wno-sign-compare,-Wno-unused-function
+build:gcc --per_file_copt=external/grpc\+.*\.cc@-Wno-redundant-move,-Wno-pessimizing-move,-Wno-class-memaccess
+build:gcc --per_file_copt=external/grpc-httpjson-transcoding.*@-Wno-range-loop-construct
+build:gcc --per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-uninitialized
+build:gcc --host_per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-uninitialized
+build:gcc --per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --host_per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --per_file_copt=external/tcmalloc.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/v8.*@-Wno-dangling-else
+
+# The GCC reference build as Envoy CI builds and tests it: with `-c opt`, as the Clang release build
+# is, but without debug info. With GCC, the split debug info `-c opt` adds (and `-ggdb3` on
+# libraries) takes compiles over the small RBE pool and the larger links over the large one, and
+# makes the binaries about 6x the size, for output that CI never publishes.
+build:gcc-ci --config=gcc
+build:gcc-ci --compilation_mode=opt
+build:gcc-ci --fission=no
+build:gcc-ci --per_file_copt=.*@-g0
 
 #############################################################################
 # tests
@@ -189,8 +223,17 @@ build:coverage --strategy=TestRunner=remote,sandboxed,local
 build:coverage --strategy=CoverageReport=local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
-build:coverage --experimental_split_coverage_postprocessing
+# The per-test lcov is produced inside the test action: the raw profile (~140MB per test, mostly
+# a copy of the binary's symbol table) never leaves the worker, and there is no second action
+# per test to queue, stage and run.
+build:coverage --noexperimental_split_coverage_postprocessing
 build:coverage --experimental_fetch_all_coverage_outputs
+# toolshed's llvm-cov exports line coverage for workspace sources only, and its lcov merger
+# strips function and branch records (unused by the report) and removes the coverage
+# directory's intermediates before the test's outputs are uploaded.
+build:coverage --coverage_support=@envoy_toolshed//coverage:llvm_support
+build:coverage --test_env=LLVM_COV=external/envoy_toolshed+/coverage/llvm/llvm-cov.sh
+build:coverage --coverage_output_generator=@envoy_toolshed//coverage:lcov_merger
 build:coverage --collect_code_coverage
 build:coverage --instrumentation_filter="^//source(?!/common/quic/platform)[/:],^//envoy[/:],^//contrib(?!/.*/test)[/:]"
 build:coverage --remote_download_minimal
@@ -210,6 +253,8 @@ build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target,-quiche
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
 # changes, this build type may need to be broken up.
+# Identifies the compile time options build, eg to `rbe_pool` (`bazel/envoy_rbe.bzl`).
+build:compile-time-options --define=ENVOY_CONFIG_COMPILE_TIME_OPTIONS=1
 build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
@@ -272,14 +317,13 @@ test:sanitizer --build_tests_only
 
 # ASAN config with clang runtime
 build:asan --config=asan-common
-build:asan --linkopt --rtlib=compiler-rt
-build:asan --linkopt --unwindlib=libgcc
+build:asan --@envoy//bazel:shared_unwind=true
+# Clang adds the hermetic resource directory's per-target runtime library search path.
 build:asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 build:asan --action_env=ENVOY_UBSAN_VPTR=1
 build:asan --copt=-fsanitize=vptr,function
 build:asan --linkopt=-fsanitize=vptr,function
-build:asan --linkopt='-L/opt/llvm/lib/clang/22/lib/x86_64-unknown-linux-gnu'
 
 # Basic ASAN/UBSAN that works for gcc or llvm
 build:asan-common --config=sanitizer
@@ -316,6 +360,8 @@ build:macos-asan --dynamic_mode=off
 # Base MSAN config
 build:msan --action_env=ENVOY_MSAN=1
 build:msan --config=sanitizer
+# msan runs tests at 4-5x the unsanitized time; scale the per-size timeouts as tsan does.
+build:msan --test_timeout=120,600,1500,4800
 build:msan --build_tag_filters=-no_san
 build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1
@@ -364,6 +410,8 @@ build:asan-fuzzer --copt=-fno-omit-frame-pointer
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
 build:fuzz-coverage --config=plain-fuzzer
+# Identifies the fuzz coverage build, eg to `rbe_pool` (`bazel/envoy_rbe.bzl`).
+build:fuzz-coverage --define=ENVOY_CONFIG_FUZZ_COVERAGE=1
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage,-quiche
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to

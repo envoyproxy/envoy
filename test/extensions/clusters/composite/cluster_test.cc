@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -854,10 +853,10 @@ cluster_type:
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("async_cluster"))
       .WillOnce(Return(&async_cluster));
   EXPECT_CALL(async_cluster, loadBalancer()).WillRepeatedly(ReturnRef(async_lb));
-  EXPECT_CALL(async_lb, chooseHost(_)).WillOnce(InvokeWithoutArgs([]() {
+  EXPECT_CALL(async_lb, chooseHost(_)).WillOnce([]() {
     return Upstream::HostSelectionResponse{nullptr,
                                            std::make_unique<TestAsyncHostSelectionHandle>()};
-  }));
+  });
 
   // The second cluster is never consulted, so no expectation is set for it.
   auto result = lb.chooseHost(&context);

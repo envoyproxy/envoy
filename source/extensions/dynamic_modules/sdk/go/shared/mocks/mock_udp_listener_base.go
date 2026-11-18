@@ -312,6 +312,20 @@ func (mr *MockUdpListenerFilterConfigHandleMockRecorder) DefineHistogram(name an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockUdpListenerFilterConfigHandle)(nil).DefineHistogram), name)
 }
 
+// GetLoadShedPoint mocks base method.
+func (m *MockUdpListenerFilterConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLoadShedPoint", name)
+	ret0, _ := ret[0].(shared.LoadShedPoint)
+	return ret0
+}
+
+// GetLoadShedPoint indicates an expected call of GetLoadShedPoint.
+func (mr *MockUdpListenerFilterConfigHandleMockRecorder) GetLoadShedPoint(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLoadShedPoint", reflect.TypeOf((*MockUdpListenerFilterConfigHandle)(nil).GetLoadShedPoint), name)
+}
+
 // IncrementCounterValue mocks base method.
 func (m *MockUdpListenerFilterConfigHandle) IncrementCounterValue(id shared.MetricID, value uint64) shared.MetricsResult {
 	m.ctrl.T.Helper()

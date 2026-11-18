@@ -4,6 +4,8 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/filters/network/rbac/config.h"
 
 #include "test/integration/integration.h"
@@ -368,6 +370,73 @@ typed_config:
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
+// The stats are identical in the legacy tag-extraction mode (IPv4) and the explicit tags mode
+// (IPv6). The stat prefix avoids "tcp", which collides with the tcp_proxy extraction rule.
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest,
+       StatsTagsAndNamesAreIdenticalInBothModes) {
+  // The mode is read during server initialization, so it must be set directly rather than with
+  // addRuntimeOverride().
+  const bool explicit_tags = GetParam() == Network::Address::IpVersion::v6;
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicit_tags);
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: rbac_stats_prefix
+  shadow_rules_stat_prefix: shadow_rules_prefix_
+  rules:
+    policies:
+      "allow_all":
+        permissions:
+          - any: true
+        principals:
+          - any: true
+  shadow_rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+)EOF");
+
+  // Sanity check that the mode really took effect.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicit_tags);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(tcp_client->connected());
+  tcp_client->close();
+
+  test_server_->waitForCounter("rbac_stats_prefix.rbac.allowed", Ge(1));
+  test_server_->waitForCounter("rbac_stats_prefix.rbac.shadow_rules_prefix_.shadow_denied", Ge(1));
+
+  // Checks a counter's flat name, tag-extracted name and tags.
+  auto expect_stat = [this](const std::string& name, const std::string& tag_extracted_name,
+                            std::vector<std::pair<std::string, std::string>> expected_tags) {
+    const Stats::CounterSharedPtr counter = test_server_->counter(name);
+    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+    EXPECT_EQ(counter->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+    std::vector<std::pair<std::string, std::string>> actual_tags;
+    for (const Stats::Tag& tag : counter->tags()) {
+      actual_tags.emplace_back(tag.name_, tag.value_);
+    }
+    std::sort(actual_tags.begin(), actual_tags.end());
+    std::sort(expected_tags.begin(), expected_tags.end());
+    EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
+  };
+
+  expect_stat("rbac_stats_prefix.rbac.allowed", "rbac.allowed",
+              {{"envoy.rbac_prefix", "rbac_stats_prefix"}});
+  expect_stat("rbac_stats_prefix.rbac.shadow_rules_prefix_.shadow_denied", "rbac.shadow_denied",
+              {{"envoy.rbac_prefix", "rbac_stats_prefix"},
+               {"envoy.rbac_rules_prefix", "shadow_rules_prefix_"}});
 }
 
 } // namespace RBAC

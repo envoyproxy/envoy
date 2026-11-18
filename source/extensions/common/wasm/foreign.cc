@@ -285,7 +285,7 @@ public:
     WasmForeignFunction f =
         [self](WasmBase&, std::string_view expr,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
-      auto parse_status = google::api::expr::parser::Parse(std::string(expr));
+      auto parse_status = google::api::expr::parser::Parse(expr);
       if (!parse_status.ok()) {
         ENVOY_LOG(info, "expr_create parse error: {}", parse_status.status().message());
         return WasmResult::BadArgument;
@@ -349,7 +349,8 @@ public:
         return WasmResult::InternalFailure;
       }
       std::string result;
-      auto serialize_status = serializeValue(value, &result);
+      auto serialize_status = serializeValue(
+          value, &result, proxy_wasm::current_context_->wasmVm()->usesWasmByteOrder());
       if (serialize_status != WasmResult::Ok) {
         return serialize_status;
       }

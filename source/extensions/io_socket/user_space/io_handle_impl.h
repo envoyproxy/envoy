@@ -51,6 +51,7 @@ public:
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;
+  bool wasPeerFullyClosed() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
@@ -180,11 +181,10 @@ private:
   // pending data to drain.
   bool receive_data_end_stream_{false};
   bool receive_data_reset_{false};
-  // Set by onPeerDestroy() when the peer fully closed (close(), not shutdown(WR)). Reads drain
-  // pending data first, then report ECONNRESET where they would report EOF. This is how a full
-  // peer close is distinguished from a write half-close, which real sockets cannot signal on the
-  // read side.
-  bool receive_data_reset_after_drain_{false};
+  // Set by onPeerDestroy() when the in-process peer fully closed (close(), not shutdown(WR)).
+  // Reads still drain pending data and return a normal EOF, while ConnectionImpl queries
+  // wasPeerFullyClosed() to close half-close-enabled connections cleanly after end_stream.
+  bool peer_closed_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.

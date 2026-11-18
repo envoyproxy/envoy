@@ -148,7 +148,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
     for (const auto& header_name : StringUtil::splitToken(
              request_headers.EnvoyRetriableHeaderNames()->value().getStringView(), ",")) {
       envoy::config::route::v3::HeaderMatcher header_matcher;
-      header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
+      header_matcher.set_name(absl::StripAsciiWhitespace(header_name));
       retriable_headers_.emplace_back(
           Http::HeaderUtility::createHeaderData(header_matcher, context));
     }

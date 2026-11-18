@@ -53,6 +53,10 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
     return;
   }
 
+  // The module can trigger a nested log from its log callback, so the context of the outer log is
+  // restored afterwards.
+  const Formatter::Context* const outer_log_context = tl_logger.log_context_;
+  const StreamInfo::StreamInfo* const outer_stream_info = tl_logger.stream_info_;
   tl_logger.log_context_ = &context;
   tl_logger.stream_info_ = &stream_info;
 
@@ -62,8 +66,8 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
   // Invoke the module's log callback with the context pointer.
   config_->on_logger_log_(tl_logger.thisAsVoidPtr(), tl_logger.logger_, abi_log_type);
 
-  tl_logger.log_context_ = nullptr;
-  tl_logger.stream_info_ = nullptr;
+  tl_logger.log_context_ = outer_log_context;
+  tl_logger.stream_info_ = outer_stream_info;
 }
 
 } // namespace DynamicModules

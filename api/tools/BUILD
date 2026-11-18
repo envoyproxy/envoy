@@ -1,30 +1,15 @@
+load("@envoy_toolshed//tap:defs.bzl", "tap2pcap")
 load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 licenses(["notice"])  # Apache 2
 
-py_binary(
+# Converts a socket tap trace to PCAP:
+#   bazel run @envoy_api//tools:tap2pcap <tap .pb/.pb_text> <pcap path>
+tap2pcap(
     name = "tap2pcap",
-    srcs = ["tap2pcap.py"],
-    licenses = ["notice"],  # Apache 2
+    message = "envoy.data.tap.v3.wrapper_pb2.TraceWrapper",
+    proto = "//envoy/data/tap/v3:pkg_py_proto",
     visibility = ["//visibility:public"],
-    deps = ["//envoy/data/tap/v2alpha:pkg_py_proto"],
-)
-
-py_test(
-    name = "tap2pcap_test",
-    srcs = ["tap2pcap_test.py"],
-    data = [
-        "data/tap2pcap_h2_ipv4.pb_text",
-        "data/tap2pcap_h2_ipv4.txt",
-    ],
-    # Don't run this by default, since we don't want to force local dependency on Wireshark/tshark,
-    # will explicitly invoke in CI.
-    tags = [
-        "manual",
-        "no-remote-exec",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [":tap2pcap"],
 )
 
 py_binary(

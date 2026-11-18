@@ -79,12 +79,14 @@ public:
     ON_CALL(*this, getJwtCache()).WillByDefault(::testing::ReturnRef(jwt_cache_));
     ON_CALL(*this, isSubjectAllowed(_)).WillByDefault(::testing::Return(true));
     ON_CALL(*this, isLifetimeAllowed(_, _)).WillByDefault(::testing::Return(true));
+    ON_CALL(*this, isAlgorithmAllowed(_)).WillByDefault(::testing::Return(true));
     ON_CALL(*this, retryPolicy()).WillByDefault(::testing::ReturnRef(retry_policy_));
   }
 
   MOCK_METHOD(bool, areAudiencesAllowed, (const std::vector<std::string>&), (const));
   MOCK_METHOD(bool, isSubjectAllowed, (const absl::string_view), (const));
   MOCK_METHOD(bool, isLifetimeAllowed, (const absl::Time&, const absl::Time*), (const));
+  MOCK_METHOD(bool, isAlgorithmAllowed, (absl::string_view), (const));
   MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider,
               (), (const));
   MOCK_METHOD(const std::vector<ClaimToHeader>&, claimsToHeaders, (), (const));
@@ -129,17 +131,16 @@ public:
   MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
       : request_(&mock_cm.thread_local_cluster_.async_client_), response_body_(response_body) {
     ON_CALL(mock_cm.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillByDefault(
-            Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              Http::ResponseMessagePtr response_message(
-                  new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-              response_message->body().add(response_body_);
-              cb.onSuccess(request_, std::move(response_message));
-              called_count_++;
-              return &request_;
-            }));
+        .WillByDefault([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                              const Http::AsyncClient::RequestOptions&)
+                           -> Http::AsyncClient::Request* {
+          Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+              Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+          response_message->body().add(response_body_);
+          cb.onSuccess(request_, std::move(response_message));
+          called_count_++;
+          return &request_;
+        });
   }
 
   int called_count() const { return called_count_; }

@@ -25,7 +25,11 @@ envoy_cc_test(
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -72,11 +76,70 @@ envoy_cc_test_library(
     ],
 )
 
+# The listener manager tests are compiled once and run as separate targets by suite, so the slow
+# in-place update tests and the large real filter suite each get their own shards and time budget.
+# Keep these lists in step with the suite names: a filter matching no tests runs nothing and passes.
+# Suites not listed run in `listener_manager_impl_test`.
+_REAL_FILTERS_SUITES = [
+    "ListenerManagerImplWithRealFiltersTest",
+    "ListenerManagerImplWithRealFiltersWorkerRoutingTest",
+]
+
+_IN_PLACE_SUITES = [
+    "ListenerManagerImplFcdsInPlaceUpdateTest",
+    "ListenerManagerImplForInPlaceFilterChainUpdateTest",
+    "ListenerManagerImplInPlaceAddressUpdateTest",
+    "ListenerManagerImplInPlaceAddressUpdateWithTwoWorkersTest",
+]
+
+_REAL_FILTERS_TESTS = ":".join(["*/%s.*" % suite for suite in _REAL_FILTERS_SUITES])
+
+_IN_PLACE_TESTS = ":".join(["*/%s.*" % suite for suite in _IN_PLACE_SUITES])
+
 envoy_cc_test(
     name = "listener_manager_impl_test",
+    args = ["--gtest_filter=-%s:%s" % (_REAL_FILTERS_TESTS, _IN_PLACE_TESTS)],
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "msan": {"test": "linux_x64_small"},
+    },
+    shard_count = 6,
+    deps = [":listener_manager_impl_test_suites"],
+)
+
+envoy_cc_test(
+    name = "listener_manager_impl_real_filters_test",
+    args = ["--gtest_filter=" + _REAL_FILTERS_TESTS],
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "msan": {"test": "linux_x64_small"},
+    },
+    shard_count = 7,
+    deps = [":listener_manager_impl_test_suites"],
+)
+
+envoy_cc_test(
+    name = "listener_manager_impl_in_place_test",
+    args = ["--gtest_filter=" + _IN_PLACE_TESTS],
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+    },
+    shard_count = 4,
+    deps = [":listener_manager_impl_test_suites"],
+)
+
+# The suites' compile needs about 8GB with GCC, so it keeps the pool the single test target
+# had (an envoy_cc_test's pool also applies to its compiles).
+envoy_cc_test_library(
+    name = "listener_manager_impl_test_suites",
     srcs = ["listener_manager_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
-    shard_count = 10,
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",
@@ -122,7 +185,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = envoy_select_enable_http3(["listener_manager_impl_quic_only_test.cc"]),
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -149,12 +222,23 @@ envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:resource_name_lib",
+        "//source/common/init:target_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/network:addr_family_aware_socket_option_lib",
@@ -176,8 +260,10 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/server:utility_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -189,10 +275,18 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
+        "//source/common/config:decoded_resource_lib",
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/init:init_mocks",
@@ -201,6 +295,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -211,7 +306,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fcds_api_test",
     srcs = ["fcds_api_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:resource_type_helper_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
@@ -234,7 +339,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/mocks/config:config_mocks",

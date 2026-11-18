@@ -1,0 +1,5 @@
+body: "{\"id\":\"chatcmpl-9xYz123456\",\"object\":\"chat.completion\",\"created\":1700000000,\"model\":\"gpt-4o\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Calling get_weather for San Francisco.\"},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":90,\"completion_tokens\":35,\"total_tokens\":125,\"prompt_tokens_details\":{\"cached_tokens\":25}}}"
+fragmentation_seed: 18364758544493064721
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: OPENAI_CHAT_COMPLETIONS
+max_json_body_size: 4095
