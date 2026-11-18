@@ -21,11 +21,13 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager)
+    Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider)
     : cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      metrics_(*stats_scope_), init_manager_(init_manager), server_context_(context),
+      metrics_(*stats_scope_), init_manager_(init_manager),
+      load_shed_point_provider_(load_shed_point_provider), server_context_(context),
       filter_name_(filter_name), filter_config_(filter_config),
       metrics_namespace_(metrics_namespace), dynamic_module_(std::move(dynamic_module)) {}
 
@@ -195,7 +197,8 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, const bool terminal_filter,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager) {
+    Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager,
+    OptRef<Server::LoadShedPointProvider> load_shed_point_provider) {
   auto constructor =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_new)>(
           "envoy_dynamic_module_on_http_filter_config_new");
@@ -311,7 +314,7 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
 
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
-      context, init_manager);
+      context, init_manager, load_shed_point_provider);
 
   const void* filter_config_envoy_ptr = (*constructor.value())(
       static_cast<void*>(config.get()), {filter_name.data(), filter_name.size()},

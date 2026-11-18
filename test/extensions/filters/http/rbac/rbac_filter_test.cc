@@ -19,6 +19,7 @@
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -30,6 +31,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::Contains;
+using ::testing::ElementsAre;
 using ::testing::IsSupersetOf;
 using ::testing::Key;
 using ::testing::NiceMock;
@@ -255,6 +257,14 @@ on_no_match:
         ProtobufMessage::getStrictValidationVisitor()));
   }
 
+  RoleBasedAccessControlFilterConfigSharedPtr configFromYaml(const std::string& yaml) {
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
+    TestUtility::loadFromYaml(yaml, config);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", *stats_store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor());
+  }
+
   void setupConfig(RoleBasedAccessControlFilterConfigSharedPtr config) {
     config_ = config;
     filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
@@ -312,12 +322,6 @@ on_no_match:
   }
 
   void setMetadata() {
-    ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
-        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
-          req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, Protobuf::Struct>("envoy.filters.http.rbac", obj));
-        });
-
     ON_CALL(req_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
@@ -481,6 +485,353 @@ TEST_F(RoleBasedAccessControlFilterTest, NoEnginesNoDynamicMetadataStats) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
 
   ASSERT_FALSE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+}
+
+// The route's most specific config is resolved once per request, here with both engines and a
+// route config that carries both.
+TEST_F(RoleBasedAccessControlFilterTest, RouteConfigResolvedOnceWhenAllowed) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
+  setDestinationPort(123);
+
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route;
+  TestUtility::loadFromYaml(R"EOF(
+rbac:
+  rules_stat_prefix: route_rules_
+  rules:
+    action: ALLOW
+    policies:
+      route_policy:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+  shadow_rules:
+    action: ALLOW
+    policies:
+      route_shadow_policy:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+)EOF",
+                            per_route);
+  RoleBasedAccessControlRouteSpecificFilterConfig route_config(
+      per_route, context_, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_CALL(callbacks_, mostSpecificPerFilterConfig()).WillOnce(Return(&route_config));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+}
+
+// The same holds on the denial path, where the filter also sends a local reply.
+TEST_F(RoleBasedAccessControlFilterTest, RouteConfigResolvedOnceWhenDenied) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
+  setDestinationPort(456);
+
+  EXPECT_CALL(callbacks_, mostSpecificPerFilterConfig());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+}
+
+// A listener config writes exactly the four fields its two stat prefixes name.
+TEST_F(RoleBasedAccessControlFilterTest, ListenerConfigWritesExactDynamicMetadataFields) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "rules_stat_prefix_");
+  setDestinationPort(123);
+  setRequestedServerName("xyz.cncf.io");
+  // The fields go straight into the stream's metadata, with no Struct to merge.
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              ElementsAre(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(UnorderedElementsAre(
+                      IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
+                      IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foo"),
+                      IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"),
+                      IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"))))));
+}
+
+// A route config that overrides only the rules stat prefix renames the enforced fields, while the
+// shadow fields keep the listener's shadow stat prefix.
+TEST_F(RoleBasedAccessControlFilterTest, RouteConfigRulesStatPrefixOverridesOnlyEnforcedFields) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "listener_rules_");
+  setDestinationPort(123);
+
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route;
+  TestUtility::loadFromYaml(R"EOF(
+rbac:
+  rules_stat_prefix: route_rules_
+  rules:
+    action: ALLOW
+    policies:
+      route_policy:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+  shadow_rules:
+    action: DENY
+    policies:
+      route_shadow_policy:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+)EOF",
+                            per_route);
+  RoleBasedAccessControlRouteSpecificFilterConfig route_config(
+      per_route, context_, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_CALL(callbacks_, mostSpecificPerFilterConfig()).WillRepeatedly(Return(&route_config));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              ElementsAre(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(UnorderedElementsAre(
+                      IsStructString("route_rules_enforced_engine_result", "allowed"),
+                      IsStructString("route_rules_enforced_effective_policy_id", "route_policy"),
+                      IsStructString("shadow_rules_prefix_shadow_engine_result", "denied"),
+                      IsStructString("shadow_rules_prefix_shadow_effective_policy_id",
+                                     "route_shadow_policy"))))));
+}
+
+// Each engine's field names come from the route config when the route sets that engine's stat
+// prefix, and from the listener config otherwise.
+TEST_F(RoleBasedAccessControlFilterTest, RouteStatPrefixesPickFieldNamesPerEngine) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "listener_rules_");
+  setDestinationPort(123);
+  setRequestedServerName("xyz.cncf.io");
+
+  const auto route_config = [this](absl::string_view prefixes) {
+    envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route;
+    TestUtility::loadFromYaml(absl::StrCat(R"EOF(
+rbac:
+  rules:
+    action: ALLOW
+    policies:
+      route_policy:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+  shadow_rules:
+    action: ALLOW
+    policies:
+      route_shadow_policy:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+)EOF",
+                                           prefixes),
+                              per_route);
+    return std::make_unique<RoleBasedAccessControlRouteSpecificFilterConfig>(
+        per_route, context_, ProtobufMessage::getStrictValidationVisitor());
+  };
+  const auto no_prefix = route_config("");
+  const auto rules_prefix = route_config("  rules_stat_prefix: route_rules_\n");
+  const auto shadow_prefix = route_config("  shadow_rules_stat_prefix: route_shadow_\n");
+
+  const auto expect_fields = [this](const RoleBasedAccessControlRouteSpecificFilterConfig* route,
+                                    const std::string& enforced_prefix,
+                                    const std::string& enforced_policy,
+                                    const std::string& shadow_prefix,
+                                    const std::string& shadow_policy) {
+    req_info_.metadata_.Clear();
+    ON_CALL(callbacks_, mostSpecificPerFilterConfig()).WillByDefault(Return(route));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+    EXPECT_THAT(
+        req_info_.dynamicMetadata().filter_metadata(),
+        ElementsAre(Pair(
+            "envoy.filters.http.rbac",
+            HasStructFields(UnorderedElementsAre(
+                IsStructString(enforced_prefix + "enforced_engine_result", "allowed"),
+                IsStructString(enforced_prefix + "enforced_effective_policy_id", enforced_policy),
+                IsStructString(shadow_prefix + "shadow_engine_result", "allowed"),
+                IsStructString(shadow_prefix + "shadow_effective_policy_id", shadow_policy))))));
+  };
+  expect_fields(nullptr, "listener_rules_", "foo", "shadow_rules_prefix_", "bar");
+  expect_fields(no_prefix.get(), "listener_rules_", "route_policy", "shadow_rules_prefix_",
+                "route_shadow_policy");
+  expect_fields(rules_prefix.get(), "route_rules_", "route_policy", "shadow_rules_prefix_",
+                "route_shadow_policy");
+  expect_fields(shadow_prefix.get(), "listener_rules_", "route_policy", "route_shadow_",
+                "route_shadow_policy");
+}
+
+// A denial under a route config that sets both stat prefixes writes only the route's field names,
+// and none under the filter config's prefixes.
+TEST_F(RoleBasedAccessControlFilterTest, DeniedUnderRouteStatPrefixesWritesOnlyRouteFields) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "listener_rules_");
+  setDestinationPort(123);
+
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route;
+  TestUtility::loadFromYaml(R"EOF(
+rbac:
+  rules_stat_prefix: route_rules_
+  shadow_rules_stat_prefix: route_shadow_
+  rules:
+    action: DENY
+    policies:
+      route_deny:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+  shadow_rules:
+    action: ALLOW
+    policies:
+      route_shadow_allow:
+        permissions: [{any: true}]
+        principals: [{any: true}]
+)EOF",
+                            per_route);
+  RoleBasedAccessControlRouteSpecificFilterConfig route_config(
+      per_route, context_, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_CALL(callbacks_, mostSpecificPerFilterConfig()).WillRepeatedly(Return(&route_config));
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", _, _,
+                                         "rbac_access_denied_matched_policy[route_deny]"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      ElementsAre(Pair(
+          "envoy.filters.http.rbac",
+          HasStructFields(UnorderedElementsAre(
+              IsStructString("route_rules_enforced_engine_result", "denied"),
+              IsStructString("route_rules_enforced_effective_policy_id", "route_deny"),
+              IsStructString("route_shadow_shadow_engine_result", "allowed"),
+              IsStructString("route_shadow_shadow_effective_policy_id", "route_shadow_allow"))))));
+}
+
+// An RBACPerRoute without `rbac` turns the filter off for the route, so neither engine runs and no
+// dynamic metadata is written.
+TEST_F(RoleBasedAccessControlFilterTest, RouteConfigWithoutRbacWritesNoDynamicMetadata) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY);
+  setDestinationPort(123);
+
+  RoleBasedAccessControlRouteSpecificFilterConfig route_config(
+      envoy::extensions::filters::http::rbac::v3::RBACPerRoute{}, context_,
+      ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_CALL(callbacks_, mostSpecificPerFilterConfig()).WillRepeatedly(Return(&route_config));
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().empty());
+}
+
+// A denial writes the results after sendLocalReply() returns, so nothing sendLocalReply() runs
+// sees a field of this filter.
+TEST_F(RoleBasedAccessControlFilterTest, DeniedRequestWritesDynamicMetadataAfterLocalReply) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY, "rules_stat_prefix_");
+  setDestinationPort(123);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _)).Times(0);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", _, _,
+                                         "rbac_access_denied_matched_policy[foo]"))
+      .WillOnce([this] {
+        EXPECT_FALSE(
+            req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              ElementsAre(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(UnorderedElementsAre(
+                      IsStructString("rules_stat_prefix_enforced_engine_result", "denied"),
+                      IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foo"),
+                      IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))))));
+}
+
+// The enforced engine matches on the dynamic metadata that earlier filters wrote, and never on the
+// shadow result of its own filter. A second filter with the same config sees the first one's.
+TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineSeesOnlyEarlierFiltersResults) {
+  const std::string yaml = R"EOF(
+rules:
+  action: DENY
+  policies:
+    shadow_denied_before:
+      permissions:
+      - metadata:
+          filter: envoy.filters.http.rbac
+          path:
+          - key: shadow_engine_result
+          value:
+            string_match:
+              exact: denied
+      principals: [{any: true}]
+shadow_rules:
+  action: ALLOW
+  policies:
+    never:
+      permissions: [{not_rule: {any: true}}]
+      principals: [{any: true}]
+)EOF";
+  setupConfig(configFromYaml(yaml));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+
+  RoleBasedAccessControlFilter second_filter(configFromYaml(yaml));
+  second_filter.setDecoderFilterCallbacks(callbacks_);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, second_filter.decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      ElementsAre(Pair("envoy.filters.http.rbac",
+                       HasStructFields(UnorderedElementsAre(
+                           IsStructString("enforced_engine_result", "denied"),
+                           IsStructString("enforced_effective_policy_id", "shadow_denied_before"),
+                           IsStructString("shadow_engine_result", "denied"))))));
+}
+
+// Two filters with no stat prefixes write the same field names in one namespace. The second one
+// replaces each field it writes and keeps every field it does not write.
+TEST_F(RoleBasedAccessControlFilterTest, TwoFiltersOverwriteSharedFieldsPerField) {
+  setupConfig(configFromYaml(R"EOF(
+rules:
+  action: ALLOW
+  policies:
+    first_policy:
+      permissions: [{any: true}]
+      principals: [{any: true}]
+shadow_rules:
+  action: DENY
+  policies:
+    first_shadow_policy:
+      permissions: [{any: true}]
+      principals: [{any: true}]
+)EOF"));
+  RoleBasedAccessControlFilter second_filter(configFromYaml(R"EOF(
+rules:
+  action: DENY
+  policies:
+    second_policy:
+      permissions: [{header: {name: ":method", string_match: {exact: TRACE}}}]
+      principals: [{any: true}]
+shadow_rules:
+  action: DENY
+  policies:
+    second_shadow_policy:
+      permissions: [{header: {name: ":method", string_match: {exact: TRACE}}}]
+      principals: [{any: true}]
+)EOF"));
+  second_filter.setDecoderFilterCallbacks(callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, second_filter.decodeHeaders(headers, false));
+
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      ElementsAre(Pair("envoy.filters.http.rbac",
+                       HasStructFields(UnorderedElementsAre(
+                           IsStructString("enforced_engine_result", "allowed"),
+                           IsStructString("enforced_effective_policy_id", "first_policy"),
+                           IsStructString("shadow_engine_result", "allowed"),
+                           IsStructString("shadow_effective_policy_id", "first_shadow_policy"))))));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {

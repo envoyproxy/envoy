@@ -6,6 +6,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files(["envoyproxy_io_proxy.yaml"])
+
 py_binary(
     name = "configgen",
     srcs = ["configgen.py"],

@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     data = ["testdata/response_goldens.json"],
     extension_names = ["envoy.http.ai_filters.transcoder"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -44,7 +43,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.transcoder"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -66,7 +71,12 @@ envoy_extension_cc_test(
         "envoy.http.ai_filters.transcoder",
         "envoy.filters.http.ai_protocol_manager",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/set_filter_state:config",

@@ -1,7 +1,10 @@
 #include <functional>
+#include <type_traits>
 #include <vector>
 
 #include "source/common/common/linked_object.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -276,19 +279,20 @@ TEST(IntrusiveListNodeTest, ListDestructorDeletesFrontToBack) {
   EXPECT_TRUE(empty_after_last);
 }
 
-#if !defined(NDEBUG)
-TEST(IntrusiveListNodeDeathTest, RemoveWhenNotInsertedAborts) {
+TEST(IntrusiveListNodeTest, RemoveWhenNotInsertedIsEnvoyBug) {
   auto obj = std::make_unique<IntrusiveTestObject>(1);
-  EXPECT_DEATH(obj->removeFromList(), "removed while not in a list");
+  EXPECT_ENVOY_BUG(EXPECT_EQ(nullptr, obj->removeFromList()), "removed while not in a list");
 
   // Also after it was removed from a list.
   IntrusiveList<IntrusiveTestObject> list;
   list.pushBack(std::move(obj));
   obj = list.front()->removeFromList();
-  EXPECT_DEATH(obj->removeFromList(), "removed while not in a list");
+  ASSERT_NE(nullptr, obj);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(nullptr, obj->removeFromList()), "removed while not in a list");
   EXPECT_TRUE(list.empty());
 }
 
+#if !defined(NDEBUG)
 TEST(IntrusiveListNodeDeathTest, DoublePushAborts) {
   IntrusiveList<IntrusiveTestObject> list;
   IntrusiveList<IntrusiveTestObject> other;
@@ -390,5 +394,37 @@ TEST(IntrusiveListNodeTest, PrevChainAfterRemoveHeadTailAndMiddle) {
   EXPECT_EQ(ptrs[1], ptrs[3]->prev());
   EXPECT_EQ(nullptr, ptrs[3]->next());
 }
+
+TEST(IntrusiveListNodeTest, NodeIsNotCopyableOrMovable) {
+  static_assert(!std::is_copy_constructible_v<IntrusiveTestObject>);
+  static_assert(!std::is_copy_assignable_v<IntrusiveTestObject>);
+  static_assert(!std::is_move_constructible_v<IntrusiveTestObject>);
+  static_assert(!std::is_move_assignable_v<IntrusiveTestObject>);
+}
+
+TEST(IntrusiveListNodeTest, PushNullIsIgnored) {
+  IntrusiveList<IntrusiveTestObject> list;
+  list.push(std::unique_ptr<IntrusiveTestObject>());
+  list.pushBack(std::unique_ptr<IntrusiveTestObject>());
+  EXPECT_TRUE(list.empty());
+  EXPECT_EQ(nullptr, list.front());
+  EXPECT_EQ(nullptr, list.back());
+
+  list.pushBack(std::make_unique<IntrusiveTestObject>(1));
+  list.push(std::unique_ptr<IntrusiveTestObject>());
+  list.pushBack(std::unique_ptr<IntrusiveTestObject>());
+  ASSERT_EQ(1u, list.size());
+  EXPECT_EQ(list.front(), list.back());
+  EXPECT_EQ(1, list.front()->value());
+}
+
+#if !defined(NDEBUG)
+TEST(IntrusiveListNodeDeathTest, DestroyWhileInsertedAborts) {
+  IntrusiveList<IntrusiveTestObject> list;
+  list.pushBack(std::make_unique<IntrusiveTestObject>(1));
+  EXPECT_DEATH(delete list.front(), "destroyed while in a list");
+  EXPECT_EQ(1u, list.size());
+}
+#endif
 
 } // namespace Envoy

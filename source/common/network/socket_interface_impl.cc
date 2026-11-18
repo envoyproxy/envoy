@@ -165,7 +165,7 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   return SOCKET_VALID(result.return_value_);
 }
 
-Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
+Server::BootstrapExtensionCreationResult SocketInterfaceImpl::createBootstrapExtension(
     [[maybe_unused]] const Protobuf::Message& config,
     [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
 #if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)

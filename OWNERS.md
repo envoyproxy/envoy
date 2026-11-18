@@ -102,7 +102,6 @@ without further review.
 * Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
 * Peng Gao ([penguingao](https://github.com/penguingao)) (pengg@google.com)
 * Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
-* Adi (Suissa) Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
 * Ignasi Barrera ([nacx](https://github.com/nacx)) (nacx@apache.org)
 * Carlos Chavez ([charz87](https://github.com/charz87)) (cchavezperez@google.com)
 * Aliaksei Khilko ([alekskhilko](https://github.com/alekskhilko)) (khilko@google.com)
@@ -152,5 +151,4 @@ now have left Envoy community or become inactive because of various reasons. Whe
 section, some of code owners have left for a while. So, feel free to ping the maintainers if
 you find any emeritus code owners missing and would like to be added to this list.
 
-* Derek Argueta ([derekargueta](https://github.com/derekargueta))
 * marc-barry ([marc-barry](https://github.com/marc-barry))
