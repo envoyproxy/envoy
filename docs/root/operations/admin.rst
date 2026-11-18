@@ -517,12 +517,6 @@ modify different aspects of the server:
 
   Hidden stats will be excluded from the output. This is the default behavior.
 
-  .. http:get:: /stats?unordered
-
-  Allows the stats to be returned in any order. Without this parameter, the stats are sorted by
-  name. This output is still sorted for now; the parameter currently only changes the Prometheus
-  output, see ``/stats?format=prometheus&unordered`` below.
-
   .. http:get:: /stats?filter=regex
 
   Filters the returned stats to those with names matching the regular
@@ -798,6 +792,11 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   format. This can be used to integrate with a Prometheus server.
 
+  The stats are not sorted by name. Each metric family is emitted as one group with a single
+  ``TYPE`` line, as the exposition format requires, but the order of the families and series can
+  change from one scrape to the next. Set the runtime guard
+  ``envoy.reloadable_features.prometheus_stats_unsorted`` to ``false`` to sort the stats by name.
+
   The output will either be the protobuf format or the v0.0.4 text format, depending on the value
   of the ``Accept`` header. A prometheus scrape configuration specifies the desired protocol:
 
@@ -836,13 +835,6 @@ modify different aspects of the server:
     in Prometheus, which can dramatically increase the amount of data stored.
     Text readout stats create a new label value every time the value
     of the text readout stat changes, which could create an unbounded number of time series.
-
-  .. http:get:: /stats?format=prometheus&unordered
-
-  Optional ``unordered`` query parameter skips sorting the metric families and the series within
-  each family by name, which saves CPU when there are many stats. Each metric family is still
-  emitted as one group with a single ``TYPE`` line, as the exposition format requires, but the
-  order of the families and series can change from one scrape to the next.
 
   .. http:get:: /stats?format=prometheus&histogram_buckets=summary
 

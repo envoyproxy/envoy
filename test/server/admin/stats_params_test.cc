@@ -2,6 +2,7 @@
 #include "source/server/admin/stats_params.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -128,17 +129,19 @@ TEST(StatsParamsTest, ShouldShowMetric) {
   }
 }
 
-TEST(StatsParamsTest, ParseParamsUnordered) {
+TEST(StatsParamsTest, ParseParamsUnorderedFromRuntime) {
   Buffer::OwnedImpl response;
   {
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("", response));
-    EXPECT_FALSE(params.unordered_);
+    EXPECT_TRUE(params.unordered_);
   }
   {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.prometheus_stats_unsorted", "false"}});
     StatsParams params;
-    ASSERT_EQ(Http::Code::OK, params.parse("?unordered", response));
-    EXPECT_TRUE(params.unordered_);
+    ASSERT_EQ(Http::Code::OK, params.parse("", response));
+    EXPECT_FALSE(params.unordered_);
   }
 }
 

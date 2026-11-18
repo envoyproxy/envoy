@@ -21,6 +21,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -3189,7 +3190,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputUnordered) {
 
   StatsParams params;
   Buffer::OwnedImpl parse_response;
-  ASSERT_EQ(Http::Code::OK, params.parse("?unordered", parse_response));
+  ASSERT_EQ(Http::Code::OK, params.parse("", parse_response));
   Buffer::OwnedImpl response;
   PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
                                                   endpoints_helper_->cm_, response, params,
@@ -3217,6 +3218,42 @@ TEST_F(PrometheusStatsFormatterTest, OutputUnordered) {
     EXPECT_TRUE(absl::StartsWith(line, family)) << line << " is outside of family " << family;
   }
   EXPECT_GT(families.size(), 3);
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputSortedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prometheus_stats_unsorted", "false"}});
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+  }
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_response;
+  ASSERT_EQ(Http::Code::OK, params.parse("", parse_response));
+  EXPECT_FALSE(params.unordered_);
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, response, params,
+                                                  custom_namespaces);
+
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_connect_fail counter
+envoy_cluster_upstream_cx_connect_fail{cluster="aaa"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="bbb"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="ccc"} 0
+# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="aaa"} 0
+envoy_cluster_upstream_cx_total{cluster="bbb"} 0
+envoy_cluster_upstream_cx_total{cluster="ccc"} 0
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="aaa"} 0
+envoy_cluster_upstream_cx_active{cluster="bbb"} 0
+envoy_cluster_upstream_cx_active{cluster="ccc"} 0
+)EOF",
+            response.toString());
 }
 
 } // namespace Server

@@ -65,6 +65,7 @@ struct StatsParams {
   bool prometheus_text_readouts_{false};
   bool pretty_{false};
   // When set, the stats may be returned in any order. Only Prometheus output skips sorting now.
+  // Read once per request from envoy.reloadable_features.prometheus_stats_unsorted.
   bool unordered_{false};
   StatsFormat format_{StatsFormat::Text};
   HiddenFlag hidden_{HiddenFlag::Exclude};
