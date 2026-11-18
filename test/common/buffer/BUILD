@@ -31,7 +31,6 @@ envoy_cc_test_library(
     name = "buffer_fuzz_lib",
     srcs = ["buffer_fuzz.cc"],
     hdrs = ["buffer_fuzz.h"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         ":buffer_fuzz_proto_cc_proto",
@@ -46,7 +45,7 @@ envoy_cc_fuzz_test(
     name = "buffer_fuzz_test",
     srcs = ["buffer_fuzz_test.cc"],
     corpus = "buffer_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [":buffer_fuzz_lib"],
 )
 

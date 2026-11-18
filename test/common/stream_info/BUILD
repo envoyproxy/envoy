@@ -37,7 +37,10 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "stream_info_impl_test",
     srcs = ["stream_info_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":test_int_accessor_lib",
         "//envoy/http:protocol_interface",
@@ -82,7 +85,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/stream_info:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",

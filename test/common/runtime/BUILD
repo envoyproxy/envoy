@@ -15,6 +15,18 @@ filegroup(
 )
 
 envoy_cc_test(
+    name = "breaking_changes_test",
+    srcs = ["breaking_changes_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/runtime:breaking_changes",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "@abseil-cpp//absl/flags:flag",
+    ],
+)
+
+envoy_cc_test(
     name = "runtime_protos_test",
     srcs = ["runtime_protos_test.cc"],
     deps = [
@@ -30,7 +42,13 @@ envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]),
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",

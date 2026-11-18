@@ -1,7 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test_binary",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -9,26 +7,19 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test_library(
-    name = "config_load_check_lib",
-    srcs = ["config_load_check.cc"],
-    deps = [
-        "//source/common/config:protobuf_link_hacks",
-        "//test/config_test:config_test_lib",
-    ],
+# The tool moved to //tools/config_load_check. These are for users of the old labels.
+
+alias(
+    name = "config_load_check_tool",
+    actual = "//tools/config_load_check:config_load_check_tool",
 )
 
-envoy_cc_test_binary(
-    name = "config_load_check_tool",
-    rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
-    },
-    deps = [
-        ":config_load_check_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:thread_lib",
-        "//source/common/config:protobuf_link_hacks",
-        "//source/common/event:libevent_lib",
-    ],
+alias(
+    name = "config_load_check_tool.stripped",
+    actual = "//tools/config_load_check:config_load_check_tool.stripped",
+)
+
+alias(
+    name = "config_load_check_lib",
+    actual = "//tools/config_load_check:config_load_check_lib",
 )

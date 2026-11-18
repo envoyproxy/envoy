@@ -132,6 +132,10 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 }
 
 TEST_P(OverloadIntegrationTest, NoNewStreamsWhenOverloaded) {
+  // Keepalive behavior does not need the default five-second HTTP drain period.
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    *hcm.mutable_drain_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(100);
+  });
   initialize();
   updateResource(file_updater_1_, 0.7);
 
