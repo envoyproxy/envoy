@@ -44,6 +44,8 @@ public:
   struct Pubkey {
     std::string hmac_key_;
     std::string kid_;
+    std::string x5t_s256_;
+    std::string x5t_;
     std::string kty_;
     std::string alg_;
     std::string crv_;

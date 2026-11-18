@@ -4,6 +4,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
 namespace Envoy {
@@ -26,6 +27,18 @@ namespace RBAC {
   COUNTER(shadow_allowed)                                                                          \
   COUNTER(shadow_denied)
 
+// Pre-encoded constant pieces of the per-policy stat names.
+struct PerPolicyStatNames {
+  explicit PerPolicyStatNames(Stats::SymbolTable& symbol_table);
+
+  Stats::StatNamePool pool_;
+  const Stats::StatName policy_tag_;
+  const Stats::StatName allowed_;
+  const Stats::StatName denied_;
+  const Stats::StatName shadow_allowed_;
+  const Stats::StatName shadow_denied_;
+};
+
 /**
  * Wrapper struct for shadow rules in RBAC filter stats. @see stats_macros.h
  */
@@ -34,37 +47,38 @@ struct RoleBasedAccessControlFilterStats {
   SHADOW_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 
   Stats::Scope& scope_;
-  std::string per_policy_final_prefix_;
-  std::string per_policy_final_shadow_prefix_;
+
+  // Tagged per-policy prefixes "<prefix>.rbac.<rules_prefix>.policy" of the enforced and shadow
+  // rules.
+  Stats::TaggedStatName per_policy_final_prefix_;
+  Stats::TaggedStatName per_policy_final_shadow_prefix_;
+
+  PerPolicyStatNames names_;
 
   void incPolicyAllowed(absl::string_view name) {
-    incCounter(per_policy_final_prefix_, name, ".allowed");
+    incCounter(per_policy_final_prefix_, name, names_.allowed_);
   }
 
   void incPolicyDenied(absl::string_view name) {
-    incCounter(per_policy_final_prefix_, name, ".denied");
+    incCounter(per_policy_final_prefix_, name, names_.denied_);
   }
 
   void incPolicyShadowAllowed(absl::string_view name) {
-    incCounter(per_policy_final_shadow_prefix_, name, ".shadow_allowed");
+    incCounter(per_policy_final_shadow_prefix_, name, names_.shadow_allowed_);
   }
 
   void incPolicyShadowDenied(absl::string_view name) {
-    incCounter(per_policy_final_shadow_prefix_, name, ".shadow_denied");
+    incCounter(per_policy_final_shadow_prefix_, name, names_.shadow_denied_);
   }
 
-  void incCounter(absl::string_view prefix, absl::string_view name, absl::string_view suffix) {
-    Stats::StatNameDynamicPool pool(scope_.symbolTable());
-    Stats::StatName metric_prefix = pool.add(prefix);
-    Stats::StatName metric_name = pool.add(absl::StrCat(name, suffix));
-    Stats::Utility::counterFromElements(scope_, {metric_prefix, metric_name}).inc();
-  }
+  void incCounter(const Stats::TaggedStatName& prefix, absl::string_view policy,
+                  Stats::StatName leaf);
 };
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
                                                 const std::string& rules_prefix,
                                                 const std::string& shadow_rules_prefix,
-                                                Stats::Scope& scope);
+                                                bool http_filter, Stats::Scope& scope);
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngine>

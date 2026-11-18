@@ -37,6 +37,7 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
+using testing::InSequence;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -52,8 +53,9 @@ public:
   AsyncClientImplTest()
       : http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
         router_config_(std::make_shared<Router::FilterConfig>(
-            factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(), cm_,
-            factory_context_.runtime(), factory_context_.api().randomGenerator(),
+            factory_context_, *stats_store_.rootScope(), http_context_.asyncClientStatPrefix(),
+            *stats_store_.rootScope(), cm_, factory_context_.runtime(),
+            factory_context_.api().randomGenerator(),
             Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, true, false, false,
             false, false, false, false, Protobuf::RepeatedPtrField<std::string>{},
             dispatcher_.timeSource(), http_context_, router_context_)),
@@ -480,6 +482,10 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
 }
 
 TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.async_client_downstream_flow_control2", "true"}});
+
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
   TestRequestHeaderMapImpl headers_copy = *headers;
@@ -535,12 +541,18 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   request->sendData(empty, true);
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
-  // On request end, we expect to run the low watermark callbacks.
+  // On request end, we expect to run the low watermark callbacks and remove the
+  // downstream watermark callbacks.
   EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
 TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.async_client_downstream_flow_control2", "true"}});
+
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
   TestRequestHeaderMapImpl headers_copy = *headers;
@@ -575,8 +587,10 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
-  // Reset the stream, which will call the low watermark callbacks.
+  // Reset the stream, which will call the low watermark callbacks and remove
+  // the downstream watermark callbacks.
   EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
   expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -1757,6 +1771,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   AsyncClient::Request* request =
       client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_FALSE(request->context().has_value());
   request->cancel();
 }
 
@@ -1988,6 +2003,155 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
   EXPECT_EQ(
       1UL,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+}
+
+class MockRequestContext : public AsyncClient::RequestContext {
+public:
+  ~MockRequestContext() override { onDestroy(); }
+  MOCK_METHOD(void, onDestroy, ());
+};
+
+TEST_F(AsyncClientImplTest, ContextSuccess) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::Request* request = client_.send(
+      std::move(message_), callbacks, AsyncClient::RequestOptions().setContext(std::move(context)));
+  ASSERT_NE(nullptr, request);
+  EXPECT_EQ(&context_ref, request->context().ptr());
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks, onSuccess_(_, _))
+      .WillOnce([&](const AsyncClient::Request& inner_request, ResponseMessage*) {
+        EXPECT_EQ(&context_ref, inner_request.context().ptr());
+      });
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), true);
+
+  // The request is the last owner of the context and is deferred deleted.
+  EXPECT_CALL(context_ref, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, ContextCancel) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::Request* request = client_.send(
+      std::move(message_), callbacks, AsyncClient::RequestOptions().setContext(std::move(context)));
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  request->cancel();
+
+  EXPECT_CALL(context_ref, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(AsyncClientImplTest, ContextOngoingRequestReset) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            return nullptr;
+          });
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::OngoingRequest* request = client_.startRequest(
+      std::move(headers), callbacks, AsyncClient::RequestOptions().setContext(std::move(context)));
+  ASSERT_NE(nullptr, request);
+
+  EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks, onFailure(_, AsyncClient::FailureReason::Reset))
+      .WillOnce([&](const AsyncClient::Request& inner_request, AsyncClient::FailureReason) {
+        EXPECT_EQ(&context_ref, inner_request.context().ptr());
+      });
+  request->reset();
+
+  EXPECT_CALL(context_ref, onDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// The request fails while it is being started and is destroyed before send() returns.
+TEST_F(AsyncClientImplTest, ContextImmediateFailure) {
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](StreamDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow,
+                                    absl::string_view(), nullptr);
+            return nullptr;
+          });
+
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::RequestOptions options;
+  options.setContext(std::move(context));
+  {
+    InSequence s;
+    EXPECT_CALL(callbacks, onBeforeFinalizeUpstreamSpan(_, _));
+    EXPECT_CALL(callbacks, onSuccess_(_, _))
+        .WillOnce([&](const AsyncClient::Request& inner_request, ResponseMessage* response) {
+          EXPECT_EQ(&context_ref, inner_request.context().ptr());
+          EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
+        });
+  }
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks, options));
+
+  // The options are now the last owner of the context.
+  EXPECT_CALL(context_ref, onDestroy());
+  options.setContext(nullptr);
+}
+
+// The request cannot be created: the callbacks are not called and the context is released.
+TEST_F(AsyncClientImplTest, ContextCreationFailure) {
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  TestUtility::loadFromYaml(R"EOF(
+retry_back_off:
+  base_interval: 10s
+  max_interval: 3s
+)EOF",
+                            retry_policy);
+  StrictMock<MockAsyncClientCallbacks> callbacks;
+  auto context = std::make_shared<StrictMock<MockRequestContext>>();
+  MockRequestContext& context_ref = *context;
+  AsyncClient::RequestOptions options;
+  options.setRetryPolicy(retry_policy).setContext(std::move(context));
+  EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks, options));
+
+  EXPECT_CALL(context_ref, onDestroy());
+  options.setContext(nullptr);
 }
 
 TEST_F(AsyncClientImplTest, StreamTimeout) {
@@ -2230,17 +2394,59 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 
 TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  stream->setWatermarkCallbacks(watermark_callbacks);
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark()).Times(2);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark()).Times(2);
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_FALSE(stream->isAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, DownstreamWatermarkCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.async_client_downstream_flow_control2", "true"}});
+
+  StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  stream->setWatermarkCallbacks(sidestream_watermark_callbacks);
+  stream->sendHeaders(headers_, false);
+  StrictMock<MockDownstreamWatermarkCallbacks> downstream_watermark_callbacks;
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(sidestream_watermark_callbacks, addDownstreamWatermarkCallbacks);
+  filter_callbacks->addDownstreamWatermarkCallbacks(downstream_watermark_callbacks);
+  EXPECT_CALL(sidestream_watermark_callbacks, removeDownstreamWatermarkCallbacks);
+  filter_callbacks->removeDownstreamWatermarkCallbacks(downstream_watermark_callbacks);
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, RemoveWatermarkCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.async_client_downstream_flow_control2", "true"}});
+
+  StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  stream->setWatermarkCallbacks(sidestream_watermark_callbacks);
+  stream->sendHeaders(headers_, false);
+  StrictMock<MockDownstreamWatermarkCallbacks> downstream_watermark_callbacks;
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(sidestream_watermark_callbacks, addDownstreamWatermarkCallbacks);
+  filter_callbacks->addDownstreamWatermarkCallbacks(downstream_watermark_callbacks);
+  EXPECT_CALL(sidestream_watermark_callbacks, removeDownstreamWatermarkCallbacks);
+  stream->removeWatermarkCallbacks();
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 

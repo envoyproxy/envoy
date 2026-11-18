@@ -59,6 +59,7 @@ namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::ByMove;
 using testing::ElementsAre;
 using testing::Eq;
@@ -133,6 +134,14 @@ public:
     }
   }
 };
+
+// The real filter tests build filter chains and listener config, which
+// `envoy.restart_features.defer_worker_routing_init` does not affect, so they run with the
+// flag at its default. Tests that depend on what the flag changes, UDP listener worker routing
+// or when a listener registers its init target (eg warming), use this suite to run with both
+// values.
+class ListenerManagerImplWithRealFiltersWorkerRoutingTest
+    : public ListenerManagerImplWithRealFiltersTest {};
 
 class ListenerManagerImplForInPlaceFilterChainUpdateTest : public Event::SimulatedTimeSystem,
                                                            public ListenerManagerImplTest {
@@ -477,8 +486,15 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+#ifdef __linux__
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+#else
+  // Without reuse port, the new version of the listener cannot bind '127.0.0.1:1000' while the
+  // existing version holds it.
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                          "'foo' has duplicate address");
+#endif
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -673,7 +689,7 @@ filter_chains:
       "test_value");
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpGroDisabledByDefault) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, UdpGroDisabledByDefault) {
   if (!ENVOY_SOCKET_UDP_GRO.hasValue()) {
     GTEST_SKIP();
   }
@@ -694,7 +710,7 @@ address:
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpGroDisabledOnUpdate) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, UdpGroDisabledOnUpdate) {
   if (!ENVOY_SOCKET_UDP_GRO.hasValue()) {
     GTEST_SKIP();
   }
@@ -729,7 +745,7 @@ udp_listener_config:
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
   ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
@@ -1042,13 +1058,10 @@ filter_chains:
   envoy::config::listener::v3::Listener listener_config =
       parseListenerFromV3Yaml(fmt::format(listener_yaml_tmpl, namespace_path));
 
-  auto status = manager_->addOrUpdateListener(listener_config, "", true);
-#if defined(__linux__)
-  // On Linux, adding the listener should succeed.
-  EXPECT_OK(status);
-#else
-  EXPECT_THAT(status, Not(IsOk()));
-#endif
+  // Adding the listener succeeds on every platform: the network namespace is entered when the
+  // (mocked) listener factory creates the socket, and it has no effect on platforms other than
+  // Linux.
+  EXPECT_OK(manager_->addOrUpdateListener(listener_config, "", true));
 }
 
 #if defined(__linux__)
@@ -1978,6 +1991,86 @@ static_listeners:
     EXPECT_CALL(*listener_foo2, onDestroy());
     EXPECT_TRUE(manager_->removeListener("foo"));
   }
+}
+
+// A listener and an update of it, before the workers start.
+constexpr absl::string_view ListenerFooYaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+constexpr absl::string_view ListenerFooUpdateYaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+per_connection_buffer_limit_bytes: 10
+filter_chains: {}
+  )EOF";
+
+// An update before the workers start keeps the server waiting for the new version of the listener,
+// also when the replaced version holds the last target that the server waits for.
+TEST_P(ListenerManagerImplTest, UpdateBeforeWorkersStartWaitsForTheNewListener) {
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(server_init_mgr));
+  testing::StrictMock<MockListenerUpdateCallbacks> callbacks;
+  auto callbacks_handle = manager_->addListenerUpdateCallbacks(callbacks);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooYaml))));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  server_init_mgr.initialize(server_init_watcher);
+
+  ListenerHandle* listener_foo_update = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_foo_update->target_, initialize());
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooUpdateYaml))));
+  EXPECT_EQ(Init::Manager::State::Initializing, server_init_mgr.state());
+
+  server_init_watcher.expectReady();
+  listener_foo_update->target_.ready();
+  EXPECT_EQ(Init::Manager::State::Initialized, server_init_mgr.state());
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+}
+
+// An update before the workers start reaches the listener update callbacks before the workers
+// start, also when destroying the replaced version finishes the server initialization.
+TEST_P(ListenerManagerImplTest, UpdateBeforeWorkersStartNotifiesBeforeTheWorkersStart) {
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  // Like the server, the watcher starts the workers once the initialization completes.
+  Init::WatcherImpl server_init_watcher("server-init-watcher", [this]() {
+    EXPECT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  });
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(server_init_mgr));
+  testing::StrictMock<MockListenerUpdateCallbacks> callbacks;
+  auto callbacks_handle = manager_->addListenerUpdateCallbacks(callbacks);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooYaml))));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  server_init_mgr.initialize(server_init_watcher);
+
+  // The new version is ready at once, so destroying the replaced version starts the workers.
+  ListenerHandle* listener_foo_update = expectListenerCreate(false, true);
+  Sequence notify_before_start;
+  EXPECT_CALL(callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
+      .InSequence(notify_before_start);
+  EXPECT_CALL(*worker_, start(_, _, _)).InSequence(notify_before_start);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(std::string(ListenerFooUpdateYaml))));
+  EXPECT_TRUE(manager_->isWorkerStarted());
+  EXPECT_CALL(*listener_foo_update, onDestroy());
 }
 
 TEST_P(ListenerManagerImplTest, OverrideListener) {
@@ -3344,6 +3437,117 @@ dynamic_listeners:
   manager_->beginListenerUpdate();
   manager_->endListenerUpdate(std::move(empty_failure_state));
 
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
+}
+
+// A listener that updates or is removed after a failed update drops the error state, also without
+// an LDS update.
+TEST_P(ListenerManagerImplTest, UpdateOrRemovalAfterFailureClearsTheErrorState) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Throw(EnvoyException("can't bind")));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)), EnvoyException);
+
+  ListenerHandle* listener_foo_retry = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0));
+  EXPECT_CALL(listener_foo_retry->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  const std::string warming_foo_dump = R"EOF(
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      listener:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        enable_reuse_port: false
+        filter_chains:
+          - {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
+)EOF";
+  checkConfigDump(warming_foo_dump);
+
+  const std::string listener_foo_new_port_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1235
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+  // An update that finds the listener unchanged drops the error state too.
+  ListenerHandle* listener_foo_new_port = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Throw(EnvoyException("can't bind")));
+  EXPECT_CALL(*listener_foo_new_port, onDestroy());
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_new_port_yaml)),
+               EnvoyException);
+  EXPECT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkConfigDump(warming_foo_dump);
+
+  ListenerHandle* listener_foo_new_port_again = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Throw(EnvoyException("can't bind")));
+  EXPECT_CALL(*listener_foo_new_port_again, onDestroy());
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_new_port_yaml)),
+               EnvoyException);
+  // A listen failure removes the listener and keeps the error state, and a removal of the name
+  // drops it.
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*listener_foo_retry, onDestroy());
+  listener_foo_retry->target_.ready();
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+  - name: foo
+    error_state:
+      failed_configuration:
+        "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        enable_reuse_port: false
+        filter_chains:
+          - {}
+      last_update_attempt:
+        seconds: 1001001001
+        nanos: 1000000
+      details: can't bind
+)EOF");
+  EXPECT_FALSE(manager_->removeListener("foo"));
   checkConfigDump(R"EOF(
 dynamic_listeners:
 )EOF");
@@ -7933,7 +8137,7 @@ api_listener:
   EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, AddOrUpdateInternalListener) {
   if (use_matcher_) {
     GTEST_SKIP() << "Filter chain match is auto-inserted in the config dump";
   }
@@ -9912,17 +10116,21 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, BindFailureRejectsUpdate) {
 }
 
 // When an added address fails to listen, the update is dropped and the active listener keeps
-// serving its addresses.
+// serving its addresses. The listener update callbacks learn that the update was dropped, and no
+// removal follows.
 TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, ListenFailureKeepsActiveListener) {
   startWorkers();
   auto socket1 = expectListenSocket("127.0.0.1:1234");
   ListenerHandle* listener_foo = addActiveListener(listenerProto({"127.0.0.1"}));
   Network::ListenerConfig& active_listener = manager_->listeners().front().get();
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
 
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   EXPECT_CALL(*socket2->io_handle_, listen(_))
       .WillOnce(Return(Api::SysCallIntResult{-1, EADDRINUSE}));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), false));
   EXPECT_TRUE(addOrUpdateListener(listenerProto({"127.0.0.1", "127.0.0.2"})));
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
@@ -10328,6 +10536,15 @@ on_no_match:
     return *context;
   }
 
+  // Adds a local filter chain with the name through the listener manager.
+  void addLocalFilterChain(const std::string& name) {
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Return(Filter::NetworkFilterFactoriesList{}));
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(name);
+    EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain), IsOkAndHolds(true));
+  }
+
   // Adds the listener of fcdsListenerProto() and delivers its FCDS filter chains.
   ListenerHandle* addActiveFcdsListener() {
     expectListenSocket("127.0.0.1:1234");
@@ -10617,6 +10834,123 @@ TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, InPlaceUpdateDrainsFcdsFilterCh
   EXPECT_EQ(0, filterChainsDraining());
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// A listener without an FCDS config source warms once the local filter chains that it finds are
+// added, and the listener update callbacks learn when they are posted to the workers.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, LocalFilterChainsServeListener) {
+  startWorkers();
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+  EXPECT_CALL(server_.server_factory_context_->cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+  auto listener_proto = fcdsListenerProto("dynamic_1", "dynamic_2");
+  listener_proto.mutable_fcds_config()->clear_config_source();
+  expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_TRUE(addOrUpdateListener(listener_proto));
+  addLocalFilterChain("dynamic_1");
+  EXPECT_CALL(*callbacks, onFilterChainAddOrUpdate(absl::string_view("dynamic_1")));
+  fcds_tls_update_cb_->invokeCallback();
+
+  EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  addLocalFilterChain("dynamic_2");
+  worker_->callAddCompletion();
+  EXPECT_CALL(*callbacks, onFilterChainAddOrUpdate(absl::string_view("dynamic_2")));
+  fcds_tls_update_cb_->invokeCallback();
+  EXPECT_THAT(manager_->listeners().front().get().filterChainManager().filterChainNames(),
+              testing::UnorderedElementsAre("foo", "dynamic_1", "dynamic_2"));
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// A name that FCDS discovers cannot be written locally, and nothing is removed without a local
+// filter chain.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, LocalFilterChainRejectsDiscoveredName) {
+  EXPECT_FALSE(manager_->removeFilterChain("dynamic_1"));
+  startWorkers();
+  ListenerHandle* listener_foo = addActiveFcdsListener();
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("dynamic_1");
+  EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain),
+              HasStatusMessage("filter chain dynamic_1 is discovered through FCDS"));
+  EXPECT_FALSE(manager_->removeFilterChain("dynamic_1"));
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// An update that clears the FCDS config source of a listener but keeps its filter chain names is
+// rejected, since the active version still holds the names.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, UpdateFromFcdsToLocalFilterChainsIsRejected) {
+  startWorkers();
+  ListenerHandle* listener_foo = addActiveFcdsListener();
+  auto listener_proto = fcdsListenerProto("dynamic_1", "dynamic_2");
+  listener_proto.mutable_fcds_config()->clear_config_source();
+  EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "filter chain dynamic_[12] is discovered through FCDS");
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// A removed listener keeps its FCDS names until it finished draining.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, DrainingListenerKeepsItsFcdsNames) {
+  startWorkers();
+  ListenerHandle* listener_foo = addActiveFcdsListener();
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("dynamic_1");
+  EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain),
+              HasStatusMessage("filter chain dynamic_1 is discovered through FCDS"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  // The rejected write kept nothing, so the FCDS manager went away with the listener and the next
+  // write creates another one.
+  fcds_tls_update_cb_ =
+      new NiceMock<Event::MockSchedulableCallback>(&server_.server_factory_context_->dispatcher_);
+  addLocalFilterChain("dynamic_1");
+}
+
+// A first write of a local filter chain that fails keeps nothing, so the FCDS manager goes away,
+// while a failed update keeps the filter chain until its removal, which releases the FCDS manager.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, FailedLocalFilterChainWrites) {
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("chain");
+  EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+      .WillOnce(Return(absl::InvalidArgumentError("bad filter")));
+  EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain), HasStatusMessage("bad filter"));
+  EXPECT_FALSE(manager_->removeFilterChain("chain"));
+
+  testing::MockFunction<void()> fcds_manager_destroyed;
+  fcds_tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(
+      &server_.server_factory_context_->dispatcher_, &fcds_manager_destroyed);
+  addLocalFilterChain("chain");
+  filter_chain.mutable_transport_socket_connect_timeout()->set_seconds(1);
+  EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+      .WillOnce(Return(absl::InvalidArgumentError("bad filter")));
+  EXPECT_THAT(manager_->addOrUpdateFilterChain(filter_chain), HasStatusMessage("bad filter"));
+  EXPECT_CALL(fcds_manager_destroyed, Call());
+  EXPECT_TRUE(manager_->removeFilterChain("chain"));
+  EXPECT_FALSE(manager_->removeFilterChain("chain"));
+}
+
+// Listener managers and callbacks that predate local filter chains keep their behavior.
+TEST_P(ListenerManagerImplTest, FilterChainMethodsHaveDefaults) {
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("chain");
+  EXPECT_THAT(manager_->ListenerManager::addOrUpdateFilterChain(filter_chain),
+              HasStatusMessage("filter chains are not supported"));
+  EXPECT_FALSE(manager_->ListenerManager::removeFilterChain("chain"));
+  testing::StrictMock<MockListenerUpdateCallbacks> callbacks;
+  callbacks.ListenerUpdateCallbacks::onFilterChainAddOrUpdate("chain");
 }
 
 #ifdef __linux__
@@ -11150,7 +11484,7 @@ public:
   bool ipFamilySupported(int domain) override { return domain == AF_INET || domain == AF_INET6; }
 
   // Server::Configuration::BootstrapExtensionFactory
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override {
     UNREFERENCED_PARAMETER(config);
@@ -11498,6 +11832,90 @@ filter_chains:
   worker_->callRemovalCompletion();
 }
 
+// Listener update callbacks that predate onListenerListenFailure() keep their removal
+// callback.
+class RemovalRecordingListenerUpdateCallbacks : public ListenerUpdateCallbacks {
+public:
+  void onListenerAddOrUpdate(absl::string_view, const Network::ListenerConfig&) override {}
+  void onListenerRemoval(const std::string& listener_name) override {
+    removed_listener_names_.push_back(listener_name);
+  }
+
+  std::vector<std::string> removed_listener_names_;
+};
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksListenFailureAfterWarming) {
+  InSequence s;
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+  RemovalRecordingListenerUpdateCallbacks callbacks_without_failure_hook;
+  auto handle_without_failure_hook =
+      manager_->addListenerUpdateCallbacks(callbacks_without_failure_hook);
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+
+  // The removal callbacks get the name after the listener is destroyed.
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), true));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  listener_foo->target_.ready();
+  EXPECT_THAT(callbacks_without_failure_hook.removed_listener_names_, ElementsAre("foo"));
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksListenFailureWhenWorkersStart) {
+  InSequence s;
+  auto callbacks = std::make_unique<testing::StrictMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*callbacks, onListenerListenFailure(absl::string_view("foo"), true));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+}
+
 TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksHandleRAII) {
   auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
   auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
@@ -11710,6 +12128,8 @@ filter_chains:
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest,
                          ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
+                         ::testing::Combine(::testing::Bool(), ::testing::Values(true)));
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersWorkerRoutingTest,
                          ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplForInPlaceFilterChainUpdateTest,
                          ::testing::Combine(::testing::Values(false), ::testing::Bool()));

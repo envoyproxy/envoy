@@ -158,7 +158,10 @@ sh_binary(
 
 filegroup(
     name = "cve-data-dir",
-    srcs = glob(["cve_data/*.json"]),
+    srcs = glob([
+        "cve_data/*.json",
+        "cve_data/cvelist/*.json",
+    ]),
     visibility = ["//visibility:public"],
 )
 

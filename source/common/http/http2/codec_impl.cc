@@ -757,6 +757,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   }
 
   std::vector<http2::adapter::Header> final_headers = buildHeaders(trailers);
+  trailers_submitted_ = true;
   parent_.adapter_->SubmitTrailer(stream_id_, final_headers);
 }
 
@@ -980,6 +981,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
       reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
+      trailers_after_exhausted_window_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_trailers_after_exhausted_window")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1947,7 +1950,10 @@ ConnectionImpl::Http2Visitor::OnReadyToSendDataForStream(Http2StreamId stream_id
     if (stream->pending_trailers_to_encode_) {
       stream->submitTrailers(*stream->pending_trailers_to_encode_);
       stream->pending_trailers_to_encode_.reset();
-    } else {
+    } else if (!stream->trailers_submitted_ || !connection_->trailers_after_exhausted_window_) {
+      // The adapter may already hold trailers submitted while the body was drained but still
+      // open, e.g. when the last DATA frame exactly exhausted the flow-control window. Ending
+      // the stream here would make the adapter drop those trailers.
       end_stream = true;
     }
   }

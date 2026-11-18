@@ -113,7 +113,10 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
-    "host_churn" => {
+    "host_churn" | "host_churn_module_opt_in" => {
+      if name == "host_churn_module_opt_in" {
+        assert!(envoy_cluster_metrics.use_persistent_host_partitions());
+      }
       let counter_id = envoy_cluster_metrics
         .define_counter("host_churn_converged_total")
         .ok();

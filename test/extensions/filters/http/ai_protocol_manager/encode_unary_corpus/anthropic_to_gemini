@@ -1,0 +1,5 @@
+body: "{\"id\":\"msg_01XzA9bC3dEfGhIjKlMnOpQr\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-5\",\"content\":[{\"type\":\"text\",\"text\":\"Hello, \"},{\"type\":\"text\",\"text\":\"world! Welcome to unary transcoding.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":10,\"cache_read_input_tokens\":30,\"output_tokens\":45}}"
+fragmentation_seed: 14627333965257922169
+request_protocol: GEMINI_GENERATE_CONTENT
+response_protocol: ANTHROPIC_MESSAGES
+max_json_body_size: 4095

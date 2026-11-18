@@ -730,6 +730,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
         "//source/common/quic:envoy_quic_clock_lib",
+        "//source/server:listener_stats",
         "@abseil-cpp//absl/container:btree",
         "@abseil-cpp//absl/container:node_hash_map",
         "@abseil-cpp//absl/time",

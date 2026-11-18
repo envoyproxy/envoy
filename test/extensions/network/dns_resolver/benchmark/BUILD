@@ -28,7 +28,6 @@ HICKORY_ABI_IMPL_DEPS = [
 envoy_cc_benchmark_dyn_module_binary(
     name = "dns_resolver_benchmark",
     srcs = ["dns_resolver_benchmark.cc"],
-    rbe_pool = "linux_x64_small",
     tags = [
         # FakeUdpDnsServer uses POSIX-only headers (arpa/inet.h, netinet/in.h).
         "fails_on_clang_cl",

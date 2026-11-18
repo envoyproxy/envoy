@@ -1542,10 +1542,7 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
-  // Land the initial fetch, which is what publishes the route configuration: the alias of a
-  // request is built from the published configuration's name, which is empty before the first
-  // publish. In production a worker can't reach the provider that early, because the initial
-  // fetch gates initialization.
+  // Land the initial fetch, which is what publishes the route configuration.
   const auto initial_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           vhdsResources("vhost_initial", "initial.com"));
@@ -1641,8 +1638,7 @@ TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish)
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
-  // Land the initial fetch first: a request made before the first publish can't build its alias,
-  // because the published route configuration's name is still empty.
+  // Land the initial fetch, which is what publishes the route configuration.
   const auto initial_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           vhdsResources("vhost_initial", "initial.com"));

@@ -153,8 +153,8 @@ impl ClusterLb for FilterStateReaderLb {
     };
     let bytes = ctx.get_filter_state_bytes(BYTES_KEY);
     let typed = ctx.get_filter_state_typed(TYPED_KEY);
-    let bytes_match = bytes.as_ref().map(|b| b.as_slice()) == Some(BYTES_VALUE);
-    let typed_match = typed.as_ref().map(|b| b.as_slice()) == Some(TYPED_VALUE);
+    let bytes_match = bytes.as_deref() == Some(BYTES_VALUE);
+    let typed_match = typed.as_deref() == Some(TYPED_VALUE);
     if !bytes_match || !typed_match {
       envoy_log_info!(
         "filter_state_reader: mismatch — bytes_match={} typed_match={}",

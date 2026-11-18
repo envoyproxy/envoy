@@ -21,7 +21,6 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:well_known_names",
         "//source/common/router:metadatamatchcriteria_lib",

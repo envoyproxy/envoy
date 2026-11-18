@@ -449,6 +449,9 @@ TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
     conn1->waitForUpstreamConnection();
   }
   waitCertsRequested(1);
+  // cert_active is incremented on the main thread right after cert_requested, so it may not be
+  // visible yet when the counter wait returns: establish it before closing the client.
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(1));
   conn1->close();
   conn1.reset();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
