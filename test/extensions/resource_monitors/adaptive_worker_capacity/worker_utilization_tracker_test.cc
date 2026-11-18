@@ -28,7 +28,7 @@ TEST(WorkerUtilizationTrackerTest, CalculatesUtilizationCorrectly) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // Time T0: tracker starts.
   // Dispatcher wakes up at T0 + 10ms (onCheck).
@@ -53,7 +53,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesInCheckDuringPoll) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // Dispatcher wakes up at T0 + 10ms (onCheck).
   time_system.advanceTimeWait(std::chrono::milliseconds(10));
@@ -72,7 +72,7 @@ TEST(WorkerUtilizationTrackerTest, IncludesWakeupDelayInUtilization) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // Tracker starts at T0.
   // onPrepare sets timeout of 10ms at T0. Expected wakeup = T0 + 10ms.
@@ -98,7 +98,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesCallbackSpanningMultiplePollPeriods) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // T0 + 50ms: onCheck starts a long 300ms callback.
   time_system.advanceTimeWait(std::chrono::milliseconds(50));
@@ -134,15 +134,15 @@ TEST(WorkerUtilizationTrackerTest, ReturnsZeroUtilizationWhenDeltaWallIsZero) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
   const auto t0 = time_system.monotonicTime();
 
   // Zero elapsed time since construction returns 0.0.
   EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.0);
 
-  // Accumulate 50ms of busy time while time_source_.monotonicTime() remains at
-  // t0 (delta_wall == 0); sampleUtilization() returns 0.0 without discarding
-  // accumulated_busy_time_.
+  // Accumulate 50ms of busy time while dispatcher_.timeSource().monotonicTime()
+  // remains at t0 (delta_wall == 0); sampleUtilization() returns 0.0 without
+  // discarding accumulated_busy_time_.
   tracker.onCheck(t0);
   tracker.onPrepare(t0 + std::chrono::milliseconds(50), std::nullopt);
   EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.0);
@@ -162,7 +162,7 @@ TEST(WorkerUtilizationTrackerTest, RegistersOnConstructionAndUnregistersOnDestru
           [&](Event::Evwatch::Observer& observer) { registered_observer = &observer; }));
   EXPECT_CALL(dispatcher, unregisterEvwatchObserver(testing::_)).Times(0);
 
-  auto tracker = std::make_unique<WorkerUtilizationTracker>(dispatcher, time_system);
+  auto tracker = std::make_unique<WorkerUtilizationTracker>(dispatcher);
   EXPECT_EQ(registered_observer, static_cast<Event::Evwatch::Observer*>(tracker.get()));
   testing::Mock::VerifyAndClearExpectations(&dispatcher);
 
@@ -176,7 +176,7 @@ TEST(WorkerUtilizationTrackerTest, ClampsUtilizationToOneWithoutCarryOver) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // onPrepare sets a 10ms timeout at T0. Expected wakeup = T0 + 10ms.
   tracker.onPrepare(time_system.monotonicTime(), std::chrono::milliseconds(10));
@@ -201,7 +201,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesEarlyWakeupWithoutNegativeUtilization)
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // Tracker starts at T0.
   // onPrepare sets timeout of 50ms at T0. Expected wakeup = T0 + 50ms.
@@ -228,7 +228,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesZeroTimeoutNonBlockingPoll) {
 
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // onPrepare with 0 timeout (e.g. non-blocking epoll or immediate min-heap
   // timer). Expected wakeup = T0.
@@ -253,7 +253,7 @@ TEST(WorkerUtilizationTrackerTest, AccumulatesBusyTimeAcrossMultipleIterations) 
   Event::SimulatedTimeSystem time_system;
   NiceMock<Event::MockDispatcher> dispatcher;
 
-  WorkerUtilizationTracker tracker(dispatcher, time_system);
+  WorkerUtilizationTracker tracker(dispatcher);
 
   // Iteration 1: indefinite sleep (std::nullopt) for 15ms (0ms busy), then 15ms active work,
   // followed by a 10ms poll timeout (expected wakeup at T0 + 40ms).

@@ -30,12 +30,11 @@ public:
 // Not thread-safe; construction, destruction, and all method calls must occur on dispatcher's
 // thread.
 //
-// Both dispatcher and time_source must outlive WorkerUtilizationTracker, and time_source must match
-// the monotonic clock backing dispatcher.
+// dispatcher must outlive WorkerUtilizationTracker.
 class WorkerUtilizationTracker final : public WorkerUtilizationTrackerInterface,
                                        public Event::Evwatch::Observer {
 public:
-  WorkerUtilizationTracker(Event::Dispatcher& dispatcher, TimeSource& time_source);
+  explicit WorkerUtilizationTracker(Event::Dispatcher& dispatcher);
   WorkerUtilizationTracker(const WorkerUtilizationTracker&) = delete;
   WorkerUtilizationTracker& operator=(const WorkerUtilizationTracker&) = delete;
   ~WorkerUtilizationTracker() override;
@@ -50,7 +49,6 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  TimeSource& time_source_;
   std::optional<MonotonicTime> busy_start_time_;
   MonotonicTime::duration accumulated_busy_time_{0};
   MonotonicTime last_poll_time_;

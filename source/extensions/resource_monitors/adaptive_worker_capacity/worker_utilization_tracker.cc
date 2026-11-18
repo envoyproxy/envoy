@@ -15,10 +15,8 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace AdaptiveWorkerCapacity {
 
-WorkerUtilizationTracker::WorkerUtilizationTracker(Event::Dispatcher& dispatcher,
-                                                   TimeSource& time_source)
-    : dispatcher_(dispatcher), time_source_(time_source),
-      last_poll_time_(time_source.monotonicTime()) {
+WorkerUtilizationTracker::WorkerUtilizationTracker(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher), last_poll_time_(dispatcher_.timeSource().monotonicTime()) {
   ASSERT(dispatcher_.isThreadSafe());
   dispatcher_.registerEvwatchObserver(*this);
 }
@@ -51,7 +49,7 @@ void WorkerUtilizationTracker::onCheck(MonotonicTime check_time) {
 
 double WorkerUtilizationTracker::sampleUtilization() {
   ASSERT(dispatcher_.isThreadSafe());
-  const MonotonicTime now = time_source_.monotonicTime();
+  const MonotonicTime now = dispatcher_.timeSource().monotonicTime();
   if (now <= last_poll_time_) {
     return 0.0;
   }
