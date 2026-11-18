@@ -31,7 +31,7 @@ on:
         description: >-
           Version to set (optional). bazel = module version (single dependency only),
           registry = bazel-registry commit (default: tip of main), actions = toolshed actions
-          release, eg `0.4.30` (default: latest), or with `wip` any toolshed commit
+          release, eg `0.4.30` (default: latest), or with `wip` any commit on toolshed `main`
       pr:
         type: boolean
         default: true

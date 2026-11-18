@@ -6,7 +6,7 @@
 #   update.sh bazel <name[=version]>... [version]   update the given modules
 #   update.sh registry [<name[=version]>...|*] [commit]  bump the registry pin, then apply updates
 #   update.sh lockfiles                             regenerate lockfiles
-#   update.sh actions [release|commit]              bump the toolshed actions pins
+#   update.sh actions "" [release|commit]           bump the toolshed actions pins
 
 set -e -o pipefail
 
@@ -42,17 +42,21 @@ TOOLSHED_REPO=envoyproxy/toolshed
 
 # Pin every `envoyproxy/toolshed/actions/...` used by the workflows to one toolshed commit: the
 # latest actions release, a given release (`0.4.30` or `actions-v0.4.30`), or, with
-# ENVOY_ACTIONS_ALLOW_UNSAFE (wip), any commit, eg to try an unreleased change. Pins are commented
-# with the release (`actions-v0.4.30`), or the commit (`0b8831c (unreleased)`).
+# ENVOY_ACTIONS_ALLOW_UNSAFE (wip), any commit on toolshed `main`, eg to try an unreleased change.
+# Pins are commented with the release (`actions-v0.4.30`), or the commit (`0b8831c (unreleased)`).
 update_actions() {
-    local ref sha comment tag files
+    local ref sha comment tag files status
     (( ${#specs[@]} == 0 )) || fail 'dependency is not supported by the actions task'
     if [[ "$version" =~ ^[0-9a-f]{40}$ ]]; then
         [[ -n "$ENVOY_ACTIONS_ALLOW_UNSAFE" ]] \
             || fail 'a commit that is not a release can only be pinned with wip'
         sha="$version"
-        gh api "repos/${TOOLSHED_REPO}/commits/${sha}" --jq .sha >/dev/null \
+        # A commit of a fork is found in the repo too (forks share objects), so check that it is on
+        # `main`: `behind` is an ancestor of it.
+        status="$(gh api "repos/${TOOLSHED_REPO}/compare/main...${sha}" --jq .status)" \
             || fail "Commit not found in ${TOOLSHED_REPO}: ${sha}"
+        [[ "$status" == "behind" || "$status" == "identical" ]] \
+            || fail "Commit is not on ${TOOLSHED_REPO} main: ${sha}"
         comment="${sha:0:7} (unreleased)"
         output="${sha:0:7}"
     else
