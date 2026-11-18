@@ -23,7 +23,8 @@ message ProcessRateLimitFilter {
   // Only one of ``dynamic_config`` or ``token_bucket`` can be set.
   DynamicTokenBucket dynamic_config = 1;
 
-  // The inline token bucket configuration.
+  // The inline token bucket configuration. The token bucket is not shared across listeners.
+  // Each access log has its own rate limit.
   // Only one of ``dynamic_config`` or ``token_bucket`` can be set.
   type.v3.TokenBucket token_bucket = 2;
 }
