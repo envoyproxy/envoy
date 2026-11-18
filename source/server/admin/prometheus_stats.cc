@@ -718,8 +718,7 @@ private:
 template <class StatType>
 class StatFamilies : public PrometheusStatsFormatter::ChunkedRenderer::MetricFamilies {
 public:
-  StatFamilies(const std::vector<Stats::RefcountPtr<StatType>>& metrics,
-               const StatsParams& params)
+  StatFamilies(const std::vector<Stats::RefcountPtr<StatType>>& metrics, const StatsParams& params)
       : sort_(!params.unordered_) {
     // Return early to avoid crashing when getting the symbol table from the first metric.
     if (metrics.empty()) {

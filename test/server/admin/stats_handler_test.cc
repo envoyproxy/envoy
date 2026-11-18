@@ -1704,7 +1704,7 @@ TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpoint) {
   createTestStats();
   const CodeResponse code_response = handlerStats("/stats/prometheus?text_readouts", true);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
 # TYPE envoy_cluster_upstream_cx_active gauge
@@ -1712,8 +1712,9 @@ envoy_cluster_upstream_cx_active{cluster="c1"} 11
 envoy_cluster_upstream_cx_active{cluster="c2"} 12
 # TYPE envoy_control_plane_identifier gauge
 envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
-)EOF",
-            code_response.second);
+)EOF";
+  // The output is not sorted by default.
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
 }
 
 TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointInvalidRegex) {
