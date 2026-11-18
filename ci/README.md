@@ -190,7 +190,6 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `docker` &mdash; build Docker images, expects `release` or `release.server_only` to have been run first.
 * `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
 * `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
@@ -198,6 +197,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
 * `release <test>` &mdash; build Envoy static binaries and run a specified test or test dir under `-c opt` with clang.
 * `release.server_only` &mdash; build Envoy static binaries under `-c opt` with clang.
+* `release.containers` &mdash; build the Envoy container images, as OCI tarballs in `$ENVOY_DOCKER_BUILD_DIR/envoy/<arch>/build_images`.
 * `sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
 * `sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
