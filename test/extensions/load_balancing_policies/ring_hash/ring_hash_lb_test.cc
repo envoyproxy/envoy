@@ -1185,6 +1185,47 @@ TEST(RingHashCoalesceDisabledTest, FallbackPathExercised) {
   EXPECT_NE(nullptr, worker_lb);
 }
 
+TEST(RingHashCoalesceEnabledTest, RefreshesFactoryBeforeMemberUpdate) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<MockPrioritySet> priority_set;
+  NiceMock<MockPrioritySet> worker_priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config, context.regex_engine_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  RingHashLoadBalancer lb(priority_set, stats, *stats_store.rootScope(), context.runtime_loader_,
+                          context.api_.random_, 50, typed_config.lb_config_,
+                          typed_config.hash_policy_);
+  ASSERT_TRUE(lb.initialize().ok());
+
+  auto old_host = makeTestHost(info, "tcp://127.0.0.1:80");
+  auto new_host = makeTestHost(info, "tcp://127.0.0.1:81");
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {old_host};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks({}, {});
+
+  HostVector new_hosts = {new_host};
+  host_set.hosts_ = new_hosts;
+  host_set.healthy_hosts_ = new_hosts;
+  priority_set.priority_update_cb_helper_.runCallbacks(0, new_hosts, {old_host});
+
+  LoadBalancerParams lb_params{worker_priority_set, {}};
+  auto worker_lb = lb.factory()->create(lb_params);
+  TestLoadBalancerContext context_for_hash(0);
+  EXPECT_EQ(new_host, worker_lb->chooseHost(&context_for_hash).host);
+}
+
 // Calls lb->initialize() from inside a PrioritySet batch update. This reproduces:
 // EDS batchUpdate -> updateHosts(P0) -> updateHosts(P1) -> onPreInitComplete -> initialize().
 class InitializeDuringBatchUpdateCb : public PrioritySet::BatchUpdateCb {
