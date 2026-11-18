@@ -43,8 +43,8 @@ public:
   static absl::StatusOr<std::unique_ptr<AltsAsyncProxy>>
   create(Grpc::RawAsyncClientSharedPtr handshaker_client, absl::string_view target_name = "");
 
-  // Ends the stream if the handshaker service has not closed it yet. No
-  // OnResponse callback is invoked once the destructor has started.
+  // Cancels the stream if a request is outstanding;
+  // otherwise half-closes it if the handshaker service has not closed it yet.
   ~AltsAsyncProxy() override;
 
   // Each of the following sends one request to the ALTS handshaker service. If

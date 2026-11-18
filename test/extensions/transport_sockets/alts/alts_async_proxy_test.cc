@@ -234,19 +234,36 @@ TEST_F(AltsAsyncProxyTest, UnexpectedMessageIsIgnored) {
   EXPECT_OK(recorder.response());
 }
 
-TEST_F(AltsAsyncProxyTest, DestructionHalfClosesOpenStream) {
+TEST_F(AltsAsyncProxyTest, DestructionWithOutstandingRequestResetsStream) {
   auto proxy = createProxy();
   ResponseRecorder recorder;
   EXPECT_OK(proxy->sendStartClientHandshakeReq(recorder.callback()));
   FakeAsyncHandshakerStream& stream = client_->lastStream();
 
+  // Destroying the proxy while a request is outstanding cancels the call.
+  proxy.reset();
+  EXPECT_TRUE(stream.reset());
+  EXPECT_FALSE(stream.closed());
+  EXPECT_FALSE(stream.waitingForRemoteClose());
+  // The pending response is never delivered to the destroyed proxy.
+  EXPECT_FALSE(stream.deliverResponse());
+  EXPECT_EQ(recorder.calls(), 0);
+}
+
+TEST_F(AltsAsyncProxyTest, DestructionAfterResponseHalfClosesStream) {
+  auto proxy = createProxy();
+  ResponseRecorder recorder;
+  EXPECT_OK(proxy->sendStartClientHandshakeReq(recorder.callback()));
+  FakeAsyncHandshakerStream& stream = client_->lastStream();
+  EXPECT_TRUE(stream.deliverResponse());
+  EXPECT_EQ(recorder.calls(), 1);
+
+  // With no request outstanding, the proxy half-closes the stream and lets the gRPC client delete
+  // it once the handshaker service closes it.
   proxy.reset();
   EXPECT_TRUE(stream.closed());
   EXPECT_TRUE(stream.waitingForRemoteClose());
   EXPECT_FALSE(stream.reset());
-  // The pending response is never delivered to the destroyed proxy.
-  EXPECT_FALSE(stream.deliverResponse());
-  EXPECT_EQ(recorder.calls(), 0);
 }
 
 TEST_F(AltsAsyncProxyTest, DestructionAfterStreamClosedLeavesStreamAlone) {

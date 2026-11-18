@@ -404,8 +404,7 @@ TEST_F(TsiHandshakerAsyncTest, DeferredDeleteCancelsCallWaitingForHandshakerServ
   EXPECT_CALL(dispatcher_, post(_)).Times(0);
   tsi_handshaker_.release()->deferredDelete();
   EXPECT_EQ(dispatcher_.to_delete_.size(), 1);
-  EXPECT_TRUE(stream.closed());
-  EXPECT_TRUE(stream.waitingForRemoteClose());
+  EXPECT_TRUE(stream.reset());
   EXPECT_FALSE(stream.deliverResponse());
   dispatcher_.to_delete_.clear();
   EXPECT_THAT(capturing_callbacks_.getNextResult(), IsNull());

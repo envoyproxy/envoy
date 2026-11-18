@@ -33,9 +33,11 @@ namespace {
 
 // Returns the descriptor of the method that streams ALTS handshakes.
 const Protobuf::MethodDescriptor& doHandshakeMethod() {
-  const Protobuf::MethodDescriptor* method =
-      Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "grpc.gcp.HandshakerService.DoHandshake");
+  static const Protobuf::MethodDescriptor* const method = [] {
+    return Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+        "grpc.gcp.HandshakerService.DoHandshake");
+  }();
+
   RELEASE_ASSERT(method != nullptr, "grpc.gcp.HandshakerService.DoHandshake not found");
   return *method;
 }
@@ -52,7 +54,7 @@ absl::StatusCode toAbslStatusCode(Grpc::Status::GrpcStatus status) {
 
 absl::StatusOr<std::unique_ptr<AltsAsyncProxy>>
 AltsAsyncProxy::create(Grpc::RawAsyncClientSharedPtr handshaker_client,
-                       absl::string_view target_name) {
+                       const absl::string_view target_name) {
   if (handshaker_client == nullptr) {
     return absl::InvalidArgumentError("Handshaker service client is null.");
   }
@@ -71,19 +73,25 @@ AltsAsyncProxy::create(Grpc::RawAsyncClientSharedPtr handshaker_client,
 }
 
 AltsAsyncProxy::AltsAsyncProxy(Grpc::RawAsyncClientSharedPtr handshaker_client,
-                               absl::string_view target_name)
+                               const absl::string_view target_name)
     : client_(std::move(handshaker_client)), target_name_(target_name) {}
 
 AltsAsyncProxy::~AltsAsyncProxy() {
+  // Whether the owner is abandoning a request that still waits for the handshaker service.
+  const bool request_outstanding = on_response_ != nullptr;
+
   // The owner is going away: a failure that the gRPC client reports while the
   // stream closes must not reach it.
   on_response_ = nullptr;
   if (stream_ != nullptr && !remote_closed_) {
-    // Half-close the stream, so that the handshaker service ends it, and let
-    // the gRPC client delete it then. No more callbacks are delivered to this
-    // object.
-    stream_.closeStream();
-    stream_.waitForRemoteCloseAndDelete();
+    if (request_outstanding) {
+      // Cancel the call now, so that its stream on the handshaker service
+      // connection is freed right away instead of after remote_close_timeout.
+      stream_.resetStream();
+    } else {
+      stream_.closeStream();
+      stream_.waitForRemoteCloseAndDelete();
+    }
   }
 }
 
@@ -91,17 +99,21 @@ absl::Status AltsAsyncProxy::sendStartClientHandshakeReq(OnResponse on_response)
   return send(AltsProxy::makeStartClientHandshakeReq(target_name_), std::move(on_response));
 }
 
-absl::Status AltsAsyncProxy::sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes,
+absl::Status AltsAsyncProxy::sendStartServerHandshakeReq(const absl::Span<const uint8_t> in_bytes,
                                                          OnResponse on_response) {
   return send(AltsProxy::makeStartServerHandshakeReq(in_bytes), std::move(on_response));
 }
 
-absl::Status AltsAsyncProxy::sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes,
+absl::Status AltsAsyncProxy::sendNextHandshakeReq(const absl::Span<const uint8_t> in_bytes,
                                                   OnResponse on_response) {
   return send(AltsProxy::makeNextHandshakeReq(in_bytes), std::move(on_response));
 }
 
 absl::Status AltsAsyncProxy::send(const HandshakerReq& request, OnResponse on_response) {
+  // create() only returns a proxy whose stream started. Once the handshaker
+  // service closes the stream, the client deletes it, and remote_closed_ guards that.
+  ASSERT(stream_ != nullptr);
+
   if (on_response_ != nullptr) {
     return absl::FailedPreconditionError(
         "A request to the handshaker service is already outstanding.");
@@ -120,12 +132,13 @@ void AltsAsyncProxy::onReceiveMessage(Grpc::ResponsePtr<HandshakerResp>&& respon
     ENVOY_LOG(debug, "ALTS: ignoring an unexpected message from the handshaker service");
     return;
   }
-  OnResponse on_response = std::move(on_response_);
+  const OnResponse on_response = std::move(on_response_);
   on_response_ = nullptr;
   on_response(AltsProxy::checkResponse(std::move(*response)));
 }
 
-void AltsAsyncProxy::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+void AltsAsyncProxy::onRemoteClose(const Grpc::Status::GrpcStatus status,
+                                   const std::string& message) {
   remote_closed_ = true;
   if (status == Grpc::Status::WellKnownGrpcStatus::Ok) {
     remote_close_status_ = absl::InternalError("The handshaker service closed the stream.");
@@ -137,7 +150,7 @@ void AltsAsyncProxy::onRemoteClose(Grpc::Status::GrpcStatus status, const std::s
   }
   ENVOY_LOG(debug, "ALTS: handshaker service stream closed: {}", remote_close_status_.ToString());
   if (on_response_ != nullptr) {
-    OnResponse on_response = std::move(on_response_);
+    const OnResponse on_response = std::move(on_response_);
     on_response_ = nullptr;
     on_response(remote_close_status_);
   }

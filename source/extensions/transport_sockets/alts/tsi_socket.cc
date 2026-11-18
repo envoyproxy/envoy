@@ -163,7 +163,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     }
   }
 
-  if (read_error_ || (!handshake_complete_ && end_stream_read_)) {
+  if (read_error_ || (!handshake_complete_ && end_stream_read_ && raw_read_buffer_.length() == 0)) {
     ENVOY_CONN_LOG(debug, "TSI: Handshake failed: end of stream without enough data",
                    callbacks_->connection());
     return Network::PostIoAction::Close;
@@ -267,6 +267,7 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
       // An end of stream without data fails the handshake. With half-close, though, a pending call
       // to the handshaker service may still complete it, so doHandshakeNextDone() decides.
       if (result.end_stream_read_ && result.bytes_processed_ == 0 &&
+          raw_read_buffer_.length() == 0 &&
           !(handshaker_next_calling_ && callbacks_->connection().isHalfCloseEnabled())) {
         return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
       }

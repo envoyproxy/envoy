@@ -825,8 +825,7 @@ TEST_F(AltsTsiHandshakerAsyncTest, CancelDropsResponse) {
   FakeAsyncHandshakerStream& stream = client_->lastStream();
 
   handshaker->cancel();
-  EXPECT_TRUE(stream.closed());
-  EXPECT_TRUE(stream.waitingForRemoteClose());
+  EXPECT_TRUE(stream.reset());
   EXPECT_FALSE(stream.deliverResponse());
   EXPECT_EQ(results(), 0);
 }

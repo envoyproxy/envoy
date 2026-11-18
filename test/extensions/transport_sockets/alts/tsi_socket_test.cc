@@ -1021,8 +1021,7 @@ TEST_P(TsiSocketTest, AsyncHandshakeEndOfStreamWhileWaitingCloses) {
                  server_.tsi_socket_->doRead(server_.read_buffer_),
                  "While reading the end of stream.");
   server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose, false);
-  EXPECT_TRUE(stream.closed());
-  EXPECT_TRUE(stream.waitingForRemoteClose());
+  EXPECT_TRUE(stream.reset());
 }
 
 // With half-close, the client may close its side while the server still waits for the handshaker
@@ -1057,6 +1056,64 @@ TEST_P(TsiSocketTest, AsyncHandshakeEndOfStreamWhileWaitingWithHalfClose) {
   EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
   EXPECT_TRUE(stream.deliverResponse(clientFinishedResponse()));
   EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, ApplicationData.size(), true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading application data.");
+  EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
+}
+
+// The ClientFinished may arrive in two reads, with the end of stream right behind its second part,
+// while the server waits for the handshaker service. The end of stream must not fail the handshake
+// while bytes are still buffered for the handshaker service.
+TEST_P(TsiSocketTest, AsyncHandshakeEndOfStreamWhileWaitingWithBufferedBytes) {
+  startFakeHandshakerService();
+  useAsyncServerHandshaker();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  ASSERT_NO_FATAL_FAILURE(doAsyncHandshakeUntilClientFinished());
+  FakeAsyncHandshakerStream& stream = async_handshaker_client_->lastStream();
+  clientWrite(ApplicationData);
+  const absl::string_view first_part = ClientFinished.substr(0, 5);
+
+  // The server reads the first part of the ClientFinished and waits for the handshaker service.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce([&](Buffer::Instance& buffer) {
+    buffer.move(client_to_server_, first_part.size());
+    return Network::IoResult{Network::PostIoAction::KeepOpen, first_part.size(), false};
+  });
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading the first part of ClientFinished.");
+
+  // The rest of the ClientFinished, the application data and the end of stream arrive together.
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce([&](Buffer::Instance& buffer) {
+    const uint64_t length = client_to_server_.length();
+    buffer.move(client_to_server_);
+    return Network::IoResult{Network::PostIoAction::KeepOpen, length, true};
+  });
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While reading the rest of ClientFinished and the end of stream.");
+
+  // The handshaker service needs more bytes. The server keeps the connection and asks to be read
+  // again, to hand the buffered bytes to the handshaker service.
+  EXPECT_CALL(server_.callbacks_.connection_, close(_, _)).Times(0);
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  HandshakerResp need_more_response;
+  need_more_response.set_bytes_consumed(first_part.size());
+  EXPECT_TRUE(stream.deliverResponse(need_more_response));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).Times(0);
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_),
+                 "While handing the buffered bytes to the handshaker service.");
+  EXPECT_EQ(stream.requests().size(), 3);
+
+  // The handshaker service completes the handshake. The server reports the application data and
+  // the end of stream.
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(server_.callbacks_, setTransportSocketIsReadable());
+  HandshakerResp finished_response = clientFinishedResponse();
+  finished_response.set_bytes_consumed(ClientFinished.size() - first_part.size());
+  EXPECT_TRUE(stream.deliverResponse(finished_response));
   expectIoResult({Network::PostIoAction::KeepOpen, ApplicationData.size(), true},
                  server_.tsi_socket_->doRead(server_.read_buffer_),
                  "While reading application data.");
