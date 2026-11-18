@@ -127,6 +127,11 @@ message EndpointHealth {
   //   Set by a :ref:`dynamic module health checker
   //   <envoy_v3_api_msg_extensions.health_checkers.dynamic_modules.v3.DynamicModuleHealthCheck>`.
   //   Contains the string key/value pairs the module attached to its most recent health check.
+  //   Also set by the HTTP health checker for the response headers listed in
+  //   :ref:`response_headers_to_metadata
+  //   <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_headers_to_metadata>`.
+  //   Contains the values of those headers in the most recent complete response, keyed by the
+  //   lower-cased header name.
   google.protobuf.Struct health_metadata = 3;
 }
 

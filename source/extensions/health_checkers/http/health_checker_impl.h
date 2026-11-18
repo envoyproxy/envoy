@@ -103,6 +103,7 @@ private:
     void onInterval() override;
     void onTimeout() override;
     void onDeferredDelete() final;
+    void onNetworkFailure() override;
 
     // Http::StreamDecoder
     void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -207,6 +208,8 @@ private:
   std::optional<Matchers::StringMatcherImpl> service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
+  // `response_headers_to_metadata`, lower-cased. The names are also the health check metadata keys.
+  const std::vector<Http::LowerCaseString> response_headers_to_metadata_;
 
 protected:
   // The codec from `codec_client_type`: used as is when `negotiate_codec_` is false, and as the
