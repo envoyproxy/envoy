@@ -1597,7 +1597,7 @@ TEST_F(FilterManagerDecodeLifecycleTest,
   filter_manager_->decodeHeaders(*headers_, true);
 }
 
-TEST_F(FilterManagerDecodeLifecycleTest, DecodeDataClearsCallStateBeforeDecodeComplete) {
+TEST_F(FilterManagerDecodeLifecycleTest, LocalReplyFromDecodeCompleteInDecodeDataIsDeferred) {
   auto filter = setupSingleDecoderFilter();
   bool encoded_during_decode_complete = false;
 
@@ -1607,7 +1607,7 @@ TEST_F(FilterManagerDecodeLifecycleTest, DecodeDataClearsCallStateBeforeDecodeCo
   EXPECT_CALL(*filter, decodeComplete()).WillOnce([&]() {
     filter->callbacks_->sendLocalReply(Code::BadRequest, "bad_body", nullptr, std::nullopt,
                                        "bad_body");
-    EXPECT_TRUE(encoded_during_decode_complete);
+    EXPECT_FALSE(encoded_during_decode_complete);
   });
   EXPECT_CALL(*filter, onLocalReply(_)).WillOnce(Return(LocalErrorStatus::Continue));
   EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout());
@@ -1623,8 +1623,7 @@ TEST_F(FilterManagerDecodeLifecycleTest, DecodeDataClearsCallStateBeforeDecodeCo
   sendData("body", true);
 }
 
-TEST_F(FilterManagerDecodeLifecycleTest,
-       DecodeTrailersSetsEndStreamAndClearsCallStateBeforeDecodeComplete) {
+TEST_F(FilterManagerDecodeLifecycleTest, LocalReplyFromDecodeCompleteInDecodeTrailersIsDeferred) {
   auto [filter_1, filter_2] = setupTwoDecoderFilters();
   bool encoded_during_decode_complete = false;
   EXPECT_CALL(*filter_2, decodeData(_, _)).Times(0);
@@ -1641,7 +1640,7 @@ TEST_F(FilterManagerDecodeLifecycleTest,
         f1->callbacks_->injectDecodedDataToFilterChain(extra, false);
         f2->callbacks_->sendLocalReply(Code::BadRequest, "bad_trailers", nullptr, std::nullopt,
                                        "bad_trailers");
-        EXPECT_TRUE(encoded_during_decode_complete);
+        EXPECT_FALSE(encoded_during_decode_complete);
       });
   EXPECT_CALL(*filter_1, onLocalReply(_)).WillOnce(Return(LocalErrorStatus::Continue));
   EXPECT_CALL(*filter_2, onLocalReply(_)).WillOnce(Return(LocalErrorStatus::Continue));
@@ -1652,6 +1651,52 @@ TEST_F(FilterManagerDecodeLifecycleTest,
   EXPECT_CALL(filter_manager_callbacks_, endStream()).WillOnce([this]() {
     filter_manager_->destroyFilters();
   });
+  EXPECT_CALL(*filter_1, onDestroy());
+  EXPECT_CALL(*filter_2, onDestroy());
+
+  filter_manager_->decodeHeaders(*headers_, false);
+  sendTrailers();
+}
+
+TEST_F(FilterManagerDecodeLifecycleTest, ResetFromDecodeCompleteInDecodeDataStopsIteration) {
+  auto [filter_1, filter_2] = setupTwoDecoderFilters();
+  EXPECT_CALL(*filter_2, decodeData(_, _)).Times(0);
+
+  InSequence s;
+  EXPECT_CALL(*filter_1, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_1, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter_1, decodeComplete()).WillOnce([f1 = filter_1.get()]() {
+    f1->callbacks_->resetStream(StreamResetReason::LocalReset, "");
+  });
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, ""))
+      .WillOnce([this](StreamResetReason, absl::string_view) {
+        filter_manager_->onDownstreamReset();
+        filter_manager_->destroyFilters();
+      });
+  EXPECT_CALL(*filter_1, onDestroy());
+  EXPECT_CALL(*filter_2, onDestroy());
+
+  filter_manager_->decodeHeaders(*headers_, false);
+  sendData("body", true);
+}
+
+TEST_F(FilterManagerDecodeLifecycleTest, ResetFromDecodeCompleteInDecodeTrailersStopsIteration) {
+  auto [filter_1, filter_2] = setupTwoDecoderFilters();
+  EXPECT_CALL(*filter_2, decodeTrailers(_)).Times(0);
+
+  InSequence s;
+  EXPECT_CALL(*filter_1, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_1, decodeTrailers(_)).WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*filter_1, decodeComplete()).WillOnce([f1 = filter_1.get()]() {
+    f1->callbacks_->resetStream(StreamResetReason::LocalReset, "");
+  });
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, ""))
+      .WillOnce([this](StreamResetReason, absl::string_view) {
+        filter_manager_->onDownstreamReset();
+        filter_manager_->destroyFilters();
+      });
   EXPECT_CALL(*filter_1, onDestroy());
   EXPECT_CALL(*filter_2, onDestroy());
 
