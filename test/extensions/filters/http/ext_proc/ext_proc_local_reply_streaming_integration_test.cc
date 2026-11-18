@@ -342,6 +342,8 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, RequestWithBodyDuplexAndLocalR
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->body(), "bbbbcccccccc");
   verifyDownstreamResponse(*response, 200);
+  // ext_proc is the terminal filter of a local response: the request does not go upstream.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
 }
 
 TEST_P(ExtProcLocalReplyStreamingIntegrationTest,
