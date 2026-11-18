@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <iterator>
@@ -1462,6 +1463,9 @@ public:
   }
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return uses_vhds_; }
+  bool warmingBlocksUnmatchedRequests() const override {
+    return warming_blocks_unmatched_requests_;
+  }
   bool mostSpecificHeaderMutationsWins() const override {
     return most_specific_header_mutations_wins_;
   }
@@ -1496,6 +1500,7 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;
+  const bool warming_blocks_unmatched_requests_ : 1;
   const bool most_specific_header_mutations_wins_ : 1;
   const bool ignore_path_parameters_in_path_matching_ : 1;
 };
@@ -1534,7 +1539,16 @@ public:
     return shared_config_->internalOnlyHeaders();
   }
   const std::string& name() const override { return shared_config_->name(); }
+  void setAwaitingInitialVhdsUpdate(bool awaiting) {
+    awaiting_initial_vhds_update_.store(awaiting, std::memory_order_release);
+  }
+  bool awaitingInitialVhdsUpdate() const override {
+    return awaiting_initial_vhds_update_.load(std::memory_order_acquire);
+  }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
+  bool warmingBlocksUnmatchedRequests() const override {
+    return shared_config_->warmingBlocksUnmatchedRequests();
+  }
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
   }
@@ -1563,6 +1577,7 @@ protected:
 private:
   CommonConfigSharedPtr shared_config_;
   std::unique_ptr<RouteMatcher> route_matcher_;
+  std::atomic<bool> awaiting_initial_vhds_update_{false};
 };
 
 /**

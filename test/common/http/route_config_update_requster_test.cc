@@ -67,6 +67,16 @@ TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateWithoutHostContinuesFilterCh
   EXPECT_FALSE(updated);
 }
 
+TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateSkippedWhenWarmingBlocksUnmatchedRequests) {
+  ON_CALL(*route_config_, warmingBlocksUnmatchedRequests()).WillByDefault(Return(true));
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+
+  bool updated = true;
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}};
+  requestUpdate(headers, updated);
+  EXPECT_FALSE(updated);
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
