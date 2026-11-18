@@ -21,16 +21,15 @@ public:
   virtual double sampleUtilization() = 0;
 };
 
-// WorkerUtilizationTracker measures event-loop CPU utilization on a worker thread.
+// WorkerUtilizationTracker measures event-loop utilization on a persistent blocking worker event
+// loop (RunType::Block or RunType::RunUntilExit).
 //
-// This tracker is designed for persistent blocking worker event loops (RunType::Block or
-// RunType::RunUntilExit), not episodic RunType::NonBlock loops (which exit libevent after
-// EVWATCH_CHECK without a closing EVWATCH_PREPARE).
+// Because sampleUtilization() is always invoked from a callback on dispatcher's thread (between
+// onCheck and onPrepare, never while blocked inside epoll_wait), every idle sleep interval since
+// last_sample_time_ has already completed by the time sampleUtilization() runs.
 //
-// Not thread-safe; construction, destruction, and all method calls must occur on dispatcher's
-// thread.
-//
-// dispatcher must outlive WorkerUtilizationTracker.
+// Not thread-safe; dispatcher must outlive WorkerUtilizationTracker, and construction,
+// destruction, and all method calls must occur on dispatcher's thread.
 class WorkerUtilizationTracker final : public WorkerUtilizationTrackerInterface,
                                        public Event::Evwatch::Observer {
 public:
@@ -48,10 +47,15 @@ public:
   double sampleUtilization() override;
 
 private:
+  struct PendingPoll {
+    MonotonicTime prepare_time;
+    std::optional<MonotonicTime::duration> timeout;
+  };
+
   Event::Dispatcher& dispatcher_;
-  std::optional<MonotonicTime> busy_start_time_;
-  MonotonicTime::duration accumulated_busy_time_{0};
-  MonotonicTime last_poll_time_;
+  std::optional<PendingPoll> pending_poll_;
+  MonotonicTime::duration accumulated_idle_time_{0};
+  MonotonicTime last_sample_time_;
 };
 
 } // namespace AdaptiveWorkerCapacity

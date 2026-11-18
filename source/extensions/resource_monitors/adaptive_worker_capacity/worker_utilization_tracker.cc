@@ -16,7 +16,7 @@ namespace ResourceMonitors {
 namespace AdaptiveWorkerCapacity {
 
 WorkerUtilizationTracker::WorkerUtilizationTracker(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), last_poll_time_(dispatcher_.timeSource().monotonicTime()) {
+    : dispatcher_(dispatcher), last_sample_time_(dispatcher_.timeSource().monotonicTime()) {
   ASSERT(dispatcher_.isThreadSafe());
   dispatcher_.registerEvwatchObserver(*this);
 }
@@ -29,42 +29,39 @@ WorkerUtilizationTracker::~WorkerUtilizationTracker() {
 void WorkerUtilizationTracker::onPrepare(MonotonicTime prepare_time,
                                          std::optional<MonotonicTime::duration> timeout) {
   ASSERT(dispatcher_.isThreadSafe());
-  if (busy_start_time_.has_value() && prepare_time > *busy_start_time_) {
-    accumulated_busy_time_ += (prepare_time - *busy_start_time_);
-  }
-  if (timeout.has_value()) {
-    busy_start_time_ = prepare_time + *timeout;
-  } else {
-    busy_start_time_ = std::nullopt;
-  }
+  pending_poll_ = PendingPoll{prepare_time, timeout};
 }
 
 void WorkerUtilizationTracker::onCheck(MonotonicTime check_time) {
   ASSERT(dispatcher_.isThreadSafe());
-  if (busy_start_time_.has_value() && check_time > *busy_start_time_) {
-    accumulated_busy_time_ += (check_time - *busy_start_time_);
+  if (pending_poll_.has_value()) {
+    if (check_time > pending_poll_->prepare_time) {
+      MonotonicTime::duration idle_time = check_time - pending_poll_->prepare_time;
+      if (pending_poll_->timeout.has_value()) {
+        idle_time =
+            std::min(idle_time, std::max(MonotonicTime::duration::zero(), *pending_poll_->timeout));
+      }
+      accumulated_idle_time_ += idle_time;
+    }
+    pending_poll_.reset();
   }
-  busy_start_time_ = check_time;
 }
 
 double WorkerUtilizationTracker::sampleUtilization() {
   ASSERT(dispatcher_.isThreadSafe());
+  ASSERT(!pending_poll_.has_value());
   const MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-  if (now <= last_poll_time_) {
+  if (now <= last_sample_time_) {
     return 0.0;
   }
-  if (busy_start_time_.has_value() && now > *busy_start_time_) {
-    accumulated_busy_time_ += (now - *busy_start_time_);
-    busy_start_time_ = now;
-  }
-  const MonotonicTime::duration delta_wall = now - last_poll_time_;
-  last_poll_time_ = now;
+  const MonotonicTime::duration delta_wall = now - last_sample_time_;
+  last_sample_time_ = now;
 
-  const MonotonicTime::duration busy_time =
-      std::exchange(accumulated_busy_time_, MonotonicTime::duration::zero());
-  const double utilization = std::chrono::duration<double>(busy_time).count() /
-                             std::chrono::duration<double>(delta_wall).count();
-  return std::clamp(utilization, 0.0, 1.0);
+  const MonotonicTime::duration idle_time =
+      std::exchange(accumulated_idle_time_, MonotonicTime::duration::zero());
+  const double idle_fraction = std::chrono::duration<double>(idle_time).count() /
+                               std::chrono::duration<double>(delta_wall).count();
+  return std::clamp(1.0 - idle_fraction, 0.0, 1.0);
 }
 
 } // namespace AdaptiveWorkerCapacity
