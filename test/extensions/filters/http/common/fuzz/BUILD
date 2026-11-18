@@ -46,6 +46,7 @@ envoy_cc_test_library(
     deps = [
         ":filter_fuzz_proto_cc_proto",
         ":http_filter_fuzzer_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
