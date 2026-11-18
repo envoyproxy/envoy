@@ -156,6 +156,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:real_threads_test_helper_lib",
         "//test/test_common:stats_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -167,6 +168,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -278,6 +280,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:stats_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

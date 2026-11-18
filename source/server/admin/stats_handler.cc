@@ -233,10 +233,6 @@ Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
                               {StatLabels::All, StatLabels::Counters, StatLabels::Histograms,
                                StatLabels::Gauges, StatLabels::TextReadouts}};
 
-  Admin::ParamDescriptor unordered{
-      Admin::ParamDescriptor::Type::Boolean, "unordered",
-      "Allow the stats to be returned in any order, which can be faster"};
-
   Admin::ParamDescriptorVec params{usedonly, filter, invert_filter};
   if (!active_mode) {
     params.push_back(format);
@@ -244,7 +240,6 @@ Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
   params.push_back(type);
   if (!active_mode) {
     params.push_back(histogram_buckets);
-    params.push_back(unordered);
   }
 
   return {
