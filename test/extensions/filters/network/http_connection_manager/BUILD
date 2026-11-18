@@ -46,7 +46,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.http_connection_manager"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":config_cc_proto",
@@ -80,7 +87,17 @@ envoy_extension_cc_test(
     name = "config_filter_chain_test",
     srcs = ["config_filter_chain_test.cc"],
     extension_names = ["envoy.filters.network.http_connection_manager"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":config_cc_proto",
         ":config_test_base",
@@ -96,7 +113,17 @@ envoy_extension_cc_test(
     name = "config_filter_dependencies_test",
     srcs = ["config_filter_dependencies_test.cc"],
     extension_names = ["envoy.filters.network.http_connection_manager"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":config_cc_proto",
         ":config_test_base",

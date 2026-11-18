@@ -21,7 +21,7 @@ envoy_cc_test(
     data = envoy_select_wasm_rust_tests([
         "//test/extensions/common/wasm/test_data:test_rust.wasm",
     ]),
-    rbe_pool = {"tsan": {"build": "linux_x64_small"}},
+    rbe_pool = {"tsan": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
@@ -44,8 +44,29 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "gcc": {
+            "build": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -128,7 +149,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wasm_runtime_test",
     srcs = ["wasm_runtime_test.cc"],
-    rbe_pool = {"tsan": {"build": "linux_x64_small"}},
+    rbe_pool = {"tsan": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         ":wasm_runtime",
@@ -138,7 +159,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:base_includes",
@@ -165,6 +192,18 @@ envoy_cc_test(
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -188,7 +227,15 @@ envoy_cc_test(
 envoy_cc_test(
     name = "remote_async_datasource_test",
     srcs = ["remote_async_datasource_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:empty_string",
         "//source/common/crypto:utility_lib",

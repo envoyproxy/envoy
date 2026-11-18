@@ -18,19 +18,19 @@ use std::ptr;
 // -----------------------------------------------------------------------------
 
 /// Handle for a counter metric. Counters can only be incremented.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CounterHandle {
   id: usize,
 }
 
 /// Handle for a gauge metric. Gauges can be set, incremented, or decremented.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GaugeHandle {
   id: usize,
 }
 
 /// Handle for a histogram metric. Histograms record value distributions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HistogramHandle {
   id: usize,
 }
@@ -308,7 +308,7 @@ pub trait AccessLogger: Send {
 }
 
 /// Byte count information from the stream info.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BytesInfo {
   /// Total bytes received from downstream.
   pub bytes_received: u64,
@@ -321,7 +321,7 @@ pub struct BytesInfo {
 }
 
 /// Cumulative wire byte counts from the stream's downstream bytes meter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DownstreamWireBytes {
   /// Wire bytes received from downstream.
   pub bytes_received: u64,
@@ -1629,4 +1629,38 @@ macro_rules! declare_access_logger {
       }
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashSet;
+
+  #[test]
+  fn metric_handles_are_comparable_and_hashable() {
+    let a = CounterHandle { id: 1 };
+    let b = CounterHandle { id: 1 };
+    let c = CounterHandle { id: 2 };
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+
+    let mut set = HashSet::new();
+    set.insert(a);
+    assert!(!set.insert(b));
+    assert!(set.insert(c));
+
+    assert_eq!(GaugeHandle { id: 1 }, GaugeHandle { id: 1 });
+    assert_eq!(HistogramHandle { id: 3 }, HistogramHandle { id: 3 });
+  }
+
+  #[test]
+  fn bytes_info_is_copyable_and_comparable() {
+    let a = BytesInfo::default();
+    let b = a;
+    assert_eq!(a, b);
+
+    let c = DownstreamWireBytes::default();
+    let d = c;
+    assert_eq!(c, d);
+  }
 }

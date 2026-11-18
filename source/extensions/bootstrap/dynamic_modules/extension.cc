@@ -85,6 +85,8 @@ void DynamicModuleBootstrapExtension::registerLifecycleCallbacks() {
   // the server's callback lists, so this extension holds the registration.
   config_shutdown_handle_ = config_->context_.lifecycleNotifier().registerCallback(
       Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() { config_->onShutdown(); });
+  post_init_handle_ = config_->context_.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::PostInit, [this]() { config_->onPostInit(); });
 }
 
 } // namespace DynamicModules

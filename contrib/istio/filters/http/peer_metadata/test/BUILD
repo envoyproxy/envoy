@@ -11,6 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/http/peer_metadata/source:config",
         "//source/common/network:address_lib",
@@ -24,6 +25,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/http/peer_metadata/source:config",
         "//test/mocks/server:factory_context_mocks",

@@ -2,6 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
@@ -17,6 +18,10 @@ namespace Configuration {
 absl::StatusOr<Network::FilterFactoryCb>
 DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, FactoryContext& context) {
+  // QUIC connections never flush the access logs of their network filters when they end.
+  if (!proto_config.access_log().empty() && context.isQuic()) {
+    return absl::InvalidArgumentError("access_log is not supported on QUIC listeners");
+  }
 
   Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
   const auto& module_config = proto_config.dynamic_module_config();
@@ -64,6 +69,16 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
         absl::StrCat("Failed to create filter config: ", filter_config.status().message()));
   }
 
+  for (const envoy::config::accesslog::v3::AccessLog& log_config : proto_config.access_log()) {
+    filter_config.value()->access_logs_.push_back(
+        AccessLog::AccessLogFactory::fromProto(log_config, context));
+  }
+  filter_config.value()->access_log_flush_interval_ =
+      PROTOBUF_GET_OPTIONAL_MS(proto_config.access_log_options(), access_log_flush_interval);
+  filter_config.value()->flush_access_log_on_start_ =
+      proto_config.access_log_options().flush_access_log_on_start();
+  filter_config.value()->random_generator_ = server_context.api().randomGenerator();
+
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
   // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
   // is added. This is the legacy behavior for backward compatibility.
@@ -76,6 +91,9 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     auto filter = std::make_shared<
         Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilter>(config);
     filter_manager.addFilter(filter);
+    if (!config->access_logs_.empty()) {
+      filter_manager.addAccessLogHandler(std::move(filter));
+    }
   };
 }
 

@@ -11,9 +11,10 @@ Envoy-side handling (`ENVOY_SSL_OPENSSL`, `//bazel:using_openssl`, skipped tests
 
 OpenSSL builds use `--config=openssl` (see `.bazelrc`). It swaps `//bazel:ssl` and
 `//bazel:crypto` to this compat layer, defines `ENVOY_SSL_OPENSSL`, disables HTTP/3, and skips
-tests tagged `nofips` or `quiche`. In CI, the openssl check is allowed to fail. It runs
-`ci/do_ci.sh openssl.presubmit` on PRs (only tests affected by the change) and
-`ci/do_ci.sh openssl` post-submit (the full suite plus `//compat/openssl/test/...`).
+tests tagged `nofips` or `quiche`. In CI, the openssl check is allowed to fail. On PRs it runs
+`ci/do_ci.sh openssl.build` and `ci/do_ci.sh openssl.test_affected` (only tests affected by the
+change), and post-submit `ci/do_ci.sh openssl.build`, `ci/do_ci.sh openssl.test` (the full suite
+plus `//compat/openssl/test/...`) and `ci/do_ci.sh openssl.asan`.
 
 ```bash
 bazel build --config=openssl //source/exe:envoy-static
