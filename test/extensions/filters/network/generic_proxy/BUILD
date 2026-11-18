@@ -33,8 +33,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":fake_codec_lib",
@@ -56,11 +59,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":fake_codec_lib",
@@ -86,8 +93,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":fake_codec_lib",
@@ -117,11 +131,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     tags = [
         "cpu:3",
@@ -156,8 +169,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":fake_codec_lib",
@@ -172,7 +188,7 @@ envoy_extension_cc_test(
         "access_log_test.cc",
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         ":fake_codec_lib",
         "//source/common/formatter:substitution_formatter_lib",
@@ -211,8 +227,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.generic_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/network/generic_proxy:stats_lib",

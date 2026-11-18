@@ -19,8 +19,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tls.certificate_selectors.on_demand_secret"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:utility_lib",
@@ -61,11 +64,9 @@ envoy_extension_cc_test(
         "envoy.tls.certificate_mappers.sni",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",

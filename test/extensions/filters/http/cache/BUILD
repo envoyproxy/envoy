@@ -22,8 +22,11 @@ envoy_extension_cc_test(
     srcs = ["cache_headers_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/http:header_map_interface",
@@ -58,8 +61,11 @@ envoy_extension_cc_test(
     srcs = ["http_cache_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/cache:http_cache_lib",
@@ -87,8 +93,11 @@ envoy_extension_cc_test(
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mocks",
@@ -109,8 +118,11 @@ envoy_extension_cc_test(
     srcs = ["cacheability_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/cache:cacheability_utils_lib",
@@ -124,8 +136,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/cache:config",
@@ -146,11 +161,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/cache:config",

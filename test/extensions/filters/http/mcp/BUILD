@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["mcp_filter_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/common/mcp:filter_state_lib",
@@ -33,7 +36,7 @@ envoy_extension_cc_test(
     name = "mcp_json_parser_test",
     srcs = ["mcp_json_parser_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/filters/http/mcp:mcp_json_parser_lib",
         "//test/mocks/http:http_mocks",
@@ -47,11 +50,10 @@ envoy_extension_cc_test(
     srcs = ["mcp_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/protobuf:utility_lib",
@@ -69,8 +71,15 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.mcp"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     deps = [
         "//source/extensions/filters/http/mcp:config",
@@ -105,7 +114,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["mcp_filter_fuzz_test.cc"],
     corpus = "mcp_filter_corpus",
     extension_names = ["envoy.filters.http.mcp"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":mcp_filter_fuzz_proto_cc_proto",
         "//source/common/common:base64_lib",

@@ -39,8 +39,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -60,8 +63,11 @@ envoy_extension_cc_test(
     srcs = ["cluster_writer_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/common:cleanup_lib",
@@ -86,6 +92,13 @@ envoy_extension_cc_test(
     name = "listener_writer_test",
     srcs = ["listener_writer_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/common/config:dependent_type_urls_lib",
@@ -115,8 +128,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -156,8 +172,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -182,8 +201,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
@@ -222,11 +244,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/common:base64_lib",

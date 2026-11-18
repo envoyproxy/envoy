@@ -33,8 +33,15 @@ envoy_extension_cc_test(
     srcs = ["dns_filter_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":dns_filter_test_lib",
@@ -53,8 +60,15 @@ envoy_extension_cc_test(
     srcs = ["dns_filter_access_log_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":dns_filter_test_lib",
@@ -79,11 +93,9 @@ envoy_extension_cc_test(
     srcs = ["dns_filter_integration_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":dns_filter_test_lib",
@@ -105,11 +117,9 @@ envoy_extension_cc_test(
     srcs = ["dns_filter_access_log_integration_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":dns_filter_test_lib",
@@ -127,11 +137,9 @@ envoy_extension_cc_test(
     srcs = ["dns_filter_utils_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":dns_filter_test_lib",
@@ -148,11 +156,8 @@ envoy_extension_cc_fuzz_test(
     corpus = "dns_filter_corpus",
     extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
     },
     deps = [
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",

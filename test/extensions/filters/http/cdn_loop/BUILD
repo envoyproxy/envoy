@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.cdn_loop"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
@@ -36,11 +39,10 @@ envoy_extension_cc_test(
     srcs = ["filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.cdn_loop"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
@@ -54,7 +56,10 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.cdn_loop"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -79,7 +84,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["parser_fuzz_test.cc"],
     corpus = "parser_corpus",
     extension_names = ["envoy.filters.http.cdn_loop"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/common:statusor_lib",
         "//source/extensions/filters/http/cdn_loop:parser_lib",

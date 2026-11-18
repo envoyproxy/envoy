@@ -18,8 +18,11 @@ envoy_extension_cc_test(
     srcs = ["eds_test.cc"],
     extension_names = ["envoy.clusters.eds"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:utility_lib",
@@ -97,8 +100,11 @@ envoy_extension_cc_test(
     srcs = ["leds_test.cc"],
     extension_names = ["envoy.clusters.eds"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:utility_lib",

@@ -300,6 +300,10 @@ transport_socket_matches:
 
   // Checks if the cluster counters are correct
   void checkCounters(int requests, int responses, int successes, int failures) {
+    // The health check result can be reported before the test reads the counters, so wait for
+    // them before checking the exact values.
+    test_server_->waitForCounter("cluster.anna.health_check.success", testing::Ge(successes));
+    test_server_->waitForCounter("cluster.anna.health_check.failure", testing::Ge(failures));
     EXPECT_EQ(requests, test_server_->counter("hds_delegate.requests")->value());
     EXPECT_LE(responses, test_server_->counter("hds_delegate.responses")->value());
     EXPECT_EQ(successes, test_server_->counter("cluster.anna.health_check.success")->value());

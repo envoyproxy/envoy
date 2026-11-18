@@ -25,8 +25,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.load_balancing_policies.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/upstream:upstream_lib",

@@ -12,8 +12,11 @@ envoy_cc_test(
     name = "rds_test",
     srcs = ["rds_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/init:manager_lib",

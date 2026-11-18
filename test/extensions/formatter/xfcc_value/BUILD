@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     srcs = ["xfcc_value_test.cc"],
     extension_names = ["envoy.built_in_formatters.xfcc_value"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
@@ -36,7 +39,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["xfcc_value_fuzz_test.cc"],
     corpus = "xfcc_value_corpus",
     extension_names = ["envoy.built_in_formatters.xfcc_value"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/extensions/formatter/xfcc_value:config",
         "//test/mocks/stream_info:stream_info_mocks",

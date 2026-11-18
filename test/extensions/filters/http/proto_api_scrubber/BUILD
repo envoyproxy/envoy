@@ -39,8 +39,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/matcher:matcher_lib",
@@ -72,8 +79,15 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":scrubber_test_proto_cc_proto",
@@ -112,11 +126,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":scrubber_test_proto_cc_proto",
@@ -178,8 +191,11 @@ envoy_extension_cc_fuzz_test(
     corpus = "fuzz_corpus",
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":filter_fuzz_proto_cc_proto",

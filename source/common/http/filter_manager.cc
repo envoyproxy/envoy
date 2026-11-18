@@ -269,6 +269,14 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
 
   if (status == FilterTrailersStatus::Continue) {
     if (iteration_state_ == IterationState::StopSingleIteration) {
+      // Trailers are this filter's last frame. If it was resuming from StopAllIteration and
+      // re-buffered the body before returning Continue from its trailers callback, this nested
+      // commonContinue() runs while the outer resume still has iterate_from_current_filter_ set;
+      // clear it so the nested pass starts at the next filter rather than re-entering this one
+      // (which already has end_stream_ set).
+      if (parent_.forward_held_trailers_) {
+        iterate_from_current_filter_ = false;
+      }
       commonContinue();
       return false;
     } else {

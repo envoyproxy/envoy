@@ -1205,6 +1205,9 @@ public:
    * When called in encodeData, the trailers map will be initialized to an empty map and returned by
    * reference. Calling this function more than once is invalid.
    *
+   * Filters after the caller observe end_stream == false on the current data frame and then receive
+   * the new trailers via encodeTrailers(), including when one of them stops data iteration.
+   *
    * @return a reference to the newly created trailers map.
    */
   virtual ResponseTrailerMap& addEncodedTrailers() PURE;
