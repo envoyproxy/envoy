@@ -143,3 +143,18 @@ use_repo(
     "org_golang_google_genproto_googleapis_rpc",
     "org_golang_google_protobuf",
 )
+
+# TEST: remove before merge. Tests envoyproxy/toolshed#5626.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "4a2d2a19d4de386b6bcf5294cdacf4f6b286d3ea",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "4a2d2a19d4de386b6bcf5294cdacf4f6b286d3ea",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)

@@ -826,6 +826,9 @@ case $CI_TARGET in
             exit 1
         fi
         deps_update "${DEPENDENCY_ARGS[@]}"
+        echo "Update release dates ..."
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:release_dates \
+              -- --skip-unknown "${DEPENDENCY_ARGS[@]%%=*}"
         ;;
 
     dev)

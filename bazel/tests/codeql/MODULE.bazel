@@ -45,3 +45,18 @@ register_toolchains("@llvm_toolchain//:all")
 llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
 llvm_toolchain_alias_ext.host(path = LLVM_PREFIX)
 use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+
+# TEST: remove before merge. Tests envoyproxy/toolshed#5626.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "4a2d2a19d4de386b6bcf5294cdacf4f6b286d3ea",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "4a2d2a19d4de386b6bcf5294cdacf4f6b286d3ea",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)

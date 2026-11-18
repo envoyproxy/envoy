@@ -46,3 +46,18 @@ arch_alias_ext.alias(
     amd64 = "@envoy//bazel/platforms/rbe:linux_x64",
 )
 use_repo(arch_alias_ext, "clang_platform")
+
+# TEST: remove before merge. Tests envoyproxy/toolshed#5626.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "4a2d2a19d4de386b6bcf5294cdacf4f6b286d3ea",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "4a2d2a19d4de386b6bcf5294cdacf4f6b286d3ea",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)

@@ -2,6 +2,7 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
+load("@envoy_toolshed//dependency:macros.bzl", "release_date_updater")
 load("@envoy_toolshed//dependency:reachability.bzl", "dependency_reachability")
 load("@envoy_toolshed//dependency/cve:macros.bzl", "cve_scan")
 load("@rules_python//python:defs.bzl", "py_test")
@@ -96,6 +97,18 @@ py_console_script_binary(
     script = "envoy.dependency.check",
     visibility = ["//visibility:public"],
     deps = [requirement("orjson")],
+)
+
+# Fix the release dates of dependencies in the metadata:
+#   bazel run //tools/dependency:release_dates -- <name>...
+release_date_updater(
+    name = "release_dates",
+    check = ":check",
+    dependencies = ":check-dependencies",
+    metadata = [
+        "//bazel:deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
 )
 
 py_console_script_binary(
