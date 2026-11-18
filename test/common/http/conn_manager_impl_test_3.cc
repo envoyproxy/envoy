@@ -105,6 +105,188 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeaders) {
       makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
 }
 
+// Filter adds a body to a header-only request: it injects the headers without end_stream, and the
+// next filter stops them, and continues before the body is injected. The headers it continues
+// with are not the end of the stream.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersLaterFilterContinues) {
+  setup();
+  setupFilterChain(3, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  startRequest(true);
+
+  // Filter 0 injects the headers, saying that there is more to come. Filter 1 stops them.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+
+  // Filter 1 continues before filter 0 has injected the body.
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+
+  decoder_filters_[1]->callbacks_->continueDecoding();
+
+  // Filter 0 injects the body, which ends the stream.
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[2], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  Buffer::OwnedImpl data("hello");
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(data, true);
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[2]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// As above with the runtime guard disabled: the headers the later filter continues with are the
+// end of the stream, as they were before.
+TEST_F(HttpConnectionManagerImplTest,
+       FilterStopIterationInjectHeadersLaterFilterContinuesGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_inject_headers_without_end_stream", "false"}});
+  setup();
+  setupFilterChain(3, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  decoder_filters_[1]->callbacks_->continueDecoding();
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[2]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Filter injects the headers of a header-only request without end_stream, and the next filter
+// stops them and injects them with end_stream. A later filter that stops and continues those
+// headers continues them as the end of the stream: it is the last injection that counts.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersLaterFilterInjectsEndStream) {
+  setup();
+  setupFilterChain(4, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  decoder_filters_[1]->callbacks_->injectDecodedHeadersToFilterChain(true);
+
+  EXPECT_CALL(*decoder_filters_[3], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[3], decodeComplete());
+
+  decoder_filters_[2]->callbacks_->continueDecoding();
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[3]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[3]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Filter stops the headers and buffers the whole body, then injects the headers without
+// end_stream and continues: the buffered body still ends the stream.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersThenContinueBufferedBody) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  startRequest(false);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  Buffer::OwnedImpl data("hello");
+  decoder_->decodeData(data, true);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+
+  decoder_filters_[0]->callbacks_->injectDecodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  decoder_filters_[0]->callbacks_->continueDecoding();
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
 // Filter stops headers iteration for a header-only request, then injects headers with end_stream.
 TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectHeadersEndStream) {
   setup();
@@ -221,6 +403,189 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeaders) {
 
   Buffer::OwnedImpl data("response body");
   decoder_filters_[1]->callbacks_->encodeData(data, true);
+}
+
+// Encoder filter adds a body to a header-only response: it injects the headers without end_stream,
+// and the next filter stops them, and continues before the body is injected. The headers it
+// continues with are not the end of the stream.
+TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectEncodedHeadersLaterFilterContinues) {
+  setup();
+  setupFilterChain(2, 3);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+
+  // Encoder filter 2 injects the headers, saying that there is more to come. Encoder filter 1
+  // stops them.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  encoder_filters_[2]->callbacks_->injectEncodedHeadersToFilterChain(false);
+
+  // Encoder filter 1 continues before encoder filter 2 has injected the body.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
+
+  // Encoder filter 2 injects the body, which ends the stream.
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl data("hello");
+  encoder_filters_[2]->callbacks_->injectEncodedDataToFilterChain(data, true);
+}
+
+// As above with the runtime guard disabled: the headers the later filter continues with are the
+// end of the stream, as they were before.
+TEST_F(HttpConnectionManagerImplTest,
+       FilterStopIterationInjectEncodedHeadersLaterFilterContinuesGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http_inject_headers_without_end_stream", "false"}});
+  setup();
+  setupFilterChain(2, 3);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  encoder_filters_[2]->callbacks_->injectEncodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
+}
+
+// Encoder filter injects the headers of a header-only response without end_stream, and the next
+// filter stops them and injects them with end_stream. A later filter that stops and continues
+// those headers continues them as the end of the stream: it is the last injection that counts.
+TEST_F(HttpConnectionManagerImplTest,
+       FilterStopIterationInjectEncodedHeadersLaterFilterInjectsEndStream) {
+  setup();
+  setupFilterChain(2, 4);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[3], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[3], encodeComplete());
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  encoder_filters_[3]->callbacks_->injectEncodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+
+  encoder_filters_[2]->callbacks_->injectEncodedHeadersToFilterChain(true);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
+}
+
+// Encoder filter stops the headers and buffers the whole body, then injects the headers without
+// end_stream and continues: the buffered body still ends the stream.
+TEST_F(HttpConnectionManagerImplTest,
+       FilterStopIterationInjectEncodedHeadersThenContinueBufferedBody) {
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
+
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+
+  Buffer::OwnedImpl data("hello");
+  decoder_filters_[1]->callbacks_->encodeData(data, true);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+
+  encoder_filters_[1]->callbacks_->injectEncodedHeadersToFilterChain(false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
 }
 
 // Encoder filter stops headers iteration for a header-only response, then injects headers with
