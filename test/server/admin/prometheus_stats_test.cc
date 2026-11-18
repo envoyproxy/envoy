@@ -3376,5 +3376,48 @@ TEST_F(PrometheusChunkedRendererTest, ProtobufChunksAreWholeFamilies) {
   EXPECT_EQ(expected_count, renderer->metricNameCount());
 }
 
+TEST_F(PrometheusChunkedRendererTest, TextValuesCapturedWhenGrouped) {
+  addCounter("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
+  addGauge("cluster.upstream_cx_active", {{makeStat("cluster"), makeStat("c1")}});
+  counters_[0]->add(5);
+  gauges_[0]->set(7);
+
+  auto renderer = makeRenderer();
+  // Updates after the renderer is created are not rendered.
+  counters_[0]->add(100);
+  gauges_[0]->set(200);
+
+  Buffer::OwnedImpl response;
+  EXPECT_FALSE(renderer->nextChunk(response, std::numeric_limits<uint64_t>::max()));
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 5
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 7
+)EOF",
+            response.toString());
+}
+
+TEST_F(PrometheusChunkedRendererTest, ProtobufValuesCapturedWhenGrouped) {
+  addCounter("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
+  addGauge("cluster.upstream_cx_active", {{makeStat("cluster"), makeStat("c1")}});
+  counters_[0]->add(5);
+  gauges_[0]->set(7);
+  request_headers_.addCopy("accept", "application/vnd.google.protobuf");
+
+  auto renderer = makeRenderer();
+  // Updates after the renderer is created are not rendered.
+  counters_[0]->add(100);
+  gauges_[0]->set(200);
+
+  Buffer::OwnedImpl response;
+  EXPECT_FALSE(renderer->nextChunk(response, std::numeric_limits<uint64_t>::max()));
+  const auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(2, families.size());
+  ASSERT_EQ(1, families[0].metric_size());
+  EXPECT_EQ(5, families[0].metric(0).counter().value());
+  ASSERT_EQ(1, families[1].metric_size());
+  EXPECT_EQ(7, families[1].metric(0).gauge().value());
+}
+
 } // namespace Server
 } // namespace Envoy

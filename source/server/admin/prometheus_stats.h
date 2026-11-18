@@ -13,6 +13,16 @@
 
 namespace Envoy {
 namespace Server {
+
+// A counter or gauge with its value captured up front, so that the values of one response are read
+// together, even if it is rendered in chunks over time.
+template <class StatType> struct CapturedMetric {
+  const StatType* metric_;
+  uint64_t value_;
+};
+using CapturedCounter = CapturedMetric<Stats::Counter>;
+using CapturedGauge = CapturedMetric<Stats::Gauge>;
+
 /**
  * Formatter for metric/labels exported to Prometheus.
  *
@@ -38,7 +48,7 @@ public:
 
     // Return the prometheus output for a group of Counters.
     virtual void generateOutput(Buffer::Instance& output,
-                                const std::vector<const Stats::Counter*>& counters,
+                                const std::vector<CapturedCounter>& counters,
                                 const std::string& prefixed_tag_extracted_name) const PURE;
 
     // Return the prometheus output for a group of PrimitiveCounters.
@@ -47,8 +57,7 @@ public:
                                 const std::string& prefixed_tag_extracted_name) const PURE;
 
     // Return the prometheus output for a group of Gauges.
-    virtual void generateOutput(Buffer::Instance& output,
-                                const std::vector<const Stats::Gauge*>& gauges,
+    virtual void generateOutput(Buffer::Instance& output, const std::vector<CapturedGauge>& gauges,
                                 const std::string& prefixed_tag_extracted_name) const PURE;
 
     // Returns the prometheus output for a group of TextReadouts.

@@ -83,7 +83,7 @@ struct PrimitiveMetricSnapshotLessThan {
 
 class TextFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedCounter>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, counters, prefixed_tag_extracted_name);
   }
@@ -94,7 +94,7 @@ public:
     generateNumericOutput(output, std::move(counters), prefixed_tag_extracted_name);
   }
 
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Gauge*>& gauges,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedGauge>& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, gauges, prefixed_tag_extracted_name);
   }
@@ -149,7 +149,8 @@ private:
   }
 
   template <class StatType>
-  void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
+  void generateNumericOutput(Buffer::Instance& output,
+                             const std::vector<CapturedMetric<StatType>>& metrics,
                              const std::string& prefixed_tag_extracted_name) const {
     absl::string_view type;
     if constexpr (std::is_same_v<Stats::Counter, StatType>) {
@@ -161,10 +162,11 @@ private:
     }
 
     generateTypeOutput(output, type, prefixed_tag_extracted_name);
-    for (const auto* metric : metrics) {
-      const std::string formatted_tags = PrometheusStatsFormatter::formattedTags(metric->tags());
+    for (const auto& captured : metrics) {
+      const std::string formatted_tags =
+          PrometheusStatsFormatter::formattedTags(captured.metric_->tags());
       output.add(fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, formatted_tags,
-                             metric->value()));
+                             captured.value_));
     }
   }
 
@@ -270,7 +272,7 @@ public:
       : native_histogram_max_buckets_(
             native_histogram_max_buckets.value_or(kDefaultMaxNativeHistogramBuckets)) {}
 
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedCounter>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, counters, prefixed_tag_extracted_name,
                           io::prometheus::client::MetricType::COUNTER);
@@ -285,7 +287,7 @@ public:
   }
 
   // Return the prometheus output for a group of Gauges.
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Gauge*>& gauges,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedGauge>& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, gauges, prefixed_tag_extracted_name,
                           io::prometheus::client::MetricType::GAUGE);
@@ -365,7 +367,8 @@ private:
   }
 
   template <class StatType>
-  void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
+  void generateNumericOutput(Buffer::Instance& output,
+                             const std::vector<CapturedMetric<StatType>>& metrics,
                              const std::string& prefixed_tag_extracted_name,
                              io::prometheus::client::MetricType type) const {
     ASSERT(!metrics.empty());
@@ -375,17 +378,17 @@ private:
     metric_family.set_type(type);
     metric_family.mutable_metric()->Reserve(metrics.size());
 
-    for (const auto* metric : metrics) {
+    for (const auto& captured : metrics) {
       auto* prom_metric = metric_family.add_metric();
-      addLabelsToMetric(prom_metric, metric->tags());
+      addLabelsToMetric(prom_metric, captured.metric_->tags());
 
       // Set value based on type
       if (type == io::prometheus::client::MetricType::COUNTER) {
         auto* counter = prom_metric->mutable_counter();
-        counter->set_value(metric->value());
+        counter->set_value(captured.value_);
       } else {
         auto* gauge = prom_metric->mutable_gauge();
-        gauge->set_value(metric->value());
+        gauge->set_value(captured.value_);
       }
     }
 
@@ -714,12 +717,15 @@ private:
  * So all metrics of a stat type are grouped by their tag-extracted name up front, and each group is
  * rendered as a whole. The metrics inside a group are only sorted when the group is rendered, which
  * spreads most of the cost across chunks.
+ *
+ * Counter and gauge values are captured while grouping, so the values of one response are read
+ * together rather than when each chunk is rendered. Reading the value there is cheap, as the
+ * metric is already being visited.
  */
 template <class StatType>
 class StatFamilies : public PrometheusStatsFormatter::ChunkedRenderer::MetricFamilies {
 public:
-  StatFamilies(const std::vector<Stats::RefcountPtr<StatType>>& metrics,
-               const StatsParams& params)
+  StatFamilies(const std::vector<Stats::RefcountPtr<StatType>>& metrics, const StatsParams& params)
       : sort_(!params.unordered_) {
     // Return early to avoid crashing when getting the symbol table from the first metric.
     if (metrics.empty()) {
@@ -739,7 +745,7 @@ public:
       if (!params.shouldShowMetric(*metric)) {
         continue;
       }
-      groups[metric->tagExtractedStatName()].push_back(metric.get());
+      groups[metric->tagExtractedStatName()].push_back(makeEntry(*metric));
     }
 
     families_.reserve(groups.size());
@@ -771,7 +777,9 @@ public:
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
     if (sort_) {
-      std::sort(group.begin(), group.end(), MetricLessThan());
+      std::sort(group.begin(), group.end(), [](const Entry& a, const Entry& b) {
+        return MetricLessThan()(metricOf(a), metricOf(b));
+      });
     }
 
     output_format.generateOutput(response, group, prefixed_tag_extracted_name.value());
@@ -780,7 +788,27 @@ public:
   }
 
 private:
-  using Group = std::vector<const StatType*>;
+  static constexpr bool kCaptureValue =
+      std::is_same_v<StatType, Stats::Counter> || std::is_same_v<StatType, Stats::Gauge>;
+  using Entry = std::conditional_t<kCaptureValue, CapturedMetric<StatType>, const StatType*>;
+
+  static Entry makeEntry(const StatType& metric) {
+    if constexpr (kCaptureValue) {
+      return {&metric, metric.value()};
+    } else {
+      return &metric;
+    }
+  }
+
+  static const StatType* metricOf(const Entry& entry) {
+    if constexpr (kCaptureValue) {
+      return entry.metric_;
+    } else {
+      return entry;
+    }
+  }
+
+  using Group = std::vector<Entry>;
   using Family = std::pair<Stats::StatName, Group>;
 
   const bool sort_;
