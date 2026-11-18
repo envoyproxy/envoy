@@ -328,8 +328,7 @@ function bazel_envoy_api_build() {
         --remote_download_minimal \
         -c fastbuild \
         @envoy_api//test/... \
-        @envoy_api//tools/... \
-        @envoy_api//tools:tap2pcap_test
+        @envoy_api//tools/...
     echo "Building API..."
     bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
         -c fastbuild @envoy_api//envoy/...
