@@ -217,6 +217,12 @@ private:
 
   OptRef<const MonotonicTime> findStartTime(int fd) const;
 
+  /**
+   * Drop one idle socket of the node from node_to_conn_count_map_ under socket_manager_lock.
+   * @param node_id the node ID whose socket left the idle pool.
+   */
+  void decrementIdleCount(const std::string& node_id);
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -281,9 +287,10 @@ private:
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
 
-  // Map of node IDs to the number of total accepted reverse connections
-  // for the node. This is used to rebalance a request to accept reverse
-  // connections to a different worker thread.
+  // Map of node IDs to the number of idle sockets this worker holds for the node in
+  // accepted_reverse_connections_, plus sockets already picked for it and in flight to its
+  // dispatcher. Requests only take idle sockets from their own worker, so new sockets go to the
+  // worker with the fewest. Guarded by socket_manager_lock since other workers read it.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
 
   bool tenant_isolation_enabled_{false};

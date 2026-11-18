@@ -102,6 +102,14 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
   return *target_socket_manager;
 }
 
+void UpstreamSocketManager::decrementIdleCount(const std::string& node_id) {
+  absl::WriterMutexLock wlock(UpstreamSocketManager::socket_manager_lock);
+  auto it = node_to_conn_count_map_.find(node_id);
+  if (it != node_to_conn_count_map_.end() && --it->second <= 0) {
+    node_to_conn_count_map_.erase(it);
+  }
+}
+
 void UpstreamSocketManager::onGoAway(int fd) {
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
@@ -137,6 +145,14 @@ void UpstreamSocketManager::addConnectionSocket(
     const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
     const std::chrono::seconds& ping_interval, bool rebalanced, absl::string_view tenant_id,
     absl::string_view initiator_worker_id, absl::string_view initiator_connection_id) {
+  // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
+  if (node_id.empty() || cluster_id.empty()) {
+    ENVOY_LOG(error,
+              "reverse_tunnel: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
+              node_id, cluster_id);
+    return;
+  }
+
   const std::string scoped_node_id =
       maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
   const std::string scoped_cluster_id =
@@ -159,14 +175,6 @@ void UpstreamSocketManager::addConnectionSocket(
 
   ENVOY_LOG(debug, "reverse_tunnel: adding connection for node: {}, cluster: {}.", node_id,
             cluster_id);
-
-  // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
-  if (node_id.empty() || cluster_id.empty()) {
-    ENVOY_LOG(error,
-              "reverse_tunnel: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
-              node_id, cluster_id);
-    return;
-  }
 
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& connectionKey = socket->connectionInfoProvider().localAddress()->asString();
@@ -280,6 +288,7 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   // Fetch the socket from the accepted_reverse_connections_ and remove it from the list.
   Network::ConnectionSocketPtr socket(std::move(node_sockets_it->second.front()));
   node_sockets_it->second.pop_front();
+  decrementIdleCount(node_id);
 
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& remoteConnectionKey =
@@ -475,6 +484,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     ::shutdown(fd, ENVOY_SHUT_RDWR);
     accepted_reverse_connections_[node_id].erase(socket_it->second);
     fd_to_socket_it_map_.erase(socket_it);
+    decrementIdleCount(node_id);
 
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
