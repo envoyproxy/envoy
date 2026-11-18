@@ -40,6 +40,7 @@ public:
   void testNonTerminalEncodingFilterWithCompleteRequest();
   void testNonTerminalEncodingFilterWithIncompleteRequest();
   void testFilterAddsDataAndTrailersToHeaderOnlyRequest();
+  void testStopAllDecoderFilterRebuffersBody(bool async_lb);
 
   const int count_ = 70;
   const int size_ = 1000;
@@ -654,13 +655,11 @@ static Registry::RegisterFactory<StopAllRebufferDecoderFilterFactory,
 // decodeData(false) with StopIterationAndBuffer, and returning Continue from decodeTrailers():
 // commonHandleAfterTrailersCallback() clears iterate_from_current_filter_ so the nested
 // continuation forwards the body and trailers once.
-TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
+void FilterIntegrationTest::testStopAllDecoderFilterRebuffersBody(bool async_lb) {
   if (!testing_downstream_filter_) {
     return;
   }
-  // With async host resolution the router stops all iteration too and replays the buffered body
-  // itself when it resumes, which would hide a body that the filter failed to forward.
-  async_lb_ = false;
+  async_lb_ = async_lb;
   auto& counters = StopAllRebufferDecoderFilterFactory::counters();
   counters.decode_trailers_calls.store(0);
   counters.decode_complete_calls.store(0);
@@ -692,6 +691,18 @@ typed_config:
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// The router takes the body straight from the filter. With async host resolution the router's own
+// replay of the buffered body would hide a body that the filter failed to forward.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
+  testStopAllDecoderFilterRebuffersBody(false);
+}
+
+// The router is stopped on all frames too when the filter continues, and replays the body and
+// trailers once a host is selected.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailersAsyncLb) {
+  testStopAllDecoderFilterRebuffersBody(true);
 }
 
 // Tests missing headers needed for H/1 codec first line.
