@@ -45,7 +45,7 @@ json_merge(
 
 # Metadata-only repositories absent from the resolved module graph have no
 # version to check.
-# TODO: Skip nested archive tags until envoy.dependency.check can parse nested tag names.
+# TODO(phlax): Skip nested archive tags until envoy.dependency.check can parse nested tag names.
 json_merge(
     name = "check-dependencies",
     srcs = [":filtered-dependencies"],
