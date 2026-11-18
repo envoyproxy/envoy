@@ -41,8 +41,8 @@
     "https://bcr.bazel.build/modules/apple_support/1.23.0/MODULE.bazel": "317d47e3f65b580e7fb4221c160797fda48e32f07d2dfff63d754ef2316dcd25",
     "https://bcr.bazel.build/modules/apple_support/1.24.1/MODULE.bazel": "f46e8ddad60aef170ee92b2f3d00ef66c147ceafea68b6877cb45bd91737f5f8",
     "https://bcr.bazel.build/modules/apple_support/1.24.2/MODULE.bazel": "0e62471818affb9f0b26f128831d5c40b074d32e6dda5a0d3852847215a41ca4",
-    "https://bcr.bazel.build/modules/apple_support/2.10.1/MODULE.bazel": "5c100fe4a69707da09fd1c91976506d9302d186830ea0e82f045b3537a978f83",
-    "https://bcr.bazel.build/modules/apple_support/2.10.1/source.json": "69100c3281052a77bb8e4b185bb8252bb00aaa167c900cf88aa0702bfc6dbf0c",
+    "https://bcr.bazel.build/modules/apple_support/2.12.0/MODULE.bazel": "dd64cc02d13adb1db4cd399c033e5d7bbd6854fac0a4752c76c20144f5255814",
+    "https://bcr.bazel.build/modules/apple_support/2.12.0/source.json": "c4330493f8a697a80abe0a7da3513c41d44e3a273075ecde433bb6cf84aadec9",
     "https://bcr.bazel.build/modules/apple_support/2.3.0/MODULE.bazel": "d48f824ae8eeea5f837eb3038cef3615075d996d3e82eb9187192c2820605a81",
     "https://bcr.bazel.build/modules/apple_support/2.5.2/MODULE.bazel": "bb1b7081e390a8d3885f642cb0073dfcf8e7a36525e079fa8f5835af7079c0fe",
     "https://bcr.bazel.build/modules/apple_support/2.8.0/MODULE.bazel": "c45f5176057092afba0be6c48a9ea02101666802f8be536947e099e94757f8ed",
@@ -7857,10 +7857,9 @@
     },
     "@@rules_rust+//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "bwGx8lzzwHSdB5yH+wrcPJ6wkyvNEAjwrOqN7a4iUt4=",
+        "bzlTransitiveDigest": "j3zCSUBXJRuS466Tw9b9hD2cw9ZLTF0z47R9rp6XkYI=",
         "usagesDigest": "gPzbCKgzyeBCRrzMjhv2cAe139IR1vfEaSyXWN7MHJM=",
         "recordedInputs": [
-          "REPO_MAPPING:apple_support+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
           "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
           "REPO_MAPPING:rules_cc+,bazel_features bazel_features+",
