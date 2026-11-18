@@ -523,9 +523,11 @@ void WatchMap::cacheResource(const DecodedResource& resource, const std::string&
   if (!resource.hasResource() || !watch_interest_.contains(resource.name())) {
     return;
   }
+  // CopyFrom() is not available on MessageLite in lite proto builds. Merging into the freshly
+  // created empty message is equivalent.
   Protobuf::Arena::UniquePtr<Protobuf::Message> copy =
       Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, resource.resource().New());
-  copy->CopyFrom(resource.resource());
+  copy->CheckTypeAndMergeFrom(resource.resource());
   cached_resources_.insert_or_assign(resource.name(),
                                      CachedResource{std::move(copy), resource.aliases(), version});
 }
@@ -562,9 +564,10 @@ void WatchMap::replayCachedResources() {
       if (cached == cached_resources_.end() || !watch->resource_names_.contains(name)) {
         continue;
       }
+      // Merge into an empty message rather than CopyFrom(); see cacheResource().
       Protobuf::Arena::UniquePtr<Protobuf::Message> copy =
           Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, cached->second.resource_->New());
-      copy->CopyFrom(*cached->second.resource_);
+      copy->CheckTypeAndMergeFrom(*cached->second.resource_);
       decoded.push_back(std::make_unique<DecodedResourceImpl>(
           std::move(copy), name, cached->second.aliases_, cached->second.version_,
           /*from_cache=*/true));
