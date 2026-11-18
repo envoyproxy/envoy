@@ -1028,7 +1028,7 @@ rules_cc:
   project_name: "C++ rules for Bazel"
   project_desc: "Bazel rules for the C++ language"
   project_url: "https://github.com/bazelbuild/rules_cc"
-  release_date: "2026-10-22"
+  release_date: "2026-11-05"
   use_category:
   - build
   - controlplane
