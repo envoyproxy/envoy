@@ -32,7 +32,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
 
 /// A literal struct key or zero-based list index in a metadata path.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetadataPathComponent<'a> {
   /// Select a struct field, including an empty key.
   Key(&'a str),
