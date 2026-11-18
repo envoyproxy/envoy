@@ -368,6 +368,7 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocketInNetworkNamespace) {
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_EQ(bind_addr->networkNamespace(), local_addr->networkNamespace());
   EXPECT_EQ(local_addr, connection_socket->connectionInfoProvider().localAddress());
+  EXPECT_NE(0, local_addr->ip()->port());
 
   local_addr = bind_addr;
   EXPECT_CALL(netns_syscalls, setns(_, CLONE_NEWNET))

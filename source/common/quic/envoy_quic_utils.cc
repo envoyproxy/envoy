@@ -70,19 +70,23 @@ getLoopbackAddress(Network::Address::InstanceConstSharedPtr peer_address) {
 Network::ConnectionSocketPtr
 createDatagramSocket(const Network::Address::InstanceConstSharedPtr& local_addr,
                      const Network::Address::InstanceConstSharedPtr& peer_addr,
+                     [[maybe_unused]] const std::optional<std::string>& netns,
                      const Network::SocketCreationOptions& options) {
   auto create_socket = [&]() {
     return std::make_unique<Network::ConnectionSocketImpl>(Network::Socket::Type::Datagram,
                                                            local_addr, peer_addr, options);
   };
 #if defined(__linux__)
-  if (const auto netns = local_addr->networkNamespace(); netns.has_value()) {
+  if (netns.has_value()) {
     auto result = Network::Utility::execInNetworkNamespace(create_socket, netns->c_str());
-    // The packet writer requires a non-null socket even on namespace failure.
-    return result.ok()
-               ? *std::move(result)
-               : std::make_unique<Network::ConnectionSocketImpl>(
-                     std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
+    if (!result.ok()) {
+      ENVOY_LOG_MISC(error, "Failed to create quic socket in network namespace {}: {}", *netns,
+                     result.status().ToString());
+      // The packet writer requires a non-null socket even on namespace failure.
+      return std::make_unique<Network::ConnectionSocketImpl>(
+          std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
+    }
+    return *std::move(result);
   }
 #endif
   return create_socket();
@@ -260,7 +264,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   auto connection_socket = createDatagramSocket(
       // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
       // create the IoHandle, without having to make the more expensive `getifaddrs` call.
-      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
+      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr, netns,
       Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
