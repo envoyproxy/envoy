@@ -898,8 +898,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ZeroRttBusyClientCapacityIncreasedBef
   // must win that slot in FIFO order ahead of the later queued GET, without incrementing
   // upstream_rq_0rtt.
   test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(3));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(1));
   EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
-  EXPECT_EQ(1u, test_server_->gauge("cluster.cluster_0.upstream_rq_pending_active")->value());
 
   waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
                                 fake_upstream_connection_);
