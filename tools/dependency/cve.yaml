@@ -28,3 +28,9 @@ ignored_cves:
 # msgpack_unpacker_reserve_buffer C API. Envoy uses the header-only C++ library (msgpack-cxx)
 # and only packs (fluentd access logger/tracer); the C unpacker is neither built nor called.
 - CVE-2026-72854
+
+# Heap overflow in msgpack_vrefbuffer_migrate (src/vrefbuffer.c): the capacity check uses the
+# source buffer's end pointer. The C file is not built (header-only msgpack-cxx); the C++
+# msgpack::vrefbuffer::migrate has the same check, but Envoy only packs into msgpack::sbuffer
+# (fluentd access logger/tracer) and never uses a vrefbuffer.
+- CVE-2026-130065
