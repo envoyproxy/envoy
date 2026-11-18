@@ -531,5 +531,57 @@ TEST_P(DecompressorIntegrationTest, LimitZstdDecompression) {
   ASSERT_TRUE(response->waitForEndStream());
 }
 
+// Upstream filters change the router's request headers in place, and the router does not restore
+// them before a retry. The retried request then carries the original compressed body without
+// content-encoding.
+TEST_P(DecompressorIntegrationTest, RequestDecompressionOnRetry) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* retry_policy = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_num_retries()->set_value(1);
+      });
+  initializeFilter(default_config);
+
+  Buffer::OwnedImpl request_data;
+  TestUtility::feedBufferWithRandomCharacters(request_data, 8192);
+  const uint64_t uncompressed_request_length = request_data.length();
+  request_compressor_->compress(request_data, Envoy::Compression::Compressor::State::Finish);
+  const std::string compressed_request = request_data.toString();
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":scheme", "http"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"content-encoding", "gzip"}},
+      compressed_request);
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+  EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+  if (testing_downstream_filter_) {
+    EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
+  } else {
+    // TODO(botengyao): expect the decompressed body once the router restores the request headers
+    // before a retry.
+    EXPECT_EQ(compressed_request, upstream_request_->body().toString());
+  }
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace Envoy

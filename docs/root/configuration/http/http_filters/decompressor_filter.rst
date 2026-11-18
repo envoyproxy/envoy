@@ -111,6 +111,13 @@ This is useful, for example, to decompress responses only from clusters that sen
 content, or to decompress requests before they are sent to a cluster that cannot accept them.
 When configured on a cluster, the filter's statistics are rooted at ``cluster.<name>.``.
 
+.. attention::
+
+  Request decompression in an upstream filter does not currently work with retries. The filter
+  removes ``content-encoding`` from the request headers, and the router does not restore it before a
+  retry, so the retried request is sent with the original compressed body but without
+  ``content-encoding``. Response decompression is not affected.
+
 .. _decompressor-statistics:
 
 Statistics
