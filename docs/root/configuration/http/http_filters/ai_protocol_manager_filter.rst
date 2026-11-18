@@ -422,19 +422,18 @@ independent, and a key that is not set leaves today's behavior in place.
   Response token-usage extraction follows it too, so the two never disagree about the backend.
 
 ``envoy.ai.binding.request``
-  How the client's request carries its API on HTTP. The ``TO_IR`` leg reads the client's path
-  and body under it; the path itself is not rewritten. Without it, the route's binding applies,
-  and without that, the client API's own binding and those Envoy knows for it are tried: Gemini's
-  ``/v1beta/models/{model}:generateContent`` and its Vertex AI form, and Claude on Vertex AI's
-  ``rawPredict`` and ``streamRawPredict`` for Anthropic Messages. A gateway that serves an API
-  under its own prefix names the prefix here.
+  How the client's request carries its API over HTTP. The ``TO_IR`` leg uses this binding to read
+  the client's path, body, and headers (without rewriting the path). If unset, Envoy falls back to
+  the route's binding, and then to the client API's built-in bindings (e.g., native Gemini or
+  Anthropic paths and their Vertex AI equivalents). Set this when the gateway exposes an API under
+  a custom path prefix.
 
 ``envoy.ai.binding.response``
-  How the backend expects its API on HTTP. The ``FROM_IR`` leg renders its path into ``:path``
-  and applies its edits, in place of the route's binding and the backend API's own; a Gemini
-  backend on Vertex AI, for example, names Vertex's path here. When neither it nor the route
-  names one and the backend speaks the client's API, the request leaves in the binding it
-  arrived in.
+  How the backend expects its API over HTTP. The ``FROM_IR`` leg uses this binding to render
+  ``:path`` and apply body and header edits, overriding the route's binding and the backend API's
+  default binding (for example, to target a Gemini backend on Vertex AI). If neither this nor the
+  route sets a binding, and the backend speaks the same API as the client, the request keeps the
+  binding it arrived with.
 
 ``envoy.ai.model.resolved``
   The model to send upstream in place of the one the client asked for. It reaches the body and
@@ -453,7 +452,8 @@ route's binding that no AI filter of the chain applies is counted by ``route_bin
 A binding is written as a URI pattern, starting with ``/``, or as an :ref:`LLMBinding
 <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON, starting with ``{``. A part the binding leaves
 empty is the API's own: a pattern alone keeps the edits of the API's own binding, such as Gemini
-removing ``model`` and ``stream`` from the body.
+removing ``model`` and ``stream`` from the body, or Anthropic adding its ``anthropic-version``
+header.
 
 A URI pattern is a path in the :ref:`URI template syntax
 <envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>` of
@@ -481,10 +481,11 @@ wildcards match on the way in but cannot be rendered.
   /v1/messages
 
 On the way in, the path's value wins for a field the binding removes from the body, and the
-body's wins otherwise; the body fields the binding writes are taken out, so Vertex AI's
-``anthropic_version`` never reaches another API. On the way out, the body is validated against
-the backend API's schema first, then the binding's edits apply in order. A request that leaves
-in the binding it arrived in gets those fields back as the client sent them.
+body's wins otherwise; the body fields and headers the binding writes are taken out, so Vertex
+AI's ``anthropic_version`` field and Anthropic's ``anthropic-version`` header never reach another
+API. On the way out, the body is validated against the backend API's schema first, then the
+binding's edits apply in order: to the body, and to the request headers. A request that leaves in
+the binding it arrived in gets those fields and headers back as the client sent them.
 
 A binding that does not parse, or one that needs a path variable the client's path did not hold,
 is a misconfiguration of the proxy, not of the client: the request fails with a 500, counted by
@@ -521,20 +522,48 @@ The example pins a route to Claude on an illustrative gateway, statically, with
             text_format_source:
               inline_string: "claude-sonnet-4-5"
 
-A binding in JSON also edits the body. Claude on Vertex AI takes the model in the path alone and
-the Vertex AI API version in the body:
+A binding in JSON also edits the body and the request headers, with the same
+:ref:`KeyValueMutation <envoy_v3_api_msg_config.core.v3.KeyValueMutation>` and
+:ref:`HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`
+messages other filters use. Claude on Vertex AI takes the model in the path alone and the
+Vertex AI API version in the body, not in the API's header:
 
 .. code-block:: json
 
   {
     "uri_pattern": "/v1/projects/my-project/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
-    "mutations": [
-      {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    "body_mutations": [
+      {"remove": "model"},
+      {"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "ADD_IF_ABSENT"}}
+    ],
+    "header_mutations": [
+      {"remove": "anthropic-version"}
     ]
   }
 
-Credentials stay with the route, for example through ``request_headers_to_add``.
+Envoy's built-in ``ANTHROPIC_MESSAGES`` binding sets the ``anthropic-version`` header
+automatically, so requests to Anthropic need no extra path or header configuration:
+
+.. code-block:: json
+
+  {
+    "uri_pattern": "/v1/messages",
+    "header_mutations": [
+      {"append": {"header": {"key": "anthropic-version", "value": "2023-06-01"}, "append_action": "ADD_IF_ABSENT"}}
+    ]
+  }
+
+A binding's mutations apply on top of the API's own, header edits first, so a binding that only
+adds a header keeps the API's body edits. A mutation naming a field or header the API's also
+name replaces that one edit, which is how the Vertex binding above removes the API's version
+header. The action is named explicitly: ``OVERWRITE_IF_EXISTS_OR_ADD`` sets, ``ADD_IF_ABSENT``
+sets where absent, ``remove`` removes. The enum default ``APPEND_IF_EXISTS_OR_ADD``,
+``OVERWRITE_IF_EXISTS``, ``remove_on_match``, ``raw_value`` and the deprecated ``append`` and
+``entry`` fields are rejected for now. A value is not a format string: only ``{model}`` and the
+client's path variables are replaced.
+
+Use header mutations only for non-secret API headers; pass credentials via
+``request_headers_to_add`` or :ref:`credential_injector <config_http_filters_credential_injector>`.
 
 Response token-usage extraction
 -------------------------------

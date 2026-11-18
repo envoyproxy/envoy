@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Network {
 namespace Vcl {
 
-Server::BootstrapExtensionPtr
+Server::BootstrapExtensionCreationResult
 VclSocketInterface::createBootstrapExtension(const Protobuf::Message&,
                                              Server::Configuration::ServerFactoryContext& ctx) {
 

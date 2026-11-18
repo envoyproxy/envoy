@@ -3,6 +3,9 @@
 #############################################################################
 
 
+build:windows --build_tag_filters=-skip_on_windows
+build:windows --test_tag_filters=-skip_on_windows
+
 build:windows --extra_execution_platforms=//bazel/platforms:x64_windows-clang-cl
 build:windows --extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows-clang-cl
 build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_autoconf_toolchain

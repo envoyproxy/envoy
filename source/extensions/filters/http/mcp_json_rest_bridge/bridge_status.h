@@ -14,6 +14,7 @@ enum class BridgeStatus {
   RequestFailedToParseJsonRpc,
   RequestUnsupportedMcpVersion,
   RequestMcpHeaderMismatch,
+  RequestMcpProtocolVersionMetaInvalid,
   RequestMcpClientCapabilitiesInvalid,
   RequestInitializeNotValid,
   RequestMcpMethodNotSupported,
@@ -46,6 +47,8 @@ inline constexpr absl::string_view REQUEST_UNSUPPORTED_MCP_VERSION =
     "mcp_json_rest_bridge_request_unsupported_mcp_version";
 inline constexpr absl::string_view REQUEST_MCP_HEADER_MISMATCH =
     "mcp_json_rest_bridge_request_mcp_header_mismatch";
+inline constexpr absl::string_view REQUEST_MCP_PROTOCOL_VERSION_META_INVALID =
+    "mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid";
 inline constexpr absl::string_view REQUEST_MCP_CLIENT_CAPABILITIES_INVALID =
     "mcp_json_rest_bridge_request_mcp_client_capabilities_invalid";
 inline constexpr absl::string_view REQUEST_INITIALIZE_NOT_VALID =

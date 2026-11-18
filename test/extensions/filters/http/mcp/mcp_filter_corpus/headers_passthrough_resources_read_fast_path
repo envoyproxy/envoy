@@ -1,0 +1,17 @@
+config {
+  attribute_source: HEADERS
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "accept" value: "application/json, text/event-stream" }
+    headers { key: "mcp-protocol-version" value: "2026-07-28" }
+    headers { key: "mcp-method" value: "resources/read" }
+    headers { key: "mcp-name" value: "file:///notes.txt" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"file:///notes.txt","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+  }
+}

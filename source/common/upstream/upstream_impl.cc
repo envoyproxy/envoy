@@ -115,6 +115,7 @@ resolvePendingRqQueuePolicy(
   RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
                                                           server_context.messageValidationVisitor(),
                                                           *factory_config));
+  // This instance is only used to run factory-specific validation.
   auto queue = factory->createQueuePolicy(*factory_config, stat_prefix,
                                           server_context.messageValidationVisitor());
   RETURN_IF_NOT_OK(queue.status());

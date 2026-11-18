@@ -122,14 +122,8 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                      buffered_chunk.length());
-    auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
-      // Move the current buffer into the queue for remote processing and clear the buffered data.
-      enqueueStreamingChunk(buffered_chunk, end_stream);
-    } else {
-      buffered_chunk.drain(buffered_chunk.length());
-    }
-    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                  ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
   }
   if (queueBelowLowLimit()) {
     clearWatermark();
@@ -283,8 +277,14 @@ absl::Status ProcessorState::handleCompleteBodyAvailable() {
       // flag of decodeData() can be determined by whether the trailers are received.
       // Also, bufferedData() is not nullptr means decodeData() is called, even though
       // the data can be an empty chunk.
-      auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      if (filter_.maxStreamedBodyChunkSize().has_value() &&
+          (body_mode_ == ProcessingMode::STREAMED ||
+           body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED)) {
+        sendBufferedDataInStreamedMode(trailers_ == nullptr);
+      } else {
+        auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
+        filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      }
       clearWatermark();
     } else {
       return handleTrailersAndCleanup();
@@ -839,9 +839,8 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
       modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
       ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                        buffered_chunk.length());
-      auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-      buffered_chunk.drain(buffered_chunk.length());
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+      filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                    ProcessorState::CallbackState::HeadersCallback, end_stream);
     }
 
     if (trailers_ != nullptr) {
@@ -956,6 +955,16 @@ ProcessingResult DecodingProcessorState::startLocalResponse(
   if (!mut_status.ok()) {
     filter_.onProcessStreamingImmediateResponse(response, mut_status);
     return ProcessingResult{.status = mut_status, .processing_complete = true};
+  }
+
+  // The :status pseudo-header is mandatory in HTTP response headers. protoToHeaders() validates
+  // the value of :status when the server supplies one, but does not require its presence.
+  if (local_response_headers->Status() == nullptr) {
+    filter_.stats().rejected_header_mutations_.inc();
+    const auto status =
+        absl::InvalidArgumentError("streamed immediate response headers missing status");
+    filter_.onProcessStreamingImmediateResponse(response, status);
+    return ProcessingResult{.status = status, .processing_complete = true};
   }
 
   local_response_started_ = true;

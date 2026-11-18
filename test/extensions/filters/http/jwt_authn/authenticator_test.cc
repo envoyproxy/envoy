@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
@@ -158,6 +159,31 @@ TEST_F(AuthenticatorTest, TestLifetimeConstraint) {
     Http::TestRequestHeaderMapImpl non_expiring_headers{
         {"Authorization", "Bearer " + std::string(NonExpiringToken)}};
     expectVerifyStatus(Status::JwtVerificationFail, non_expiring_headers);
+  }
+}
+
+// Test authenticator constraints for algorithms
+TEST_F(AuthenticatorTest, TestAllowedAlgorithms) {
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+
+  {
+    // GoodToken is signed with RS256, so it is rejected before the Jwks is fetched.
+    provider.add_allowed_algorithms(JwtProvider::ES256);
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::JwtAlgorithmNotAllowed, headers);
+  }
+
+  {
+    provider.add_allowed_algorithms(JwtProvider::RS256);
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+        .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+          receiver.onJwksSuccess(std::move(jwks_));
+        });
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    expectVerifyStatus(Status::Ok, headers);
   }
 }
 

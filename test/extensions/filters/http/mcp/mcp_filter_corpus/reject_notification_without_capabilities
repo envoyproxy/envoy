@@ -1,0 +1,16 @@
+config {
+  traffic_mode: REJECT_NO_MCP
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "accept" value: "application/json, text/event-stream" }
+    headers { key: "mcp-protocol-version" value: "2026-07-28" }
+    headers { key: "mcp-method" value: "notifications/cancelled" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1,"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}'
+  }
+}

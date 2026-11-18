@@ -2,6 +2,14 @@ load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("//distribution/debian:packages.bzl", "envoy_pkg_debs")
 
+MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
+
+# Tags for the targets that package the release binaries. Their outputs are several GB for each
+# platform and change with every commit (the binaries are stamped with it), so they are built
+# locally and kept out of the remote cache: there they would never be hit, and would push out
+# what is.
+PUBLISH_PACKAGING_TAGS = ["no-remote"]
+
 def release_version_for(version):
     """The `<major>.<minor>` release version for a full Envoy `version`."""
     if "-" in version:
@@ -16,7 +24,10 @@ def envoy_pkg_distros(
         envoy_contrib_bin = ":envoy-contrib-binary",
         version = None,
         maintainer = None,
-        config = "//configs:envoyproxy_io_proxy.yaml"):
+        config = "//configs:envoyproxy_io_proxy.yaml",
+        compressor = None,
+        compressor_args = None,
+        tags = []):
     # data common to all packages
     pkg_files(
         name = "envoy-config",
@@ -48,6 +59,7 @@ def envoy_pkg_distros(
         contrib_bin_files = ":envoy-contrib-bin-files",
         release_version = release_version_for(version),
         maintainer = maintainer,
+        tags = tags,
     )
 
     # bundle distro packages into a tarball
@@ -57,6 +69,9 @@ def envoy_pkg_distros(
     # `distribution/changes.bzl`.
     pkg_tar(
         name = name,
+        compressor = compressor,
+        compressor_args = compressor_args,
         extension = "tar.gz",
+        tags = tags,
         deps = [":debs"],
     )

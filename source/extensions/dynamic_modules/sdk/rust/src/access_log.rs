@@ -18,19 +18,19 @@ use std::ptr;
 // -----------------------------------------------------------------------------
 
 /// Handle for a counter metric. Counters can only be incremented.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CounterHandle {
   id: usize,
 }
 
 /// Handle for a gauge metric. Gauges can be set, incremented, or decremented.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GaugeHandle {
   id: usize,
 }
 
 /// Handle for a histogram metric. Histograms record value distributions.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HistogramHandle {
   id: usize,
 }
@@ -308,7 +308,7 @@ pub trait AccessLogger: Send {
 }
 
 /// Byte count information from the stream info.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BytesInfo {
   /// Total bytes received from downstream.
   pub bytes_received: u64,
@@ -321,7 +321,7 @@ pub struct BytesInfo {
 }
 
 /// Cumulative wire byte counts from the stream's downstream bytes meter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DownstreamWireBytes {
   /// Wire bytes received from downstream.
   pub bytes_received: u64,
@@ -1339,6 +1339,63 @@ impl LogContext {
   }
 }
 
+impl abi::envoy_dynamic_module_type_response_flag {
+  /// Returns the single bit this flag occupies in a response-flag bitmask.
+  //
+  /// Returns `u64` to match [`LogContext::response_flags`].
+  pub const fn to_bitmask(self) -> u64 {
+    1u64 << (self as u32)
+  }
+
+  /// Returns an iterator over every known flag set in `bitmask`, lowest bit first.
+  pub fn iter_from_bitmask(bitmask: u64) -> ResponseFlagBitmaskIter {
+    ResponseFlagBitmaskIter {
+      remaining: bitmask & Self::VALID_RESPONSE_FLAG_MASK,
+    }
+  }
+
+  const VALID_RESPONSE_FLAG_MASK: u64 = {
+    let variants = <Self as strum::VariantArray>::VARIANTS;
+    let mut mask = 0u64;
+    let mut i = 0;
+    while i < variants.len() {
+      mask |= variants[i].to_bitmask();
+      i += 1;
+    }
+    mask
+  };
+}
+
+/// [Iterator] over the known response flags set in a bitmask.
+#[derive(Copy, Clone, Debug)]
+pub struct ResponseFlagBitmaskIter {
+  remaining: u64,
+}
+
+impl Iterator for ResponseFlagBitmaskIter {
+  type Item = abi::envoy_dynamic_module_type_response_flag;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.remaining == 0 {
+      return None;
+    }
+    let bit = self.remaining.trailing_zeros(); // Always < 64, so fits in a u32 bit index.
+    self.remaining &= self.remaining - 1; // Clear the lowest set bit.
+    abi::envoy_dynamic_module_type_response_flag::from_repr(bit)
+  }
+
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    let len = self.len();
+    (len, Some(len))
+  }
+}
+
+impl ExactSizeIterator for ResponseFlagBitmaskIter {
+  fn len(&self) -> usize {
+    self.remaining.count_ones() as usize
+  }
+}
+
 /// Wrapper that stores the trait object together with the config-scope Envoy pointer.
 ///
 /// Envoy does not re-pass the config-scope pointer to the per-worker logger callback, so the
@@ -1572,4 +1629,38 @@ macro_rules! declare_access_logger {
       }
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashSet;
+
+  #[test]
+  fn metric_handles_are_comparable_and_hashable() {
+    let a = CounterHandle { id: 1 };
+    let b = CounterHandle { id: 1 };
+    let c = CounterHandle { id: 2 };
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+
+    let mut set = HashSet::new();
+    set.insert(a);
+    assert!(!set.insert(b));
+    assert!(set.insert(c));
+
+    assert_eq!(GaugeHandle { id: 1 }, GaugeHandle { id: 1 });
+    assert_eq!(HistogramHandle { id: 3 }, HistogramHandle { id: 3 });
+  }
+
+  #[test]
+  fn bytes_info_is_copyable_and_comparable() {
+    let a = BytesInfo::default();
+    let b = a;
+    assert_eq!(a, b);
+
+    let c = DownstreamWireBytes::default();
+    let d = c;
+    assert_eq!(c, d);
+  }
 }

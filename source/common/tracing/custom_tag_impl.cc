@@ -49,7 +49,7 @@ void CustomTagBase::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
   absl::string_view tag_value = value(ctx);
   if (!tag_value.empty()) {
     auto& custom_tags = *entry.mutable_custom_tags();
-    custom_tags[std::string(tag())] = std::string(tag_value);
+    custom_tags[tag()] = tag_value;
   }
 }
 

@@ -25,7 +25,17 @@ public:
                       mode_t socket_mode);
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server);
   void shutdown();
+  // HotRestartMessageSender: forwards a UDP packet message to the child on the UDP forwarding
+  // stream, from the dispatcher's thread, without ever blocking on the child. Datagrams the
+  // child's socket cannot take right now are queued (bounded) and retried shortly; the packet is
+  // dropped when the queue is full or the child is gone. The parent's main thread must not wait
+  // on the child here: the child's main thread waits on the parent for its replies, and a mutual
+  // wait wedges both processes for good.
   void sendHotRestartMessage(envoy::HotRestartMessage&& msg) override;
+
+  // Interval at which a backlog of forwarded UDP datagrams is retried while the child's socket
+  // is full.
+  static constexpr std::chrono::milliseconds UDP_FORWARDING_RETRY_INTERVAL{2};
 
   // The hot restarting parent's hot restart logic. Each function is meant to be called to fulfill a
   // request from the child for that action.
@@ -53,14 +63,22 @@ public:
   };
 
 private:
+  friend class HotRestartParentUdpForwardingTestHelper;
   void onSocketEvent();
+  void flushUdpForwarding();
 
   const int restart_epoch_;
   sockaddr_un child_address_;
   sockaddr_un child_address_udp_forwarding_;
   Event::FileEventPtr socket_event_;
+  Event::TimerPtr udp_forwarding_retry_timer_;
   OptRef<Event::Dispatcher> dispatcher_;
   std::unique_ptr<Internal> internal_;
+  // Forwarded UDP datagrams handed to the child's socket, flush attempts that found it full, and
+  // datagrams dropped (queue full, or the child gone). See sendHotRestartMessage().
+  Stats::Counter* udp_forwarding_datagrams_{};
+  Stats::Counter* udp_forwarding_retries_{};
+  Stats::Counter* udp_forwarding_dropped_{};
 };
 
 } // namespace Server

@@ -77,6 +77,7 @@ TEST(IoSocketHandleImpl, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
   os_fd_t test_fd = 42;
   IoSocketHandleImpl io_handle(test_fd);
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
   EXPECT_CALL(os_sys_calls, setsockopt_(test_fd, SOL_SOCKET, SO_LINGER, _, sizeof(struct linger)))
       .WillOnce([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
         const auto* l = static_cast<const struct linger*>(optval);
@@ -84,6 +85,10 @@ TEST(IoSocketHandleImpl, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
         EXPECT_EQ(0, l->l_linger);
         return 0;
       });
+#else
+  // Abortive close is not supported on this platform, so SO_LINGER is left alone.
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).Times(0);
+#endif
   EXPECT_CALL(os_sys_calls, close(test_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
   io_handle.setAbortiveClose();
