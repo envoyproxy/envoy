@@ -115,7 +115,13 @@ for how to update or override dependencies.
     Envoy supports the following compiler toolchains:
 
     - `--config=clang` (recommended): Uses `clang` compiler with `libc++` (LLVM standard library)
-    - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
+    - `--config=gcc`: Uses toolshed's hermetic GCC 13.4.0 with static `libstdc++` (GNU standard
+      library). No host GCC or binutils installation is needed. It builds Linux x86_64 targets on
+      Linux x86_64 only; on other platforms `--config=gcc` fails rather than falling back to Clang.
+      It links with the LLVM toolchain's LLD, against the same sysroot as Clang. To use a GCC
+      installed on the host instead, set `--repo_env=BAZEL_GCC_PATH=<prefix>` (eg `/usr`): the
+      prefix must contain `bin/gcc`, `bin/g++`, binutils, C/C++ headers and a static `libstdc++`.
+      That uses the host's libc and headers, and is not for remote execution.
     - No config flag: Uses system default compiler settings
 
     Note: While it's possible to use `clang` with `libstdc++` by setting CC/CXX environment variables without a config flag, this combination is not tested or supported.
