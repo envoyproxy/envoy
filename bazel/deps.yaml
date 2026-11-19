@@ -1100,7 +1100,7 @@ io_bazel_rules_go:
   project_name: "Go rules for Bazel"
   project_desc: "Bazel rules for the Go language"
   project_url: "https://github.com/bazelbuild/rules_go"
-  release_date: "2026-02-09"
+  release_date: "2026-08-16"
   use_category:
   - build
   - api
@@ -1265,7 +1265,7 @@ platforms:
   project_name: "platforms"
   project_desc: "Constraint values for specifying platforms and toolchains"
   project_url: "https://github.com/bazelbuild/platforms"
-  release_date: "2025-05-27"
+  release_date: "2026-05-01"
   use_category:
   - build
   license: "Apache-2.0"

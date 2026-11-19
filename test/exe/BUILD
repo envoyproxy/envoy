@@ -44,10 +44,8 @@ envoy_sh_test(
     coverage = False,
     data = [
         "//source/exe:envoy-static",
-    ] + select({
-        "//bazel:clang_build": ["@llvm_toolchain_llvm//:readelf"],
-        "//conditions:default": [],
-    }),
+        "@llvm_toolchain_llvm//:readelf",
+    ],
     # Since VS2015 or even earlier, link.exe defaults to PIE generation
     tags = [
         "nofips",

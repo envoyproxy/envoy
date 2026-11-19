@@ -11,7 +11,7 @@ if [[ $(uname) == "Darwin" ]]; then
 fi
 
 # Try to find llvm-readelf, failing that fallback to non-hermetic readelf in PATH
-READELF="$(find "${RUNFILES_DIR}" -name llvm-readelf -type f | head -n1 || :)"
+READELF="$(find -L "${RUNFILES_DIR}" -name llvm-readelf -type f | head -n1 || :)"
 if [[ -z "$READELF" ]]; then
     READELF="$(command -v llvm-readelf || :)"
 fi

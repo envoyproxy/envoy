@@ -1,5 +1,6 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
+load("@envoy_repo//:compiler.bzl", "GCC_PATH", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
+load("@envoy_toolshed//toolchains/gcc:repositories.bzl", "setup_gcc_toolchains")
 load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
@@ -18,7 +19,10 @@ LIBLLVM = ("@llvm_toolchain_llvm//:" + _LLVM_LIB_PREFIX + "/libLLVM.so." + LLVM_
 _LLVM_LOCAL_BUILD = """\
 package(default_visibility = ["//visibility:public"])
 
+# `bin/lld` and `bin/llvm-dwp` are used by the hermetic GCC toolchain (`--config=gcc`).
 exports_files([
+    "bin/lld",
+    "bin/llvm-dwp",
     "{lib_dir}/libclang-cpp.so.{major_minor}",
     "{lib_dir}/libLLVM.so.{major_minor}",
     "lib/clang/{major}/include/fuzzer/FuzzedDataProvider.h",
@@ -41,10 +45,30 @@ filegroup(
     name = "symbolizer",
     srcs = ["bin/llvm-symbolizer"],
 )
+
+filegroup(
+    name = "readelf",
+    srcs = glob(
+        ["bin/llvm-readelf"],
+        allow_empty = True,
+    ),
+)
 """
 
 def envoy_toolchains():
-    native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
+    # GCC is opt-in (`--config=gcc`): hermetic, linking with the LLVM toolchain's lld, unless
+    # `BAZEL_GCC_PATH` names a host GCC.
+    setup_gcc_toolchains(
+        dwp = "@llvm_toolchain_llvm//:bin/llvm-dwp",
+        host_path = GCC_PATH or None,
+        lld = "@llvm_toolchain_llvm//:bin/lld",
+    )
+    native.register_toolchains(
+        "@envoy//bazel/gcc:linux_x86_64_toolchain",
+        "@envoy//bazel/gcc:unavailable_linux_toolchain",
+        "@envoy//bazel/gcc:unavailable_macos_toolchain",
+        "@envoy//bazel/gcc:unavailable_windows_toolchain",
+    )
     arch_alias(
         name = "clang_platform",
         aliases = {

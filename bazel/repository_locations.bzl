@@ -500,8 +500,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
     io_bazel_rules_go = dict(
-        version = "0.60.0",
-        sha256 = "86d3dc8f59d253524f933aaf2f3c05896cb0b605fc35b460c0b4b039996124c6",
+        version = "0.63.0",
+        sha256 = "c3e253237109ab2e2a8d3cb075688b98a6e6fce43d849849648e8e3a84f20d6f",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
     ),
     rules_cc = dict(
@@ -685,8 +685,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # May be removable once Envoy upgrades to Bazel 8.0+ which includes this by default.
     # See: https://github.com/envoyproxy/envoy/pull/41172#issuecomment-2365923085
     platforms = dict(
-        version = "1.0.0",
-        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        version = "1.1.0",
+        sha256 = "324f5381753a610e472f79563d44e2026438195042aae4dc660b8c021f7de7f5",
         strip_prefix = "platforms-{version}",
         urls = [
             "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",
