@@ -16,6 +16,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_client_connection.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 
@@ -50,15 +51,14 @@ ReverseTunnelUpstreamCodecOptions::createClientCodec(const Context& context) con
   const Upstream::ClusterInfo& cluster = context.cluster;
   int fd = context.connection.getSocket()->ioHandle().fdDoNotUse();
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(context.callbacks, fd);
-  auto inner = std::make_unique<DrainAwareHttp2ClientConnection>(
+  auto inner = std::make_unique<Envoy::Http::Http2::ClientConnectionImpl>(
       context.connection, *callbacks, cluster.http2CodecStats(), context.random,
       cluster.httpProtocolOptions().http2Options(),
       cluster.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
       cluster.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
-  auto* h2_codec = inner.get();
-  return std::make_unique<DrainAwareClientConnection>(std::move(inner), std::move(callbacks),
-                                                      stats_, context.connection.dispatcher(),
-                                                      registry_, cluster.name(), h2_codec);
+  return std::make_unique<DrainAwareClientConnection>(
+      std::move(inner), std::move(callbacks), stats_, context.connection.dispatcher(), registry_,
+      cluster.name(), send_drain_metadata_);
 }
 
 absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
@@ -69,10 +69,16 @@ ReverseTunnelUpstreamCodecFactory::createProtocolOptionsConfig(
       const ReverseTunnelProto::ReverseTunnelUpstreamCodecOptions&>(
       config, context.messageValidationVisitor());
 
+  if (typed_config.send_drain_metadata() && !typed_config.enable_drain_with_goaway()) {
+    return absl::InvalidArgumentError(
+        "reverse_tunnel: send_drain_metadata requires enable_drain_with_goaway to be true");
+  }
+
   // Logged once per cluster config load, unlike the per-connection codec lifecycle logs.
   ENVOY_LOG_MISC(info,
-                 "reverse_tunnel: drain-aware upstream codec configured (drain_with_goaway={})",
-                 typed_config.enable_drain_with_goaway());
+                 "reverse_tunnel: drain-aware upstream codec configured "
+                 "(drain_with_goaway={}, send_drain_metadata={})",
+                 typed_config.enable_drain_with_goaway(), typed_config.send_drain_metadata());
 
   auto& server_context = context.serverFactoryContext();
 

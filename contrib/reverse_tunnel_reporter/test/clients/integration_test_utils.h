@@ -193,6 +193,7 @@ inline Cluster getRevConnClusterWithMetadata(bool enable_tenant_isolation = fals
 
   ReverseTunnelUpstreamCodecOptions codec_options;
   codec_options.set_enable_drain_with_goaway(true);
+  codec_options.set_send_drain_metadata(true);
   std::ignore = (*cluster.mutable_typed_extension_protocol_options())
                     ["envoy.extensions.upstreams.http.reverse_tunnel.v3."
                      "ReverseTunnelUpstreamCodecOptions"]

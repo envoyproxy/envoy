@@ -26,4 +26,12 @@ message ReverseTunnelUpstreamCodecOptions {
   // also notifies the reverse tunnel reporter; this requires the cluster's
   // ``http2_protocol_options.allow_metadata``.
   bool enable_drain_with_goaway = 1;
+
+  // When true, starting a graceful drain emits a connection-level (stream 0) METADATA frame
+  // carrying ``envoy.reverse_tunnel.drain: true`` so the peer can dial a replacement tunnel
+  // before the final GOAWAY. Defaults to false.
+  // Requires ``enable_drain_with_goaway`` to be true (otherwise config is rejected) and the
+  // cluster's ``http2_protocol_options.allow_metadata`` to be true (otherwise the HTTP/2 codec
+  // drops the METADATA frame).
+  bool send_drain_metadata = 2;
 }

@@ -28,7 +28,8 @@ public:
                                         ReverseTunnelUpstreamCodecOptions& proto,
                                     const ReverseTunnelUpstreamCodecStats& stats,
                                     UpstreamCodecDrainRegistrySharedPtr registry)
-      : enable_drain_with_goaway_(proto.enable_drain_with_goaway()), stats_(stats),
+      : enable_drain_with_goaway_(proto.enable_drain_with_goaway()),
+        send_drain_metadata_(proto.send_drain_metadata()), stats_(stats),
         registry_(std::move(registry)) {}
 
   // Upstream::ProtocolOptionsConfig
@@ -41,6 +42,7 @@ public:
 
 private:
   const bool enable_drain_with_goaway_;
+  const bool send_drain_metadata_;
   const ReverseTunnelUpstreamCodecStats stats_;
   const UpstreamCodecDrainRegistrySharedPtr registry_;
 };

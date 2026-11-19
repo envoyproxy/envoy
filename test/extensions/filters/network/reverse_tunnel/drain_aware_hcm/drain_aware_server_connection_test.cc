@@ -411,6 +411,49 @@ TEST_F(DrainAwareServerConnectionCallbacksTest, OnMaxStreamsChangedDelegates) {
   wrapper.onMaxStreamsChanged(7);
 }
 
+// Matching drain metadata triggers the peer-drain closure once, erases the drain key, and forwards
+// any remaining metadata entries to the inner callbacks.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataMatchingKeyFiresOnceErasesAndForwards) {
+  int fired = 0;
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, [&fired]() { ++fired; });
+
+  EXPECT_CALL(inner_callbacks_, onMetadata(_))
+      .WillOnce(testing::Invoke([](Http::MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->end(), metadata_map_ptr->find("envoy.reverse_tunnel.drain"));
+        EXPECT_EQ("keep", (*metadata_map_ptr)["other"]);
+      }));
+  auto metadata = std::make_unique<Http::MetadataMap>(
+      Http::MetadataMap{{"envoy.reverse_tunnel.drain", "true"}, {"other", "keep"}});
+  wrapper.onMetadata(std::move(metadata));
+  EXPECT_EQ(1, fired);
+
+  // A subsequent GOAWAY on the same connection delegates without re-firing the closure.
+  EXPECT_CALL(inner_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
+  EXPECT_EQ(1, fired);
+}
+
+// Missing key or non-"true" value does not trigger peer-drain handling and forwards unchanged.
+TEST_F(DrainAwareServerConnectionCallbacksTest, OnMetadataNonMatchingForwardsWithoutFiring) {
+  int fired = 0;
+  DrainAwareServerConnectionCallbacks wrapper(inner_callbacks_, [&fired]() { ++fired; });
+
+  EXPECT_CALL(inner_callbacks_, onMetadata(_))
+      .WillOnce(testing::Invoke([](Http::MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ("keep", (*metadata_map_ptr)["other"]);
+      }));
+  wrapper.onMetadata(std::make_unique<Http::MetadataMap>(Http::MetadataMap{{"other", "keep"}}));
+  EXPECT_EQ(0, fired);
+
+  EXPECT_CALL(inner_callbacks_, onMetadata(_))
+      .WillOnce(testing::Invoke([](Http::MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ("false", (*metadata_map_ptr)["envoy.reverse_tunnel.drain"]);
+      }));
+  wrapper.onMetadata(std::make_unique<Http::MetadataMap>(
+      Http::MetadataMap{{"envoy.reverse_tunnel.drain", "false"}}));
+  EXPECT_EQ(0, fired);
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters

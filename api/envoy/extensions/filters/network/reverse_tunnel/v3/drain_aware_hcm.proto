@@ -37,10 +37,13 @@ message DrainAwareHttpConnectionManager {
   // The underlying HCM configuration to apply.
   http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
 
-  // When true, a peer-initiated GOAWAY on a reverse tunnel makes the initiator drop the draining
+  // When true, a peer-initiated GOAWAY or connection-level METADATA frame carrying
+  // ``envoy.reverse_tunnel.drain: true`` on a reverse tunnel makes the initiator drop the draining
   // tunnel and dial a replacement, so capacity is restored before the old tunnel closes while its
-  // in-flight streams finish. Default false, so the behavior is opt-in and unconfigured listeners
-  // are unaffected. Required by ``metadata_delay`` and ``shutdown_notice_delay``.
+  // in-flight streams finish. Receiving the METADATA frame requires
+  // ``hcm_config.http2_protocol_options.allow_metadata`` to be true. Default false, so the
+  // behavior is opt-in and unconfigured listeners are unaffected. Required by ``metadata_delay``
+  // and ``shutdown_notice_delay``.
   bool enable_drain_with_goaway = 2;
 
   // Delay from the start of a reverse tunnel drain until a METADATA frame carrying
