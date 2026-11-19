@@ -1733,6 +1733,25 @@ TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRoute) {
   EXPECT_TRUE(injected_end_stream_);
 }
 
+TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRouteEndedByTrailers) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(seen.size(), 1);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_EQ(continue_calls_, 1);
+}
+
 TEST_F(AiProtocolManagerFilterTest, UnparsedPayloadOnUnconfiguredRouteRunsNoAiFilters) {
   int built = 0;
   createFilterWithAiFilters({[&](const AiFilterContext&) -> AiFilterSharedPtr {
@@ -2380,10 +2399,12 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverSseResponse) {
             "data: {\"a\":1,\"first\":true,\"second\":true}\n\ndata: [DONE]\n\n");
 }
 
-// With no AI filters there is nothing to run over a response, so even one that would not parse
-// passes through untouched.
-TEST_F(AiProtocolManagerFilterTest, ResponsePassesThroughWithoutAiFilters) {
-  createFilter(/*parse_unconfigured_routes=*/true);
+// Only the request of an unconfigured route runs the AI filters: its response passes through, even
+// one they could not parse.
+TEST_F(AiProtocolManagerFilterTest, ResponseOnUnconfiguredRoutePassesThrough) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged");
+  }});
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
   Buffer::OwnedImpl req_body(R"({"model":"gpt-4"})");

@@ -164,7 +164,10 @@ is set, which parses them best-effort and forwards unparseable payloads unchange
 A payload that parses runs the AI filters with no API declared, so a single
 catch-all route -- a dynamic forward proxy's, say -- can leave the API to the
 :ref:`schema validation filter <config_http_filters_ai_protocol_manager_schema_validation>`
-to detect.
+to detect. Only the request runs them; the response is left untouched. Every
+JSON request on such a route is re-serialized unless :ref:`reserialize_body
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
+is ``DISABLE``, which suits AI filters that only read the request.
 
 .. code-block:: yaml
 

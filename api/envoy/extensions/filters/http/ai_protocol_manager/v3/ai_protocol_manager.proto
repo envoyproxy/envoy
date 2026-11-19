@@ -90,7 +90,8 @@ message RequestHandling {
   //
   // A body that parses runs the :ref:`AI filters
   // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
-  // with no API declared, which an AI filter may then reject.
+  // with no API declared, and one of them may reject the request. The response is not passed to
+  // them.
   //
   // Only requests that can be held to end of stream are taken: the request must
   // carry a JSON content type (``application/json`` or a ``+json`` suffix) and
