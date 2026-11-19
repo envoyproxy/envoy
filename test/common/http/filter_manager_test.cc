@@ -4586,8 +4586,9 @@ TEST_F(FilterManagerTest, EncodeDataAddedTrailersNotRedeliveredByFilterThatSawEn
 }
 
 // When a filter paused in encodeHeaders() sits after the stopping filter and resumes
-// asynchronously before it, doTrailers() defers; the stopping filter's later continueEncoding()
-// delivers data and then trailers exactly once.
+// asynchronously before it, it continues the headers only: the buffered data is the stopping
+// filter's, and doTrailers() defers. The stopping filter's later continueEncoding() delivers data
+// and then trailers exactly once.
 TEST_F(FilterManagerTest, EncodeDataAddedTrailersDeferredWhenPausedFilterResumesFirst) {
   initialize();
   EncoderTrailerChain chain = setupEncoderTrailerChain(
@@ -4611,20 +4612,23 @@ TEST_F(FilterManagerTest, EncodeDataAddedTrailersDeferredWhenPausedFilterResumes
   Buffer::OwnedImpl payload("payload");
   chain.router_filter->callbacks_->encodeData(payload, true);
 
-  // The paused last_filter resumes first: it flushes headers and the shared buffered data
-  // but must not encode the trailers it has not been handed yet.
-  {
-    InSequence s;
-    EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false));
-    EXPECT_CALL(filter_manager_callbacks_, encodeData(_, false))
-        .WillOnce([](Buffer::Instance& data, bool) { EXPECT_EQ("payload", data.toString()); });
-  }
+  // The paused last_filter resumes first: it flushes the headers, but not the buffered data,
+  // which middle_filter is holding and has not reached it, or the trailers.
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false));
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
   chain.last_filter->callbacks_->continueEncoding();
   ::testing::Mock::VerifyAndClearExpectations(chain.last_filter.get());
   ::testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
 
   {
     InSequence s;
+    EXPECT_CALL(*chain.last_filter, encodeData(_, false))
+        .WillOnce([](Buffer::Instance& data, bool) -> FilterDataStatus {
+          EXPECT_EQ("payload", data.toString());
+          return FilterDataStatus::Continue;
+        });
+    EXPECT_CALL(filter_manager_callbacks_, encodeData(_, false))
+        .WillOnce([](Buffer::Instance& data, bool) { EXPECT_EQ("payload", data.toString()); });
     EXPECT_CALL(*chain.last_filter, encodeTrailers(ContainsHeader("x-trailer", "val")))
         .WillOnce(Return(FilterTrailersStatus::Continue));
     EXPECT_CALL(*chain.last_filter, encodeComplete());

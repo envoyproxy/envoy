@@ -236,7 +236,19 @@ void ActiveStreamFilterBase::commonContinue() {
   // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
   // on doData() to do so.
   const bool had_trailers_before_data = hasTrailers();
-  if (bufferedData()) {
+  // The buffered data is shared by the filters of this direction, and it may not be this filter's
+  // to send on: an earlier filter that is still stopped may have buffered data that has not
+  // reached this filter, which stopped the headers. This filter then continues the headers only.
+  // The data, and any trailers, follow when the earlier filter continues.
+  releaseBufferedDataHeldHere();
+  const bool data_held_by_earlier_filter =
+      bufferedData() && bufferedData()->length() > 0 && bufferedDataHeldByEarlierFilter() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.filter_manager_buffered_data_holder");
+  if (data_held_by_earlier_filter) {
+    ENVOY_STREAM_LOG(trace, "not continuing data buffered by an earlier filter: filter={}", *this,
+                     static_cast<const void*>(this));
+  } else if (bufferedData()) {
     doData(observedEndStream() && !had_trailers_before_data);
   }
 
@@ -246,7 +258,7 @@ void ActiveStreamFilterBase::commonContinue() {
     return;
   }
 
-  if (had_trailers_before_data) {
+  if (had_trailers_before_data && !data_held_by_earlier_filter) {
     doTrailers();
   }
 
@@ -312,6 +324,9 @@ void ActiveStreamFilterBase::commonHandleBufferData(Buffer::Instance& provided_d
   // continue iteration in the future, we use the buffered data. A future filter can stop and
   // buffer again. In this case, since we are already operating on buffered data, we don't
   // rebuffer, because we assume the filter has modified the buffer as it wishes in place.
+  //
+  // Either way the buffered data is now this filter's to send on, when it continues.
+  markBufferedDataHeldHere();
   if (bufferedData().get() != &provided_data) {
     if (!bufferedData()) {
       bufferedData() = createBuffer();
@@ -569,6 +584,21 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
 
 bool ActiveStreamDecoderFilter::streamObservedEndStream() const {
   return parent_.decoderObservedEndStream();
+}
+
+void ActiveStreamDecoderFilter::markBufferedDataHeldHere() {
+  parent_.state_.buffered_request_data_holder_ = this;
+}
+
+void ActiveStreamDecoderFilter::releaseBufferedDataHeldHere() {
+  if (parent_.state_.buffered_request_data_holder_ == this) {
+    parent_.state_.buffered_request_data_holder_ = nullptr;
+  }
+}
+
+bool ActiveStreamDecoderFilter::bufferedDataHeldByEarlierFilter() {
+  ActiveStreamDecoderFilter* holder = parent_.state_.buffered_request_data_holder_;
+  return holder != nullptr && holder != this && !holder->canIterate() && holder->entry() < entry_;
 }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
@@ -2327,6 +2357,22 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.per_filter_buffer_ ? buffered_data_ : parent_.buffered_response_data_;
 }
+
+void ActiveStreamEncoderFilter::markBufferedDataHeldHere() {
+  parent_.state_.buffered_response_data_holder_ = this;
+}
+
+void ActiveStreamEncoderFilter::releaseBufferedDataHeldHere() {
+  if (parent_.state_.buffered_response_data_holder_ == this) {
+    parent_.state_.buffered_response_data_holder_ = nullptr;
+  }
+}
+
+bool ActiveStreamEncoderFilter::bufferedDataHeldByEarlierFilter() {
+  ActiveStreamEncoderFilter* holder = parent_.state_.buffered_response_data_holder_;
+  return holder != nullptr && holder != this && !holder->canIterate() && holder->entry() < entry_;
+}
+
 bool ActiveStreamEncoderFilter::streamObservedEndStream() const {
   return parent_.state_.observed_encode_end_stream_;
 }

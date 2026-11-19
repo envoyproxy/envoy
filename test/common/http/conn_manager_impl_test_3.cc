@@ -3924,5 +3924,320 @@ TEST_F(HttpConnectionManagerImplTest, NoProactiveDrainForConnectionAcceptedLate)
       Server::DrainStrategy::Gradual});
 }
 
+// A filter buffers the body of a request until it has all of it, as a filter that changes the
+// body does. The next filter stopped all iteration on the headers, as the upstream codec filter
+// does until it has a connection, and continues while the first filter is still buffering. The
+// buffered data is the first filter's: the second filter continues the headers only, and gets the
+// body when the first filter sends it on.
+TEST_F(HttpConnectionManagerImplTest, LaterFilterContinuesWhileEarlierFilterBuffersData) {
+  setup();
+  setupFilterChain(3, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+
+  startRequest(false);
+
+  // The first part of the body arrives, and filter 0 buffers it.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+
+  Buffer::OwnedImpl chunk1("hello");
+  decoder_->decodeData(chunk1, false);
+
+  // Filter 1 continues. It sends the headers on, but not the data that filter 0 is buffering.
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filters_[2], decodeData(_, _)).Times(0);
+
+  decoder_filters_[1]->callbacks_->continueDecoding();
+  testing::Mock::VerifyAndClearExpectations(decoder_filters_[1]);
+  testing::Mock::VerifyAndClearExpectations(decoder_filters_[2]);
+
+  // The rest of the body arrives. Filter 0 adds it to what it buffered, which is still its to
+  // change, and sends the whole body on.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        decoder_filters_[0]->callbacks_->addDecodedData(data, false);
+        decoder_filters_[0]->callbacks_->modifyDecodingBuffer(
+            [](Buffer::Instance& buffer) { buffer.add("!"); });
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("helloworld!"), true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[2], decodeData(BufferString("helloworld!"), true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  Buffer::OwnedImpl chunk2("world");
+  decoder_->decodeData(chunk2, true);
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[2]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// With the runtime guard disabled, the later filter sends on the data the earlier filter is
+// buffering (the previous behaviour).
+TEST_F(HttpConnectionManagerImplTest, LaterFilterContinuesWhileEarlierFilterBuffersDataDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.filter_manager_buffered_data_holder", "false"}});
+  setup();
+  setupFilterChain(3, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+
+  startRequest(false);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+
+  Buffer::OwnedImpl chunk1("hello");
+  decoder_->decodeData(chunk1, false);
+
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("hello"), false))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[2], decodeData(BufferString("hello"), false))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  decoder_filters_[1]->callbacks_->continueDecoding();
+  testing::Mock::VerifyAndClearExpectations(decoder_filters_[1]);
+  testing::Mock::VerifyAndClearExpectations(decoder_filters_[2]);
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[2]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Encoder mirror of LaterFilterContinuesWhileEarlierFilterBuffersData.
+TEST_F(HttpConnectionManagerImplTest, LaterFilterContinuesWhileEarlierFilterBuffersEncodedData) {
+  setup();
+  setupFilterChain(1, 3);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
+
+  // The first part of the body arrives, and the first encoder filter buffers it.
+  EXPECT_CALL(*encoder_filters_[2], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+
+  Buffer::OwnedImpl chunk1("hello");
+  decoder_filters_[0]->callbacks_->encodeData(chunk1, false);
+
+  // The second filter continues. It sends the headers on, but not the buffered data.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, _)).Times(0);
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, _)).Times(0);
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
+  testing::Mock::VerifyAndClearExpectations(encoder_filters_[1]);
+  testing::Mock::VerifyAndClearExpectations(encoder_filters_[0]);
+
+  // The rest of the body arrives. The first filter adds it to what it buffered, which is still
+  // its to change, and sends the whole body on.
+  EXPECT_CALL(*encoder_filters_[2], encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        encoder_filters_[2]->callbacks_->addEncodedData(data, false);
+        encoder_filters_[2]->callbacks_->modifyEncodingBuffer(
+            [](Buffer::Instance& buffer) { buffer.add("!"); });
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeData(BufferString("helloworld!"), true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferString("helloworld!"), true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(BufferString("helloworld!"), true));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl chunk2("world");
+  decoder_filters_[0]->callbacks_->encodeData(chunk2, true);
+}
+
+// As LaterFilterContinuesWhileEarlierFilterBuffersData, with trailers: the earlier filter also
+// stops the trailers. The later filter continues the headers only, and the body and then the
+// trailers follow, once, when the earlier filter continues. With and without the trailers being
+// forwarded from the filter holding them.
+class BufferedDataHolderTrailersTest : public HttpConnectionManagerImplTest,
+                                       public testing::WithParamInterface<bool> {
+public:
+  BufferedDataHolderTrailersTest() {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.filter_manager_forward_held_trailers",
+                                  GetParam() ? "true" : "false"}});
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(ForwardHeldTrailers, BufferedDataHolderTrailersTest, testing::Bool());
+
+TEST_P(BufferedDataHolderTrailersTest, LaterFilterContinuesWhileEarlierFilterBuffersData) {
+  setup();
+  setupFilterChain(3, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+
+  startRequest(false);
+
+  // The body arrives, and filter 0 buffers it. It also stops the trailers.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  Buffer::OwnedImpl body("hello");
+  decoder_->decodeData(body, false);
+  decoder_->decodeTrailers(RequestTrailerMapPtr{new TestRequestTrailerMapImpl{{"foo", "bar"}}});
+
+  // Filter 1 continues. It sends the headers on, but not the data, or the trailers.
+  EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*decoder_filters_[2], decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filters_[2], decodeTrailers(_)).Times(0);
+
+  decoder_filters_[1]->callbacks_->continueDecoding();
+  testing::Mock::VerifyAndClearExpectations(decoder_filters_[1]);
+  testing::Mock::VerifyAndClearExpectations(decoder_filters_[2]);
+
+  // Filter 0 continues: the body, and then the trailers, reach the later filters once.
+  {
+    InSequence s;
+    EXPECT_CALL(*decoder_filters_[1], decodeData(BufferString("hello"), false))
+        .WillOnce(Return(FilterDataStatus::Continue));
+    EXPECT_CALL(*decoder_filters_[2], decodeData(BufferString("hello"), false))
+        .WillOnce(Return(FilterDataStatus::Continue));
+    EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+        .WillOnce(Return(FilterTrailersStatus::Continue));
+    EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+    EXPECT_CALL(*decoder_filters_[2], decodeTrailers(_))
+        .WillOnce(Return(FilterTrailersStatus::Continue));
+    EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+  }
+
+  decoder_filters_[0]->callbacks_->continueDecoding();
+
+  // Clean up stream by sending response.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[2]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
+}
+
+// Encoder mirror.
+TEST_P(BufferedDataHolderTrailersTest, LaterFilterContinuesWhileEarlierFilterBuffersEncodedData) {
+  setup();
+  setupFilterChain(1, 3);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
+
+  // The body arrives, and the first encoder filter buffers it. It also stops the trailers.
+  EXPECT_CALL(*encoder_filters_[2], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*encoder_filters_[2], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
+
+  Buffer::OwnedImpl body("hello");
+  decoder_filters_[0]->callbacks_->encodeData(body, false);
+  decoder_filters_[0]->callbacks_->encodeTrailers(
+      ResponseTrailerMapPtr{new TestResponseTrailerMapImpl{{"some", "trailer"}}});
+
+  // The second filter continues. It sends the headers on, but not the data, or the trailers.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, _)).Times(0);
+  EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_)).Times(0);
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, _)).Times(0);
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_)).Times(0);
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
+  testing::Mock::VerifyAndClearExpectations(encoder_filters_[1]);
+  testing::Mock::VerifyAndClearExpectations(encoder_filters_[0]);
+
+  // The first filter continues: the body, and then the trailers, are sent on once.
+  {
+    InSequence s;
+    EXPECT_CALL(*encoder_filters_[1], encodeData(BufferString("hello"), false))
+        .WillOnce(Return(FilterDataStatus::Continue));
+    EXPECT_CALL(*encoder_filters_[0], encodeData(BufferString("hello"), false))
+        .WillOnce(Return(FilterDataStatus::Continue));
+    EXPECT_CALL(response_encoder_, encodeData(BufferString("hello"), false));
+    EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
+        .WillOnce(Return(FilterTrailersStatus::Continue));
+    EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+    EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
+        .WillOnce(Return(FilterTrailersStatus::Continue));
+    EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+    EXPECT_CALL(response_encoder_, encodeTrailers(_));
+  }
+  expectOnDestroy();
+
+  encoder_filters_[2]->callbacks_->continueEncoding();
+}
+
 } // namespace Http
 } // namespace Envoy
