@@ -17,16 +17,18 @@ class WorkerUtilizationTrackerInterface {
 public:
   virtual ~WorkerUtilizationTrackerInterface() = default;
 
-  // Calculates thread utilization in [0.0, 1.0] since the last time it was sampled.
-  virtual double sampleUtilization() = 0;
+  // Calculates thread utilization in [0.0, 1.0] over the window ending at now (a monotonic
+  // timestamp obtained from the worker dispatcher's TimeSource) since the previous sample.
+  virtual double sampleUtilization(MonotonicTime now) = 0;
 };
 
 // WorkerUtilizationTracker measures event-loop utilization on a persistent blocking worker event
 // loop (RunType::Block or RunType::RunUntilExit).
 //
-// Because sampleUtilization() is always invoked from a callback on dispatcher's thread (between
+// Because sampleUtilization(now) is always invoked from a callback on dispatcher's thread (between
 // onCheck and onPrepare, never while blocked inside epoll_wait), every idle sleep interval since
-// last_sample_time_ has already completed by the time sampleUtilization() runs.
+// last_sample_time_ has already completed by the time sampleUtilization(now) runs using the
+// caller-provided snapshot timestamp now.
 //
 // Not thread-safe; dispatcher must outlive WorkerUtilizationTracker, and construction,
 // destruction, and all method calls must occur on dispatcher's thread.
@@ -44,7 +46,7 @@ public:
   void onCheck(MonotonicTime check_time) override;
 
   // WorkerUtilizationTrackerInterface
-  double sampleUtilization() override;
+  double sampleUtilization(MonotonicTime now) override;
 
 private:
   struct PendingPoll {

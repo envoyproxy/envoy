@@ -47,10 +47,9 @@ void WorkerUtilizationTracker::onCheck(MonotonicTime check_time) {
   }
 }
 
-double WorkerUtilizationTracker::sampleUtilization() {
+double WorkerUtilizationTracker::sampleUtilization(MonotonicTime now) {
   ASSERT(dispatcher_.isThreadSafe());
   ASSERT(!pending_poll_.has_value());
-  const MonotonicTime now = dispatcher_.timeSource().monotonicTime();
   if (now <= last_sample_time_) {
     return 0.0;
   }

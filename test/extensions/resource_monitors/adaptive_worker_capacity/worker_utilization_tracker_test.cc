@@ -42,7 +42,7 @@ TEST(WorkerUtilizationTrackerTest, CalculatesUtilizationCorrectly) {
   time_system.advanceTimeWait(std::chrono::milliseconds(20));
 
   // Polling at T0 + 100ms: idle = 75ms, wall = 100ms -> utilization = 1.0 - 75 / 100 = 0.25.
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.25);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.25);
 }
 
 TEST(WorkerUtilizationTrackerTest, IncludesWakeupDelayInUtilization) {
@@ -61,7 +61,7 @@ TEST(WorkerUtilizationTrackerTest, IncludesWakeupDelayInUtilization) {
 
   // Active event processing for 20ms until T0 + 50ms: idle = 10ms, wall = 50ms -> 0.80.
   time_system.advanceTimeWait(std::chrono::milliseconds(20));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.80);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.80);
 }
 
 TEST(WorkerUtilizationTrackerTest, HandlesContinuousActiveExecutionAcrossMultipleSamples) {
@@ -77,15 +77,15 @@ TEST(WorkerUtilizationTrackerTest, HandlesContinuousActiveExecutionAcrossMultipl
 
   // Poll 1 at T0 + 100ms: idle = 50ms, wall = 100ms -> utilization = 0.50.
   time_system.advanceTimeWait(std::chrono::milliseconds(50));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.50);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.50);
 
   // Poll 2 at T0 + 200ms: idle = 0ms, wall = 100ms -> utilization = 1.00.
   time_system.advanceTimeWait(std::chrono::milliseconds(100));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 1.00);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 1.00);
 
   // Poll 3 at T0 + 300ms: idle = 0ms, wall = 100ms -> utilization = 1.00.
   time_system.advanceTimeWait(std::chrono::milliseconds(100));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 1.00);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 1.00);
 
   // T0 + 350ms: active callbacks finish and dispatcher sleeps 50ms until T0 + 400ms.
   time_system.advanceTimeWait(std::chrono::milliseconds(50));
@@ -94,13 +94,13 @@ TEST(WorkerUtilizationTrackerTest, HandlesContinuousActiveExecutionAcrossMultipl
   tracker.onCheck(time_system.monotonicTime());
 
   // Poll 4 at T0 + 400ms: idle = 50ms, wall = 100ms -> utilization = 0.50.
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.50);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.50);
 
   // Poll 5 at T0 + 500ms: pure idle 400ms -> 500ms, wall = 100ms -> utilization = 0.00.
   tracker.onPrepare(time_system.monotonicTime(), std::nullopt);
   time_system.advanceTimeWait(std::chrono::milliseconds(100));
   tracker.onCheck(time_system.monotonicTime());
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.00);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.00);
 }
 
 TEST(WorkerUtilizationTrackerTest, ReturnsZeroUtilizationWhenDeltaWallIsZero) {
@@ -112,17 +112,17 @@ TEST(WorkerUtilizationTrackerTest, ReturnsZeroUtilizationWhenDeltaWallIsZero) {
   const auto t0 = time_system.monotonicTime();
 
   // Zero elapsed time since construction returns 0.0.
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(t0), 0.0);
 
-  // Accumulate 50ms of idle time while dispatcher_.timeSource().monotonicTime() remains at t0
-  // (delta_wall == 0); sampleUtilization() returns 0.0 without discarding accumulated_idle_time_.
+  // Accumulate 50ms of idle time and sample at t0 (delta_wall == 0); sampleUtilization(t0)
+  // returns 0.0 without discarding accumulated_idle_time_.
   tracker.onPrepare(t0 - std::chrono::milliseconds(50), std::nullopt);
   tracker.onCheck(t0);
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(t0), 0.0);
 
   // Advancing wall time by 100ms reports the preserved 50ms of idle time (1.0 - 50 / 100 = 0.50).
   time_system.advanceTimeWait(std::chrono::milliseconds(100));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.50);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.50);
 }
 
 TEST(WorkerUtilizationTrackerTest, RegistersOnConstructionAndUnregistersOnDestruction) {
@@ -157,11 +157,11 @@ TEST(WorkerUtilizationTrackerTest, ClampsExcessIdleTimeToZeroWithoutCarryOver) {
   tracker.onCheck(time_system.monotonicTime());
 
   // 1.0 - (150ms / 100ms) = -0.50 clamps to 0.0, and the excess 50ms is discarded.
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.0);
 
   // In the next 100ms active window, 0ms idle is reported (no carry-over from previous window).
   time_system.advanceTimeWait(std::chrono::milliseconds(100));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 1.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 1.0);
 }
 
 TEST(WorkerUtilizationTrackerTest, HandlesEarlyWakeupWithoutOvercountingIdleTime) {
@@ -179,7 +179,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesEarlyWakeupWithoutOvercountingIdleTime
 
   // Active event processing for 80ms until T0 + 100ms -> 1.0 - 20 / 100 = 0.80.
   time_system.advanceTimeWait(std::chrono::milliseconds(80));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.80);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.80);
 }
 
 TEST(WorkerUtilizationTrackerTest, HandlesZeroTimeoutAndZeroElapsedPolls) {
@@ -192,7 +192,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesZeroTimeoutAndZeroElapsedPolls) {
   // Unmatched initial onCheck before any onPrepare records 0ms idle -> 1.0 utilization.
   time_system.advanceTimeWait(std::chrono::milliseconds(10));
   tracker.onCheck(time_system.monotonicTime());
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 1.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 1.0);
 
   // onPrepare with 0 timeout: 5ms syscall counts as busy (0ms idle), followed by 15ms callback
   // and 80ms indefinite sleep -> 1.0 - 80 / 100 = 0.20.
@@ -203,7 +203,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesZeroTimeoutAndZeroElapsedPolls) {
   tracker.onPrepare(time_system.monotonicTime(), std::nullopt);
   time_system.advanceTimeWait(std::chrono::milliseconds(80));
   tracker.onCheck(time_system.monotonicTime());
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.20);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.20);
 
   // Instant 0ms-elapsed poll (check_time == prepare_time) still clears pending_poll_: debug
   // builds check ASSERT(!pending_poll_.has_value()) in the first sampleUtilization(), and release
@@ -212,10 +212,10 @@ TEST(WorkerUtilizationTrackerTest, HandlesZeroTimeoutAndZeroElapsedPolls) {
   tracker.onPrepare(t_instant, std::nullopt);
   tracker.onCheck(t_instant);
   time_system.advanceTimeWait(std::chrono::milliseconds(10));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 1.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 1.0);
   time_system.advanceTimeWait(std::chrono::milliseconds(10));
   tracker.onCheck(time_system.monotonicTime());
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 1.0);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 1.0);
 
   // Negative timeout clamps idle_time for that poll to 0ms (combined with a 20ms indefinite sleep
   // over 50ms total wall time so negative idle_time would produce 0.70 rather than 0.60).
@@ -226,7 +226,7 @@ TEST(WorkerUtilizationTrackerTest, HandlesZeroTimeoutAndZeroElapsedPolls) {
   time_system.advanceTimeWait(std::chrono::milliseconds(20));
   tracker.onCheck(time_system.monotonicTime());
   time_system.advanceTimeWait(std::chrono::milliseconds(25));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.60);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.60);
 }
 
 TEST(WorkerUtilizationTrackerTest, AccumulatesIdleTimeAcrossMultipleIterations) {
@@ -247,7 +247,37 @@ TEST(WorkerUtilizationTrackerTest, AccumulatesIdleTimeAcrossMultipleIterations) 
   time_system.advanceTimeWait(std::chrono::milliseconds(30));
   tracker.onCheck(time_system.monotonicTime());
   time_system.advanceTimeWait(std::chrono::milliseconds(35));
-  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(), 0.70);
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.70);
+}
+
+TEST(WorkerUtilizationTrackerTest,
+     UsesExplicitSnapshotTimestampIndependentOfCurrentDispatcherClock) {
+  Event::SimulatedTimeSystem time_system;
+  NiceMock<Event::MockDispatcher> dispatcher;
+
+  WorkerUtilizationTracker tracker(dispatcher);
+
+  // T0..T0+30ms idle, T0+30ms..T0+100ms active => snapshot at T0+100ms has 70% utilization.
+  tracker.onPrepare(time_system.monotonicTime(), std::nullopt);
+  time_system.advanceTimeWait(std::chrono::milliseconds(30));
+  tracker.onCheck(time_system.monotonicTime());
+  time_system.advanceTimeWait(std::chrono::milliseconds(70));
+  const MonotonicTime snapshot = time_system.monotonicTime();
+
+  // Advance the dispatcher clock past snapshot before calling sampleUtilization(snapshot).
+  // Utilization must be computed against snapshot (100ms window, 0.70), not current clock
+  // (150ms, 0.80).
+  time_system.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(snapshot), 0.70);
+
+  // Subsequent window starts at snapshot (T0+100ms), not T0+150ms:
+  // 50ms active (already elapsed before onPrepare), 20ms idle, 30ms active => 100ms total,
+  // 20ms idle => 0.80 utilization (vs 0.60 if last_sample_time_ had used T0+150ms).
+  tracker.onPrepare(time_system.monotonicTime(), std::nullopt);
+  time_system.advanceTimeWait(std::chrono::milliseconds(20));
+  tracker.onCheck(time_system.monotonicTime());
+  time_system.advanceTimeWait(std::chrono::milliseconds(30));
+  EXPECT_DOUBLE_EQ(tracker.sampleUtilization(time_system.monotonicTime()), 0.80);
 }
 
 } // namespace
