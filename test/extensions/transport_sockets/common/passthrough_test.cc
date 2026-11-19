@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -132,6 +133,10 @@ TEST(PassthroughFactoryTest, TestDelegation) {
   {
     EXPECT_CALL(*inner_factory, supportsAlpn());
     factory->supportsAlpn();
+  }
+  {
+    EXPECT_CALL(*inner_factory, tunnelsHttp11ProxyTraffic()).WillOnce(Return(true));
+    EXPECT_TRUE(factory->tunnelsHttp11ProxyTraffic());
   }
   {
     std::vector<uint8_t> key;
