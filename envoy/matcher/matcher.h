@@ -428,6 +428,18 @@ public:
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
 template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<DataType>()>;
 
+// When a data input's data is first available on a connection and its HTTP streams, from earliest
+// to latest.
+enum class DataInputStage {
+  // Once the connection is established, e.g. addresses and TLS details.
+  Connection,
+  RequestHeaders,
+  RequestTrailers,
+  ResponseHeaders,
+  ResponseTrailers,
+  Unknown
+};
+
 /**
  * Factory for data inputs.
  */
@@ -439,6 +451,11 @@ public:
   virtual DataInputFactoryCb<DataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
                            ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  /**
+   * @return the earliest stage at which this input's data is available.
+   */
+  virtual DataInputStage availableAt() const { return DataInputStage::Unknown; }
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

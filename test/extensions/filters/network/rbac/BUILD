@@ -22,6 +22,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/rbac:config",
+        "//test/extensions/filters/common/rbac:extension_input_lib",
         "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/rbac/v3:pkg_cc_proto",
