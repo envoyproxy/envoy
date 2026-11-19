@@ -78,9 +78,16 @@ HealthCheckerImplBase::~HealthCheckerImplBase() {
   callbacks_.clear();
   // ASSERTs inside the session destructor check to make sure we have been previously deferred
   // deleted. Unify that logic here before actual destruction happens.
+  //
+  // Defer the session itself. HDS can drop the cluster in the same event-loop iteration as a
+  // health-check socket error. Destroying the session inline frees it while that connection
+  // callback (or a later one already queued in this iteration) is still on the stack, and
+  // handleFailure() / onResetStream() then touch freed state.
   for (auto& session : active_sessions_) {
     session.second->onDeferredDeleteBase();
+    dispatcher_.deferredDelete(std::move(session.second));
   }
+  active_sessions_.clear();
 }
 
 void HealthCheckerImplBase::decHealthy() { stats_.healthy_.sub(1); }
@@ -203,7 +210,11 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
 
 void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state,
                                          HealthState current_check_result) {
-  for (const HostStatusCb& cb : callbacks_) {
+  // Copy before invoking. A callback may drop the last reference to this health checker (cluster
+  // removal), and the destructor clears callbacks_. The copy keeps the running functor alive and
+  // the loop below must not touch members after a callback returns.
+  const std::list<HostStatusCb> callbacks = callbacks_;
+  for (const HostStatusCb& cb : callbacks) {
     cb(host, changed_state, current_check_result);
   }
 }
@@ -276,6 +287,10 @@ HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
+  // Publish detachment before tearing down timers or closing the connection. Close delivers
+  // resets inline, and those callbacks must not re-enter failure handling.
+  detached_ = true;
+
   HealthState state = HealthState::Unhealthy;
   // The session is about to be deferred deleted. Make sure all timers are gone and any
   // implementation specific state is destroyed.
@@ -360,6 +375,12 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   first_check_ = false;
   parent_.runCallbacks(host_, changed_state, HealthState::Healthy);
 
+  // The callback above can remove the host or the whole cluster. Teardown has already cleared the
+  // timers and may have destroyed the parent health checker.
+  if (detached_ || timeout_timer_ == nullptr) {
+    return;
+  }
+
   timeout_timer_->disableTimer();
   interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
 }
@@ -424,20 +445,26 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
     envoy::data::core::v3::HealthCheckFailureType type, bool retriable, uint64_t http_status_code) {
+  // A connection failure can be delivered in the same I/O iteration that removed the cluster
+  // (HDS). The session stays alive until deferred deletion, but its parent is already gone.
+  if (detached_) {
+    return;
+  }
+
   HealthTransition changed_state = setUnhealthy(type, retriable, http_status_code);
   // Clear the cached HTTP status code on non-HTTP failures so the HDS report does
   // not ship a stale code from the last successful response.
   if (type == envoy::data::core::v3::NETWORK || type == envoy::data::core::v3::NETWORK_TIMEOUT) {
     host_->setLastHealthCheckHttpStatus(0);
   }
-  // It's possible that the previous call caused this session to be deferred deleted.
-  if (timeout_timer_ != nullptr) {
-    timeout_timer_->disableTimer();
+  // It's possible that the previous call caused this session to be deferred deleted, or destroyed
+  // the health checker entirely. Timers are null and the parent must not be touched in that case.
+  if (detached_ || timeout_timer_ == nullptr) {
+    return;
   }
 
-  if (interval_timer_ != nullptr) {
-    interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
-  }
+  timeout_timer_->disableTimer();
+  interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
 }
 
 HealthTransition

@@ -1422,6 +1422,39 @@ TEST_P(HdsIntegrationTest, RemoveClusterDuringHealthCheck) {
   cleanupHdsConnection();
 }
 
+// Cluster removal and a health-check connection reset in the same server turn. The reset used to
+// run handleFailure()/onResetStream() against the session HDS had already freed.
+TEST_P(HdsIntegrationTest, RemoveClusterAndResetHealthCheckConnection) {
+  initialize();
+
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounter("hds_delegate.requests", Ge(++hds_requests_));
+
+  healthcheckEndpoints();
+
+  // Reset the in-flight health-check connection, then drop the cluster. Envoy must survive the
+  // failure and the removal together.
+  ASSERT_TRUE(host_fake_connection_->close(Network::ConnectionCloseType::AbortReset));
+  server_health_check_specifier_ = envoy::service::health::v3::HealthCheckSpecifier();
+  server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounter("hds_delegate.requests", Ge(++hds_requests_));
+
+  EXPECT_TRUE(host_fake_connection_->waitForDisconnect());
+  waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
+
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
 // Tests Envoy gRPC health checking a single healthy endpoint via HDS and reporting
 // that it is indeed healthy to the server. This exercises the code path where
 // createClusterConfig must set http2_protocol_options for gRPC health checks.

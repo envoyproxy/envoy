@@ -55,6 +55,11 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onDeferredDelete() {
     expect_close_ = true;
     client_->close();
   }
+  // close() does not raise another event when the socket is already going away in this same
+  // callback. Drop the client here so it is not destroyed on that connection's stack.
+  if (client_ != nullptr) {
+    parent_.dispatcher_.deferredDelete(std::move(client_));
+  }
 }
 
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
