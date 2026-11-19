@@ -1,3 +1,4 @@
+load("//bazel:envoy_rbe.bzl", "envoy_rbe_pool_without_link")
 load("//bazel:envoy_test.bzl", "envoy_cc_test", "envoy_exec_properties", "envoy_test_env")
 
 def _execution_context_transition_impl(settings, attr):
@@ -62,7 +63,8 @@ def execution_context_enabled_test(name, test, rbe_pool = None, exec_properties 
     _execution_context_enabled_test(
         name = name,
         test = test,
-        exec_properties = envoy_exec_properties(rbe_pool, exec_properties),
+        # The test rule wraps a C++ test built in its own right: it has no link of its own.
+        exec_properties = envoy_exec_properties(envoy_rbe_pool_without_link(rbe_pool), exec_properties),
         args = args,
         env = envoy_test_env(env),
         tags = tags,

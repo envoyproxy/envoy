@@ -34,7 +34,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/oauth2:config",
         "//test/mocks/init:init_mocks",
@@ -54,8 +60,10 @@ envoy_extension_cc_test(
     srcs = ["oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/common:base64_lib",
@@ -78,8 +86,10 @@ envoy_extension_cc_test(
     srcs = ["oauth_route_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -103,9 +113,19 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "asan": "linux_x64_small",
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
         "tsan": "linux_x64_small",
-        "gcc": {"build": "linux_x64_large"},
+        "asan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/common:base64_lib",
@@ -132,7 +152,22 @@ envoy_extension_cc_test(
     name = "oauth_client_test",
     srcs = ["oauth_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/filters/http/oauth2:oauth_client",

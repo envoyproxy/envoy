@@ -57,9 +57,11 @@ envoy_cc_dyn_module_test(
         "GODEBUG": "cgocheck=0",
     },
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
-        "gcc": {"build": "linux_x64_large"},
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "cto": {"link": "linux_x64_large"},
+        "openssl": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_large"},
     },
     deps = [":test_runner_lib"],
 )
@@ -68,10 +70,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
-    },
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",
