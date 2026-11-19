@@ -239,7 +239,7 @@ typed_config:
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 1);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 1);
 
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  time_system_->advanceTimeWait(std::chrono::seconds(1));
   // After refill.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
