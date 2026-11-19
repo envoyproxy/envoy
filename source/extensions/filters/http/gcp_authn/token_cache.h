@@ -16,7 +16,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
-using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<uint64_t, GcpToken>;
+// A cached token with the deterministic serialization of its audience, which tells apart the
+// audiences whose cache keys collide.
+struct CachedToken {
+  std::string token;
+  uint64_t expires_at;
+  std::optional<std::string> fingerprint;
+  std::string serialized_audience;
+};
+
+using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<uint64_t, CachedToken>;
 
 class TokenCacheImpl : public Logger::Loggable<Logger::Id::init> {
 public:

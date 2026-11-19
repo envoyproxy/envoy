@@ -1,0 +1,10 @@
+path: "/v1/chat/completions"
+body: "{\"model\":\"gemini-2.5-pro\",\"stream\":true,\"messages\":[{\"role\":\"system\",\"content\":\"Return JSON object on Vertex Gemini.\"},{\"role\":\"user\",\"content\":\"Give status ok.\"}],\"response_format\":{\"type\":\"json_object\"},\"tool_choice\":\"auto\",\"max_tokens\":200}"
+fragmentation_seed: 1311768467463790321
+request_protocol: OPENAI_CHAT_COMPLETIONS
+response_protocol: GEMINI_GENERATE_CONTENT
+response_binding {
+  uri_pattern: "/v1/projects/acme/locations/us-central1/publishers/google/models/{model}:{generateContent|streamGenerateContent?alt=sse}"
+}
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

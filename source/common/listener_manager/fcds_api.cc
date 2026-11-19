@@ -27,6 +27,11 @@ FcdsApiImpl::FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_confi
   subscription_ = std::move(subscription_or_error).value();
 }
 
+FcdsApiImpl::FcdsApiImpl(const std::string& filter_chain_name,
+                         FilterChainUpdateCallbacks& callbacks)
+    : filter_chain_name_(filter_chain_name), callbacks_(callbacks),
+      init_target_(absl::StrCat("FCDS init ", filter_chain_name_), [] {}) {}
+
 FcdsApiImpl::~FcdsApiImpl() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
@@ -76,26 +81,39 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
         "Invalid FCDS update: cannot add and remove in the same update");
   }
   if (updated_or_removed) {
-    const uint64_t new_hash = MessageUtil::hash(*updated_or_removed);
-    if (config_hash_ == new_hash) {
-      ENVOY_LOG(debug, "fcds: skip update for name {}", filter_chain_name_);
+    absl::StatusOr<bool> updated = update(*updated_or_removed);
+    RETURN_IF_NOT_OK(updated.status());
+    if (!*updated) {
       return absl::OkStatus();
     }
-    RETURN_IF_NOT_OK(callbacks_.onFilterChainUpdated(*updated_or_removed));
-    // Delay readiness until the filter chain runtime instance is constructed.
-    config_hash_ = new_hash;
   } else {
-    if (filter_chain_) {
-      Network::DrainableFilterChainSharedPtr draining = std::move(filter_chain_);
-      callbacks_.onFilterChainRemoved(std::move(draining));
-      config_hash_.reset();
-    }
-    init_target_.ready();
+    remove();
   }
   // Record the version only after an update or removal is actually applied, matching the CDS
   // behavior of advancing the version on applied changes rather than skipped or rejected ones.
   system_version_info_ = system_version_info;
   return absl::OkStatus();
+}
+
+absl::StatusOr<bool> FcdsApiImpl::update(const FilterChainProto& filter_chain) {
+  const uint64_t new_hash = MessageUtil::hash(filter_chain);
+  if (config_hash_ == new_hash) {
+    ENVOY_LOG(debug, "fcds: skip update for name {}", filter_chain_name_);
+    return false;
+  }
+  RETURN_IF_NOT_OK(callbacks_.onFilterChainUpdated(filter_chain));
+  // Delay readiness until the filter chain runtime instance is constructed.
+  config_hash_ = new_hash;
+  return true;
+}
+
+void FcdsApiImpl::remove() {
+  if (filter_chain_) {
+    Network::DrainableFilterChainSharedPtr draining = std::move(filter_chain_);
+    callbacks_.onFilterChainRemoved(std::move(draining));
+    config_hash_.reset();
+  }
+  init_target_.ready();
 }
 
 absl::Status FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

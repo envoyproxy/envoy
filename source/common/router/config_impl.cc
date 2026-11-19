@@ -410,7 +410,22 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
     SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
     request_headers_mutations_ = std::move(mutations_or_error.value());
   }
+
+  if (!config.stat_prefix().empty()) {
+    // mirror.(<stat_prefix>.)*
+    auto holder =
+        std::make_shared<ShadowPolicyStatsHolder>(factory_context.scope().createScopeWithTaggedName(
+            "mirror",
+            {Stats::TagStringView{Envoy::Config::TagNames::get().MIRROR_PREFIX,
+                                  config.stat_prefix()}},
+            absl::StrCat("mirror.", config.stat_prefix())));
+    // Share ownership with the holder so that the scope outlives in-flight mirror requests.
+    stats_ = ShadowPolicyStatsSharedPtr(holder, &holder->stats_);
+  }
 }
+
+ShadowPolicyImpl::ShadowPolicyStatsHolder::ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope)
+    : scope_(std::move(scope)), stats_{ALL_SHADOW_POLICY_STATS(POOL_COUNTER(*scope_))} {}
 
 const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
   if (request_headers_mutations_) {
@@ -1236,7 +1251,15 @@ absl::StatusOr<RetryPolicyConstSharedPtr> RouteEntryImplBase::buildRetryPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::CommonFactoryContext& factory_context) const {
+  if (route_config.has_retry_policy() && route_config.has_retry_policy_typed_config()) {
+    return absl::InvalidArgumentError(
+        "Cannot set both retry_policy and retry_policy_typed_config in RouteAction.");
+  }
   // Route specific policy wins, if available.
+  if (route_config.has_retry_policy_typed_config()) {
+    return RetryPolicyImpl::createFromTypedConfig(route_config.retry_policy_typed_config(),
+                                                  validation_visitor, factory_context);
+  }
   if (route_config.has_retry_policy()) {
     return RetryPolicyImpl::create(route_config.retry_policy(), validation_visitor,
                                    factory_context);
@@ -1694,7 +1717,17 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.
-  if (virtual_host.has_retry_policy()) {
+  if (virtual_host.has_retry_policy() && virtual_host.has_retry_policy_typed_config()) {
+    creation_status = absl::InvalidArgumentError(
+        "Cannot set both retry_policy and retry_policy_typed_config in VirtualHost.");
+    return;
+  }
+  if (virtual_host.has_retry_policy_typed_config()) {
+    auto policy_or_error = RetryPolicyImpl::createFromTypedConfig(
+        virtual_host.retry_policy_typed_config(), validator, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(policy_or_error.value());
+  } else if (virtual_host.has_retry_policy()) {
     auto policy_or_error =
         RetryPolicyImpl::create(virtual_host.retry_policy(), validator, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);

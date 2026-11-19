@@ -1,5 +1,6 @@
 #include "source/common/protobuf/utility.h"
 
+#include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
@@ -22,6 +23,11 @@ absl::StatusOr<std::string> MessageUtil::knownAnyToBytes(const Protobuf::Any& an
   }
   if (any.Is<xds::type::v3::TypedStruct>()) {
     xds::type::v3::TypedStruct typed_struct;
+    RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, typed_struct));
+    return getJsonStringFromMessage(typed_struct.value());
+  }
+  if (any.Is<udpa::type::v1::TypedStruct>()) {
+    udpa::type::v1::TypedStruct typed_struct;
     RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, typed_struct));
     return getJsonStringFromMessage(typed_struct.value());
   }

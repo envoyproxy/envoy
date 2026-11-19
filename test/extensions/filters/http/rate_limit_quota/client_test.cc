@@ -15,7 +15,6 @@
 #include "envoy/type/v3/token_bucket.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
@@ -97,7 +96,7 @@ protected:
   GlobalClientTest() {
     (*sample_bucket_id_.mutable_bucket())["mock_id_key"] = "mock_id_value";
     (*sample_bucket_id_.mutable_bucket())["mock_id_key2"] = "mock_id_value2";
-    sample_id_hash_ = MessageUtil::hash(sample_bucket_id_);
+    sample_id_hash_ = hashBucketId(sample_bucket_id_);
     default_allow_action = buildBlanketAction(sample_bucket_id_, false);
     default_deny_action = buildBlanketAction(sample_bucket_id_, true);
   }
@@ -536,7 +535,7 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
   (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value4";
-  size_t sample_id_hash2 = MessageUtil::hash(sample_bucket_id2);
+  size_t sample_id_hash2 = hashBucketId(sample_bucket_id2);
   cb_ptr_->expectBuckets({sample_id_hash2});
   BucketAction default_allow_action2 = default_allow_action;
   *default_allow_action2.mutable_bucket_id() = sample_bucket_id2;
@@ -577,11 +576,11 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
   (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value4";
-  size_t sample_id_hash2 = MessageUtil::hash(sample_bucket_id2);
+  size_t sample_id_hash2 = hashBucketId(sample_bucket_id2);
   BucketId sample_bucket_id3;
   (*sample_bucket_id3.mutable_bucket())["mock_id_key"] = "mutable_id_value5";
   (*sample_bucket_id3.mutable_bucket())["mock_id_key2"] = "mutable_id_value6";
-  size_t sample_id_hash3 = MessageUtil::hash(sample_bucket_id3);
+  size_t sample_id_hash3 = hashBucketId(sample_bucket_id3);
 
   BucketAction default_allow_action2 = default_allow_action;
   *default_allow_action2.mutable_bucket_id() = sample_bucket_id2;
@@ -779,7 +778,7 @@ TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
   (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value4";
-  size_t sample_id_hash2 = MessageUtil::hash(sample_bucket_id2);
+  size_t sample_id_hash2 = hashBucketId(sample_bucket_id2);
 
   cb_ptr_->expectBuckets({sample_id_hash_});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
@@ -826,7 +825,7 @@ TEST_F(GlobalClientTest, TestResponseEdgeCases) {
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value5";
   (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value6";
-  size_t sample_id_hash2 = MessageUtil::hash(sample_bucket_id2);
+  size_t sample_id_hash2 = hashBucketId(sample_bucket_id2);
 
   BucketAction default_allow_action2 = default_allow_action;
   *default_allow_action2.mutable_bucket_id() = sample_bucket_id2;
@@ -917,11 +916,11 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
   (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value4";
-  size_t sample_id_hash2 = MessageUtil::hash(sample_bucket_id2);
+  size_t sample_id_hash2 = hashBucketId(sample_bucket_id2);
   BucketId sample_bucket_id3;
   (*sample_bucket_id3.mutable_bucket())["mock_id_key"] = "mutable_id_value5";
   (*sample_bucket_id3.mutable_bucket())["mock_id_key2"] = "mutable_id_value6";
-  size_t sample_id_hash3 = MessageUtil::hash(sample_bucket_id3);
+  size_t sample_id_hash3 = hashBucketId(sample_bucket_id3);
 
   // Test the bucket with a TokenBucket assignment pushed in a response, then
   // falling back to a configured deny-all after that expires, and falling
@@ -1356,6 +1355,34 @@ TEST_F(LocalClientTest, TestLocalClient) {
   ASSERT_TRUE(bucket);
   EXPECT_FALSE(bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(bucket->default_action, default_allow_action));
+}
+
+TEST(HashBucketIdTest, HashesEntriesInAnyOrder) {
+  // Two maps with many entries almost never iterate in the same order.
+  BucketId bucket_id;
+  BucketId reversed_bucket_id;
+  for (int i = 0; i < 16; ++i) {
+    (*bucket_id.mutable_bucket())["key_" + std::to_string(i)] = "value_" + std::to_string(i);
+    (*reversed_bucket_id.mutable_bucket())["key_" + std::to_string(15 - i)] =
+        "value_" + std::to_string(15 - i);
+  }
+  EXPECT_EQ(hashBucketId(bucket_id), hashBucketId(reversed_bucket_id));
+}
+
+TEST(HashBucketIdTest, HashesDifferentBucketIdsDifferently) {
+  BucketId bucket_id;
+  (*bucket_id.mutable_bucket())["name"] = "prod";
+  (*bucket_id.mutable_bucket())["env"] = "staging";
+
+  // Values that move between keys make a different bucket.
+  BucketId swapped_bucket_id;
+  (*swapped_bucket_id.mutable_bucket())["name"] = "staging";
+  (*swapped_bucket_id.mutable_bucket())["env"] = "prod";
+  EXPECT_NE(hashBucketId(bucket_id), hashBucketId(swapped_bucket_id));
+
+  BucketId extended_bucket_id = bucket_id;
+  (*extended_bucket_id.mutable_bucket())["region"] = "us";
+  EXPECT_NE(hashBucketId(bucket_id), hashBucketId(extended_bucket_id));
 }
 
 } // namespace

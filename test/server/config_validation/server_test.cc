@@ -2,8 +2,11 @@
 #include <vector>
 
 #include "envoy/common/logger.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/config/decoded_resource_impl.h"
 #include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/config_validation/server.h"
@@ -14,12 +17,15 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_time.h"
 
 using testing::HasSubstr;
@@ -221,6 +227,38 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
 
   ValidationListenerComponentFactory listener_component_factory(server);
   listener_component_factory.getTcpListenerConfigProviderManager();
+}
+
+// The LDS of the validation listener component factory names a nameless listener with the random
+// generator of the server.
+TEST(ValidationListenerComponentFactoryTest, LdsNamesListenersWithTheServerRandomGenerator) {
+  testing::NiceMock<MockInstance> server;
+  ValidationListenerComponentFactory listener_component_factory(server);
+  envoy::config::core::v3::ConfigSource lds_config;
+  lds_config.mutable_ads();
+  LdsApiPtr lds_api = listener_component_factory.createLdsApi(lds_config, nullptr);
+  ASSERT_NE(nullptr, lds_api);
+
+  EXPECT_CALL(server.api_.random_, uuid()).WillOnce(Return("generated_name"));
+  Protobuf::RepeatedPtrField<Protobuf::Any> resources;
+  std::ignore = resources.Add()->PackFrom(envoy::config::listener::v3::Listener());
+  absl::StatusOr<std::unique_ptr<Config::DecodedResourcesWrapper>> decoded_resources =
+      Config::DecodedResourcesWrapper::create(
+          *server.cluster_manager_.subscription_factory_.resource_decoder_, resources, "");
+  ASSERT_OK(decoded_resources);
+  EXPECT_EQ("generated_name", Protobuf::DynamicCastMessage<envoy::config::listener::v3::Listener>(
+                                  (*decoded_resources)->refvec_[0].get().resource())
+                                  .name());
+}
+
+TEST(ValidationListenerComponentFactoryTest, CreatesQuicListenerFilters) {
+  testing::NiceMock<MockInstance> server;
+  ValidationListenerComponentFactory listener_component_factory(server);
+  testing::NiceMock<Configuration::MockListenerFactoryContext> context;
+  absl::StatusOr<Filter::QuicListenerFilterFactoriesList> filter_factories =
+      listener_component_factory.createQuicListenerFilterFactoryList({}, context);
+  ASSERT_OK(filter_factories);
+  EXPECT_TRUE(filter_factories->empty());
 }
 
 class TestObject : public ProcessObject {

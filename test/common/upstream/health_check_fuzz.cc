@@ -92,7 +92,7 @@ makeBufferListToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respon
 
 void HttpHealthCheckFuzz::allocHttpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
-  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+  health_checker_ = std::make_shared<NiceMock<TestHttpHealthCheckerImpl>>(
       *cluster_, config, context_, HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Http Health Checker");
 }
@@ -107,7 +107,6 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
     cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
-  expectStreamCreate(0);
   // This sets up the possibility of testing hosts that never become healthy
   if (input.start_failed()) {
     cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
@@ -158,24 +157,16 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   // Interval timer gets turned on from decodeHeaders()
   if ((!reuse_connection_ || client_will_close) && !last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
-void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
+void HttpHealthCheckFuzz::triggerIntervalTimer() {
   // Interval timer needs to be explicitly enabled, usually by decodeHeaders.
   if (!test_sessions_[0]->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
-  if (expect_client_create) {
-    expectClientCreate(0);
-  } else if (test_sessions_[0]->client_connection_->state() != Network::Connection::State::Open) {
-    // No client connection to reuse.
-    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
-    return;
-  }
-  expectStreamCreate(0);
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   test_sessions_[0]->interval_timer_->invokeCallback();
 }
@@ -191,7 +182,7 @@ void HttpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
                                                        // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
@@ -199,9 +190,9 @@ void HttpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type,
   test_sessions_[0]->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
-    triggerIntervalTimer(
-        true); // Interval timer is guaranteed to be enabled from a close event - calls
-               // onResetStream which handles failure, turning interval timer on and timeout off
+    // Interval timer is guaranteed to be enabled from a close event - calls onResetStream which
+    // handles failure, turning interval timer on and timeout off
+    triggerIntervalTimer();
   }
 }
 
@@ -222,7 +213,7 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
     cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
-  expectClientCreate();
+  setupClientCreate();
   health_checker_->start();
   reuse_connection_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
@@ -259,21 +250,13 @@ void TcpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool l
   // response doesn't match, it only sets the host to unhealthy. If it does match, it will turn
   // timeout off and interval on.
   if (!reuse_connection_ && interval_timer_->enabled_ && !last_action) {
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
-void TcpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
+void TcpHealthCheckFuzz::triggerIntervalTimer() {
   if (!interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
-    return;
-  }
-  if (expect_client_create) {
-    ENVOY_LOG_MISC(trace, "Creating client");
-    expectClientCreate();
-  } else if (connection_->state() != Network::Connection::State::Open) {
-    // Without a client no interval timer possible.
-    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
     return;
   }
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
@@ -290,7 +273,7 @@ void TcpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
                                     // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Will create client and stream from network timeout");
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
@@ -310,7 +293,7 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
       return;
     }
     ENVOY_LOG_MISC(trace, "Will create client from close event");
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 
   // In the specific case of:
@@ -318,7 +301,7 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
   // This blows away client, should create a new one
   if (event_type == Network::ConnectionEvent::Connected && empty_response_) {
     ENVOY_LOG_MISC(trace, "Will create client from connected event and empty response.");
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
@@ -340,22 +323,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
     cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
-  ON_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
-      .WillByDefault(
-          [&]() -> Network::ClientConnection* { return test_session_->client_connection_; });
-
-  ON_CALL(*health_checker_, createCodecClient_(_))
-      .WillByDefault([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-        TestSession& test_session = *test_session_;
-        std::shared_ptr<Upstream::MockClusterInfo> cluster{
-            new NiceMock<Upstream::MockClusterInfo>()};
-        Event::MockDispatcher dispatcher_;
-        test_session.codec_client_ = new CodecClientForTest(
-            Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
-            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-        return test_session.codec_client_;
-      });
-  expectStreamCreate();
+  setupClientCreate();
   health_checker_->start();
   ON_CALL(context_.runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
@@ -442,26 +410,17 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   // checker had a goaway event with no error flag.
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Triggering interval timer after response");
-    triggerIntervalTimer(!reuse_connection_ || received_no_error_goaway_);
+    triggerIntervalTimer();
     received_no_error_goaway_ = false; // from resetState()
   }
 }
 
-void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
+void GrpcHealthCheckFuzz::triggerIntervalTimer() {
   if (!test_session_->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
-  if (expect_client_create) {
-    expectClientCreate();
-    ENVOY_LOG_MISC(trace, "Created client");
-  } else if (test_session_->client_connection_->state() != Network::Connection::State::Open) {
-    // No client connection to reuse.
-    ENVOY_LOG_MISC(trace, "Interval timer on closed connection; ignored.");
-    return;
-  }
-  expectStreamCreate();
-  ENVOY_LOG_MISC(trace, "Created stream");
+  ENVOY_LOG_MISC(trace, "Triggered interval timer");
   test_session_->interval_timer_->invokeCallback();
 }
 
@@ -476,7 +435,7 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 
   if ((!reuse_connection_ || received_no_error_goaway_) && !last_action) {
     ENVOY_LOG_MISC(trace, "Triggering interval timer after timeout.");
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   } else {
     received_no_error_goaway_ = false; // from resetState()
   }
@@ -490,7 +449,7 @@ void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type,
     ENVOY_LOG_MISC(trace, "Triggering interval timer after close event");
     // Interval timer is guaranteed to be enabled from a close event - calls
     // onResetStream which handles failure, turning interval timer on and timeout off
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
@@ -499,11 +458,11 @@ void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
     test_session_->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
     // Will cause other events to blow away client, because this is a "graceful" go away
     received_no_error_goaway_ = true;
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   } else {
     // go away events without no error flag explicitly blow away client
     test_session_->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
-    triggerIntervalTimer(true);
+    triggerIntervalTimer();
   }
 }
 
@@ -511,20 +470,35 @@ void GrpcHealthCheckFuzz::expectSessionCreate() {
   test_session_->timeout_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   test_session_->interval_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   test_session_->request_encoder_.stream_.callbacks_.clear();
-  expectClientCreate();
 }
 
-void GrpcHealthCheckFuzz::expectClientCreate() {
-  TestSession& test_session = *test_session_;
-  test_session.codec_ = new NiceMock<Http::MockClientConnection>();
-  test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
-}
-
-void GrpcHealthCheckFuzz::expectStreamCreate() {
-  test_session_->request_encoder_.stream_.callbacks_.clear();
-  EXPECT_CALL(*test_session_->codec_, newStream(_))
-      .WillRepeatedly(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
-                            ReturnRef(test_session_->request_encoder_)));
+void GrpcHealthCheckFuzz::setupClientCreate() {
+  ON_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillByDefault([this]() -> Network::ClientConnection* {
+        test_session_->client_connection_ = new NiceMock<Network::MockClientConnection>();
+        return test_session_->client_connection_;
+      });
+  ON_CALL(*health_checker_, createCodecClient_(_))
+      .WillByDefault([this](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+        TestSession& test_session = *test_session_;
+        test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+        ON_CALL(*test_session.codec_, newStream(_))
+            .WillByDefault(
+                [&test_session](Http::ResponseDecoder& decoder) -> Http::RequestEncoder& {
+                  // Every stream is created on the same encoder: drop the callbacks of the previous
+                  // one before the health checker registers the callbacks of this one.
+                  test_session.request_encoder_.stream_.callbacks_.clear();
+                  test_session.stream_response_callbacks_ = &decoder;
+                  return test_session.request_encoder_;
+                });
+        std::shared_ptr<Upstream::MockClusterInfo> cluster{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        Event::MockDispatcher dispatcher_;
+        test_session.codec_client_ = new CodecClientForTest(
+            Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+        return test_session.codec_client_;
+      });
 }
 
 Network::ConnectionEvent
@@ -568,7 +542,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kTriggerIntervalTimer: {
-      triggerIntervalTimer(false);
+      triggerIntervalTimer();
       break;
     }
     case test::common::upstream::Action::kTriggerTimeoutTimer: {

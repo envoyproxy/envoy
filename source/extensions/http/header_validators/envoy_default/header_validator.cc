@@ -697,9 +697,13 @@ HeaderValidator::transformUrlPath(::Envoy::Http::RequestHeaderMap& header_map) {
     // Path normalization includes sanitization of encoded slashes for performance reasons.
     // If normalization is disabled, sanitize encoded slashes here
     auto result = sanitizeEncodedSlashes(header_map);
-    if (!result.ok()) {
+    if (result.action() == PathNormalizer::PathNormalizationResult::Action::Reject) {
       return result;
     }
+    if (!config_.uri_path_normalization_options().skip_merging_slashes() && header_map.Path()) {
+      PathUtil::mergeSlashes(header_map);
+    }
+    return result;
   }
   return PathNormalizer::PathNormalizationResult::success();
 }

@@ -17,7 +17,13 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":test_common",
         "//source/common/tls/cert_validator:cert_validator_lib",
@@ -34,7 +40,6 @@ envoy_cc_test(
     srcs = [
         "factory_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":test_common",
         "//source/common/tls/cert_validator:cert_validator_lib",
@@ -57,7 +62,13 @@ envoy_cc_test(
     srcs = [
         "san_matcher_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
@@ -83,7 +94,12 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         ":default_validator_integration_test_lib",
         "//test/integration:http_integration_lib",
