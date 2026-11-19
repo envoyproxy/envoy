@@ -1752,6 +1752,28 @@ TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRouteEndedByTrail
   EXPECT_EQ(continue_calls_, 1);
 }
 
+// DISABLE means the same on an unconfigured route: the AI filters run, and the received bytes are
+// what is forwarded.
+TEST_F(AiProtocolManagerFilterTest, ForwardsTheReceivedBodyOnUnconfiguredRouteWhenDisabled) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters(
+      {[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+        return std::make_unique<ContextRecordingAiFilter>(context, seen);
+      }},
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::DISABLE);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = "{ \"stream\": true,  \"model\": \"gpt-4\" }";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(seen.size(), 1);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+}
+
 TEST_F(AiProtocolManagerFilterTest, UnparsedPayloadOnUnconfiguredRouteRunsNoAiFilters) {
   int built = 0;
   createFilterWithAiFilters({[&](const AiFilterContext&) -> AiFilterSharedPtr {
