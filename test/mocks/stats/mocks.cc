@@ -82,6 +82,22 @@ MockSinkPredicates::~MockSinkPredicates() = default;
 
 MockScope::MockScope(StatName prefix, MockStore& store)
     : TestUtil::TestScope(prefix, store), mock_store_(store) {
+  ON_CALL(*this, createScope_(_, _))
+      .WillByDefault(
+          [this](const std::string& base_name, const std::string& tagged_name) -> ScopeSharedPtr {
+            // Production code relies on createScope() returning a usable scope, so the default
+            // is a real child scope named and registered the same way IsolatedScopeImpl does it.
+            // Tests can still EXPECT_CALL createScope_ to inject a null or fake scope.
+            const std::string prefix_str = symbolTable().toString(prefix());
+            const std::string& leaf = tagged_name.empty() ? base_name : tagged_name;
+            const std::string child_name_str =
+                leaf.empty() ? prefix_str : (prefix_str.empty() ? leaf : prefix_str + "." + leaf);
+            StatNameManagedStorage child_name(child_name_str, symbolTable());
+            ScopeSharedPtr child =
+                std::make_shared<NiceMock<MockScope>>(child_name.statName(), mock_store_);
+            addScopeToStore(child);
+            return child;
+          });
   ON_CALL(*this, counterFromTaggedName(_, _, _))
       .WillByDefault([this](StatName base_name, std::optional<StatNameTagSpan> name_tags,
                             StatName tagged_name) -> Counter& {

@@ -162,7 +162,7 @@ public:
 // A dynamic certificate whose OCSP stapling policy always fails.
 class MustStapleAsyncContext : public AsyncContext {
 public:
-  explicit MustStapleAsyncContext(Stats::Scope& scope) : AsyncContext(scope) {}
+  explicit MustStapleAsyncContext(Stats::Scope&) {}
 
   Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
     return OcspStaplePolicy::MustStaple;

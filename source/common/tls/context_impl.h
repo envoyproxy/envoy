@@ -159,12 +159,6 @@ protected:
   void incCounter(const Stats::StatName name, const Stats::StatName tag_name,
                   absl::string_view value, const Stats::StatName fallback) const;
 
-  // The scope certificate expiration gauges are created in: the context-owned child scope when
-  // one could be allocated, otherwise the scope passed to the context (stats mocks may not
-  // provide child scopes). Not named certScope(): certificate-selector async contexts already
-  // define AsyncContext::certScope() and multiply-inherit from this class.
-  Stats::Scope& certExpirationScope() { return cert_scope_ != nullptr ? *cert_scope_ : scope_; }
-
   // Helper function to validate cert for TCP connections asynchronously.
   ValidationResults customVerifyCertChain(
       Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
@@ -184,7 +178,6 @@ protected:
   Stats::Scope& scope_;
   // Child scope holding all certificate expiration gauges for this context. Its destruction on
   // context teardown removes those gauges so they stop being exported for removed certificates.
-  // Null if the parent scope did not provide a child scope (e.g. test mock scopes).
   Stats::ScopeSharedPtr cert_scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;
