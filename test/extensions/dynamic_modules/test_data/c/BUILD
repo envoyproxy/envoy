@@ -21,6 +21,7 @@ package(default_visibility = [
     "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
+    "//test/extensions/resource_monitors/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
@@ -416,3 +417,17 @@ test_program(name = "health_checker_missing_session_on_interval")
 test_program(name = "health_checker_missing_session_destroy")
 
 test_program(name = "health_checker_session_new_null")
+
+test_program(name = "resource_monitor_no_op")
+
+test_program(name = "resource_monitor_missing_config_new")
+
+test_program(name = "resource_monitor_missing_config_destroy")
+
+test_program(name = "resource_monitor_missing_update_resource_usage")
+
+test_program(name = "resource_monitor_synchronous_feedback")
+
+test_program(name = "resource_monitor_synchronous_feedback_missing_get_resource_usage")
+
+test_program(name = "resource_monitor_synchronous_feedback_missing_load_accepted")

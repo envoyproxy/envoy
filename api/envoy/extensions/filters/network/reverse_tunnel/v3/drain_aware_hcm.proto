@@ -4,7 +4,10 @@ package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
 option java_outer_classname = "DrainAwareHcmProto";
@@ -13,16 +16,23 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Drain-Aware HTTP Connection Manager]
-// A network filter that wraps the standard HCM and sends HTTP/2 GOAWAY frames
-// on all active connections when the listener is drained (e.g. via admin
-// /drain_listeners). Intended for use on reverse-tunnel listeners so that
-// agents can detect drain and re-establish connections gracefully.
+// A network filter that wraps the standard HCM and drains all active HTTP/2
+// connections when the listener is drained (e.g. via admin /drain_listeners).
+// Intended for use on reverse-tunnel listeners so that agents can detect drain
+// and re-establish connections gracefully.
 // [#extension: envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager]
 
 // Configuration for the drain-aware HTTP Connection Manager.
-// All HCM fields are forwarded verbatim; the only difference is that this
-// filter registers a listener-drain callback and emits a GOAWAY before the
-// connection is closed.
+// All HCM fields are forwarded verbatim. In addition, when the listener drains,
+// every connection is drained like an HCM graceful drain, whether or not any of
+// the fields below are set: a soft GOAWAY (shutdown notice) is sent when the
+// drain starts, and the final GOAWAY follows after ``hcm_config.drain_timeout``,
+// extended by ``hcm_config.drain_timeout_jitter`` if set. With
+// ``enable_drain_with_goaway``, a reverse tunnel instead dials a replacement
+// when the drain starts and sends the soft GOAWAY and an optional METADATA frame
+// at the configured delays before the final GOAWAY. Without
+// ``shutdown_notice_delay``, such a tunnel receives no GOAWAY until the final
+// one, so it keeps serving while the replacement is established.
 message DrainAwareHttpConnectionManager {
   // The underlying HCM configuration to apply.
   http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
@@ -30,6 +40,19 @@ message DrainAwareHttpConnectionManager {
   // When true, a peer-initiated GOAWAY on a reverse tunnel makes the initiator drop the draining
   // tunnel and dial a replacement, so capacity is restored before the old tunnel closes while its
   // in-flight streams finish. Default false, so the behavior is opt-in and unconfigured listeners
-  // are unaffected.
+  // are unaffected. Required by ``metadata_delay`` and ``shutdown_notice_delay``.
   bool enable_drain_with_goaway = 2;
+
+  // Delay from the start of a reverse tunnel drain until a METADATA frame carrying
+  // ``envoy.reverse_tunnel.drain: true`` is sent. Requires ``enable_drain_with_goaway`` and
+  // ``hcm_config.http2_protocol_options.allow_metadata``. Must be less than
+  // ``hcm_config.drain_timeout`` and, if set, ``shutdown_notice_delay``; otherwise the config is
+  // rejected. Default: 0s (not sent).
+  google.protobuf.Duration metadata_delay = 3 [(validate.rules).duration = {gte {}}];
+
+  // Delay from the start of a reverse tunnel drain until the soft GOAWAY (shutdown notice) is
+  // sent, telling the peer to stop opening new streams on this tunnel. Requires
+  // ``enable_drain_with_goaway``. Must be less than ``hcm_config.drain_timeout``; otherwise the
+  // config is rejected. Default: 0s (not sent).
+  google.protobuf.Duration shutdown_notice_delay = 4 [(validate.rules).duration = {gte {}}];
 }

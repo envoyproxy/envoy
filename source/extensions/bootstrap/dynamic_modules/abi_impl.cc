@@ -21,6 +21,7 @@ using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtens
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleClusterWriter;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleListenerWriter;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 namespace {
@@ -818,6 +819,55 @@ envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
     return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed;
   }
   return cluster_writer->removeCluster({cluster_name.ptr, cluster_name.length});
+}
+
+// -------------------- Listener Writer Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableListenerWriter();
+}
+
+envoy_dynamic_module_type_bootstrap_listener_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer listener_name,
+    envoy_dynamic_module_type_module_buffer listener,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out) {
+  *update_id_out = 0;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleListenerWriter* listener_writer = config->listener_writer_.get();
+  if (listener_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed;
+  }
+  return listener_writer->addOrUpdateListener(
+      {listener_name.ptr, listener_name.length}, {listener.ptr, listener.length},
+      {version_info.ptr, version_info.length}, *update_id_out);
+}
+
+envoy_dynamic_module_type_bootstrap_listener_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer listener_name) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleListenerWriter* listener_writer = config->listener_writer_.get();
+  if (listener_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed;
+  }
+  return listener_writer->removeListener({listener_name.ptr, listener_name.length});
 }
 
 } // extern "C"

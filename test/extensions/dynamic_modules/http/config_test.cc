@@ -12,6 +12,7 @@
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
+#include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
@@ -325,12 +326,21 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   NiceMock<Event::MockDispatcher> worker_dispatcher{"worker_0"};
   ON_CALL(filter_callbacks, dispatcher()).WillByDefault(ReturnRef(worker_dispatcher));
-  EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_));
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).WillOnce(testing::SaveArg<0>(&filter));
   cb_or_error.value()(filter_callbacks);
 
   // Clean up the temp file.
   std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
   std::filesystem::remove(temp_path);
+
+  // The configuration of the module loaded later gets the load shed points too.
+  auto* dynamic_module_filter =
+      dynamic_cast<Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter*>(filter.get());
+  ASSERT_NE(nullptr, dynamic_module_filter);
+  EXPECT_EQ(static_cast<Server::LoadShedPointProvider*>(
+                &context_.server_factory_context_.overload_manager_),
+            dynamic_module_filter->getFilterConfig().load_shed_point_provider_.ptr());
 }
 
 // Remote fetch returns data that is not a valid shared object (invalid ELF).

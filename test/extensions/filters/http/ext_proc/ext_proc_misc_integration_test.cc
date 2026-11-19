@@ -5,11 +5,13 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 #include "test/integration/http_integration.h"
 
 // Tests for status_on_error functionality.
 namespace Envoy {
 
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
@@ -214,6 +216,206 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, ProcessingErrorCustomStatus) {
   // Should get custom status code 422 for processing error.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("422", response->headers().getStatusValue());
+}
+
+class ExtProcGracefulCloseIntegrationTest
+    : public Extensions::HttpFilters::ExternalProcessing::ExtProcIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing,
+                         ExtProcGracefulCloseIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(ExtProcGracefulCloseIntegrationTest, ServerEndStreamOnLastExpectedReply) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  // Envoy gRPC only: the Google gRPC client uses a different completion path.
+  if (clientType() != Grpc::ClientType::EnvoyGrpc) {
+    GTEST_SKIP();
+  }
+  // Only request_headers are sent so the request_headers reply is "last".+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(std::nullopt);
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  EXPECT_TRUE(request_headers_msg.has_request_headers());
+  processor_stream_->startGrpcStream();
+
+  // Send the request_headers reply as gRPC-framed DATA with END_STREAM set
+  // and no trailers. This is not gRPC spec compliant, the test just checks
+  // that this path does not crash.
+  ProcessingResponse resp;
+  resp.mutable_request_headers();
+  auto serialized = Grpc::Common::serializeToGrpcFrame(resp);
+  processor_stream_->encodeData(*serialized, /*end_stream=*/true);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcGracefulCloseIntegrationTest, GracefulHalfCloseThenLateNon200Headers) {
+  // The graceful-close path only exists for the EnvoyGrpc client (it goes
+  // through Grpc::AsyncStreamImpl, not GoogleAsyncStreamImpl).
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP();
+  }
+
+  // Enable the graceful-close path so onDestroy takes
+  // halfCloseAndWaitForRemoteClose() instead of closeStream()/resetStream().
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.ext_proc_graceful_grpc_close",
+                                    "true");
+
+  // Minimal processing mode: just request and response headers, so that ext_proc
+  // stream is not closed early on request header response.
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // 1. Downstream → Envoy: header-only GET. ext_proc opens the gRPC stream and
+  //    sends the request_headers ProcessingRequest.
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  // Wait for the gRPC side-stream to be fully established and for Envoy's
+  // ProcessingRequest to arrive. We deliberately do NOT call
+  // startGrpcStream() — the fake server has not yet sent its response
+  // HEADERS (:status:200), so AsyncStreamImpl::onHeaders has not yet fired.
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ProcessingRequest req;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, req));
+  ASSERT_TRUE(req.has_request_headers());
+
+  // 2. Close downstream connection to cause ext_proc filter to be deleted
+  //    and the AsyncGrpcClient to enter graceful close.
+  codec_client_->close();
+  ASSERT_TRUE(response->waitForReset());
+
+  // Wait for graceful half-close to show up at the ext_proc server.
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  // 3. ext_proc server now sends its first response headers as a
+  //    non-200 trailers-only response. Make sure callbacks in the
+  //    deleted ext_proc are not called.
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}},
+                                   /*end_stream=*/false);
+
+  // Give the worker dispatcher a chance to process the headers.
+  ASSERT_TRUE(processor_stream_->waitForReset());
+}
+
+TEST_P(ExtProcGracefulCloseIntegrationTest, StreamErrorOrphansHttpStream) {
+  // The graceful-close path only exists for the EnvoyGrpc client (it goes
+  // through Grpc::AsyncStreamImpl, not GoogleAsyncStreamImpl).
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP();
+  }
+  // Enable the graceful-close path so that onDestroy goes via
+  // halfCloseAndWaitForRemoteClose() instead of closeStream()+resetStream().
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+
+  // Only process request headers; everything else SKIP so the downstream
+  // request can complete without further sidecar round-trips.
+  proto_config_.mutable_processing_mode()->set_request_header_mode(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // 1. Downstream request opens ext_proc side stream.
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  // 2. ext_proc server accepts the gRPC stream, sends 200 headers (startGrpcStream),
+  //    and replies to the request_headers message so the downstream chain
+  //    continues to the upstream.
+  processRequestHeadersMessage(*grpc_upstreams_[0], /*first_message=*/true, std::nullopt);
+
+  // 3. Finish the request to cause ext_proc filter to be deleted.
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  // 4. Wait until the gRPC side-stream has been half-closed by Envoy
+  //    (i.e. ext_proc::onDestroy has run on the worker).
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  // 5. ext_proc server sends a DATA frame (NOT end_stream) carrying a malformed gRPC
+  //    frame. This cases GrpcAsyncStream to be reset and scheduled for deferred deletion.
+  {
+    Buffer::OwnedImpl bad_flag("\x02", 1);
+    processor_stream_->encodeData(bad_flag, /*end_stream=*/false);
+  }
+
+  // 6. The deferredDelete callback is scheduled in the worker dispatcher's
+  //    current iteration. Once that iteration finishes, ~Grpc::AsyncStreamImpl
+  //    fires and frees the object (and its headers_message_). Send a series of
+  //    follow-up DATA frames with small gaps so that at least one of them is
+  //    dispatched in a SEPARATE worker I/O event after the deferred-delete has
+  //    run.
+  for (int i = 0; i < 20; ++i) {
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
+    Buffer::OwnedImpl more("\x00\x00\x00\x00\x00", 5); // benign 0-len gRPC frame
+    processor_stream_->encodeData(more, /*end_stream=*/false);
+  }
+
+  // Give the worker time to dispatch the last frames.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // Make sure we got here without ASAN tripping,
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_completed", ::testing::Ge(1));
+}
+
+TEST_P(ExtProcGracefulCloseIntegrationTest, GracefulCloseWithErrorResponse) {
+  // The graceful-close path only exists for the EnvoyGrpc client (it goes
+  // through Grpc::AsyncStreamImpl, not GoogleAsyncStreamImpl).
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP();
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.ext_proc_graceful_grpc_close",
+                                    "true");
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // (1) Downstream → Envoy: start a request (no end-stream so we can reset it).
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Accept ext_proc request but do not respond.
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ProcessingRequest req;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, req));
+  ASSERT_TRUE(req.has_request_headers());
+
+  // Reset downstream request that causes ext_proc filter to be deleted. This also
+  // deletes ProcessorStreamImpl which has callbacks from AsyncGrpcClient
+  codec_client_->sendReset(*request_encoder_);
+  ASSERT_TRUE(response->waitForReset());
+
+  // half closing AsyncGrpcClient writes a 0-length DATA(end_stream).
+  // Wait for it so we know the ext_proc was freed.
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  // Send a non-200 response from the ext_proc server, to check that it does
+  // no call into deleted ProcessorStreamImpl
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}},
+                                   /*end_stream=*/true);
+
+  // Synchronize: wait for the worker thread to dispatch the H2 HEADERS frame.
+  // Without the fix ASAN aborts inside Grpc::AsyncStreamImpl::onHeaders before this returns.
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_503", ::testing::Ge(1));
+  codec_client_->close();
 }
 
 } // namespace Envoy

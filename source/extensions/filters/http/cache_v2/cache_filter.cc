@@ -188,6 +188,7 @@ void CacheFilter::onLookupResult(ActiveLookupResultPtr lookup_result) {
   lookup_result_ = std::move(lookup_result);
   if (!lookup_result_->http_source_) {
     // Lookup failed, typically implying upstream request was reset.
+    stats().incForStatus(CacheEntryStatus::UpstreamReset);
     decoder_callbacks_->streamInfo().setResponseCodeDetails(
         CacheResponseCodeDetails::CacheFilterAbortedDuringLookup);
     decoder_callbacks_->resetStream();

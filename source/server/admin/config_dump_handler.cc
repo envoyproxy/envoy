@@ -216,11 +216,13 @@ std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResource
                       field_descriptor->name(), field_descriptor->name()))};
     }
 
+    Protobuf::FieldMask field_mask;
+    if (mask.has_value()) {
+      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+    }
     auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
     for (Protobuf::Message& msg : repeated) {
       if (mask.has_value()) {
-        Protobuf::FieldMask field_mask;
-        ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
         if (!trimResourceMessage(field_mask, msg)) {
           return std::optional<std::pair<Http::Code, std::string>>{std::make_pair(
               Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
@@ -243,6 +245,10 @@ std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResource
 std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
     envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
     const Matchers::StringMatcher& name_matcher, bool include_eds) const {
+  Protobuf::FieldMask field_mask;
+  if (mask.has_value()) {
+    ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+  }
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
@@ -259,8 +265,6 @@ std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfi
     ASSERT(message);
 
     if (mask.has_value()) {
-      Protobuf::FieldMask field_mask;
-      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
       // indexing through repeated fields. We don't return error on failure
       // because different callback return types will have different valid

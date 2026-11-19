@@ -2238,7 +2238,7 @@ public:
   createHttpFilterFactoryFromProto(const Protobuf::Message& config,
                                    Server::Configuration::ServerFactoryContext&,
                                    Server::Configuration::ExtraFactoryContext&) override {
-    const auto& fields = dynamic_cast<const Protobuf::Struct&>(config).fields();
+    const auto& fields = Protobuf::DynamicCastMessage<Protobuf::Struct>(config).fields();
     const auto it = fields.find("filter_count");
     const int filter_count = it == fields.end() ? 1 : static_cast<int>(it->second.number_value());
     ++live_callbacks_;

@@ -41,15 +41,19 @@ public:
     void registerListener(Network::Address::InstanceConstSharedPtr address,
                           std::shared_ptr<Network::UdpListenerConfig> listener_config);
 
-    void clear() { listener_map_.clear(); }
-
   private:
+    using WeakForwardEntry = std::pair<Network::Address::InstanceConstSharedPtr,
+                                       std::weak_ptr<Network::UdpListenerConfig>>;
+    using ListenerMap = absl::flat_hash_map<std::string, WeakForwardEntry>;
+
     // Builds the map key for an address string within a network namespace.
     static std::string key(absl::string_view network_namespace, absl::string_view address);
+    // Finds the entry for the key, erasing it if its config is gone.
+    ListenerMap::iterator findListener(const std::string& map_key);
 
     // Map keyed on network namespace and address as a string, because
     // Network::Address::Instance isn't hashable.
-    absl::flat_hash_map<std::string, ForwardEntry> listener_map_;
+    ListenerMap listener_map_;
   };
 
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,

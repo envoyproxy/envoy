@@ -434,6 +434,7 @@ proto_library(
         "//envoy/extensions/resource_monitors/cgroup_memory/v3:pkg",
         "//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg",
         "//envoy/extensions/resource_monitors/downstream_connections/v3:pkg",
+        "//envoy/extensions/resource_monitors/dynamic_modules/v3:pkg",
         "//envoy/extensions/resource_monitors/fixed_heap/v3:pkg",
         "//envoy/extensions/resource_monitors/injected_resource/v3:pkg",
         "//envoy/extensions/retry/host/omit_canary_hosts/v3:pkg",

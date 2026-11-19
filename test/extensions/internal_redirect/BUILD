@@ -23,7 +23,12 @@ envoy_extension_cc_test(
         "envoy.internal_redirect_predicates.previous_routes",
         "envoy.internal_redirect_predicates.safe_cross_scheme",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/set_filter_state:config",

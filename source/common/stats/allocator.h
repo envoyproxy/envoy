@@ -25,6 +25,17 @@ public:
   virtual ~Allocator();
 
   /**
+   * Finds an existing stat by its full name without creating one. Stats marked for deletion are
+   * skipped. These take the allocator's lock, so never call them from a forEach functor or a sink
+   * predicate.
+   * @param name the full name of the stat.
+   * @return a shared pointer to the stat, or nullptr when no stat of that type has this name.
+   */
+  CounterSharedPtr findCounter(StatName name) const;
+  GaugeSharedPtr findGauge(StatName name) const;
+  TextReadoutSharedPtr findTextReadout(StatName name) const;
+
+  /**
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the tag values.

@@ -123,6 +123,7 @@ envoy_cc_library(
     deps = [
         ":task_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:stderr_writer_lib",
         "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
