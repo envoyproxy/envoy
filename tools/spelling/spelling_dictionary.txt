@@ -1544,6 +1544,7 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
 vanishingly

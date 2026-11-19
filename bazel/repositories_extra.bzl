@@ -3,6 +3,7 @@ load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_baze
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_examples//bazel:env.bzl", "envoy_examples_env")
 load("@envoy_toolshed//compile:libcxx_libs.bzl", "setup_libcxx_libs")
+load("@envoy_toolshed//hunspell:repositories.bzl", "load_hunspell_toolchains", "setup_hunspell")
 load("@envoy_toolshed//pgp:repositories.bzl", "setup_sq")
 load("@envoy_toolshed//pgp:toolchain.bzl", "load_pgp_toolchains")
 load("@envoy_toolshed//pigz:repositories.bzl", "load_pigz_toolchains", "setup_pigz")
@@ -33,6 +34,8 @@ def envoy_dependencies_extra(
     load_pgp_toolchains()
     setup_pigz()
     load_pigz_toolchains()
+    setup_hunspell()
+    load_hunspell_toolchains()
 
     compatibility_proxy_repo()
     bazel_toolchain_dependencies()
