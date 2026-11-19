@@ -10,6 +10,21 @@ namespace Tracing {
  * See: https://www.w3.org/TR/trace-context/ and https://www.w3.org/TR/baggage/
  */
 
+// See https://www.w3.org/TR/trace-context/#traceparent-header
+class W3cTraceConstants {
+public:
+  static constexpr int kVersionHexSize = 2;
+  static constexpr int kTraceIdHexSize = 32;
+  static constexpr int kParentIdHexSize = 16;
+  static constexpr int kTraceFlagsHexSize = 2;
+
+  static constexpr int kTraceparentHeaderSize = kVersionHexSize + 1 +  //
+                                                kTraceIdHexSize + 1 +  //
+                                                kParentIdHexSize + 1 + //
+                                                kTraceFlagsHexSize;
+  static_assert(kTraceparentHeaderSize == 55);
+};
+
 /**
  * Verifies that the given string is a valid traceparent header.
  */
