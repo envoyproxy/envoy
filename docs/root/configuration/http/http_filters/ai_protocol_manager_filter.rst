@@ -200,10 +200,9 @@ set to ``DISABLE``, the received body is forwarded byte for byte instead, and
 edits AI filters make to the document are not sent; use it only with AI filters
 that read the request.
 
-A response runs the AI filters when its request was an AI call -- a declared
-AI endpoint, or one whose API an AI filter detected -- and at least one of
-them handles responses, as the transcoder does. Any other response passes
-through untouched.
+A response runs the AI filters when its request was an AI call: a declared
+AI endpoint, or one whose API an AI filter detected. Any other response
+passes through untouched.
 
 .. _config_http_filters_ai_protocol_manager_schema_validation:
 

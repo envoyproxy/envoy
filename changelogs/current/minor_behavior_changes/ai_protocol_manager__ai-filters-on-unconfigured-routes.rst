@@ -6,5 +6,4 @@ so a catch-all route such as a dynamic forward proxy's can rely on schema valida
 API. A payload that parses is re-serialized like a declared endpoint's unless ``reserialize_body``
 is ``DISABLE``; one that fails to parse is still forwarded unchanged. An API an AI filter detects is
 published as ``envoy.ai.llm_protocol.request`` filter state, and the response then runs the AI
-filters as a declared endpoint's does. A response no longer runs a chain in which no AI filter
-handles responses.
+filters as a declared endpoint's does.

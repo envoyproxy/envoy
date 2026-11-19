@@ -117,10 +117,6 @@ public:
                                                AiRequestPropagator propagate_request,
                                                LocalReplier reply_locally) = 0;
 
-  // Whether the filter acts on responses, which a filter overriding encodeSSE() or encodeUnary()
-  // must say. A response skips a chain in which no filter does.
-  virtual bool handlesResponse() const { return false; }
-
   // Invoked for Server-Sent Events (SSE) streaming responses. The coroutine runs for the entire
   // lifetime of the response stream, receiving and propagating discrete frames.
   //

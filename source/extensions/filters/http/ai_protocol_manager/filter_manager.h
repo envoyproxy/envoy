@@ -62,8 +62,6 @@ public:
   // Cancels all in-flight request and response coroutines on stream reset or teardown.
   void cancel();
 
-  bool handlesResponse() const;
-
 private:
   std::vector<AiFilterSharedPtr> filters_;
   RequestFilterManagerPtr request_manager_;

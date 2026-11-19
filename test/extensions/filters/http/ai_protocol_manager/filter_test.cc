@@ -2369,8 +2369,6 @@ public:
     co_return co_await std::move(propagate_request)(std::move(request));
   }
 
-  bool handlesResponse() const override { return true; }
-
   Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver receive_event,
                                           SseStreamPropagator propagate_event) override {
     while (true) {
@@ -2491,29 +2489,6 @@ TEST_F(AiProtocolManagerFilterTest, ResponseToDetectedRequestRunsAiFilters) {
   EXPECT_EQ(encoded_injected_.toString(), "data: {\"a\":1,\"tagged\":true}\n\n");
 }
 
-// A chain in which no filter handles responses leaves a declared endpoint's response untouched.
-TEST_F(AiProtocolManagerFilterTest, ResponseSkipsAChainThatHandlesNoResponse) {
-  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
-    return std::make_shared<PassThroughAiFilter>();
-  }});
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl req_body(R"({"model":"gpt-4"})");
-  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-  ASSERT_TRUE(injected_end_stream_);
-
-  Http::TestResponseHeaderMapImpl resp_headers{
-      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "8"}};
-  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(resp_headers.getContentLengthValue(), "8");
-
-  Buffer::OwnedImpl resp_body("not json");
-  EXPECT_EQ(filter_->encodeData(resp_body, true), Http::FilterDataStatus::Continue);
-  EXPECT_EQ(encode_local_reply_calls_, 0);
-}
-
 TEST_F(AiProtocolManagerFilterTest, SseResponseEndedByTrailersContinuesEncoding) {
   createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
     return std::make_shared<SseTaggingAiFilter>("tagged");
@@ -2577,8 +2552,6 @@ public:
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
     co_return co_await std::move(propagate_request)(std::move(request));
   }
-
-  bool handlesResponse() const override { return true; }
 
   Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
                                             AiResponseStreamPropagator propagate) override {

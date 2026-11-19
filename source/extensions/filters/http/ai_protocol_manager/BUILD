@@ -460,7 +460,6 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
     ],

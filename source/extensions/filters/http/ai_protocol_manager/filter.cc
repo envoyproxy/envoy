@@ -593,10 +593,13 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
       config_->tokenUsageEnabled() &&
       (route_config != nullptr || filter_state_request_api != LLMProtocol::Unspecified ||
        config_->includeUnconfiguredRoutes());
-  // A response runs the AI filters when its request was an AI call -- a declared endpoint, or one
-  // whose API a filter named -- and one of them handles responses.
+  // TODO(penguingao): consider add request only / response only AI filter chain
+  // when there is a need. Currently, all AI filters handle both request and
+  // response.
+  // A response runs the AI filters when its request was an AI call: a declared endpoint, or one
+  // whose API a filter named.
   const bool can_filter_response =
-      filter_manager_ != nullptr && !payload_rejected_ && filter_manager_->handlesResponse() &&
+      filter_manager_ != nullptr && !payload_rejected_ &&
       (isAiEndpoint() || filter_state_request_api != LLMProtocol::Unspecified);
 
   if (!can_filter_response && !want_token_usage) {
