@@ -462,6 +462,10 @@ getMetadataValueByPath(envoy_dynamic_module_type_http_filter_envoy_ptr filter_en
       value = &list.values(component.index);
       break;
     }
+    default:
+      ENVOY_LOG_TO_LOGGER(logger, debug, "metadata path component {} has unknown kind {}", i,
+                          static_cast<int>(component.kind));
+      return nullptr;
     }
   }
   return value;

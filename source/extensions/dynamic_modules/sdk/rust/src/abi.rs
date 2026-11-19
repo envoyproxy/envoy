@@ -3097,10 +3097,11 @@ unsafe extern "C" {
 pub enum envoy_dynamic_module_type_metadata_path_component_kind {
     Key = 0,
     Index = 1,
+    Sentinel = 2147483647,
 }
 /** A component of a metadata path. The kind selects either a literal struct key or a zero-based
  list index. The other field is ignored. A key of length zero selects an empty key and may have a
- null pointer.*/
+ null pointer. The callbacks reject unknown component kinds.*/
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct envoy_dynamic_module_type_module_metadata_path_component {

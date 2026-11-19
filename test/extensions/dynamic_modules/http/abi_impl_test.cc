@@ -1860,6 +1860,10 @@ TEST(ABIImpl, NestedMetadata) {
   size = 99;
   str = {"sentinel", 8};
   expect_failure({{Index, {}, 0}}); // Namespace is a struct.
+  path = make_path({"claims", "sub"});
+  const auto unknown_kind = static_cast<envoy_dynamic_module_type_metadata_path_component_kind>(2);
+  path.insert(path.begin() + 1, {unknown_kind, {}, 0});
+  expect_failure(path);
   for (const auto& keys :
        {make_path({"claims"}), make_path({"claims", "sub"}), make_path({"claims", "empty"})}) {
     path = keys;
