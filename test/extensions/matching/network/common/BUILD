@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
     extension_names = ["envoy.matching.inputs.destination_ip"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/network:address_lib",
@@ -33,7 +36,13 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["inputs_integration_test.cc"],
     extension_names = ["envoy.matching.inputs.destination_ip"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network/matching:data_impl_lib",

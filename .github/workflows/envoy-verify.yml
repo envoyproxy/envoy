@@ -78,8 +78,7 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    # Only report on a `verify` check: release branches whose config has none still run the verify
-    # jobs, unreported.
+    # Only report on a `verify` check.
     if: |
       !cancelled()
       && needs.load.result == 'success'

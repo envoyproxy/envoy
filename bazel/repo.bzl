@@ -265,17 +265,6 @@ py_console_script_binary(
     data = [":envoy_repo.py"],
 )
 
-py_console_script_binary(
-    name = "trigger",
-    args = [
-        "trigger",
-        PATH,
-    ],
-    pkg = "@base_pip3//envoy_base_utils",
-    script = "envoy.project",
-    data = [":envoy_repo.py"],
-)
-
 ''' % local_sysroot)
 
 _envoy_repo = repository_rule(

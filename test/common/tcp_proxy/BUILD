@@ -52,7 +52,13 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":tcp_proxy_test_base",
         "//envoy/common:hashable_interface",
@@ -67,8 +73,19 @@ envoy_cc_test(
     ],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     # MemorySanitizer's instrumentation overhead makes this large parameterized suite exceed the
     # default 300s cap, so allow 900s and shard the work to keep each shard well under the limit.
@@ -90,8 +107,18 @@ envoy_cc_test(
     srcs = ["upstream_test.cc"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "msan": "linux_x64_small",
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:formatter_extension_lib",

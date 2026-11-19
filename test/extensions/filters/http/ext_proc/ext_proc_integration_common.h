@@ -263,6 +263,7 @@ protected:
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
   bool two_ext_proc_filters_ = false;
+  bool per_try_timeout_enabled_ = false;
 };
 
 } // namespace ExternalProcessing
