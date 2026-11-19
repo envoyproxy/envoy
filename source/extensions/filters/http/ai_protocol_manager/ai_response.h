@@ -3,6 +3,8 @@
 #include <optional>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/coroutine/task.h"
 #include "source/extensions/filters/http/ai_protocol_manager/flattening_json_codec.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
@@ -33,6 +35,14 @@ using AiResponseStreamReceiver =
 // an empty vector ends the unary response stream for downstream stages.
 using AiResponseStreamPropagator =
     absl::AnyInvocable<Coroutine::Task<absl::Status>(std::vector<FlattenJsonField>)>;
+
+// Delivers the next chunk of a raw response body; nullopt marks its end.
+using RawResponseReceiver =
+    absl::AnyInvocable<Coroutine::Task<absl::StatusOr<std::optional<Buffer::InstancePtr>>>()>;
+
+// Forwards body bytes to the next filter in the chain. The chain rejects a null chunk.
+using RawResponsePropagator =
+    absl::AnyInvocable<Coroutine::Task<absl::Status>(Buffer::InstancePtr)>;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

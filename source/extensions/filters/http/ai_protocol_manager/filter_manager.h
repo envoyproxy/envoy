@@ -32,7 +32,7 @@ namespace AiProtocolManager {
 // instances across both directions.
 class FilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
-  using LocalReplyFn = RequestFilterManager::LocalReplyFn;
+  using LocalReplyFn = AiProtocolManager::LocalReplyFn;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
   explicit FilterManager(std::vector<AiFilterSharedPtr> filters);
@@ -55,6 +55,15 @@ public:
   // Starts the unary JSON response filter chain in reverse filter order (N-1..0).
   void startUnaryResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,
                           BufferManager& out_buffer_manager, OnCompleteFn on_complete);
+
+  // Offers the response headers to the filters in reverse filter order (N-1..0). Returns the
+  // mode the response is taken in: raw when any filter asks for it.
+  ResponseMode onResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream);
+
+  // Starts the raw response filter chain in reverse filter order (N-1..0).
+  void startRawResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,
+                        BufferManager& out_buffer_manager, OnCompleteFn on_complete,
+                        LocalReplyFn local_reply_fn);
 
   // Feeds response body bytes to the active response filter manager.
   void onResponseData(Buffer::Instance& data, bool end_stream);

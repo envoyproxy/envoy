@@ -2447,6 +2447,14 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.mcp_json_rest_bridge:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  - envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridgePerRoute
 envoy.http.ai_filters.model_router:
   categories:
   - envoy.http.ai_filters

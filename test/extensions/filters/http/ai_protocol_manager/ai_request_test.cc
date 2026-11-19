@@ -72,6 +72,15 @@ TEST(AiRequestTest, ExternalRefsSurviveTheWrapper) {
   EXPECT_EQ(*decoded, ref);
 }
 
+// A request has a body until a filter maps it onto one without.
+TEST(AiRequestTest, BodyCanBeDropped) {
+  AiRequest request{JsonWithExtBuf{}};
+  EXPECT_TRUE(request.hasBody());
+
+  request.dropBody();
+  EXPECT_FALSE(request.hasBody());
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

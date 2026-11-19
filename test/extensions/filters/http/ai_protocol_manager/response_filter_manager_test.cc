@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -204,7 +205,7 @@ public:
 
   void makeManager(std::vector<AiFilterSharedPtr> filters,
                    ResponseFilterManager::Config config = ResponseFilterManager::Config{},
-                   uint32_t buffer_limit = 1024 * 1024) {
+                   uint32_t buffer_limit = 1024 * 1024, LocalReplyFn local_reply_fn = nullptr) {
     bridge_ = std::make_unique<FakeBridge>(*dispatcher_, buffer_limit);
     out_buffer_manager_ =
         std::make_unique<BufferManager>(BufferManager::Config{}, factory_, *bridge_);
@@ -214,7 +215,7 @@ public:
           ++complete_calls_;
           result_ = std::move(status);
         },
-        config);
+        config, std::move(local_reply_fn));
     manager_->start();
   }
 
@@ -897,6 +898,150 @@ TEST_F(ResponseFilterManagerTest, UnarySourceIsPausedWhenPipelineIsBackedUp) {
   EXPECT_THAT(result_, IsOk());
   EXPECT_EQ(nlohmann::json::parse(output()),
             nlohmann::json::parse(R"({"a":"1111111111","b":"2222222222","c":"3333333333"})"));
+}
+
+// Wraps the whole body in a pair of marks, so its place in the chain shows on the wire.
+class WrappingRawFilter : public AiFilter {
+public:
+  WrappingRawFilter(std::string open, std::string close)
+      : open_(std::move(open)), close_(std::move(close)) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeRaw(RawResponseReceiver receive,
+                                          RawResponsePropagator propagate, LocalReplier) override {
+    CO_RETURN_IF_ERROR(co_await propagate(std::make_unique<Buffer::OwnedImpl>(open_)));
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::optional<Buffer::InstancePtr> chunk, co_await receive());
+      if (!chunk.has_value()) {
+        break;
+      }
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(*chunk)));
+    }
+    co_return co_await propagate(std::make_unique<Buffer::OwnedImpl>(close_));
+  }
+
+private:
+  const std::string open_;
+  const std::string close_;
+};
+
+// Forwards a null chunk, which the chain must reject rather than write out.
+class NullPropagatingRawFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeRaw(RawResponseReceiver receive,
+                                          RawResponsePropagator propagate, LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(std::optional<Buffer::InstancePtr> chunk, co_await receive());
+    if (!chunk.has_value()) {
+      co_return absl::OkStatus();
+    }
+    co_return co_await propagate(nullptr);
+  }
+};
+
+// Answers the response with a local reply once its first chunk arrives.
+class ReplyingRawFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  Coroutine::Task<absl::Status> encodeRaw(RawResponseReceiver receive, RawResponsePropagator,
+                                          LocalReplier reply_locally) override {
+    ASSIGN_OR_CO_RETURN(std::optional<Buffer::InstancePtr> chunk, co_await receive());
+    (void)chunk;
+    std::move(reply_locally)(Http::Code::BadGateway, "replaced");
+    co_return absl::OkStatus();
+  }
+};
+
+ResponseFilterManager::Config rawConfig() {
+  ResponseFilterManager::Config config;
+  config.mode = ResponseFilterManager::Mode::Raw;
+  return config;
+}
+
+TEST_F(ResponseFilterManagerTest, RawNoFiltersPassesBytesThrough) {
+  makeManager({}, rawConfig());
+  feed("not json, ", /*end_stream=*/false);
+  feed("not sse");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(output(), "not json, not sse");
+}
+
+// A filter that does not take the response raw is out of the chain before the first chunk.
+TEST_F(ResponseFilterManagerTest, RawInertFilterIsSplicedOut) {
+  makeManager({std::make_shared<InertFilter>()}, rawConfig());
+  feed("bytes");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "bytes");
+}
+
+TEST_F(ResponseFilterManagerTest, RawFiltersRunInOrder) {
+  makeManager({std::make_shared<WrappingRawFilter>("(", ")"),
+               std::make_shared<WrappingRawFilter>("[", "]")},
+              rawConfig());
+  feed("a", /*end_stream=*/false);
+  feed("b");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "[(ab)]");
+}
+
+// A response that ended on its headers has an empty body, which a filter may still add to.
+TEST_F(ResponseFilterManagerTest, RawFilterMayGiveAnEmptyBodyContent) {
+  makeManager({std::make_shared<WrappingRawFilter>("<", ">")}, rawConfig());
+  feed("");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "<>");
+}
+
+TEST_F(ResponseFilterManagerTest, RawPropagatingANullChunkFailsTheStream) {
+  makeManager({std::make_shared<NullPropagatingRawFilter>()}, rawConfig());
+
+  EXPECT_ENVOY_BUG(
+      {
+        feed("bytes");
+        EXPECT_EQ(result_.code(), absl::StatusCode::kInvalidArgument);
+      },
+      "null Buffer::InstancePtr");
+}
+
+// A local reply ends the pipeline: nothing more is written, and it does not complete.
+TEST_F(ResponseFilterManagerTest, RawFilterRepliesLocally) {
+  std::optional<LocalReply> reply;
+  makeManager({std::make_shared<ReplyingRawFilter>()}, rawConfig(), 1024 * 1024,
+              [&reply](LocalReply local_reply) { reply = std::move(local_reply); });
+  feed("first", /*end_stream=*/false);
+
+  ASSERT_TRUE(reply.has_value());
+  EXPECT_EQ(reply->code, Http::Code::BadGateway);
+  EXPECT_EQ(reply->body, "replaced");
+
+  feed("second");
+  EXPECT_EQ(complete_calls_, 0);
+  EXPECT_EQ(output(), "");
+}
+
+TEST_F(ResponseFilterManagerTest, RawLocalReplyWithoutASinkEndsThePipeline) {
+  makeManager({std::make_shared<ReplyingRawFilter>()}, rawConfig());
+  feed("first");
+
+  EXPECT_EQ(complete_calls_, 0);
+  EXPECT_EQ(output(), "");
 }
 
 } // namespace
