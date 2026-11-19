@@ -1,5 +1,6 @@
 #include <array>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/config_validator.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/registry/registry.h"
@@ -251,6 +252,72 @@ TEST_P(XdsManagerImplTest, ConfigTrackersEnableTrackingWhileRegistered) {
   EXPECT_FALSE(tracker_->enabled());
 }
 
+TEST_P(XdsManagerImplTest, ConfigTrackersReachPerTypeGrpcSubscriptions) {
+  initialize();
+  class MockGrpcConfigSubscriptionFactory : public MockAdsConfigSubscriptionFactory {
+  public:
+    std::string name() const override { return "envoy.config_subscription.grpc"; }
+  };
+  NiceMock<MockGrpcConfigSubscriptionFactory> factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> registration(factory);
+  XdsConfigTrackerOptRef subscription_tracker;
+  EXPECT_CALL(factory, create(_))
+      .WillOnce([&](ConfigSubscriptionFactory::SubscriptionData& data) -> SubscriptionPtr {
+        subscription_tracker = data.xds_config_tracker_;
+        return std::make_unique<NiceMock<MockSubscription>>();
+      });
+  const Upstream::ClusterManager::ClusterSet primary_clusters{"xds_cluster"};
+  ON_CALL(cm_, primaryClusters()).WillByDefault(ReturnRef(primary_clusters));
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config = config.mutable_api_config_source();
+  api_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  auto subscription = xds_manager_impl_.subscribeToSingletonResource(
+      "resource", makeOptRef(config), "test-type", *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), {});
+  ASSERT_OK(subscription.status());
+  ASSERT_TRUE(subscription_tracker.has_value());
+  EXPECT_FALSE(subscription_tracker->enabled());
+  testing::StrictMock<MockXdsConfigTracker> observer;
+  auto handle = xds_manager_impl_.addXdsConfigTracker(observer);
+  EXPECT_TRUE(subscription_tracker->enabled());
+  EXPECT_CALL(observer, onResourceUnsubscribed("test-type", "resource"));
+  subscription_tracker->onResourceUnsubscribed("test-type", "resource");
+  handle.reset();
+  EXPECT_FALSE(subscription_tracker->enabled());
+}
+
+TEST_P(XdsManagerImplTest, ConfigTrackersReachXdstpAuthorityMux) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "false"}});
+  auto* config_source = server_.bootstrap_.add_config_sources();
+  config_source->add_authorities()->set_name("test_authority");
+  auto* api_config = config_source->mutable_api_config_source();
+  api_config->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  api_config->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<MuxFactory> registration(factory);
+  XdsConfigTrackerOptRef authority_tracker;
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(testing::WithArg<9>([&](XdsConfigTrackerOptRef tracker) {
+        authority_tracker = tracker;
+        return std::make_shared<NiceMock<MockGrpcMux>>();
+      }));
+  initialize();
+  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  ASSERT_TRUE(authority_tracker.has_value());
+  EXPECT_FALSE(authority_tracker->enabled());
+  testing::StrictMock<MockXdsConfigTracker> observer;
+  auto handle = xds_manager_impl_.addXdsConfigTracker(observer);
+  EXPECT_TRUE(authority_tracker->enabled());
+  EXPECT_CALL(observer, onResourceUnsubscribed("test-type", "resource"));
+  authority_tracker->onResourceUnsubscribed("test-type", "resource");
+  handle.reset();
+  EXPECT_FALSE(authority_tracker->enabled());
+}
+
 TEST(XdsConfigTrackersTest, RegistrationMayOutliveManager) {
   testing::StrictMock<MockXdsConfigTracker> tracker;
   Common::CallbackHandlePtr handle;
@@ -269,14 +336,124 @@ TEST(XdsConfigTrackersTest, TrackerCanUnregisterItselfDuringCallback) {
   auto second_handle = trackers.add(second);
   EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
     first_handle.reset();
+    EXPECT_TRUE(trackers.enabled());
   });
   EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
   trackers.onResourceUnsubscribed("type", "name");
   EXPECT_TRUE(trackers.enabled());
   EXPECT_CALL(second, onResourceUnsubscribed("type", "name")).WillOnce([&] {
     second_handle.reset();
+    EXPECT_FALSE(trackers.enabled());
   });
   trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_FALSE(trackers.enabled());
+}
+
+TEST(XdsConfigTrackersTest, RemovedTrackersAreSkippedDuringCallback) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  auto second = std::make_unique<testing::StrictMock<MockXdsConfigTracker>>();
+  testing::StrictMock<MockXdsConfigTracker> third;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(*second);
+  auto third_handle = trackers.add(third);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+    second.reset();
+  });
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+}
+
+TEST(XdsConfigTrackersTest, NewTrackersWaitUntilNextUpdate) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  testing::StrictMock<MockXdsConfigTracker> third;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  Common::CallbackHandlePtr third_handle;
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    third_handle = trackers.add(third);
+  });
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name"));
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+}
+
+TEST(XdsConfigTrackersTest, ReregisteredTrackersWaitUntilNextUpdate) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    first_handle.reset();
+    first_handle = trackers.add(first);
+  });
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+    second_handle = trackers.add(second);
+  });
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name"));
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+}
+
+TEST(XdsConfigTrackersTest, DuplicateRegistrationsAreIndependent) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> tracker;
+  auto first_handle = trackers.add(tracker);
+  auto second_handle = trackers.add(tracker);
+  EXPECT_CALL(tracker, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+  });
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_TRUE(trackers.enabled());
+  first_handle.reset();
+  EXPECT_FALSE(trackers.enabled());
+}
+
+TEST(XdsConfigTrackersTest, NestedCallbacksDeferCompactionUntilOuterDispatchCompletes) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  testing::StrictMock<MockXdsConfigTracker> third;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  auto third_handle = trackers.add(third);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "outer")).WillOnce([&] {
+    trackers.onResourceUnsubscribed("type", "inner");
+  });
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "inner")).WillOnce([&] {
+    second_handle.reset();
+  });
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "inner"));
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "outer"));
+  trackers.onResourceUnsubscribed("type", "outer");
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "next"));
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "next"));
+  trackers.onResourceUnsubscribed("type", "next");
+}
+
+TEST(XdsConfigTrackersTest, TrackersRemainUsableAfterCallbackThrows) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    first_handle.reset();
+    throw EnvoyException("tracker callback failed");
+  });
+  EXPECT_THROW(trackers.onResourceUnsubscribed("type", "name"), EnvoyException);
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+  second_handle.reset();
   EXPECT_FALSE(trackers.enabled());
 }
 

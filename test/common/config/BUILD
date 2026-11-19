@@ -307,6 +307,7 @@ envoy_cc_test(
         "msan": "linux_x64_small",
     },
     deps = [
+        "//envoy/common:exception_lib",
         "//source/common/config:xds_manager_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",

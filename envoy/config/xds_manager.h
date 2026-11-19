@@ -66,9 +66,9 @@ public:
   virtual void startXdstpAdsMuxes() PURE;
 
   /**
-   * Registers a tracker alongside the bootstrap-configured tracker. Registration and removal run
-   * on the main thread. The tracker must outlive the returned handle, which unregisters it on
-   * destruction. A tracker may unregister itself during a callback, but not other trackers.
+   * Registers a tracker alongside the bootstrap-configured tracker. Destroying the returned handle
+   * unregisters it. Both operations run on the main thread. The tracker must outlive the handle.
+   * Trackers removed during a callback are skipped; new trackers wait until the next notification.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addXdsConfigTracker(XdsConfigTracker& tracker) PURE;

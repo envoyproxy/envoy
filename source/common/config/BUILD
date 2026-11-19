@@ -366,6 +366,7 @@ envoy_cc_library(
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:thread_lib",
         "//source/common/upstream:load_stats_reporter_lib",
         "@abseil-cpp//absl/functional:function_ref",

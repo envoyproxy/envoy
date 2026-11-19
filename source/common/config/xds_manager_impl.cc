@@ -1,6 +1,7 @@
 #include "source/common/config/xds_manager_impl.h"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -620,12 +621,26 @@ XdsManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ad
 class XdsConfigTrackers::Registration : public Common::CallbackHandle {
 public:
   Registration(const std::shared_ptr<Trackers>& trackers, XdsConfigTracker& tracker)
-      : trackers_(trackers), it_(trackers_->insert(trackers_->end(), tracker)) {}
-  ~Registration() override { trackers_->erase(it_); }
+      : trackers_(trackers), tracker_(tracker) {
+    trackers_->entries_.push_back(this);
+  }
+  ~Registration() override {
+    auto& entries = trackers_->entries_;
+    const auto it = std::find(entries.begin(), entries.end(), this);
+    ASSERT(it != entries.end());
+    if (trackers_->iteration_depth_ > 0) {
+      *it = nullptr;
+      trackers_->has_removed_entries_ = true;
+    } else {
+      entries.erase(it);
+    }
+  }
+
+  XdsConfigTracker& tracker() const { return tracker_; }
 
 private:
   const std::shared_ptr<Trackers> trackers_;
-  const Trackers::iterator it_;
+  XdsConfigTracker& tracker_;
 };
 
 Common::CallbackHandlePtr XdsConfigTrackers::add(XdsConfigTracker& tracker) {
@@ -633,15 +648,26 @@ Common::CallbackHandlePtr XdsConfigTrackers::add(XdsConfigTracker& tracker) {
 }
 
 bool XdsConfigTrackers::enabled() const {
-  return std::any_of(trackers_->begin(), trackers_->end(),
-                     [](const auto& tracker) { return tracker.get().enabled(); });
+  return std::any_of(
+      trackers_->entries_.begin(), trackers_->entries_.end(),
+      [](const Registration* entry) { return entry != nullptr && entry->tracker().enabled(); });
 }
 
 void XdsConfigTrackers::forEach(absl::FunctionRef<void(XdsConfigTracker&)> callback) {
-  for (auto it = trackers_->begin(); it != trackers_->end();) {
-    auto& tracker = (it++)->get();
-    if (tracker.enabled()) {
-      callback(tracker);
+  auto& trackers = *trackers_;
+  ++trackers.iteration_depth_;
+  Cleanup cleanup([&trackers] {
+    if (--trackers.iteration_depth_ == 0 && trackers.has_removed_entries_) {
+      std::erase(trackers.entries_, nullptr);
+      trackers.has_removed_entries_ = false;
+    }
+  });
+  // callbacks can remove any registration or append new ones
+  const size_t size_at_start = trackers.entries_.size();
+  for (size_t i = 0; i < size_at_start; ++i) {
+    const auto* entry = trackers.entries_[i];
+    if (entry != nullptr && entry->tracker().enabled()) {
+      callback(entry->tracker());
     }
   }
 }

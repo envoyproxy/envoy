@@ -1,8 +1,8 @@
 #pragma once
 
-#include <functional>
-#include <list>
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_manager.h"
@@ -35,8 +35,12 @@ public:
   void onResourceUnsubscribed(absl::string_view type_url, absl::string_view resource) override;
 
 private:
-  using Trackers = std::list<std::reference_wrapper<XdsConfigTracker>>;
   class Registration;
+  struct Trackers {
+    std::vector<Registration*> entries_;
+    uint32_t iteration_depth_{0};
+    bool has_removed_entries_{false};
+  };
 
   void forEach(absl::FunctionRef<void(XdsConfigTracker&)> callback);
 
