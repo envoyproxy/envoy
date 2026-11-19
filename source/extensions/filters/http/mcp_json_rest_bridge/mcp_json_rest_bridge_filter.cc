@@ -1176,7 +1176,7 @@ bool McpJsonRestBridge::onResponseBodySize(uint64_t size,
         headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
       },
       Grpc::Status::WellKnownGrpcStatus::Internal,
-      bridgeStatusToString(BridgeStatus::ResponseTooLarge));
+      bridgeStatusToString(BridgeStatus::ResponseTooLarge), LocalReplyFor::BufferedResponse);
   return false;
 }
 
@@ -1324,7 +1324,8 @@ void McpJsonRestBridge::serveToolsListLocal(
       [](Http::ResponseHeaderMap& headers) {
         headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
       },
-      Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_tools_list");
+      Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_tools_list",
+      LocalReplyFor::Request);
 }
 
 absl::Status McpJsonRestBridge::validateMcpProtocolVersionHeader(
@@ -1589,7 +1590,8 @@ McpJsonRestBridge::RequestStatus McpJsonRestBridge::onRequestBody(
           [](Http::ResponseHeaderMap& headers) {
             headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
           },
-          Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize");
+          Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize",
+          LocalReplyFor::Request);
       return RequestStatus::Replied;
     }
     sendErrorResponse(
@@ -1608,7 +1610,7 @@ McpJsonRestBridge::RequestStatus McpJsonRestBridge::onRequestBody(
                                    : json::object());
     callbacks_.sendLocalReply(Http::Code::Accepted, "", nullptr,
                               Grpc::Status::WellKnownGrpcStatus::Ok,
-                              "mcp_json_rest_bridge_filter_initialize_ack");
+                              "mcp_json_rest_bridge_filter_initialize_ack", LocalReplyFor::Request);
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
     if (config_->traceContextExtraction() && request_headers.has_value()) {
@@ -1632,7 +1634,8 @@ McpJsonRestBridge::RequestStatus McpJsonRestBridge::onRequestBody(
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
-        Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
+        Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover",
+        LocalReplyFor::Request);
   } else {
     // MCP 2026-07-28 Streamable HTTP requires 404 Not Found together with -32601 (Method not found)
     // for methods the server does not implement. Legacy (2025-11-25 and earlier) requests keep
@@ -1902,7 +1905,7 @@ void McpJsonRestBridge::sendErrorResponse(
   setParsingMetadata(method, params);
 
   callbacks_.sendLocalReply(response_code, response_body, modify_headers, grpc_status,
-                            bridgeStatusToString(status));
+                            bridgeStatusToString(status), LocalReplyFor::Request);
 }
 
 void McpJsonRestBridge::setDynamicMetadata() {
@@ -1980,7 +1983,8 @@ bool McpJsonRestBridge::encodeStreamingData(Buffer::Instance& data, bool end_str
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
         Grpc::Status::WellKnownGrpcStatus::Internal,
-        "mcp_json_rest_bridge_filter_streaming_payload_preparation_error");
+        "mcp_json_rest_bridge_filter_streaming_payload_preparation_error",
+        LocalReplyFor::StreamingResponse);
     return false;
   }
   std::string output_to_add = *std::move(payload);
@@ -2073,9 +2077,9 @@ absl::Status McpJsonRestBridge::validateJsonRpcIdAndMethod(const nlohmann::json&
 void McpJsonRestBridgeFilter::sendLocalReply(
     Http::Code code, absl::string_view body,
     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-    Grpc::Status::GrpcStatus grpc_status, absl::string_view details) {
+    Grpc::Status::GrpcStatus grpc_status, absl::string_view details, LocalReplyFor reply_for) {
   // A streaming response is replaced from the encode path, which is where it fails.
-  if (bridge_.responseStatus() == McpJsonRestBridge::ResponseStatus::Streaming) {
+  if (reply_for == LocalReplyFor::StreamingResponse) {
     encoder_callbacks_->sendLocalReply(code, body, std::move(modify_headers), grpc_status, details);
   } else {
     decoder_callbacks_->sendLocalReply(code, body, std::move(modify_headers), grpc_status, details);

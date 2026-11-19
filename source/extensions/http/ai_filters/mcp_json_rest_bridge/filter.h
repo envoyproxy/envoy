@@ -47,7 +47,8 @@ public:
   // Bridge::BridgeCallbacks
   void sendLocalReply(Http::Code code, absl::string_view body,
                       std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details) override;
+                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details,
+                      Bridge::LocalReplyFor reply_for) override;
   void clearRouteCache() override { context_.clear_route_cache(); }
   StreamInfo::StreamInfo& streamInfo() override { return context_.stream_info; }
   absl::string_view filterConfigName() const override { return context_.filter_name; }
@@ -58,6 +59,9 @@ private:
   // Runs the bridge over the request. Returns whether the request goes on; if not, the reply
   // is in local_reply_.
   bool bridgeRequest(HttpFilters::AiProtocolManager::AiRequest& request);
+
+  // Takes the reply the bridge sent during the current call.
+  HttpFilters::AiProtocolManager::LocalReply takeLocalReply();
 
   const Bridge::McpJsonRestBridgePerRouteConfig* routeConfig() const;
 

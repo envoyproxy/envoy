@@ -19,6 +19,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "//source/common/http:headers_lib",

@@ -237,6 +237,16 @@ private:
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
 using McpJsonRestBridgePerRouteConfigSharedPtr = std::shared_ptr<McpJsonRestBridgePerRouteConfig>;
 
+// What a local reply of the bridge takes the place of.
+enum class LocalReplyFor {
+  // The request.
+  Request,
+  // A Buffered response, whose headers are still held.
+  BufferedResponse,
+  // A Streaming response, whose headers have gone downstream.
+  StreamingResponse,
+};
+
 // The stream a bridge runs on, as the filter hosting it provides it.
 class BridgeCallbacks {
 public:
@@ -244,7 +254,8 @@ public:
 
   virtual void sendLocalReply(Http::Code code, absl::string_view body,
                               std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                              Grpc::Status::GrpcStatus grpc_status, absl::string_view details) PURE;
+                              Grpc::Status::GrpcStatus grpc_status, absl::string_view details,
+                              LocalReplyFor reply_for) PURE;
   virtual void clearRouteCache() PURE;
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
   // The hosting filter's configured name, which is the dynamic metadata namespace.
@@ -530,7 +541,8 @@ public:
   // BridgeCallbacks
   void sendLocalReply(Http::Code code, absl::string_view body,
                       std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details) override;
+                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details,
+                      LocalReplyFor reply_for) override;
   void clearRouteCache() override {
     if (decoder_callbacks_->downstreamCallbacks().has_value()) {
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();

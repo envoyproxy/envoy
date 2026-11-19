@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
@@ -51,7 +52,7 @@ McpJsonRestBridgeFilter::McpJsonRestBridgeFilter(
 
 absl::Status McpJsonRestBridgeFilter::decodeSync(AiRequest& request, LocalReplier reply_locally) {
   if (!bridgeRequest(request)) {
-    std::move(reply_locally)(*std::move(local_reply_));
+    std::move(reply_locally)(takeLocalReply());
   }
   return absl::OkStatus();
 }
@@ -92,6 +93,11 @@ bool McpJsonRestBridgeFilter::bridgeRequest(AiRequest& request) {
     break;
   }
   return true;
+}
+
+LocalReply McpJsonRestBridgeFilter::takeLocalReply() {
+  ASSERT(local_reply_.has_value());
+  return *std::exchange(local_reply_, std::nullopt);
 }
 
 std::optional<LocalReply> McpJsonRestBridgeFilter::onUnparsedRequest(UnparsedRequest reason) {
@@ -146,7 +152,7 @@ Coroutine::Task<absl::Status> McpJsonRestBridgeFilter::encodeStreaming(
     end_stream = !chunk.has_value();
     Buffer::InstancePtr data = end_stream ? toBuffer("") : std::move(*chunk);
     if (!bridge_.encodeStreamingData(*data, end_stream)) {
-      std::move(reply_locally)(*std::move(local_reply_));
+      std::move(reply_locally)(takeLocalReply());
       co_return absl::OkStatus();
     }
     CO_RETURN_IF_ERROR(co_await propagate(std::move(data)));
@@ -163,7 +169,7 @@ Coroutine::Task<absl::Status> McpJsonRestBridgeFilter::encodeBuffered(
       break;
     }
     if (!bridge_.onResponseBodySize(body.length() + (*chunk)->length(), *response_headers_)) {
-      std::move(reply_locally)(*std::move(local_reply_));
+      std::move(reply_locally)(takeLocalReply());
       co_return absl::OkStatus();
     }
     body.move(**chunk);
@@ -174,14 +180,15 @@ Coroutine::Task<absl::Status> McpJsonRestBridgeFilter::encodeBuffered(
 void McpJsonRestBridgeFilter::sendLocalReply(
     Http::Code code, absl::string_view body,
     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-    Grpc::Status::GrpcStatus grpc_status, absl::string_view details) {
+    Grpc::Status::GrpcStatus grpc_status, absl::string_view details,
+    Bridge::LocalReplyFor reply_for) {
   local_reply_ = LocalReply{.code = code,
                             .body = std::string(body),
                             .details = std::string(details),
                             .modify_headers = std::move(modify_headers),
                             .grpc_status = grpc_status};
   // A reply in place of a response is complete as the bridge sends it.
-  if (response_status_ != ResponseStatus::PassThrough) {
+  if (reply_for != Bridge::LocalReplyFor::Request) {
     return;
   }
   // The HTTP filter gives a failed request's error its JSON-RPC envelope as the reply passes back
