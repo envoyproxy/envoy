@@ -88,7 +88,7 @@ MockScope::MockScope(StatName prefix, MockStore& store)
             // Production code relies on createScope() returning a usable scope, so the default
             // is a real child scope named and registered the same way IsolatedScopeImpl does it.
             // Tests can still EXPECT_CALL createScope_ to inject a null or fake scope.
-            const std::string prefix_str = symbolTable().toString(prefix());
+            const std::string prefix_str = symbolTable().toString(this->prefix());
             const std::string& leaf = tagged_name.empty() ? base_name : tagged_name;
             const std::string child_name_str =
                 leaf.empty() ? prefix_str : (prefix_str.empty() ? leaf : prefix_str + "." + leaf);
