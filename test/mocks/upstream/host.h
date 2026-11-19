@@ -192,6 +192,15 @@ public:
   void setDisableActiveHealthCheck(bool disable_active_health_check) override {
     disable_active_health_check_ = disable_active_health_check;
   }
+  uint32_t consecutiveEagerPreconnectFloorFailures() const override {
+    return consecutive_eager_preconnect_floor_failures_;
+  }
+  void incConsecutiveEagerPreconnectFloorFailures() const override {
+    ++consecutive_eager_preconnect_floor_failures_;
+  }
+  void resetConsecutiveEagerPreconnectFloorFailures() const override {
+    consecutive_eager_preconnect_floor_failures_ = 0;
+  }
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
   MOCK_METHOD(SharedConstAddressVector, addressListOrNull, (), (const));
@@ -258,6 +267,7 @@ public:
   }
 
   bool disable_active_health_check_ = false;
+  mutable uint32_t consecutive_eager_preconnect_floor_failures_ = 0;
   std::string observability_name_;
   absl::flat_hash_map<std::string, std::string> hc_metadata_;
 };
