@@ -109,8 +109,10 @@ consider the answers to these questions before sending a PR.
   place in the tree? Consider not just the current users of this proto
   but also other possible uses in the future. Would it make more sense
   to make the proto a generic type and put it in a common location, so
-  that it can be used in other places in the future? Conversely, avoid
-  moving a proto to a common location until there is a second user.
+  that it can be used in other places in the future? Getting this right
+  up front matters: moving a proto to a different package is a breaking
+  change, so a later move can only add a copy in the new location while
+  the original remains.
 - Is the field at the right scope? Protocol specific settings belong in
   protocol options (e.g. `HttpProtocolOptions`), and extension specific
   settings in the extension's config, rather than on `Cluster`,
