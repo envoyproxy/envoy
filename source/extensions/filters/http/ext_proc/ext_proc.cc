@@ -727,10 +727,9 @@ void Filter::updateDownstreamWatermarkPushback() {
   // FULL_DUPLEX_STREAMED mode, also when the complete downstream request
   // has arrived. So pausing the side-stream won't cause deadlocks.
   // For STREAMED mode, the flow control is done by the chunk_queue size check.
-  const bool should_enable =
-      decoding_state_.completeBodyAvailable() &&
-      (decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
-      (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED);
+  const bool should_enable = decoding_state_.completeBodyAvailable() &&
+                             (decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
+                             (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED);
   watermark_callbacks_.setDownstreamWatermarkPushbackEnabled(should_enable);
 }
 
