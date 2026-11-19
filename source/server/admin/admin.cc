@@ -277,7 +277,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       "Adds or modifies runtime values as passed in query parameters. To delete a "
                       "previously added key, use an empty string as the value. Note that deletion "
                       "only applies to overrides added via this endpoint; values loaded from disk "
-                      "can be modified via override but not deleted. E.g. "
+                      "can be modified via override but not deleted. Requests that set or delete "
+                      "restart features are rejected with 400 Bad Request. E.g. "
                       "?key1=value1&key2=value2...",
                       MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true),
           makeHandler("/reopen_logs", "reopen access logs",

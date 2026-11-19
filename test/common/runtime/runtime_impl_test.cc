@@ -28,7 +28,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/flags/declare.h"
-#include "absl/flags/reflection.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -634,7 +633,6 @@ TEST_F(StaticLoaderImplTest, RemovedFlags) {
 }
 
 TEST_F(StaticLoaderImplTest, FrozenRestartFeaturesRejectAdminChanges) {
-  absl::FlagSaver saver;
   base_ = TestUtility::parseYaml<Protobuf::Struct>(R"EOF(
     envoy.restart_features.test_feature: true
   )EOF");

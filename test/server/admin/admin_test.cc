@@ -275,7 +275,7 @@ TEST_P(AdminInstanceTest, Help) {
   /reopen_logs (POST): reopen access logs
   /reset_counters (POST): reset all counters to zero
   /runtime: print runtime values
-  /runtime_modify (POST): Adds or modifies runtime values as passed in query parameters. To delete a previously added key, use an empty string as the value. Note that deletion only applies to overrides added via this endpoint; values loaded from disk can be modified via override but not deleted. E.g. ?key1=value1&key2=value2...
+  /runtime_modify (POST): Adds or modifies runtime values as passed in query parameters. To delete a previously added key, use an empty string as the value. Note that deletion only applies to overrides added via this endpoint; values loaded from disk can be modified via override but not deleted. Requests that set or delete restart features are rejected with 400 Bad Request. E.g. ?key1=value1&key2=value2...
   /server_info: print server version/status information
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
