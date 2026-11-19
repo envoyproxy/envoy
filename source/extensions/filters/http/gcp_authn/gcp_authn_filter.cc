@@ -32,28 +32,26 @@ namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
 
-std::optional<envoy::extensions::filters::http::gcp_authn::v3::Audience>
-retrieveAudience(Upstream::ThreadLocalCluster* cluster, const FilterConfigProto& config) {
+// Returns false if neither the filter config nor the cluster metadata has a valid audience. The
+// audience is only valid when this returns true.
+bool retrieveAudience(Upstream::ThreadLocalCluster* cluster, const FilterConfigProto& config,
+                      envoy::extensions::filters::http::gcp_authn::v3::Audience& audience) {
   if (config.has_audience()) {
-    return config.audience();
+    audience = config.audience();
+    return true;
   }
 
   if (cluster == nullptr) {
-    return std::nullopt;
+    return false;
   }
 
-  auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
-  const auto filter_it = filter_metadata.find(std::string(FilterName));
+  const auto& filter_metadata = cluster->info()->metadata().typed_filter_metadata();
+  const auto filter_it = filter_metadata.find(FilterName);
   if (filter_it == filter_metadata.end()) {
-    return std::nullopt;
+    return false;
   }
 
-  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-  if (MessageUtil::unpackTo(filter_it->second, audience).ok()) {
-    return audience;
-  }
-
-  return std::nullopt;
+  return MessageUtil::unpackTo(filter_it->second, audience).ok();
 }
 } // namespace
 
@@ -149,14 +147,11 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       filter_config_->context().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
 
-  auto audience_opt = retrieveAudience(cluster, filter_config_->config());
-  if (!audience_opt.has_value()) {
+  if (!retrieveAudience(cluster, filter_config_->config(), audience_)) {
     filter_config_->stats().retrieve_audience_failed_.inc();
     state_ = State::Complete;
     return FilterHeadersStatus::Continue;
   }
-
-  audience_ = audience_opt.value();
 
   std::string resolved_authorization;
   std::optional<ClientCertData> client_cert_data;

@@ -120,12 +120,12 @@ jobs:
     - github-dev
     runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/dispatch@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         ref: main
         repository: envoyproxy/envoy-website

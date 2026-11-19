@@ -46,6 +46,7 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -99,6 +100,7 @@ envoy_extension_cc_test(
         ":delta_subscription_test_harness",
         "//envoy/config:xds_config_tracker_interface",
         "//source/common/config:api_version_lib",
+        "//source/common/config:decoded_resource_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//test/mocks:common_lib",
@@ -206,6 +208,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -250,8 +253,12 @@ envoy_extension_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",
         "//test/mocks/config:eds_resources_cache_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

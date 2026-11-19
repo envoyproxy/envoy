@@ -2586,7 +2586,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
-  StreamImpl* stream_ptr = getStream(stream_id);
+  StreamImpl* stream_ptr = getStreamUnchecked(stream_id);
   if (stream_ptr != nullptr) {
     return stream_ptr->onBeginHeaders();
   }

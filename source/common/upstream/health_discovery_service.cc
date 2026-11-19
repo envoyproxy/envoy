@@ -223,17 +223,19 @@ HdsDelegate::updateHdsCluster(HdsClusterPtr cluster,
   return cluster->update(cluster_config, bind_config, *info_factory_, tls_);
 }
 
-HdsClusterPtr
+absl::StatusOr<HdsClusterPtr>
 HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                               const envoy::config::core::v3::BindConfig& bind_config) {
   // Create HdsCluster.
-  auto new_cluster =
-      std::make_shared<HdsCluster>(server_context_, std::move(cluster_config), bind_config,
-                                   store_stats_, ssl_context_manager_, false, *info_factory_, tls_);
+  auto cluster_or_error =
+      HdsCluster::create(server_context_, cluster_config, bind_config, store_stats_,
+                         ssl_context_manager_, false, *info_factory_, tls_);
+  RETURN_IF_NOT_OK_REF(cluster_or_error.status());
+  auto new_cluster = cluster_or_error.value();
 
   // Begin HCs in the background.
   new_cluster->initialize([] { return absl::OkStatus(); });
-  new_cluster->initHealthchecks();
+  RETURN_IF_NOT_OK(new_cluster->initHealthchecks());
 
   return new_cluster;
 }
@@ -269,7 +271,10 @@ absl::Status HdsDelegate::processMessage(
       } else {
         // There is no cluster with this name previously or its an empty string, so just create a
         // new cluster.
-        cluster_ptr = createHdsCluster(cluster_config, cluster_health_check.upstream_bind_config());
+        auto cluster_or_error =
+            createHdsCluster(cluster_config, cluster_health_check.upstream_bind_config());
+        RETURN_IF_NOT_OK_REF(cluster_or_error.status());
+        cluster_ptr = cluster_or_error.value();
       }
 
       // If this cluster does not have a name, do not add it to the name map since cluster_name is
@@ -362,29 +367,37 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
 }
 
 HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_context,
-                       envoy::config::cluster::v3::Cluster cluster,
-                       const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                       ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls)
+                       envoy::config::cluster::v3::Cluster cluster, Stats::Store& stats,
+                       Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : server_context_(server_context), cluster_(std::move(cluster)), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      hosts_(new HostVector()) {
-  ENVOY_LOG(debug, "Creating an HdsCluster");
-  priority_set_.getOrCreateHostSet(0);
-  // Set initial hashes for possible delta updates.
-  config_hash_ = MessageUtil::hash(cluster_);
-  socket_match_hash_ = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
+      hosts_(new HostVector()) {}
 
-  info_ = info_factory.createClusterInfo(
-      {server_context, cluster_, bind_config, stats_, ssl_context_manager_, added_via_api_, tls});
+absl::StatusOr<HdsClusterPtr>
+HdsCluster::create(Server::Configuration::ServerFactoryContext& server_context,
+                   envoy::config::cluster::v3::Cluster cluster,
+                   const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
+                   Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                   ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls) {
+  ENVOY_LOG(debug, "Creating an HdsCluster");
+  HdsClusterPtr new_cluster(new HdsCluster(server_context, std::move(cluster), stats,
+                                           ssl_context_manager, added_via_api));
+  new_cluster->priority_set_.getOrCreateHostSet(0);
+  // Set initial hashes for possible delta updates.
+  new_cluster->config_hash_ = MessageUtil::hash(new_cluster->cluster_);
+  new_cluster->socket_match_hash_ =
+      RepeatedPtrUtil::hash(new_cluster->cluster_.transport_socket_matches());
+
+  new_cluster->info_ = info_factory.createClusterInfo(
+      {server_context, new_cluster->cluster_, bind_config, new_cluster->stats_,
+       new_cluster->ssl_context_manager_, new_cluster->added_via_api_, tls});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
   std::vector<HostVector> hosts_by_locality;
-  hosts_by_locality.reserve(cluster_.load_assignment().endpoints_size());
-
+  hosts_by_locality.reserve(new_cluster->cluster_.load_assignment().endpoints_size());
   // Iterate over every endpoint in every cluster.
-  for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
+  for (const auto& locality_endpoints : new_cluster->cluster_.load_assignment().endpoints()) {
     // Add a locality grouping to the hosts sorted by locality.
     hosts_by_locality.emplace_back();
     hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
@@ -393,28 +406,30 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       const LocalityEndpointTuple endpoint_key = {locality_endpoints.locality(), host};
       // Initialize an endpoint host object.
       auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
-      THROW_IF_NOT_OK_REF(address_or_error.status());
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       auto const_locality_shared_pool = LocalityPool::getConstLocalitySharedPool(
-          server_context_.singletonManager(), server_context_.mainThreadDispatcher());
-      HostSharedPtr endpoint = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
-          HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-                           const_locality_shared_pool->getObject(locality_endpoints.locality()),
-                           host.endpoint().health_check_config(), 0,
-                           envoy::config::core::v3::UNKNOWN, {},
-                           host.endpoint().observability_name()),
-          std::unique_ptr<HostImpl>));
+          server_context.singletonManager(), server_context.mainThreadDispatcher());
+      auto host_or_error = HostImpl::create(
+          new_cluster->info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+          const_locality_shared_pool->getObject(locality_endpoints.locality()),
+          host.endpoint().health_check_config(), 0, envoy::config::core::v3::UNKNOWN, {},
+          host.endpoint().observability_name());
+      RETURN_IF_NOT_OK_REF(host_or_error.status());
+      HostSharedPtr endpoint = std::shared_ptr<HostImpl>(std::move(host_or_error.value()));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
-      hosts_->push_back(endpoint);
+      new_cluster->hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
       // requested by locality.
       hosts_by_locality.back().push_back(endpoint);
       // Add this host/endpoint pointer to our map so we can rebuild this later.
-      hosts_map_.insert({endpoint_key, endpoint});
+      new_cluster->hosts_map_.insert({endpoint_key, endpoint});
     }
   }
   // Create the HostsPerLocality.
-  hosts_per_locality_ =
+  new_cluster->hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
+
+  return new_cluster;
 }
 
 absl::Status HdsCluster::update(envoy::config::cluster::v3::Cluster cluster,
@@ -439,7 +454,11 @@ absl::Status HdsCluster::update(envoy::config::cluster::v3::Cluster cluster,
     }
 
     // Check to see if anything in the endpoints list has changed.
-    updateHosts(cluster_.load_assignment().endpoints(), update_cluster_info);
+    absl::Status hosts_status =
+        updateHosts(cluster_.load_assignment().endpoints(), update_cluster_info);
+    if (!hosts_status.ok()) {
+      return hosts_status;
+    }
 
     // Check to see if any of the health checkers have changed.
     absl::Status status = updateHealthchecks(cluster_.health_checks());
@@ -484,7 +503,7 @@ absl::Status HdsCluster::updateHealthchecks(
   return absl::OkStatus();
 }
 
-void HdsCluster::updateHosts(
+absl::Status HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints,
     bool update_cluster_info) {
@@ -513,16 +532,16 @@ void HdsCluster::updateHosts(
         // We do not have this endpoint saved, so create a new one.
         auto address_or_error =
             Network::Address::resolveProtoAddress(endpoint.endpoint().address());
-        THROW_IF_NOT_OK_REF(address_or_error.status());
+        RETURN_IF_NOT_OK_REF(address_or_error.status());
         auto const_locality_shared_pool = LocalityPool::getConstLocalitySharedPool(
             server_context_.singletonManager(), server_context_.mainThreadDispatcher());
-        host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
-            HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-                             const_locality_shared_pool->getObject(endpoints.locality()),
-                             endpoint.endpoint().health_check_config(), 0,
-                             envoy::config::core::v3::UNKNOWN, {},
-                             endpoint.endpoint().observability_name()),
-            std::unique_ptr<HostImpl>));
+        auto host_or_error = HostImpl::create(
+            info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+            const_locality_shared_pool->getObject(endpoints.locality()),
+            endpoint.endpoint().health_check_config(), 0, envoy::config::core::v3::UNKNOWN, {},
+            endpoint.endpoint().observability_name());
+        RETURN_IF_NOT_OK_REF(host_or_error.status());
+        host = std::shared_ptr<HostImpl>(std::move(host_or_error.value()));
 
         // Set the initial health status as in HdsCluster::initialize.
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -558,21 +577,23 @@ void HdsCluster::updateHosts(
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
                             hosts_added, hosts_removed, std::nullopt, std::nullopt);
+  return absl::OkStatus();
 }
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
 
-void HdsCluster::initHealthchecks() {
+absl::Status HdsCluster::initHealthchecks() {
   for (auto& health_check : cluster_.health_checks()) {
     auto health_checker_or_error =
         Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
-    THROW_IF_NOT_OK_REF(health_checker_or_error.status());
+    RETURN_IF_NOT_OK_REF(health_checker_or_error.status());
 
     auto health_checker = health_checker_or_error.value();
     health_checkers_.push_back(health_checker);
     health_checkers_map_.insert({health_check, health_checker});
     health_checker->start();
   }
+  return absl::OkStatus();
 }
 
 void HdsCluster::initialize(std::function<absl::Status()> callback) {
