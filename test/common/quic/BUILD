@@ -386,6 +386,8 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

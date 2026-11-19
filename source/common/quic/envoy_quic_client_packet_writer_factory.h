@@ -19,9 +19,9 @@ public:
   virtual ~QuicClientPacketWriterFactory() = default;
 
   struct CreationResult {
-    // May be nullptr if socket creation or setup fails.
+    // Not null.
     std::unique_ptr<EnvoyQuicPacketWriter> writer_;
-    // May be nullptr or an unopened socket if socket creation or setup fails.
+    // Not null but can be a bad socket if creation goes wrong.
     Network::ConnectionSocketPtr socket_;
   };
 

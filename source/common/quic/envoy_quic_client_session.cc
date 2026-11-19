@@ -161,7 +161,9 @@ void EnvoyQuicClientSession::connect() {
           *static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
-  CryptoConnect();
+  if (connection()->connected()) {
+    CryptoConnect();
+  }
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
