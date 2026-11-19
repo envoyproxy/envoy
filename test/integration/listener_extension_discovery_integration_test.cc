@@ -30,11 +30,10 @@ public:
                                                 const std::string& listener_filter_name)
       : HttpIntegrationTest(downstream_type, ipVersion(), config),
         filter_name_(listener_filter_name), port_name_("http") {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'extension_config_discovery.tcp_listener_filter.foo.grpc.ecds_cluster.streams_closed_7' and
-    // stat_prefix 'ecds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
+    // extension_config_discovery.*.grpc.<stat_prefix>.* is now covered by the
+    // extension_config_discovery.**.grpc.$.** rule, so the tag-extraction check can be enabled
+    // here. Toward #21595.
+    skip_tag_extraction_rule_check_ = false;
   }
 
   void addDynamicFilterWithType(const std::string& filter_name,

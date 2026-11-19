@@ -257,6 +257,12 @@ TagNameValues::TagNameValues() {
 
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
+  // listener_manager.lds.grpc.(<stat_prefix>).**
+  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "listener_manager.lds.grpc.$.**");
+  // sds.[<resource_name>.]grpc.(<stat_prefix>).**
+  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "sds.**.grpc.$.**");
+  // extension_config_discovery.[<config_name>.]grpc.(<stat_prefix>).**
+  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "extension_config_discovery.**.grpc.$.**");
 
   // listener.[<address>.]ssl.certificate.(<cert_name>).<metric_name> or
   // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).<metric_name>

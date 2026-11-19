@@ -96,22 +96,18 @@ public:
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version),
         test_quic_(GetParam().test_quic) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'sds.client_cert.grpc.sds_cluster.lyft.com.streams_closed_12' and stat_prefix
-    // 'sds_cluster.lyft.com'.
-    skip_tag_extraction_rule_check_ = true;
+    // sds.*.grpc.<stat_prefix>.* is now covered by the sds.**.grpc.$.** rule, so the
+    // tag-extraction check can be enabled here. Toward #21595.
+    skip_tag_extraction_rule_check_ = false;
   }
 
   SdsDynamicIntegrationBaseTest(Http::CodecType downstream_protocol,
                                 Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, config),
         test_quic_(GetParam().test_quic) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'sds.client_cert.grpc.sds_cluster.lyft.com.streams_closed_12' and stat_prefix
-    // 'sds_cluster.lyft.com'.
-    skip_tag_extraction_rule_check_ = true;
+    // sds.*.grpc.<stat_prefix>.* is now covered by the sds.**.grpc.$.** rule, so the
+    // tag-extraction check can be enabled here. Toward #21595.
+    skip_tag_extraction_rule_check_ = false;
   }
 
   Network::Address::IpVersion ipVersion() const override { return GetParam().ip_version; }

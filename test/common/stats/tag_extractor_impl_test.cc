@@ -636,6 +636,40 @@ TEST(TagExtractorTest, ExtAuthzTagExtractors) {
                          {grpc_cluster, ext_authz_prefix});
 }
 
+TEST(TagExtractorTest, GoogleGrpcClientPrefixTagExtractors) {
+  const auto& tag_names = Config::TagNames::get();
+
+  DefaultTagRegexTester regex_tester;
+
+  Tag grpc_prefix;
+  grpc_prefix.name_ = tag_names.GOOGLE_GRPC_CLIENT_PREFIX;
+
+  // grpc.(<stat_prefix>).**
+  grpc_prefix.value_ = "accesslog";
+  regex_tester.testRegex("grpc.accesslog.streams_closed_14", "grpc.streams_closed_14",
+                         {grpc_prefix});
+
+  // listener_manager.lds.grpc.(<stat_prefix>).**
+  grpc_prefix.value_ = "lds_cluster";
+  regex_tester.testRegex("listener_manager.lds.grpc.lds_cluster.streams_closed_1",
+                         "listener_manager.lds.grpc.streams_closed_1", {grpc_prefix});
+
+  // sds.[<resource_name>.]grpc.(<stat_prefix>).**
+  // Note: if <stat_prefix> contains dots, only its first token is captured as the tag value.
+  Tag sds_resource;
+  sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
+  sds_resource.value_ = "client_cert";
+  grpc_prefix.value_ = "sds_cluster";
+  regex_tester.testRegex("sds.client_cert.grpc.sds_cluster.lyft.com.streams_closed_12",
+                         "sds.grpc.lyft.com.streams_closed_12", {sds_resource, grpc_prefix});
+
+  // extension_config_discovery.[<config_name>.]grpc.(<stat_prefix>).**
+  grpc_prefix.value_ = "ecds_cluster";
+  regex_tester.testRegex(
+      "extension_config_discovery.tcp_listener_filter.foo.grpc.ecds_cluster.streams_closed_7",
+      "extension_config_discovery.tcp_listener_filter.foo.grpc.streams_closed_7", {grpc_prefix});
+}
+
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
