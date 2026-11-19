@@ -14,6 +14,7 @@ TypedLeastRequestLbConfig::TypedLeastRequestLbConfig(const CommonLbConfigProto& 
   Upstream::LoadBalancerConfigHelper::convertLocalityLbConfigTo(common_lb_config, lb_config_);
 
   Upstream::LoadBalancerConfigHelper::convertSlowStartConfigTo(lb_config, lb_config_);
+  Upstream::LoadBalancerConfigHelper::convertConnectionAwareLbConfigTo(lb_config, lb_config_);
   if (lb_config.has_choice_count()) {
     *lb_config_.mutable_choice_count() = lb_config.choice_count();
   }
@@ -37,7 +38,7 @@ Upstream::LoadBalancerPtr LeastRequestCreator::operator()(
       params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
       PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
                                                      healthy_panic_threshold, 100, 50),
-      typed_lb_config->lb_config_, time_source);
+      typed_lb_config->lb_config_, time_source, params.connection_state_provider);
 }
 
 /**

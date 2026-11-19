@@ -25,4 +25,7 @@ message RoundRobin {
 
   // Configuration for local zone aware load balancing or locality weighted load balancing.
   common.v3.LocalityLbConfig locality_lb_config = 2;
+
+  // Configuration for connection-aware load balancing.
+  common.v3.ConnectionAwareLbConfig connection_aware_lb_config = 3;
 }

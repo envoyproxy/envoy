@@ -82,6 +82,7 @@ public:
                                          const Instance::StreamOptions& options) override;
   bool maybePreconnect(float ratio) override { return maybePreconnectImpl(ratio); }
   bool hasActiveConnections() const override;
+  bool hasReadyConnection() const override { return !ready_clients_.empty(); }
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
