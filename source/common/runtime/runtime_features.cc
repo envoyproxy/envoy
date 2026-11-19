@@ -94,6 +94,9 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 // removal) with the configured Server::Options::drainStrategy() instead of always forcing
 // DrainStrategy::Immediate.
 RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strategy);
+// A filter that continues the headers it stopped does not send on, as the end of the stream, data
+// that an earlier filter is holding and that has not reached it.
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_continue_without_held_data);
 // When a filter drains the current data frame into the filter-manager buffer via
 // addDecoded/EncodedData() and then returns Continue (e.g. a wasm filter resuming after buffering),
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not

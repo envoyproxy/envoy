@@ -65,6 +65,10 @@ void ActiveStreamFilterBase::commonContinue() {
     return;
   }
 
+  // If this filter was holding the terminal data, continuing delivers it (or its buffered form);
+  // it no longer holds it, so a later filter is not suppressed by a stale pointer.
+  releaseTerminalDataHeldHere();
+
   // Set ScopeTrackerScopeState if there's no existing crash context.
   ScopeTrackedObjectStack encapsulated_object;
   std::optional<ScopeTrackerScopeState> state;
@@ -104,6 +108,17 @@ void ActiveStreamFilterBase::commonContinue() {
   // Make sure that we handle the zero byte data frame case. We make no effort to optimize this
   // case in terms of merging it into a header only request/response. This could be done in the
   // future.
+  // An earlier filter may be holding the terminal data of this direction: it sent the headers on,
+  // which this filter stopped, and is holding the body to inject later (it returned
+  // StopIterationNoBuffer on the end-of-stream frame). The empty placeholder buffer the filter
+  // manager made for it must not be sent on, from here, as the end of the stream: the end belongs
+  // to the data the earlier filter still has to inject. This filter continues the headers, and
+  // replays any buffered data, but not as the end of the stream.
+  const bool terminal_data_held_by_earlier_filter =
+      terminalDataHeldByEarlierFilter() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.filter_manager_continue_without_held_data");
+
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
@@ -127,9 +142,16 @@ void ActiveStreamFilterBase::commonContinue() {
   // of trailers for the non-continuation case. Thus, we must keep track of whether we had
   // trailers prior to calling doData(). If we do, then we continue them here, otherwise we rely
   // on doData() to do so.
+  // When an earlier filter holds the terminal data, the manager's buffer here may be only the empty
+  // placeholder made for that filter's resume; it is not this filter's to send on at all. Real
+  // buffered data (its own, or an earlier StopIterationAndBuffer) is still replayed, but not as the
+  // end of the stream, which belongs to the held data.
   const bool had_trailers_before_data = hasTrailers();
-  if (bufferedData()) {
-    doData(observedEndStream() && !had_trailers_before_data);
+  const bool held_empty_placeholder =
+      terminal_data_held_by_earlier_filter && bufferedData() && bufferedData()->length() == 0;
+  if (bufferedData() && !held_empty_placeholder) {
+    doData(observedEndStream() && !had_trailers_before_data &&
+           !terminal_data_held_by_earlier_filter);
   }
 
   if (!canContinue()) {
@@ -244,6 +266,12 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(
     }
   } else {
     iteration_state_ = IterationState::StopSingleIteration;
+    if (status == FilterDataStatus::StopIterationNoBuffer && end_stream_) {
+      // This filter is holding the terminal data to inject later. A later filter that continues
+      // its stopped headers before then must not take the end of the stream from the manager's
+      // buffer, which is only a placeholder for this filter's resume.
+      markTerminalDataHeldHere();
+    }
     if (status == FilterDataStatus::StopIterationAndBuffer ||
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
@@ -443,6 +471,18 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
 }
 
 bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
+void ActiveStreamDecoderFilter::markTerminalDataHeldHere() {
+  parent_.state_.decode_terminal_data_held_by_filter_ = this;
+}
+void ActiveStreamDecoderFilter::releaseTerminalDataHeldHere() {
+  if (parent_.state_.decode_terminal_data_held_by_filter_ == this) {
+    parent_.state_.decode_terminal_data_held_by_filter_ = nullptr;
+  }
+}
+bool ActiveStreamDecoderFilter::terminalDataHeldByEarlierFilter() {
+  const ActiveStreamDecoderFilter* holder = parent_.state_.decode_terminal_data_held_by_filter_;
+  return holder != nullptr && holder != this && holder->entry() < entry_;
+}
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -507,6 +547,11 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  // When this filter delivers the end of the data it was holding, it no longer holds it. A
+  // non-terminal injection leaves it holding the rest.
+  if (end_stream && parent_.state_.decode_terminal_data_held_by_filter_ == this) {
+    parent_.state_.decode_terminal_data_held_by_filter_ = nullptr;
+  }
   injectDecodedHeadersToFilterChain(false);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
@@ -1749,6 +1794,7 @@ void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     ASSERT(!state_.encoder_filter_chain_complete_);
     state_.encoder_filter_chain_complete_ = true;
+    state_.encode_terminal_data_held_by_filter_ = nullptr;
     if (filter_manager_callbacks_.isHalfCloseEnabled()) {
       // If independent half close is enabled the stream is closed when both decoder and encoder
       // filter chains has completed or were aborted.
@@ -1765,6 +1811,8 @@ void FilterManager::maybeEndDecode(bool terminal_filter_decoded_end_stream) {
   if (terminal_filter_decoded_end_stream) {
     ASSERT(!state_.decoder_filter_chain_complete_);
     state_.decoder_filter_chain_complete_ = true;
+    // The terminal data has reached the end of the chain; no filter holds it any longer.
+    state_.decode_terminal_data_held_by_filter_ = nullptr;
     // If the decoder filter chain was aborted (i.e. due to local reply)
     // we rely on the encoding of end_stream to close the stream.
     if (filter_manager_callbacks_.isHalfCloseEnabled() && !stopDecoderFilterChain()) {
@@ -2085,6 +2133,18 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
 bool ActiveStreamEncoderFilter::observedEndStream() {
   return parent_.state_.observed_encode_end_stream_;
 }
+void ActiveStreamEncoderFilter::markTerminalDataHeldHere() {
+  parent_.state_.encode_terminal_data_held_by_filter_ = this;
+}
+void ActiveStreamEncoderFilter::releaseTerminalDataHeldHere() {
+  if (parent_.state_.encode_terminal_data_held_by_filter_ == this) {
+    parent_.state_.encode_terminal_data_held_by_filter_ = nullptr;
+  }
+}
+bool ActiveStreamEncoderFilter::terminalDataHeldByEarlierFilter() {
+  const ActiveStreamEncoderFilter* holder = parent_.state_.encode_terminal_data_held_by_filter_;
+  return holder != nullptr && holder != this && holder->entry() < entry_;
+}
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
@@ -2149,6 +2209,9 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  if (end_stream && parent_.state_.encode_terminal_data_held_by_filter_ == this) {
+    parent_.state_.encode_terminal_data_held_by_filter_ = nullptr;
+  }
   injectEncodedHeadersToFilterChain(false);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
