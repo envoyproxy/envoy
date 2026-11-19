@@ -160,7 +160,7 @@ void ActiveStreamFilterBase::commonContinue() {
     return;
   }
 
-  if (had_trailers_before_data) {
+  if (had_trailers_before_data && !terminal_data_held_by_earlier_filter) {
     doTrailers();
   }
 
@@ -266,10 +266,10 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(
     }
   } else {
     iteration_state_ = IterationState::StopSingleIteration;
-    if (status == FilterDataStatus::StopIterationNoBuffer && end_stream_) {
-      // This filter is holding the terminal data to inject later. A later filter that continues
-      // its stopped headers before then must not take the end of the stream from the manager's
-      // buffer, which is only a placeholder for this filter's resume.
+    if (status == FilterDataStatus::StopIterationNoBuffer) {
+      // This filter is holding the body to deliver later (it did not let the manager buffer it).
+      // A later filter that continues its stopped headers before then must not end the stream --
+      // from the manager's placeholder buffer, or by forwarding trailers -- ahead of this body.
       markTerminalDataHeldHere();
     }
     if (status == FilterDataStatus::StopIterationAndBuffer ||
