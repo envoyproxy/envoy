@@ -26,6 +26,10 @@ envoy_extension_cc_test(
     name = "a2a_filter_test",
     srcs = ["a2a_filter_test.cc"],
     extension_names = ["envoy.filters.http.a2a"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/a2a:a2a_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -38,6 +42,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.a2a"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/a2a:config",
         "//test/mocks/server:factory_context_mocks",
@@ -50,6 +61,12 @@ envoy_extension_cc_test(
     name = "a2a_filter_integration_test",
     srcs = ["a2a_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.a2a"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/a2a:config",
         "//test/integration:fake_access_log_lib",

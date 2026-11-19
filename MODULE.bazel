@@ -9,27 +9,27 @@ module(
 
 bazel_dep(name = "abseil-cpp", version = "20260817.0")
 bazel_dep(name = "antlr4-cpp-runtime", version = "4.13.2.bcr.2")
-bazel_dep(name = "apple_support", version = "2.10.1")
+bazel_dep(name = "apple_support", version = "2.12.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy.1")
-bazel_dep(name = "bazel_features", version = "1.53.0")
+bazel_dep(name = "bazel_features", version = "1.56.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260929.0")
 bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy.1")
 bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy.1")
 bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
-bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
-bazel_dep(name = "c-ares", version = "1.34.6.bcr.3")
+bazel_dep(name = "buildifier_prebuilt", version = "10.2.0", repo_name = "buildifier")
+bazel_dep(name = "c-ares", version = "1.34.9")
 bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
 bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.17.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.26.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
-bazel_dep(name = "fmt", version = "12.2.0.bcr.1")
+bazel_dep(name = "fmt", version = "12.2.1")
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
 bazel_dep(name = "googleapis-cc", version = "1.0.0")
@@ -61,14 +61,14 @@ bazel_dep(name = "nghttp2", version = "1.66.0.envoy.1")
 bazel_dep(name = "numactl", version = "2.0.19")
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "ocp-diag-core", version = "0.0.0-230505-e965ac0.envoy.1")
-bazel_dep(name = "openssl", version = "3.5.9.envoy")
+bazel_dep(name = "openssl", version = "3.5.9.bcr.1")
 bazel_dep(name = "opentelemetry-cpp", version = "1.29.0")
 bazel_dep(name = "opentelemetry-proto", version = "1.8.0")
 bazel_dep(name = "perfetto", version = "57.2.envoy")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "prometheus-metrics-model", version = "0.6.2.envoy", repo_name = "prometheus_metrics_model")
 bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
-bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
+bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy.1")
 bazel_dep(name = "proto-converter", version = "0.0.0-20260912-3850764.envoy")
 bazel_dep(name = "proto-field-extraction", version = "0.0.0-240710-d5d39f0.envoy.1")
 bazel_dep(name = "proto-processing", version = "0.0.0-250110-279353c.envoy.1")
@@ -78,27 +78,30 @@ bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-261027-f53fd81.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-261111-9917bea.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
-bazel_dep(name = "rules_apple", version = "5.3.1")
-bazel_dep(name = "rules_buf", version = "0.5.4")
-bazel_dep(name = "rules_cc", version = "0.2.27")
+bazel_dep(name = "rules_apple", version = "5.4.0")
+bazel_dep(name = "rules_buf", version = "0.6.1")
+bazel_dep(name = "rules_cc", version = "0.2.28")
+bazel_dep(name = "rules_distroless", version = "0.9.4")
 bazel_dep(name = "rules_foreign_cc", version = "0.17.0")
 bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_license", version = "1.0.0")
+bazel_dep(name = "rules_oci", version = "2.3.5")
 bazel_dep(name = "rules_pkg", version = "1.3.0")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_proto_grpc", version = "5.8.0")
 bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
-bazel_dep(name = "rules_python", version = "2.4.5")
-bazel_dep(name = "rules_rust", version = "0.74.0.envoy")
-bazel_dep(name = "rules_shell", version = "0.8.0")
-bazel_dep(name = "rules_swift", version = "4.2.2")
+bazel_dep(name = "rules_python", version = "2.5.1")
+bazel_dep(name = "rules_rust", version = "0.74.0.envoy.1")
+bazel_dep(name = "rules_shell", version = "0.10.0")
+bazel_dep(name = "rules_swift", version = "4.3.0")
 bazel_dep(name = "spdlog", version = "1.17.0")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3.envoy")
+bazel_dep(name = "tar.bzl", version = "0.7.0")
 bazel_dep(name = "tclap", version = "1.2.5.bcr.1")
 bazel_dep(name = "tcmalloc", version = "0.0.0-250926-12f2552.envoy")
 bazel_dep(name = "thrift", version = "0.24.0.envoy")
@@ -146,9 +149,10 @@ single_version_override(
     version = "0.20260929.0",
 )
 
+# `curl` (via `opentelemetry-cpp`) requests `openssl` 4.x; bssl-compat targets 3.5.
 single_version_override(
     module_name = "openssl",
-    version = "3.5.9.envoy",
+    version = "3.5.9.bcr.1",
 )
 
 # testing/debugging
@@ -191,7 +195,14 @@ gcc_runtime.toolchain(
     lld = "@llvm_minimal_linux_x64//:bin/lld",
     sysroot = "@sysroot_linux_amd64//sysroot",
 )
-use_repo(gcc_runtime, "gcc_runtime_linux_x86_64")
+gcc_runtime.toolchain(
+    name = "gcc_runtime_linux_aarch64",
+    arch = "aarch64",
+    dwp = "@llvm_minimal_linux_arm64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_arm64//:bin/lld",
+    sysroot = "@sysroot_linux_arm64//sysroot",
+)
+use_repo(gcc_runtime, "gcc_runtime_linux_aarch64", "gcc_runtime_linux_x86_64")
 
 register_toolchains(
     "//bazel/gcc:linux_x86_64_toolchain",
@@ -217,6 +228,11 @@ use_repo(sanitizer_ext, "msan_libs", "tsan_libs")
 grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grcov_extension")
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
+
+# Prebuilt lcov merger for the coverage report (toolshed bins release).
+lcov_merge_ext = use_extension("@envoy_toolshed//coverage/lcov:extensions.bzl", "lcov_merge_extension")
+lcov_merge_ext.setup(bins_release_version = "0.2.34")
+use_repo(lcov_merge_ext, "lcov_merge")
 
 # Hermetic (prebuilt) git toolchain.
 git_prebuilt_ext = use_extension("@envoy_toolshed//git:extensions.bzl", "git_prebuilt_extension")
@@ -464,8 +480,34 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.repository_set(
     name = "rust_linux_s390x",
     edition = "2018",
+    exec_compatible_with = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+    ],
     exec_triple = "s390x-unknown-linux-gnu",
+    target_compatible_with = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+    ],
+    target_triple = "s390x-unknown-linux-gnu",
     versions = ["1.97.1"],
+)
+rust.repository_set(
+    name = "rust_linux_s390x",
+    target_compatible_with = [
+        "@platforms//cpu:wasm32",
+        "@rules_rust//rust/platform/os:unknown",
+    ],
+    target_triple = "wasm32-unknown-unknown",
+)
+rust.repository_set(
+    name = "rust_linux_s390x",
+    target_compatible_with = [
+        "@platforms//cpu:wasm32",
+        "@platforms//os:wasi",
+        "@rules_rust//rust/platform:wasi_preview_1",
+    ],
+    target_triple = "wasm32-wasip1",
 )
 rust.toolchain(
     edition = "2018",
@@ -595,3 +637,69 @@ use_repo(envoy_build_config_ext, "envoy_build_config")
 
 envoy_module_graph_ext = use_extension("//bazel:extensions.bzl", "envoy_module_graph_extension")
 use_repo(envoy_module_graph_ext, "envoy_mod_graph")
+
+# Base images for the container images (`//distribution/docker`). Each digest is that of the tag in
+# its `# tag:` comment, and is updated from it by `ci/dependency/release_images.sh`.
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "distroless_base_nossl",
+    # tag: nonroot
+    digest = "sha256:e6b0f82595aa1edde72c8054de7a9dca30f0f8f54820c37a167c0ddfc21c5c67",
+    image = "gcr.io/distroless/base-nossl-debian13",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+)
+oci.pull(
+    name = "ubuntu_base",
+    # tag: 22.04
+    digest = "sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11",
+    image = "mirror.gcr.io/library/ubuntu",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+)
+use_repo(
+    oci,
+    "distroless_base_nossl",
+    "distroless_base_nossl_linux_amd64",
+    "distroless_base_nossl_linux_arm64_v8",
+    "ubuntu_base",
+    "ubuntu_base_linux_amd64",
+    "ubuntu_base_linux_arm64_v8",
+)
+
+# Packages for the ubuntu container images (`//distribution/docker`), from an Ubuntu snapshot.
+# Only the listed packages are installed: their dependencies are in the base image.
+apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
+apt.sources_list(
+    architectures = [
+        "amd64",
+        "arm64",
+    ],
+    components = ["main"],
+    suites = [
+        "jammy",
+        "jammy-security",
+        "jammy-updates",
+    ],
+    types = ["deb"],
+    uris = ["https://snapshot.ubuntu.com/ubuntu/20261113T000000Z"],
+)
+apt.install(
+    dependency_set = "ubuntu_jammy",
+    include_transitive = False,
+    packages = [
+        "ca-certificates",
+        "openssl",
+        "tzdata",
+    ],
+    suites = [
+        "jammy",
+        "jammy-security",
+        "jammy-updates",
+    ],
+)
+use_repo(apt, "ubuntu_jammy")

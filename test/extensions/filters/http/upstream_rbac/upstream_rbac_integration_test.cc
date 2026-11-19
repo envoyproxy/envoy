@@ -28,8 +28,10 @@ public:
   }
 
   // Adds an upstream RBAC filter (followed by the upstream codec filter) to the cluster, denying
-  // requests whose selected upstream IP falls within the provided CIDR.
-  void addUpstreamRbacFilter(const std::string& address_prefix, uint32_t prefix_len) {
+  // requests whose selected upstream IP falls within the provided CIDR. With `shadow`, the same
+  // policy also runs as shadow rules under the `shadow_` stat prefix.
+  void addUpstreamRbacFilter(const std::string& address_prefix, uint32_t prefix_len,
+                             bool shadow = false) {
     envoy::extensions::filters::http::rbac::v3::RBAC rbac;
     rbac.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
 
@@ -42,6 +44,10 @@ public:
     std::ignore = matcher_ext->mutable_typed_config()->PackFrom(matcher);
     policy.add_principals()->set_any(true);
     (*rbac.mutable_rules()->mutable_policies())["deny-upstream"] = policy;
+    if (shadow) {
+      *rbac.mutable_shadow_rules() = rbac.rules();
+      rbac.set_shadow_rules_stat_prefix("shadow_");
+    }
 
     HttpFilterProto rbac_filter;
     rbac_filter.set_name("envoy.filters.http.upstream_rbac");
@@ -112,6 +118,46 @@ TEST_P(UpstreamRbacIntegrationTest, AllowsNonMatchingUpstreamIp) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// The engine result and the matched policy reach the downstream access log, since upstream filters
+// write the downstream stream's dynamic metadata.
+TEST_P(UpstreamRbacIntegrationTest, AccessLogReadsEngineResultOnDenial) {
+  useAccessLog(
+      "result=%DYNAMIC_METADATA(envoy.filters.http.upstream_rbac:enforced_engine_result)% "
+      "policy=%DYNAMIC_METADATA(envoy.filters.http.upstream_rbac:enforced_effective_policy_id)% "
+      "shadow=%DYNAMIC_METADATA(envoy.filters.http.upstream_rbac:shadow_shadow_engine_result)%;");
+  addUpstreamRbacFilter(loopbackCidr(), loopbackPrefixLen(), /*shadow=*/true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("result=denied policy=deny-upstream shadow=denied;"));
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(UpstreamRbacIntegrationTest, AccessLogReadsEngineResultWhenAllowed) {
+  useAccessLog(
+      "result=%DYNAMIC_METADATA(envoy.filters.http.upstream_rbac:enforced_engine_result)% "
+      "policy=%DYNAMIC_METADATA(envoy.filters.http.upstream_rbac:enforced_effective_policy_id)% "
+      "shadow=%DYNAMIC_METADATA(envoy.filters.http.upstream_rbac:shadow_shadow_engine_result)%;");
+  addUpstreamRbacFilter("10.255.255.255", 32, /*shadow=*/true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("result=allowed policy=- shadow=allowed;"));
 
   cleanupUpstreamAndDownstream();
 }

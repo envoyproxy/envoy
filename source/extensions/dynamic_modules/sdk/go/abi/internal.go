@@ -2077,6 +2077,15 @@ func (h *dymConfigHandle) GetGenericSecret(
 	return envoyBufferToUnsafeEnvoyBuffer(value), true
 }
 
+func (h *dymConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	loadShedPoint := C.envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+	)
+	runtime.KeepAlive(name)
+	return newLoadShedPoint(loadShedPoint)
+}
+
 func (h *dymConfigHandle) HttpCallout(
 	cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 	cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {

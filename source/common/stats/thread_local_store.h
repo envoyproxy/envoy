@@ -431,15 +431,18 @@ private:
         Allocator&, StatName name, StatName tag_extracted_name, StatNameTagSpan tags)>;
 
     /**
-     * Makes a stat either by looking it up in the central cache,
-     * generating it from the parent allocator, or as a last
-     * result, creating it with the heap allocator.
+     * Makes a stat by looking it up in the TLS or central cache, reusing one from the parent
+     * allocator, or creating it. Without explicit tags, extraction and make_stat are skipped
+     * when the allocator already has the full name.
      *
      * @param full_stat_name the full name of the stat with appended tags.
-     * @param name_no_tags the full name of the stat (not tag extracted) without appended tags.
-     * @param stat_name_tags the tags provided at creation time. If empty, tag extraction occurs.
+     * @param name_no_tags the full name without appended tags, used for extraction when needed
+     *     or as the tag-extracted name when explicit tags are supplied.
+     * @param stat_name_tags optional explicit tags. A present but empty span is explicit;
+     *     extraction occurs only when absent and the allocator lacks the full name.
      * @param central_cache_map a map from name to the desired object in the central cache.
-     * @param make_stat a function to generate the stat object, called if it's not in cache.
+     * @param make_stat a function to obtain the stat on a cache miss when tags are explicit
+     *     or the allocator lookup misses.
      * @param tls_ref possibly null reference to a cache entry for this stat, which will be
      *     used if non-empty, or filled in if empty (and non-null).
      */

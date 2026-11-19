@@ -21,6 +21,17 @@ Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compressio
 and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`
 compression only. Other compression libraries can be supported as extensions.
 
+The zstd decompressor computes a threshold for each call from the compressed input size multiplied by
+:ref:`max_inflate_ratio <envoy_v3_api_field_extensions.compression.zstd.decompressor.v3.Zstd.max_inflate_ratio>`,
+plus :ref:`max_block_size <envoy_v3_api_field_extensions.compression.zstd.decompressor.v3.Zstd.max_block_size>` bytes.
+A small input chunk can complete a block started in an earlier chunk. If this happens, set
+``max_block_size`` to the sender's maximum uncompressed block size (up to 128 KiB).
+The defaults are a ratio of 100 and a block allowance of zero.
+
+Envoy forwards the output of the step that crosses the threshold, increments ``zstd_generic_error``,
+and ends the current call. Output can exceed the threshold by up to one decompressor output buffer.
+Later calls can continue decoding with a fresh threshold.
+
 An example configuration of the filter may look like the following:
 
 .. code-block:: yaml

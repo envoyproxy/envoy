@@ -15,10 +15,6 @@ on:
       gcp-docs-archive-key:
         required: false
       gcp-key:
-      gpg-key:
-        required: true
-      gpg-key-password:
-        required: true
     inputs:
       dockerhub-username:
         type: string
@@ -80,49 +76,6 @@ jobs:
             fromJSON(inputs.request).request.version.minor,
             fromJSON(inputs.request).request.version.patch) }}
 
-  sign:
-    secrets:
-      dockerhub-token: ${{ secrets.dockerhub-token }}
-      gpg-key: ${{ secrets.gpg-key }}
-      gpg-key-password: ${{ secrets.gpg-key-password }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    if: >-
-      fromJSON(inputs.request).run.release
-      && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
-    name: Sign packages
-    uses: ./.github/workflows/_run.yml
-    with:
-      target: release.signed
-      bazel-extra: >-
-        --config=rbe
-        --noremote_upload_local_results
-        --//distribution:x64-packages=//distribution:custom/x64/packages.x64.tar.gz
-        --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
-        --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
-        --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
-        ${{ !inputs.trusted && '--//distribution:signing-key=snakeoil' || '' }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      downloads: |
-        packages.arm64: container/envoy/arm64/
-        packages.x64: container/envoy/x64/
-        release.arm64: container/envoy/arm64/bin/
-        release.x64: container/envoy/x64/bin/
-      signing: true
-      request: ${{ inputs.request }}
-      source: |
-        export NO_BUILD_SETUP=1
-      trusted: ${{ inputs.trusted }}
-      uploads: |
-        release.signed: container/envoy/release.signed.tar.zst
-      steps-pre: |
-        - run: |
-            mkdir -p distribution/custom
-            cp -a %{{ runner.temp }}/container/envoy/x64 %{{ runner.temp }}/container/envoy/arm64 distribution/custom
-          shell: bash
-
   container:
     secrets:
       dockerhub-write-token: ${{ secrets.dockerhub-write-token }}
@@ -137,6 +90,7 @@ jobs:
       dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
       dockerhub-username: ${{ inputs.dockerhub-username }}
       dev: ${{ fromJSON(inputs.request).request.version.dev }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       sha: ${{ fromJSON(inputs.request).request.sha }}
       target-branch: ${{ fromJSON(inputs.request).request.target-branch }}
       trusted: ${{ inputs.trusted }}
@@ -154,7 +108,7 @@ jobs:
       && inputs.trusted
       && github.repository == 'envoyproxy/envoy'
       && ((fromJSON(inputs.request).request.version.dev
-           && needs.github.result != 'failure')
+           && needs.github-dev.result != 'failure')
           || needs.github.result == 'success')
       && needs.docs-archive.result != 'failure'
     permissions:
@@ -163,15 +117,15 @@ jobs:
     - docs-archive
     - container
     - github
-    - sign
+    - github-dev
     runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/dispatch@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         ref: main
         repository: envoyproxy/envoy-website
@@ -191,13 +145,15 @@ jobs:
       packages: read
     needs:
     - container
-    - sign
     - docs-archive
+    # A release is published once its container images are pushed. A dev version (eg main) only
+    # dry-runs the publish, and does not wait for the images (`github-dev`).
     if: >-
       !cancelled()
       && fromJSON(inputs.request).run.release
+      && !fromJSON(inputs.request).request.version.dev
       && needs.container.result == 'success'
-      && needs.sign.result == 'success'
+      && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
       && needs.docs-archive.result != 'failure'
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
@@ -209,6 +165,7 @@ jobs:
         release.signed: container/release.signed
       source: ${{ matrix.source }}
       request: ${{ inputs.request }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       steps-pre: ${{ matrix.steps-pre }}
       trusted: ${{ inputs.trusted }}
     strategy:
@@ -217,3 +174,33 @@ jobs:
         include:
         - target: publish
           name: github
+
+  github-dev:
+    secrets:
+      app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
+      app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    needs:
+    - docs-archive
+    # As `github`, for a dev version (a dry run of the publish), alongside the container images.
+    if: >-
+      !cancelled()
+      && fromJSON(inputs.request).run.release
+      && fromJSON(inputs.request).request.version.dev
+      && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+      && needs.docs-archive.result != 'failure'
+    name: github
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: publish
+      rbe: false
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      downloads: |
+        release.signed: container/release.signed
+      request: ${{ inputs.request }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
+      trusted: ${{ inputs.trusted }}

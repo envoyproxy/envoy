@@ -16,7 +16,7 @@
 {% for version in stable_versions %}
 - [v{{ version }}-latest](https://github.com/envoyproxy/envoy/blob/release/v{{ version }}/distribution/docker/Dockerfile-envoy)
 {% endfor %}
-- [dev](https://github.com/envoyproxy/envoy/blob/main/distribution/docker/Dockerfile-envoy)
+- [dev](https://github.com/envoyproxy/envoy/blob/main/distribution/docker/BUILD) (built with Bazel)
 
 
 ## Quick reference (cont.)

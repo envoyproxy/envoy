@@ -193,6 +193,50 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerWithCustomExporterNullCon
                             "returned nullptr from createEmptyConfigProto()");
 }
 
+class OpenTelemetryTraceContextConfigTest : public testing::Test {
+public:
+  Tracing::DriverSharedPtr createDriver(absl::string_view incoming, absl::string_view outgoing) {
+    context_.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+    const std::string yaml_string = fmt::format(R"EOF(
+    http:
+      name: envoy.tracers.opentelemetry
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+        grpc_service:
+          envoy_grpc:
+            cluster_name: fake_cluster
+          timeout: 0.250s
+        incoming_trace_context: [{}]
+        outgoing_trace_context: [{}]
+  )EOF",
+                                                incoming, outgoing);
+    envoy::config::trace::v3::Tracing configuration;
+    TestUtility::loadFromYaml(yaml_string, configuration);
+    auto message = Config::Utility::translateToFactoryConfig(
+        configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory_);
+    return factory_.createTracerDriver(*message, context_);
+  }
+
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
+  OpenTelemetryTracerFactory factory_;
+};
+
+TEST_F(OpenTelemetryTraceContextConfigTest, TraceContextFormats) {
+  EXPECT_NE(nullptr, createDriver("TRACE_CONTEXT, B3, B3_MULTI", "TRACE_CONTEXT, B3_MULTI"));
+}
+
+TEST_F(OpenTelemetryTraceContextConfigTest, DuplicateIncomingTraceContextRejected) {
+  EXPECT_THROW_WITH_MESSAGE(
+      createDriver("B3, B3", ""), EnvoyException,
+      "OpenTelemetry tracer incoming_trace_context contains duplicate trace context format: B3");
+}
+
+TEST_F(OpenTelemetryTraceContextConfigTest, DuplicateOutgoingTraceContextRejected) {
+  EXPECT_THROW_WITH_MESSAGE(createDriver("", "TRACE_CONTEXT, TRACE_CONTEXT"), EnvoyException,
+                            "OpenTelemetry tracer outgoing_trace_context contains duplicate trace "
+                            "context format: TRACE_CONTEXT");
+}
+
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

@@ -5,6 +5,7 @@ use crate::{
   abi,
   bytes_to_module_buffer,
   ffi_export,
+  new_load_shed_point,
   str_to_module_buffer,
   strs_to_module_buffers,
   ClusterHostCount,
@@ -15,6 +16,7 @@ use crate::{
   EnvoyGenericSecretId,
   EnvoyHistogramId,
   EnvoyHistogramVecId,
+  EnvoyLoadShedPoint,
   NewHttpFilterConfigFunction,
   NewHttpFilterPerRouteConfigFunction,
   TimingInfo,
@@ -455,6 +457,15 @@ pub trait EnvoyHttpFilterConfig {
   /// the secret has been subscribed to but not yet delivered by the SDS server.
   fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>>;
 
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the request processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name, the filter is an
+  /// upstream filter, or the listener of its filter chain bypasses the overload manager. Filters
+  /// that the route configuration creates, such as those of a per-route filter chain, and filters
+  /// of a filter chain that FCDS delivers do not see the bypass and get the load shed point.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
+
   /// Increment the counter with the given id from the config context.
   ///
   /// Unlike [`EnvoyHttpFilter::increment_counter`], this does not require a per-stream filter and
@@ -754,6 +765,15 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     // Safety: Envoy owns the buffer and keeps it alive until the module returns from the current
     // event hook, which outlives the borrow of `self`.
     Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+  }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+      )
+    })
   }
 
   fn increment_counter(
@@ -1293,7 +1313,7 @@ pub trait EnvoyHttpFilter {
   /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
   ///
   /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
-  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// namespace once and writes each entry into it in order. Existing entries with the same key
   /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
   /// An empty `entries` is a no-op and does not create the namespace.
   fn set_dynamic_metadata_string_batch<'a>(

@@ -24,7 +24,9 @@ The `bssl-compat/BUILD` file also includes `ssl` and `crypto` aliases to the
 `bssl-compat` library for convenience.
 
 Note that the `cc_library` rule for `libbssl-compat.a` also has a *data*
-dependency on the `@openssl//:libs` target. This is because `libbssl-compat.a`
+dependency on the `:openssl_libs` target, which builds `libcrypto.so.3` and
+`libssl.so.3` from the `@openssl//:crypto` and `@openssl//:ssl` targets of the
+BCR `openssl` module (using `cc_shared_library`). This is because `libbssl-compat.a`
 needs to dynamically load the OpenSSL shared libraries at runtime, and making
 them a *data* dependency of `libbssl-compat.a` ensures that Bazel will put them
 in the `runfiles` directory of the sanbox, when running executables that link

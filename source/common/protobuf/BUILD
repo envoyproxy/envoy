@@ -94,6 +94,7 @@ envoy_cc_library(
         "@protobuf",
         "@protobuf//third_party/utf8_range:utf8_validity",
         "@xds//udpa/annotations:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
         "@yaml-cpp",
     ],

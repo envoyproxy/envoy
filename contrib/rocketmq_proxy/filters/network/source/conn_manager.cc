@@ -367,13 +367,12 @@ ActiveMessage& ConnectionManager::createActiveMessage(RemotingCommandPtr& reques
   ENVOY_CONN_LOG(trace, "ConnectionManager#createActiveMessage. Code: {}, opaque: {}",
                  read_callbacks_->connection(), request->code(), request->opaque());
   ActiveMessagePtr active_message = std::make_unique<ActiveMessage>(*this, std::move(request));
-  LinkedList::moveIntoList(std::move(active_message), active_message_list_);
-  return **active_message_list_.begin();
+  active_message_list_.push(std::move(active_message));
+  return *active_message_list_.front();
 }
 
 void ConnectionManager::deferredDelete(ActiveMessage& active_message) {
-  read_callbacks_->connection().dispatcher().deferredDelete(
-      active_message.removeFromList(active_message_list_));
+  read_callbacks_->connection().dispatcher().deferredDelete(active_message.removeFromList());
 }
 
 void ConnectionManager::resetAllActiveMessages(absl::string_view error_msg) {

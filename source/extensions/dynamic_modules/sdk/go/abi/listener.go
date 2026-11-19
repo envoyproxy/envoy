@@ -826,6 +826,15 @@ func (h *dymListenerConfigHandle) RecordHistogramValue(
 	return shared.MetricsResult(result)
 }
 
+func (h *dymListenerConfigHandle) GetLoadShedPoint(name string) shared.LoadShedPoint {
+	loadShedPoint := C.envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+	)
+	runtime.KeepAlive(name)
+	return newLoadShedPoint(loadShedPoint)
+}
+
 func (h *dymListenerConfigHandle) GetScheduler() shared.Scheduler {
 	if h.scheduler == nil {
 		schedulerPtr := C.envoy_dynamic_module_callback_listener_filter_config_scheduler_new(

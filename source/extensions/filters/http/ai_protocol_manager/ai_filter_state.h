@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/filter_state.h"
@@ -39,6 +40,8 @@ constexpr absl::string_view ModelRequest = "envoy.ai.model.request";
 // The model to send upstream, when it differs from the one the request names. It replaces the model
 // in the request body and in the rewritten path.
 constexpr absl::string_view ModelResolved = "envoy.ai.model.resolved";
+// The list of LLM providers and models to try for this request.
+constexpr absl::string_view ResolvedRoutes = "envoy.ai.routes";
 } // namespace FilterStateKeys
 
 // A wire API held in filter state. It is created from and serializes as an LLMProtocol value name,
@@ -99,6 +102,7 @@ public:
 class LlmBindingObject : public Router::StringAccessor {
 public:
   explicit LlmBindingObject(absl::string_view value);
+  explicit LlmBindingObject(LlmBindingConstSharedPtr binding);
 
   // The binding at `key`: null when no object is set, or the error of one that does not parse. Any
   // other object, such as a string set without the key's object factory, is an error.
@@ -109,13 +113,15 @@ public:
   const absl::StatusOr<LlmBindingConstSharedPtr>& binding() const { return binding_; }
 
   // Router::StringAccessor
-  absl::string_view asString() const override { return source_; }
+  absl::string_view asString() const override {
+    return source_.has_value() ? absl::string_view(*source_) : absl::string_view{};
+  }
 
   // StreamInfo::FilterState::Object
   std::optional<std::string> serializeAsString() const override { return source_; }
 
 private:
-  const std::string source_;
+  const std::optional<std::string> source_;
   const absl::StatusOr<LlmBindingConstSharedPtr> binding_;
 };
 
@@ -141,6 +147,27 @@ private:
 // The string a Router::StringAccessor at `key` holds; nullopt when no object is set.
 std::optional<absl::string_view> stringFromFilterState(const StreamInfo::FilterState& filter_state,
                                                        absl::string_view key);
+
+// A single candidate target for an LLM request.
+struct LlmRoute {
+  LLMProtocol llm_protocol{LLMProtocol::Unspecified};
+  std::string model;
+  std::string host_and_port;
+  LlmBindingConstSharedPtr binding;
+  std::string api_key;
+};
+
+// An ordered list of candidate routes stored at `FilterStateKeys::ResolvedRoutes`.
+class LlmRoutesFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  explicit LlmRoutesFilterStateObject(std::vector<LlmRoute> routes) : routes_(std::move(routes)) {}
+
+  const std::vector<LlmRoute>& routes() const { return routes_; }
+
+private:
+  const std::vector<LlmRoute> routes_;
+};
+using LlmRoutesFilterStateObjectSharedPtr = std::shared_ptr<LlmRoutesFilterStateObject>;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

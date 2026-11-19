@@ -1,0 +1,7 @@
+path: "/v1/chat/completions"
+body: "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"developer\",\"content\":\"Follow strict JSON rules.\"},{\"role\":\"system\",\"content\":\"Be accurate.\"},{\"role\":\"user\",\"content\":\"Run query.\"},{\"role\":\"assistant\",\"content\":\"Running SQL query now.\"},{\"role\":\"tool\",\"content\":\"row_1\"},{\"role\":\"tool\",\"content\":\"row_2\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"run_sql\",\"description\":\"Execute SQL\",\"parameters\":{\"type\":\"object\",\"properties\":{\"q\":{\"type\":\"string\"}}}}}],\"tool_choice\":\"required\",\"stop\":\"END\",\"stream\":true,\"stream_options\":{\"include_usage\":true}}"
+fragmentation_seed: 1311768467463790321
+request_protocol: OPENAI_CHAT_COMPLETIONS
+response_protocol: ANTHROPIC_MESSAGES
+inline_string_threshold_bytes: 960
+decoder_buffer_limit: 2048

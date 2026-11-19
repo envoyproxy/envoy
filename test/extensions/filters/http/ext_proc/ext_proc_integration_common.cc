@@ -120,6 +120,14 @@ void ExtProcIntegrationTest::initializeConfig(
         // stanza pointing to the cluster that we just made
         setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
                        grpc_upstreams_[0]->localAddress());
+        if (per_try_timeout_enabled_) {
+          auto* retry_policy = proto_config_.mutable_grpc_service()->mutable_retry_policy();
+          retry_policy->mutable_num_retries()->set_value(2);
+          retry_policy->mutable_per_try_timeout()->set_seconds(2);
+          auto* back_off = retry_policy->mutable_retry_back_off();
+          back_off->mutable_base_interval()->set_seconds(1);
+          back_off->mutable_max_interval()->set_seconds(2);
+        }
       } else {
         // Set up the gRPC service with wrong cluster name and address.
         setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
@@ -544,6 +552,24 @@ void ExtProcIntegrationTest::processResponseBodyMessage(
   const bool sendReply = !cb || (*cb)(request.response_body(), *body);
   if (sendReply) {
     processor_stream_->sendGrpcMessage(response);
+  }
+}
+
+void ExtProcIntegrationTest::processStreamedResponseBodyAs(absl::string_view body) {
+  bool end_stream = false;
+  bool first_chunk = true;
+  while (!end_stream) {
+    processResponseBodyMessage(*grpc_upstreams_[0], false,
+                               [&](const HttpBody& chunk, BodyResponse& body_resp) {
+                                 end_stream = chunk.end_of_stream();
+                                 body_resp.mutable_response()->mutable_body_mutation()->set_body(
+                                     first_chunk ? std::string(body) : "");
+                                 first_chunk = false;
+                                 return true;
+                               });
+    if (testing::Test::HasFatalFailure()) {
+      return;
+    }
   }
 }
 
