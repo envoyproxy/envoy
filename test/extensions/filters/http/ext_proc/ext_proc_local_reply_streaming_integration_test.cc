@@ -483,7 +483,6 @@ typed_config:
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
 }
 
-
 // A headers-only streamed local response (STREAMED body mode) for a request whose body is still
 // arriving: the request is not sent on to the upstream. Covers the handleHeaderContinue() path.
 TEST_P(ExtProcLocalReplyStreamingIntegrationTest, StreamedHeadersOnlyLocalResponseWithRequestBody) {
