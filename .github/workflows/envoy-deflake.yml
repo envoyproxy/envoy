@@ -22,6 +22,22 @@ on:
         description: 'Number of runs to test'
         type: number
         default: 1000
+      pr:
+        description: 'Pull request to test (merge commit); takes precedence over ref'
+        type: string
+        default: ''
+      ref:
+        description: 'Ref to test: full sha, branch, tag or refs/pull/N/head (default: this branch)'
+        type: string
+        default: ''
+      repository:
+        description: 'Repository (owner/name) to fetch ref from (default: this repository); ignored for pr'
+        type: string
+        default: ''
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        type: number
+        default: 360
 
 
 jobs:
@@ -46,10 +62,18 @@ jobs:
       bazel-extra: >-
         --config=rbe
         ${{ inputs.bazel-args }}
+      checkout-pr: ${{ inputs.pr }}
+      checkout-ref: ${{ inputs.ref }}
+      checkout-repository: ${{ inputs.repository }}
       rbe: true
       request: ${{ needs.env.outputs.request }}
       target: deflake
-      trusted: true
+      timeout-minutes: ${{ fromJSON(inputs.timeout-minutes) }}
+      # Testing a pull request, ref or fork branch runs code that is not on this branch, so the
+      # job is untrusted, as in PR CI: no app token, no deploy key. Unlike PR CI the run keeps
+      # this branch's Actions cache scope, so only dispatch code you would push to this
+      # repository.
+      trusted: ${{ !(inputs.pr || inputs.ref) }}
       steps-pre: |
         - shell: bash
           run: |

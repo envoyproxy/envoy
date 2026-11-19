@@ -267,9 +267,9 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(
   auto& fields = *metadata.mutable_fields();
 
   // Emit actual identifiers.
-  fields["node_id"].set_string_value(std::string(node_id));
-  fields["cluster_id"].set_string_value(std::string(cluster_id));
-  fields["tenant_id"].set_string_value(std::string(tenant_id));
+  fields["node_id"].set_string_value(node_id);
+  fields["cluster_id"].set_string_value(cluster_id);
+  fields["tenant_id"].set_string_value(tenant_id);
 
   // Emit validation result.
   fields["validation_result"].set_string_value(toStringView(validation_result));

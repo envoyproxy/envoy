@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/decoded_resource_impl.h"
 
 #include "test/extensions/config_subscription/grpc/delta_subscription_test_harness.h"
 
@@ -40,6 +41,23 @@ TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name4"});
+}
+
+TEST_P(DeltaSubscriptionImplTest, RequestOnDemandUpdate) {
+  startSubscription({"name1", "name2"});
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({"name3"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({"name3"});
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({"name4"}, {"name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->update({"name4"}, {"name3"});
+  EXPECT_TRUE(statsAre(3, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({}, {"name4"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->update({}, {"name4"});
+  EXPECT_TRUE(statsAre(4, 0, 0, 0, 0, 0, 0, ""));
 }
 
 // Checks that after a pause(), no requests are sent until resume().
@@ -98,16 +116,16 @@ TEST_P(DeltaSubscriptionImplTest, OnDemandUpdateRoutesResponseToWatch) {
 
   bool delivered_name2 = false;
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
-      .WillOnce(Invoke([&delivered_name2](const std::vector<DecodedResourceRef>& added_resources,
-                                          const Protobuf::RepeatedPtrField<std::string>&,
-                                          const std::string&) {
+      .WillOnce([&delivered_name2](const std::vector<DecodedResourceRef>& added_resources,
+                                   const Protobuf::RepeatedPtrField<std::string>&,
+                                   const std::string&) {
         EXPECT_EQ(1, added_resources.size());
         if (!added_resources.empty()) {
           EXPECT_EQ("name2", added_resources[0].get().name());
         }
         delivered_name2 = true;
         return absl::OkStatus();
-      }));
+      });
   expectSendMessage({}, version); // ACK
   onDiscoveryResponse(std::move(response));
   EXPECT_TRUE(delivered_name2);
@@ -149,16 +167,15 @@ TEST_P(DeltaSubscriptionImplTest, OnDemandUpdateOutsideAcceptGlobRoutesResponse)
 
   bool delivered = false;
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
-      .WillOnce(
-          Invoke([&delivered](const std::vector<DecodedResourceRef>& added_resources,
-                              const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-            EXPECT_EQ(1, added_resources.size());
-            if (!added_resources.empty()) {
-              EXPECT_EQ("rc2/vhost", added_resources[0].get().name());
-            }
-            delivered = true;
-            return absl::OkStatus();
-          }));
+      .WillOnce([&delivered](const std::vector<DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("rc2/vhost", added_resources[0].get().name());
+        }
+        delivered = true;
+        return absl::OkStatus();
+      });
   expectSendMessage({}, version); // ACK
   onDiscoveryResponse(std::move(response));
   EXPECT_TRUE(delivered);
@@ -190,16 +207,15 @@ TEST_P(DeltaSubscriptionImplTest, AcceptBeforeStartIsApplied) {
 
   bool delivered = false;
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
-      .WillOnce(
-          Invoke([&delivered](const std::vector<DecodedResourceRef>& added_resources,
-                              const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-            EXPECT_EQ(1, added_resources.size());
-            if (!added_resources.empty()) {
-              EXPECT_EQ("rc1/foo", added_resources[0].get().name());
-            }
-            delivered = true;
-            return absl::OkStatus();
-          }));
+      .WillOnce([&delivered](const std::vector<DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("rc1/foo", added_resources[0].get().name());
+        }
+        delivered = true;
+        return absl::OkStatus();
+      });
   expectSendMessage({}, version); // ACK
   onDiscoveryResponse(std::move(response));
   EXPECT_TRUE(delivered);
@@ -251,14 +267,14 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
-      .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
+      .WillRepeatedly([this](Buffer::InstancePtr& buffer, bool) {
         API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) message;
         EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
           nonce_acks_sent_.push(nonce);
         }
-      }));
+      });
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }
@@ -321,6 +337,55 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
 
   subscription->start({"name1"});
   subscription->updateResourceInterest({"name1", "name2"});
+}
+
+class DeltaSubscriptionImplInitFetchTimeoutTest : public DeltaSubscriptionTestHarness,
+                                                  public testing::TestWithParam<LegacyOrUnified> {
+protected:
+  DeltaSubscriptionImplInitFetchTimeoutTest()
+      : DeltaSubscriptionTestHarness(GetParam(), std::chrono::milliseconds(1000)) {}
+
+  void TearDown() override { doSubscriptionTearDown(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplInitFetchTimeoutTest,
+                         DeltaSubscriptionImplInitFetchTimeoutTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+DecodedResourcePtr replayedClusterLoadAssignment(const std::string& name) {
+  auto cla =
+      Protobuf::Arena::MakeUnique<envoy::config::endpoint::v3::ClusterLoadAssignment>(nullptr);
+  cla->set_cluster_name(name);
+  return std::make_unique<DecodedResourceImpl>(std::move(cla), name, std::vector<std::string>{},
+                                               "v1", /*from_cache=*/true);
+}
+
+TEST_P(DeltaSubscriptionImplInitFetchTimeoutTest, RejectedReplayKeepsInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(*init_timeout_timer_, disableTimer()).Times(0);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "v1"))
+      .WillOnce(Return(absl::InvalidArgumentError("rejected")));
+  EXPECT_FALSE(subscription_->onConfigUpdate(refs, {}, "v1").ok());
+
+  // The server will not resend the resource, so the timeout must still fire.
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr));
+  callInitFetchTimeoutCb();
+}
+
+TEST_P(DeltaSubscriptionImplInitFetchTimeoutTest, AcceptedReplayDisablesInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "v1")).WillOnce(Return(absl::OkStatus()));
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_TRUE(subscription_->onConfigUpdate(refs, {}, "v1").ok());
 }
 
 } // namespace

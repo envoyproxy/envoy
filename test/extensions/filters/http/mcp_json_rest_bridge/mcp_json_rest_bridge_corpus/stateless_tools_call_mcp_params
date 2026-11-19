@@ -1,0 +1,41 @@
+config {
+  server_info {
+    max_supported_protocol_version { value: "2026-07-28" }
+  }
+  tool_config {
+    tools {
+      name: "get_weather"
+      http_rule { get: "/v1/weather/{city}" }
+      mcp_param_headers { name: "Region" property_path: "region" type: STRING }
+      mcp_param_headers { name: "Days" property_path: "options" property_path: "days" type: INTEGER }
+      mcp_param_headers { name: "Offset" property_path: "offset" type: INTEGER }
+      mcp_param_headers { name: "Limit" property_path: "limit" type: INTEGER }
+      mcp_param_headers { name: "Metric" property_path: "metric" type: BOOLEAN }
+    }
+  }
+}
+request {
+  headers {
+    headers { key: ":method" value: "POST" }
+    headers { key: ":path" value: "/mcp" }
+    headers { key: "content-type" value: "application/json" }
+    headers { key: "mcp-protocol-version" value: "2026-07-28" }
+    headers { key: "mcp-method" value: "tools/call" }
+    headers { key: "mcp-name" value: "get_weather" }
+    headers { key: "mcp-param-region" value: "eu-west1" }
+    headers { key: "mcp-param-days" value: "=?base64?My4w?=" }
+    headers { key: "mcp-param-offset" value: "-2" }
+    headers { key: "mcp-param-limit" value: "10" }
+    headers { key: "mcp-param-metric" value: "true" }
+  }
+  http_body {
+    data: '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_weather","arguments":{"city":"Paris","region":"eu-west1","options":{"days":3},"offset":-2,"limit":10.0,"metric":true},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+  }
+}
+upstream_response {
+  headers {
+    headers { key: ":status" value: "200" }
+    headers { key: "content-type" value: "application/json" }
+  }
+  http_body { data: '{"forecast":"sunny"}' }
+}

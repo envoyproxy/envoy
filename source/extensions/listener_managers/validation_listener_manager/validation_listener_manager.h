@@ -20,9 +20,10 @@ public:
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
-        lds_config, lds_resources_locator, parent_.xdsManager(), parent_.clusterManager(),
-        parent_.initManager(), *parent_.stats().rootScope(), parent_.listenerManager(),
-        parent_.messageValidationContext().dynamicValidationVisitor());
+        lds_config, lds_resources_locator, parent_.clusterManager(), parent_.initManager(),
+        *parent_.stats().rootScope(), parent_.listenerManager(),
+        parent_.messageValidationContext().dynamicValidationVisitor(),
+        parent_.api().randomGenerator());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,

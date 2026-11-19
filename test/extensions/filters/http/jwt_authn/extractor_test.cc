@@ -465,6 +465,23 @@ providers:
   EXPECT_FALSE(tokens[1]->isIssuerAllowed("abc"));
 }
 
+// A param-location token is only produced from a :path query string, but the :path header may be
+// absent by the time removeJwt runs (e.g. a filter removed it). removeJwt must not crash and must
+// leave the path absent.
+TEST_F(ExtractorTest, TestCustomParamTokenRemoveWithoutPath) {
+  auto headers = TestRequestHeaderMapImpl{{":path", "/path?token_param=jwt_token"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+
+  // Drop the :path header before removing the JWT.
+  headers.removePath();
+  EXPECT_EQ(headers.Path(), nullptr);
+
+  tokens[0]->removeJwt(headers);
+  EXPECT_EQ(headers.Path(), nullptr);
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

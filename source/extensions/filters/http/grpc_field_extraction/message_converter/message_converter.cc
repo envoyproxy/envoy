@@ -152,6 +152,10 @@ MessageConverter::convertBackToBuffer(StreamMessagePtr message) {
   return output_message;
 }
 
+void MessageConverter::drainLeftoverData(Envoy::Buffer::Instance& data) {
+  data.move(parsing_buffer_);
+}
+
 uint64_t MessageConverter::bytesBuffered() const {
   ENVOY_LOG_MISC(info, "{} + {}", parsing_buffer_.length(), *parsed_bytes_usage_);
   return parsing_buffer_.length() + *parsed_bytes_usage_;

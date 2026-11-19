@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include "source/common/runtime/runtime_features.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
@@ -83,9 +81,7 @@ bool BrotliDecompressorImpl::process(Common::BrotliContext& ctx, Buffer::Instanc
     // Check if the output buffer is full first. If it is full then we treat it
     // as an error and stop the decompression directly to avoid possible decompression
     // bomb.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.enable_compression_bomb_protection") &&
-        (output_buffer.length() > ctx.max_output_size_)) {
+    if (output_buffer.length() > ctx.max_output_size_) {
       stats_.brotli_error_.inc();
       stats_.brotli_output_overflow_.inc();
       return false;

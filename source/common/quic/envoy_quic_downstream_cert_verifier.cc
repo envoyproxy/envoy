@@ -22,7 +22,7 @@ quic::QuicAsyncStatus verifyQuicClientCertChain(
 
   auto fail = [error_details, details](absl::string_view msg) {
     ENVOY_LOG_MISC(debug, "QUIC client certificate validation rejected: {}", msg);
-    *error_details = std::string(msg);
+    error_details->assign(msg);
     *details = std::make_unique<CertVerifyResult>(false);
     return quic::QUIC_FAILURE;
   };

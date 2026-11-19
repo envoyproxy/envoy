@@ -10,8 +10,8 @@ namespace ReverseConnection {
 namespace {
 // Identifiers flow into stat names, log fields, and handshake headers, so bound their length.
 constexpr size_t kMaxIdentifierLength = 255;
-// One maintenance tick dials inline, so bound the per-host count; zero connections is never useful.
-constexpr uint32_t kMinConnectionCount = 1;
+// One maintenance tick dials inline, so bound the per-host count. A count of 0 keeps the listener
+// idle until a listener update raises it.
 constexpr uint32_t kMaxConnectionCount = 1024;
 
 // Rejects an identifier that is too long or cannot be carried in an HTTP header value, since each
@@ -106,10 +106,9 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
     return absl::InvalidArgumentError(
         fmt::format("Invalid connection count: {}", cluster_parts[1]));
   }
-  if (count < kMinConnectionCount || count > kMaxConnectionCount) {
-    return absl::InvalidArgumentError(
-        fmt::format("Connection count {} is outside the supported range [{}, {}]", count,
-                    kMinConnectionCount, kMaxConnectionCount));
+  if (count > kMaxConnectionCount) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Connection count {} is outside the supported range [0, {}]", count, kMaxConnectionCount));
   }
 
   // The cluster name must be present, since the parser would otherwise accept an empty name.

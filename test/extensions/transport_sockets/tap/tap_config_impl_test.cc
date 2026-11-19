@@ -8,7 +8,6 @@
 using testing::_;
 using testing::ByMove;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -61,7 +60,7 @@ public:
         .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
     EXPECT_CALL(*config_, rootMatcher()).WillRepeatedly(ReturnRef(matcher_));
     EXPECT_CALL(matcher_, onNewStream(_))
-        .WillOnce(Invoke([this](TapCommon::Matcher::MatchStatusVector& statuses) {
+        .WillOnce([this](TapCommon::Matcher::MatchStatusVector& statuses) {
           statuses_ = &statuses;
           if (fail_match_) {
             statuses[0].matches_ = false;
@@ -69,7 +68,7 @@ public:
             statuses[0].matches_ = true;
           }
           statuses[0].might_change_status_ = false;
-        }));
+        });
     EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(streaming));
     EXPECT_CALL(*config_, maxBufferedRxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));

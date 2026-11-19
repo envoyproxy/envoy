@@ -6,6 +6,7 @@
 
 #include "envoy/stats/scope.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "contrib/dynamo/filters/http/source/dynamo_request_parser.h"
@@ -16,8 +17,8 @@ namespace HttpFilters {
 namespace Dynamo {
 
 DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
-    : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Dynamo")),
-      prefix_(stat_name_set_->add(prefix + "dynamodb")),
+    : scope_(scope.createScope(prefix + "dynamodb")),
+      stat_name_set_(scope.symbolTable().makeSet("Dynamo")),
       batch_failure_unprocessed_keys_(stat_name_set_->add("BatchFailureUnprocessedKeys")),
       capacity_(stat_name_set_->add("capacity")),
       empty_response_body_(stat_name_set_->add("empty_response_body")),
@@ -31,7 +32,10 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
       upstream_rq_time_(stat_name_set_->add("upstream_rq_time")),
       upstream_rq_total_(stat_name_set_->add("upstream_rq_total")),
       unknown_entity_type_(stat_name_set_->add("unknown_entity_type")),
-      unknown_operation_(stat_name_set_->add("unknown_operation")) {
+      unknown_operation_(stat_name_set_->add("unknown_operation")),
+      operation_tag_(stat_name_set_->add(Envoy::Config::TagNames::get().DYNAMO_OPERATION)),
+      table_tag_(stat_name_set_->add(Envoy::Config::TagNames::get().DYNAMO_TABLE)),
+      partition_id_tag_(stat_name_set_->add(Envoy::Config::TagNames::get().DYNAMO_PARTITION_ID)) {
   upstream_rq_total_groups_[0] = stat_name_set_->add("upstream_rq_total_unknown");
   upstream_rq_time_groups_[0] = stat_name_set_->add("upstream_rq_time_unknown");
   for (size_t i = 1; i < DynamoStats::NumGroupEntries; ++i) {
@@ -47,33 +51,62 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
   stat_name_set_->rememberBuiltins({"operation", "table"});
 }
 
-Stats::ElementVec DynamoStats::addPrefix(const Stats::ElementVec& names) {
-  Stats::ElementVec names_with_prefix;
-  names_with_prefix.reserve(1 + names.size());
-  names_with_prefix.push_back(prefix_);
-  names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
-  return names_with_prefix;
+Stats::Counter& DynamoStats::counter(absl::Span<const Stats::StatName> base_names,
+                                     Stats::StatNameTagSpan tags,
+                                     absl::Span<const Stats::StatName> names) {
+  const Stats::StatNameJoiner base_name(base_names, scope_->constSymbolTable());
+  const Stats::StatNameJoiner name(names, scope_->constSymbolTable());
+  return scope_->counterFromTaggedName(base_name.statName(), tags, name.statName());
 }
 
-void DynamoStats::incCounter(const Stats::ElementVec& names) {
-  Stats::Utility::counterFromElements(scope_, addPrefix(names)).inc();
+Stats::Histogram& DynamoStats::histogram(absl::Span<const Stats::StatName> base_names,
+                                         Stats::StatNameTagSpan tags,
+                                         absl::Span<const Stats::StatName> names,
+                                         Stats::Histogram::Unit unit) {
+  const Stats::StatNameJoiner base_name(base_names, scope_->constSymbolTable());
+  const Stats::StatNameJoiner name(names, scope_->constSymbolTable());
+  return scope_->histogramFromTaggedName(base_name.statName(), tags, name.statName(), unit);
 }
 
-void DynamoStats::recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,
-                                  uint64_t value) {
-  Stats::Utility::histogramFromElements(scope_, addPrefix(names), unit).recordValue(value);
+void DynamoStats::incCounter(absl::Span<const Stats::StatName> names) {
+  const Stats::StatNameJoiner name(names, scope_->constSymbolTable());
+  scope_->counterFromStatName(name.statName()).inc();
+}
+
+void DynamoStats::incEntityCounter(Stats::StatName entity_type, Stats::StatName entity_tag,
+                                   Stats::StatName entity, Stats::StatName name) {
+  const Stats::StatNameTag tag{entity_tag, entity};
+  counter({entity_type, name}, Stats::StatNameTagSpan{tag}, {entity_type, entity, name}).inc();
+}
+
+void DynamoStats::recordEntityHistogram(Stats::StatName entity_type, Stats::StatName entity_tag,
+                                        Stats::StatName entity, Stats::StatName name,
+                                        Stats::Histogram::Unit unit, uint64_t value) {
+  const Stats::StatNameTag tag{entity_tag, entity};
+  histogram({entity_type, name}, Stats::StatNameTagSpan{tag}, {entity_type, entity, name}, unit)
+      .recordValue(value);
+}
+
+void DynamoStats::incTableErrorCounter(Stats::StatName table, Stats::StatName name) {
+  const Stats::StatNameTag tag{table_tag_, table};
+  counter({error_, name}, Stats::StatNameTagSpan{tag}, {error_, table, name}).inc();
 }
 
 Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,
                                                        const std::string& operation,
                                                        const std::string& partition_id) {
-  // Use the last 7 characters of the partition id.
-  absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
-  std::string partition = absl::StrCat("__partition_id=", id_last_7);
-  return Stats::Utility::counterFromElements(
-      scope_,
-      addPrefix({table_, Stats::DynamicName(table_name), capacity_,
-                 getBuiltin(operation, unknown_operation_), Stats::DynamicName(partition)}));
+  // Use the last 7 characters of the partition id, or all of it when shorter.
+  const absl::string_view id_last_7 =
+      partition_id.size() > 7 ? absl::string_view(partition_id).substr(partition_id.size() - 7)
+                              : absl::string_view(partition_id);
+  Stats::StatNameDynamicPool pool(scope_->symbolTable());
+  const Stats::StatName table = pool.add(table_name);
+  const Stats::StatName operation_name = getBuiltin(operation, unknown_operation_);
+  const Stats::StatName partition = pool.add(absl::StrCat("__partition_id=", id_last_7));
+  const Stats::StatNameTag tags[] = {{table_tag_, table},
+                                     {operation_tag_, operation_name},
+                                     {partition_id_tag_, pool.add(id_last_7)}};
+  return counter({table_, capacity_}, tags, {table_, table, capacity_, operation_name, partition});
 }
 
 size_t DynamoStats::groupIndex(uint64_t status) {

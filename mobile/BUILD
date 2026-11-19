@@ -1,10 +1,7 @@
-load(
-    "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
-    "project_options",
-    "top_level_targets",
-    "xcode_schemes",
-    "xcodeproj",
-)
+load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:project_options.bzl", "project_options")
+load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:top_level_target.bzl", "top_level_targets")
+load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
+load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcschemes.bzl", "xcschemes")
 load("@rules_android//android:rules.bzl", "aar_import")
 load("@rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
@@ -118,46 +115,12 @@ genrule(
 xcodeproj(
     name = "xcodeproj",
     bazel_path = "bazel",
-    build_mode = "bazel",
     project_name = "Envoy",
     project_options = project_options(
         indent_width = 2,
         tab_width = 2,
     ),
     scheme_autogeneration_mode = "auto",  # Switch to "all" to generate schemes for all deps
-    schemes = [
-        xcode_schemes.scheme(
-            name = "Hello World App",
-            launch_action = xcode_schemes.launch_action("//examples/swift/hello_world:app"),
-        ),
-        xcode_schemes.scheme(
-            name = "Hello World App (ObjC)",
-            launch_action = xcode_schemes.launch_action("//examples/objective-c/hello_world:app"),
-        ),
-        xcode_schemes.scheme(
-            name = "Experimental App",
-            launch_action = xcode_schemes.launch_action("//test/swift/apps/experimental:app"),
-        ),
-        xcode_schemes.scheme(
-            name = "Swift Library",
-            build_action = xcode_schemes.build_action(["//library/swift:ios_lib"]),
-        ),
-        xcode_schemes.scheme(
-            name = "iOS Tests",
-            test_action = xcode_schemes.test_action([
-                "//experimental/swift:quic_stream_test",
-                "//test/objective-c:envoy_bridge_utility_test",
-                "//test/swift/integration:test",
-                "//test/swift/stats:test",
-                "//test/swift:test",
-            ]),
-        ),
-        xcode_schemes.scheme(
-            name = "Objective-C Library",
-            build_action = xcode_schemes.build_action(["//library/objective-c:envoy_engine_objc_lib"]),
-            test_action = xcode_schemes.test_action(["//test/objective-c:envoy_bridge_utility_test"]),
-        ),
-    ],
     tags = ["manual"],
     top_level_targets = [
         # Apps
@@ -179,5 +142,48 @@ xcodeproj(
         "//test/swift/integration:test",
         "//test/swift/stats:test",
         "//test/swift:test",
+    ],
+    xcschemes = [
+        xcschemes.scheme(
+            name = "Hello World App",
+            run = xcschemes.run(launch_target = "//examples/swift/hello_world:app"),
+        ),
+        xcschemes.scheme(
+            name = "Hello World App (ObjC)",
+            run = xcschemes.run(launch_target = "//examples/objective-c/hello_world:app"),
+        ),
+        xcschemes.scheme(
+            name = "Experimental App",
+            run = xcschemes.run(launch_target = "//test/swift/apps/experimental:app"),
+        ),
+        xcschemes.scheme(
+            name = "Swift Library",
+            run = xcschemes.run(build_targets = [
+                xcschemes.top_level_anchor_target(
+                    "//examples/swift/hello_world:app",
+                    library_targets = ["//library/swift:ios_lib"],
+                ),
+            ]),
+        ),
+        xcschemes.scheme(
+            name = "iOS Tests",
+            test = xcschemes.test(test_targets = [
+                "//experimental/swift:quic_stream_test",
+                "//test/objective-c:envoy_bridge_utility_test",
+                "//test/swift/integration:test",
+                "//test/swift/stats:test",
+                "//test/swift:test",
+            ]),
+        ),
+        xcschemes.scheme(
+            name = "Objective-C Library",
+            run = xcschemes.run(build_targets = [
+                xcschemes.top_level_anchor_target(
+                    "//examples/swift/hello_world:app",
+                    library_targets = ["//library/objective-c:envoy_engine_objc_lib"],
+                ),
+            ]),
+            test = xcschemes.test(test_targets = ["//test/objective-c:envoy_bridge_utility_test"]),
+        ),
     ],
 )

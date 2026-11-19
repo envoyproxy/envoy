@@ -104,6 +104,16 @@ TEST_F(MergeStatPrefixTest, ClusterParentWithSelfTag) {
                            std::make_pair(Envoy::Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf")));
 }
 
+// Redis-scoped parent "redis.<prefix>." extracted as REDIS_PREFIX tag.
+TEST_F(MergeStatPrefixTest, RedisParent) {
+  const auto p = mergeStatPrefix(symbol_table_, "redis.foo.", "splitter", {}, "splitter");
+  EXPECT_EQ(taggedName(p), "redis.foo.splitter.name");
+  EXPECT_EQ(taggedName(p), legacyName("redis.foo.splitter."));
+  EXPECT_EQ(base(p), "redis.splitter");
+  EXPECT_THAT(tags(p), testing::ElementsAre(
+                           std::make_pair(Envoy::Config::TagNames::get().REDIS_PREFIX, "foo")));
+}
+
 // A parent passed without a trailing dot will not be recognized as a tag because we assume
 // the caller should handle the dot correctly.
 TEST_F(MergeStatPrefixTest, ParentWithoutTrailingDot) {
@@ -152,6 +162,56 @@ TEST_F(MergeStatPrefixTest, EmptySelfWithParent) {
   EXPECT_EQ(taggedName(p), "http.ingress.name");
   EXPECT_EQ(base(p), "http");
   EXPECT_THAT(tags(p), testing::ElementsAre(std::make_pair(hcm_tag_, "ingress")));
+}
+
+TEST_F(MergeStatPrefixTest, WorkerStatPrefixWorker) {
+  const std::string& worker_tag = Envoy::Config::TagNames::get().WORKER_ID;
+
+  const auto dispatcher = workerStatPrefix(symbol_table_, "", "worker_3", "dispatcher.");
+  EXPECT_EQ(taggedName(dispatcher), "worker_3.dispatcher.name");
+  EXPECT_EQ(taggedName(dispatcher), legacyName("worker_3.dispatcher."));
+  EXPECT_EQ(base(dispatcher), "worker.dispatcher");
+  EXPECT_THAT(tags(dispatcher), testing::ElementsAre(std::make_pair(worker_tag, "3")));
+
+  const auto cluster_manager =
+      workerStatPrefix(symbol_table_, "thread_local_cluster_manager.", "worker_0");
+  EXPECT_EQ(taggedName(cluster_manager), "thread_local_cluster_manager.worker_0.name");
+  EXPECT_EQ(taggedName(cluster_manager), legacyName("thread_local_cluster_manager.worker_0"));
+  EXPECT_EQ(base(cluster_manager), "thread_local_cluster_manager.worker");
+  EXPECT_THAT(tags(cluster_manager), testing::ElementsAre(std::make_pair(worker_tag, "0")));
+
+  // Only the thread name: the stats sit under the 'worker.' segment of the scope.
+  const auto handler = workerStatPrefix(symbol_table_, "", "worker_1");
+  EXPECT_EQ(taggedName(handler), "worker_1.name");
+  EXPECT_EQ(taggedName(handler), legacyName("worker_1."));
+  EXPECT_EQ(base(handler), "worker");
+  EXPECT_THAT(tags(handler), testing::ElementsAre(std::make_pair(worker_tag, "1")));
+}
+
+TEST_F(MergeStatPrefixTest, WorkerStatPrefixNotAWorker) {
+  const auto main_thread = workerStatPrefix(symbol_table_, "server.", "main_thread", "dispatcher.");
+  EXPECT_EQ(taggedName(main_thread), "server.main_thread.dispatcher.name");
+  EXPECT_EQ(taggedName(main_thread), legacyName("server.main_thread.dispatcher."));
+  EXPECT_EQ(base(main_thread), "server.main_thread.dispatcher");
+  EXPECT_TRUE(tags(main_thread).empty());
+
+  // No thread name at all: just the parent and the own name.
+  const auto no_thread = workerStatPrefix(symbol_table_, "server.", "", "dispatcher.");
+  EXPECT_EQ(taggedName(no_thread), "server.dispatcher.name");
+  EXPECT_EQ(taggedName(no_thread), legacyName("server.dispatcher."));
+  EXPECT_EQ(base(no_thread), "server.dispatcher");
+  EXPECT_TRUE(tags(no_thread).empty());
+}
+
+// sanitize=false keeps a ':' in the merged names and tag values, matching the legacy
+// POOL_*_PREFIX-based stat creation that never sanitized.
+TEST_F(MergeStatPrefixTest, VerbatimNamesKeepColon) {
+  const auto p =
+      mergeStatPrefix(symbol_table_, "redis.db:6379.", "splitter", {}, {}, /*sanitize=*/false);
+  EXPECT_EQ(prefix(p), "redis.db:6379.splitter");
+  EXPECT_EQ(base(p), "redis.splitter");
+  EXPECT_THAT(tags(p), testing::ElementsAre(std::make_pair(
+                           std::string(Envoy::Config::TagNames::get().REDIS_PREFIX), "db:6379")));
 }
 
 } // namespace

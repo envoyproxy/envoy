@@ -82,15 +82,27 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
     lifecycle_stats_.created_.inc();
     vm_count_gauge_.inc();
     break;
+  case WasmEvent::VmCrashed:
+    lifecycle_stats_.crashed_.inc();
+    break;
   default:
     break;
+  }
+}
+
+void LifecycleStatsHandler::onMemorySizeChanged(uint64_t previous_size, uint64_t new_size) {
+  if (new_size > previous_size) {
+    lifecycle_stats_.memory_size_.add(new_size - previous_size);
+  } else {
+    lifecycle_stats_.memory_size_.sub(previous_size - new_size);
   }
 }
 
 int64_t LifecycleStatsHandler::getActiveVmCount() { return active_wasms; };
 
 StatsHandler::StatsHandler(Stats::Scope& parent_scope, const std::string& prefix)
-    : scope_(parent_scope.createScope(prefix)), wasm_stats_{WASM_STATS(POOL_COUNTER(*scope_))} {}
+    : scope_(parent_scope.createScope(prefix)),
+      wasm_stats_{WASM_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))} {}
 
 void StatsHandler::onEvent(WasmEvent event) const {
   switch (event) {
@@ -105,6 +117,14 @@ void StatsHandler::onEvent(WasmEvent event) const {
     break;
   default:
     break;
+  }
+}
+
+void StatsHandler::onMemorySizeChanged(uint64_t previous_size, uint64_t new_size) const {
+  if (new_size > previous_size) {
+    wasm_stats_.vm_memory_size_.add(new_size - previous_size);
+  } else {
+    wasm_stats_.vm_memory_size_.sub(previous_size - new_size);
   }
 }
 

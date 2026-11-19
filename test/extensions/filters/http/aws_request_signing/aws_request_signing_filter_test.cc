@@ -181,9 +181,9 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
 
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+      .WillOnce([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -204,10 +204,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
       .WillRepeatedly(Return(false));
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
-                          const absl::string_view) -> absl::Status {
+      .WillOnce([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
-      }));
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
@@ -321,8 +320,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataCredentialsPending) {
 
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
-                          const absl::string_view) -> absl::Status { return absl::OkStatus(); }));
+      .WillOnce([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
+        return absl::OkStatus();
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, true));
   // We should see continueDecoding called when the captured callback is triggered

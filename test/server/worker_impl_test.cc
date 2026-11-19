@@ -2,6 +2,7 @@
 
 #include "source/common/api/api_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -17,10 +18,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Optional;
+using testing::Ref;
 using testing::Return;
 
 namespace Envoy {
@@ -73,11 +75,11 @@ TEST_F(WorkerImplTest, BasicFlow) {
   NiceMock<Network::MockListenerConfig> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _))
-      .WillOnce(Invoke([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
-                                           Runtime::Loader&, Random::RandomGenerator&) -> void {
+      .WillOnce([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
+                                    Runtime::Loader&, Random::RandomGenerator&) -> void {
         EXPECT_EQ(config.listenerTag(), 1UL);
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+      });
   worker_.addListener(
       std::nullopt, listener, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
 
@@ -90,20 +92,19 @@ TEST_F(WorkerImplTest, BasicFlow) {
   NiceMock<Network::MockListenerConfig> listener2;
   ON_CALL(listener2, listenerTag()).WillByDefault(Return(2UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _))
-      .WillOnce(Invoke([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
-                                           Runtime::Loader&, Random::RandomGenerator&) -> void {
+      .WillOnce([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
+                                    Runtime::Loader&, Random::RandomGenerator&) -> void {
         EXPECT_EQ(config.listenerTag(), 2UL);
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+      });
   worker_.addListener(
       std::nullopt, listener2, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
   ci.waitReady();
 
-  EXPECT_CALL(*handler_, stopListeners(2, _))
-      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() -> void {
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-        ci.setReady();
-      }));
+  EXPECT_CALL(*handler_, stopListeners(2, _)).WillOnce([current_thread_id, &ci]() -> void {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+    ci.setReady();
+  });
 
   ConditionalInitializer ci2;
   // Verify that callback is called from the other thread.
@@ -114,10 +115,9 @@ TEST_F(WorkerImplTest, BasicFlow) {
   ci.waitReady();
   ci2.waitReady();
 
-  EXPECT_CALL(*handler_, removeListeners(2))
-      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+  EXPECT_CALL(*handler_, removeListeners(2)).WillOnce([current_thread_id]() -> void {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+  });
   worker_.removeListener(listener2, [current_thread_id, &ci]() -> void {
     EXPECT_NE(current_thread_id, std::this_thread::get_id());
     ci.setReady();
@@ -128,19 +128,18 @@ TEST_F(WorkerImplTest, BasicFlow) {
   NiceMock<Network::MockListenerConfig> listener3;
   ON_CALL(listener3, listenerTag()).WillByDefault(Return(3UL));
   EXPECT_CALL(*handler_, addListener(_, _, _, _))
-      .WillOnce(Invoke([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
-                                           Runtime::Loader&, Random::RandomGenerator&) -> void {
+      .WillOnce([current_thread_id](std::optional<uint64_t>, Network::ListenerConfig& config,
+                                    Runtime::Loader&, Random::RandomGenerator&) -> void {
         EXPECT_EQ(config.listenerTag(), 3UL);
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+      });
   worker_.addListener(
       std::nullopt, listener3, [&ci]() -> void { ci.setReady(); }, runtime_, random_);
   ci.waitReady();
 
-  EXPECT_CALL(*handler_, removeListeners(3))
-      .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
+  EXPECT_CALL(*handler_, removeListeners(3)).WillOnce([current_thread_id]() -> void {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+  });
   worker_.removeListener(listener3, [current_thread_id]() -> void {
     EXPECT_NE(current_thread_id, std::this_thread::get_id());
   });
@@ -162,24 +161,100 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
 
   // onListenerDrain posts to the worker dispatcher and invokes handler->onListenerDrain on
   // the worker thread.
-  EXPECT_CALL(*handler_, onListenerDrain(7UL, _))
-      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-        ci.setReady();
-      }));
+  EXPECT_CALL(*handler_, onListenerDrain(7UL, _)).WillOnce([current_thread_id, &ci]() {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+    ci.setReady();
+  });
   worker_.onListenerDrain(7UL, Network::ConnectionDrainEvent{});
   ci.waitReady();
 
   // onFilterChainDrain likewise posts and forwards on the worker thread.
   const std::list<const Network::FilterChain*> filter_chains;
   EXPECT_CALL(*handler_, onFilterChainDrain(7UL, _, _))
-      .WillOnce(
-          Invoke([current_thread_id, &ci](uint64_t, const std::list<const Network::FilterChain*>&,
-                                          Network::ConnectionDrainEvent) {
-            EXPECT_NE(current_thread_id, std::this_thread::get_id());
-            ci.setReady();
-          }));
+      .WillOnce([current_thread_id, &ci](uint64_t, const std::list<const Network::FilterChain*>&,
+                                         Network::ConnectionDrainEvent) {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        ci.setReady();
+      });
   worker_.onFilterChainDrain(7UL, filter_chains, Network::ConnectionDrainEvent{});
+  ci.waitReady();
+
+  worker_.stop();
+}
+
+TEST_F(WorkerImplTest, ListenerAddressesPostToWorkerThread) {
+  InSequence s;
+  std::thread::id current_thread_id = std::this_thread::get_id();
+  ConditionalInitializer ci;
+
+  NiceMock<Network::MockListenerConfig> listener;
+  EXPECT_CALL(*handler_, addListener(_, _, _, _));
+  worker_.addListener(std::nullopt, listener, [&ci]() { ci.setReady(); }, runtime_, random_);
+  worker_.start(guard_dog_, emptyCallback, std::nullopt);
+  ci.waitReady();
+
+  const Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80);
+  bool stopped = false;
+  EXPECT_CALL(*handler_, stopListenerAddresses(Ref(listener), ElementsAre(address)))
+      .WillOnce([current_thread_id, &stopped]() {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        stopped = true;
+      });
+  // The completion is called on the worker thread after the handler has stopped the addresses.
+  worker_.stopListenerAddresses(listener, {address}, [current_thread_id, &stopped, &ci]() {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+    EXPECT_TRUE(stopped);
+    ci.setReady();
+  });
+  ci.waitReady();
+
+  const Network::ConnectionDrainEvent drain_event{MonotonicTime(std::chrono::seconds(1)),
+                                                  Server::DrainStrategy::Immediate};
+  EXPECT_CALL(*handler_, onListenerAddressesDrain(Ref(listener), _))
+      .WillOnce([current_thread_id, &ci, &drain_event](const Network::ListenerConfig&,
+                                                       Network::ConnectionDrainEvent event) {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        EXPECT_EQ(drain_event.start_time, event.start_time);
+        EXPECT_EQ(drain_event.strategy, event.strategy);
+        ci.setReady();
+      });
+  worker_.onListenerAddressesDrain(listener, drain_event);
+  ci.waitReady();
+
+  EXPECT_CALL(*handler_, removeListenerAddresses(Ref(listener)))
+      .WillOnce([current_thread_id, &ci]() {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        ci.setReady();
+      });
+  worker_.removeListenerAddresses(listener);
+  ci.waitReady();
+
+  worker_.stop();
+}
+
+// A worker runs the removal of filter chains before the in place add of a later version of the
+// listener posted after it, so the removal only closes the connections accepted before that
+// version, even on a filter chain that the version uses again.
+TEST_F(WorkerImplTest, RemoveFilterChainsRunsBeforeLaterAddListener) {
+  InSequence s;
+  ConditionalInitializer ci;
+  absl::Notification later_posts_queued;
+
+  NiceMock<Network::MockListenerConfig> listener;
+  // The worker waits in the first add until both later posts are queued.
+  EXPECT_CALL(*handler_, addListener(_, _, _, _)).WillOnce([&later_posts_queued]() {
+    later_posts_queued.WaitForNotification();
+  });
+  worker_.addListener(std::nullopt, listener, []() {}, runtime_, random_);
+  worker_.start(guard_dog_, emptyCallback, std::nullopt);
+
+  const std::list<const Network::FilterChain*> filter_chains;
+  EXPECT_CALL(*handler_, removeFilterChains(7UL, _, _));
+  EXPECT_CALL(*handler_, addListener(Optional(7UL), _, _, _));
+  worker_.removeFilterChains(7UL, filter_chains, []() {});
+  worker_.addListener(7UL, listener, [&ci]() { ci.setReady(); }, runtime_, random_);
+  later_posts_queued.Notify();
   ci.waitReady();
 
   worker_.stop();
@@ -212,12 +287,12 @@ public:
 TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
   OverloadActionCb captured_cb;
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillRepeatedly(Invoke([&](const std::string& name, Event::Dispatcher&, OverloadActionCb cb) {
+      .WillRepeatedly([&](const std::string& name, Event::Dispatcher&, OverloadActionCb cb) {
         if (name == OverloadActionNames::get().CloseIdleHttpConnections) {
           captured_cb = cb;
         }
         return true;
-      }));
+      });
 
   auto* handler = new NiceMock<Network::MockConnectionHandler>();
   auto* dispatcher_ptr = dispatcher_.get();

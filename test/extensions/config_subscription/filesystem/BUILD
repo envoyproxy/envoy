@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
     extension_names = ["envoy.config_subscription.filesystem"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":filesystem_subscription_test_harness",
         "//test/mocks/event:event_mocks",

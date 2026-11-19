@@ -1,7 +1,9 @@
 #include "source/extensions/filters/http/header_mutation/header_mutation.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -66,7 +68,7 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
         append_action: "ADD_IF_ABSENT"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -93,9 +95,9 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestHeaderMapImpl headers = {
         {"flag-header", "flag-header-value"},
@@ -180,7 +182,7 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -208,9 +210,9 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseHeaderMapImpl headers = {
         {"flag-header", "flag-header-value"},
@@ -261,9 +263,9 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseHeaderMapImpl headers = {
         {"flag-header", "flag-header-value"},
@@ -358,7 +360,7 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -386,9 +388,9 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -448,9 +450,9 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -538,7 +540,7 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -561,9 +563,9 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
         {"flag-header", "flag-header-value"},
@@ -670,7 +672,7 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -693,9 +695,9 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestHeaderMapImpl headers = {
         {"another-flag-query", "another-flag-query-value"},
@@ -784,7 +786,7 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
@@ -812,9 +814,9 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -867,9 +869,9 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -918,7 +920,7 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
         action: "APPEND_IF_EXISTS_OR_ADD"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
@@ -936,8 +938,7 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(
-            Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; });
 
     // Malicious header value attempting to inject an "admin=true" parameter.
     Envoy::Http::TestRequestHeaderMapImpl headers = {{"x-user", "injected&admin=true"},
@@ -956,6 +957,86 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
     // There should be NO "admin" parameter - the injection should have been prevented.
     EXPECT_FALSE(params.data().contains("admin"));
   }
+}
+
+TEST(HeaderMutationFilterTest, CustomFormatterTest) {
+  Formatter::TestCommandFactory factory;
+  Registry::InjectFactory<Formatter::CommandParserFactory> register_factory(factory);
+
+  const std::string config_yaml = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    query_parameter_mutations:
+    - append:
+        record:
+          key: "flag-query"
+          value: "%COMMAND_EXTENSION()%"
+        action: "APPEND_IF_EXISTS_OR_ADD"
+    response_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    request_trailers_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    response_trailers_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  absl::Status creation_status = absl::OkStatus();
+  HeaderMutationConfigSharedPtr global_config =
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  HeaderMutation filter{global_config};
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
+      .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; });
+
+  Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, false));
+  EXPECT_EQ("TestFormatter", request_headers.get_("flag-header"));
+  EXPECT_EQ("/path?flag-query=TestFormatter", request_headers.getPathValue());
+
+  Envoy::Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(request_trailers));
+  EXPECT_EQ("TestFormatter", request_trailers.get_("flag-header"));
+
+  Envoy::Http::TestResponseHeaderMapImpl response_headers = {{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, false));
+  EXPECT_EQ("TestFormatter", response_headers.get_("flag-header"));
+
+  Envoy::Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.encodeTrailers(response_trailers));
+  EXPECT_EQ("TestFormatter", response_trailers.get_("flag-header"));
 }
 
 } // namespace

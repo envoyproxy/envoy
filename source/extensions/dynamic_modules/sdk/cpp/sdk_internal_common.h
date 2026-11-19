@@ -4,6 +4,7 @@
 #include <exception>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <type_traits>
@@ -144,6 +145,35 @@ private:
   uint64_t next_task_id_{1}; // 0 is reserved.
   std::map<uint64_t, std::function<void()>> tasks_;
 };
+
+/**
+ * Implements LoadShedPoint against the C ABI.
+ */
+class LoadShedPointImpl : public LoadShedPoint {
+public:
+  explicit LoadShedPointImpl(envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point)
+      : load_shed_point_(load_shed_point) {}
+
+  bool shouldShedLoad() override {
+    return envoy_dynamic_module_callback_load_shed_point_should_shed_load(load_shed_point_);
+  }
+
+private:
+  envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point_;
+};
+
+/**
+ * Wraps a load shed point that a get_load_shed_point callback returned.
+ * @param load_shed_point The load shed point, which is null when there is none.
+ * @return The load shed point, or nullptr if there is none.
+ */
+inline std::unique_ptr<LoadShedPoint>
+newLoadShedPoint(envoy_dynamic_module_type_load_shed_point_envoy_ptr load_shed_point) {
+  if (load_shed_point == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<LoadShedPointImpl>(load_shed_point);
+}
 
 } // namespace DynamicModules
 } // namespace Envoy

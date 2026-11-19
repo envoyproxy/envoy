@@ -3,7 +3,7 @@ abseil-cpp:
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
   apparent_name: abseil_cpp
-  release_date: "2026-02-11"
+  release_date: "2026-08-18"
   use_category:
   - dataplane_core
   - controlplane
@@ -43,7 +43,7 @@ aspect_bazel_lib:
   project_name: "Aspect Bazel helpers"
   project_desc: "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files"
   project_url: "https://github.com/aspect-build/bazel-lib"
-  release_date: "2025-09-17"
+  release_date: "2026-01-12"
   use_category:
   - build
   - test_only
@@ -77,7 +77,7 @@ bazel_features:
   project_name: "Bazel features"
   project_desc: "Support Bazel feature detection from starlark"
   project_url: "https://github.com/bazel-contrib/bazel_features"
-  release_date: "2026-07-06"
+  release_date: "2026-11-17"
   use_category:
   - build
   license: "Apache-2.0"
@@ -88,7 +88,7 @@ benchmark:
   project_desc: "Library to benchmark code snippets"
   project_url: "https://github.com/google/benchmark"
   apparent_name: google_benchmark
-  release_date: "2026-01-21"
+  release_date: "2026-10-14"
   use_category:
   - test_only
   license: "Apache-2.0"
@@ -113,7 +113,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2026-04-14"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -125,7 +125,7 @@ brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"
-  release_date: "2025-10-27"
+  release_date: "2026-09-30"
   use_category:
   - dataplane_core
   - dataplane_ext
@@ -149,11 +149,13 @@ c-ares:
   project_desc: "C library for asynchronous DNS requests"
   project_url: "https://c-ares.haxx.se/"
   apparent_name: c_ares
-  release_date: "2026-07-07"
+  release_date: "2026-10-20"
   use_category:
   - dataplane_core
   - controlplane
-  cpe: "cpe:2.3:a:c-ares_project:c-ares:*"
+  # TODO(phlax): add this back when the scanner supports a cpe list
+  # cpe: "cpe:2.3:a:c-ares_project:c-ares:*"
+  cpe: "cpe:2.3:a:c-ares:c-ares:*"
   license: "c-ares"
   license_url: "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md"
 
@@ -162,7 +164,7 @@ cel-cpp:
   project_desc: "Common Expression Language (CEL) C++ library"
   project_url: "https://opensource.google/projects/cel"
   apparent_name: cel_cpp
-  release_date: "2025-11-17"
+  release_date: "2026-08-13"
   use_category:
   - dataplane_ext
   extensions:
@@ -187,39 +189,9 @@ cel-cpp:
   - envoy.tracers.opentelemetry.samplers.cel
   implied_untracked_deps:
   - antlr4_runtimes
+  - cel-spec
   license: "Apache-2.0"
   license_url: "https://github.com/google/cel-cpp/blob/v{version}/LICENSE"
-
-cel-spec:
-  project_name: "Common Expression Language (CEL) spec"
-  project_desc: "Common Expression Language (CEL) spec and conformance tests"
-  project_url: "https://opensource.google/projects/cel"
-  apparent_name: cel_spec
-  release_date: "2026-05-08"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.access_loggers.extension_filters.cel
-  - envoy.access_loggers.wasm
-  - envoy.bootstrap.wasm
-  - envoy.rate_limit_descriptors.expr
-  - envoy.filters.http.ext_proc
-  - envoy.filters.http.rate_limit_quota
-  - envoy.filters.http.rbac
-  - envoy.filters.http.upstream_rbac
-  - envoy.filters.http.wasm
-  - envoy.filters.network.ext_proc
-  - envoy.filters.network.rbac
-  - envoy.filters.network.wasm
-  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
-  - envoy.stat_sinks.wasm
-  - envoy.formatter.cel
-  - envoy.matching.inputs.cel_data_input
-  - envoy.matching.matchers.cel_matcher
-  - envoy.tracers.opentelemetry
-  - envoy.tracers.opentelemetry.samplers.cel
-  license: "Apache-2.0"
-  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
 
 colm:
   project_name: "Colm"
@@ -287,7 +259,7 @@ emsdk:
   project_name: "Emscripten SDK"
   project_desc: "Emscripten SDK (use by Wasm)"
   project_url: "https://github.com/emscripten-core/emsdk"
-  release_date: "2025-03-26"
+  release_date: "2026-01-10"
   use_category:
   - test_only
   license: "Emscripten SDK"
@@ -297,7 +269,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-09-03"
+  release_date: "2026-11-18"
   use_category:
   - build
   - controlplane
@@ -320,7 +292,7 @@ fast_float:
     Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
     part of GCC 12, Chromium, Redis and WebKit/Safari
   project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
+  release_date: "2026-03-10"
   use_category:
   - dataplane_ext
   extensions:
@@ -330,7 +302,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -343,7 +315,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -356,7 +328,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -369,7 +341,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -426,7 +398,7 @@ fmt:
   project_name: "fmt"
   project_desc: "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams"
   project_url: "https://fmt.dev"
-  release_date: "2026-06-16"
+  release_date: "2026-11-07"
   use_category:
   - dataplane_core
   - controlplane
@@ -448,7 +420,7 @@ gazelle:
   project_name: "Gazelle"
   project_desc: "Bazel BUILD file generator for Go projects"
   project_url: "https://github.com/bazelbuild/bazel-gazelle"
-  release_date: "2025-11-07"
+  release_date: "2026-09-03"
   use_category:
   - build
   license: "Apache-2.0"
@@ -458,7 +430,7 @@ googletest:
   project_name: "Google Test"
   project_desc: "Google's C++ test framework"
   project_url: "https://github.com/google/googletest"
-  release_date: "2025-04-30"
+  release_date: "2026-08-10"
   use_category:
   - test_only
   cpe: "cpe:2.3:a:google:google_test:*"
@@ -537,7 +509,7 @@ highway:
   project_name: "Efficient and performance-portable vector software"
   project_desc: "Performance-portable, length-agnostic SIMD with runtime dispatch"
   project_url: "https://github.com/google/highway"
-  release_date: "2024-05-31"
+  release_date: "2025-08-14"
   use_category:
   - dataplane_ext
   extensions:
@@ -586,7 +558,7 @@ jemalloc:
   project_name: "jemalloc"
   project_desc: "General-purpose scalable concurrent memory allocator"
   project_url: "https://github.com/jemalloc/jemalloc"
-  release_date: "2022-05-06"
+  release_date: "2026-03-31"
   use_category:
   - dataplane_core
   - controlplane
@@ -649,7 +621,7 @@ libmaxminddb:
   project_name: "maxmind_libmaxminddb"
   project_desc: "C library for reading MaxMind DB files"
   project_url: "https://github.com/maxmind/libmaxminddb"
-  release_date: "2026-03-05"
+  release_date: "2025-01-10"
   use_category:
   - dataplane_ext
   extensions:
@@ -662,7 +634,7 @@ libpfm:
   project_name: "libpfm"
   project_desc: "A helper library to develop monitoring tools"
   project_url: "https://sourceforge.net/projects/perfmon2"
-  release_date: "2020-09-02"
+  release_date: "2020-09-03"
   use_category:
   - test_only
 
@@ -807,7 +779,7 @@ openssl:
   project_name: "OpenSSL"
   project_desc: "TLS/SSL and crypto library"
   project_url: "https://github.com/openssl/openssl"
-  release_date: "2026-06-09"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -820,7 +792,7 @@ opentelemetry-cpp:
   project_desc: "Observability framework and toolkit designed to create and manage telemetry data such as traces, metrics, and logs."
   project_url: "https://opentelemetry.io"
   apparent_name: opentelemetry-cpp
-  release_date: "2026-07-16"
+  release_date: "2026-09-13"
   use_category:
   - observability_ext
   extensions:
@@ -860,7 +832,7 @@ proto-converter:
   project_desc: "Library that supports the conversion between protobuf binary and json"
   project_url: "https://github.com/grpc-ecosystem/proto-converter"
   apparent_name: proto-converter
-  release_date: "2024-06-25"
+  release_date: "2026-09-12"
   use_category:
   - dataplane_core
   - controlplane
@@ -965,7 +937,7 @@ proxy-wasm-rust-sdk:
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
   apparent_name: proxy-wasm-rust-sdk
-  release_date: "2025-10-01"
+  release_date: "2026-05-20"
   use_category:
   - test_only
   license: "Apache-2.0"
@@ -999,7 +971,7 @@ qatzip:
   project_name: "qatzip"
   project_desc: "Intel QuickAssist Technology QATzip Library"
   project_url: "https://github.com/intel/qatzip"
-  release_date: "2026-02-18"
+  release_date: "2026-08-14"
   use_category:
   - dataplane_ext
   extensions:
@@ -1011,7 +983,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-31"
+  release_date: "2026-11-11"
   use_category:
   - controlplane
   - dataplane_core
@@ -1035,7 +1007,7 @@ re2:
   project_name: "RE2"
   project_desc: "RE2, a regular expression library"
   project_url: "https://github.com/google/re2"
-  release_date: "2024-07-01"
+  release_date: "2025-11-05"
   use_category:
   - controlplane
   - dataplane_core
@@ -1046,7 +1018,7 @@ rules_apple:
   project_name: "Apple Rules for Bazel"
   project_desc: "Bazel rules for Apple platforms"
   project_url: "https://github.com/bazelbuild/rules_apple"
-  release_date: "2025-03-14"
+  release_date: "2026-10-30"
   use_category:
   - build
   license: "Apache-2.0"
@@ -1056,7 +1028,7 @@ rules_cc:
   project_name: "C++ rules for Bazel"
   project_desc: "Bazel rules for the C++ language"
   project_url: "https://github.com/bazelbuild/rules_cc"
-  release_date: "2026-07-07"
+  release_date: "2026-11-05"
   use_category:
   - build
   - controlplane
@@ -1064,11 +1036,21 @@ rules_cc:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_cc/blob/{version}/LICENSE"
 
+rules_distroless:
+  project_name: "Bazel rules for distroless images"
+  project_desc: "Bazel rules for building container images from Debian packages"
+  project_url: "https://github.com/GoogleContainerTools/rules_distroless"
+  release_date: "2026-08-21"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/GoogleContainerTools/rules_distroless/blob/v{version}/LICENSE"
+
 rules_foreign_cc:
   project_name: "Rules for using foreign build systems in Bazel"
   project_desc: "Rules for using foreign build systems in Bazel"
   project_url: "https://github.com/bazelbuild/rules_foreign_cc"
-  release_date: "2025-06-24"
+  release_date: "2026-10-25"
   use_category:
   - build
   - dataplane_core
@@ -1080,7 +1062,7 @@ rules_fuzzing:
   project_name: "Fuzzing Rules for Bazel"
   project_desc: "Bazel rules for fuzz tests"
   project_url: "https://github.com/bazelbuild/rules_fuzzing"
-  release_date: "2026-04-16"
+  release_date: "2025-07-18"
   use_category:
   - test_only
   implied_untracked_deps:
@@ -1093,7 +1075,7 @@ rules_go:
   project_desc: "Bazel rules for the Go language"
   project_url: "https://github.com/bazelbuild/rules_go"
   apparent_name: io_bazel_rules_go
-  release_date: "2026-06-04"
+  release_date: "2026-08-16"
   use_category:
   - build
   - api
@@ -1109,7 +1091,7 @@ rules_java:
   project_name: "Java rules for Bazel"
   project_desc: "Bazel rules for the Java language"
   project_url: "https://github.com/bazelbuild/rules_java/"
-  release_date: "2026-07-15"
+  release_date: "2026-08-25"
   use_category:
   - build
   - dataplane_core
@@ -1133,11 +1115,21 @@ rules_license:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE"
 
+rules_oci:
+  project_name: "Bazel rules for OCI containers"
+  project_desc: "Bazel rules for building OCI container images"
+  project_url: "https://github.com/bazel-contrib/rules_oci"
+  release_date: "2026-11-13"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/rules_oci/blob/v{version}/LICENSE"
+
 rules_pkg:
   project_name: "Packaging rules for Bazel"
   project_desc: "Bazel rules for the packaging distributions"
   project_url: "https://github.com/bazelbuild/rules_pkg"
-  release_date: "2025-12-03"
+  release_date: "2026-05-05"
   use_category:
   - build
   - test_only
@@ -1148,7 +1140,7 @@ rules_proto_grpc:
   project_name: "Protobuf and gRPC rules for Bazel"
   project_desc: "Bazel rules for building Protobuf and gRPC code and libraries from proto_library targets"
   project_url: "https://github.com/rules-proto-grpc/rules_proto_grpc"
-  release_date: "2023-12-14"
+  release_date: "2025-10-23"
   use_category:
   - dataplane_ext
   extensions:
@@ -1160,7 +1152,7 @@ rules_python:
   project_name: "Python rules for Bazel"
   project_desc: "Bazel rules for the Python language"
   project_url: "https://github.com/bazelbuild/rules_python"
-  release_date: "2026-07-04"
+  release_date: "2026-11-13"
   use_category:
   - build
   - controlplane
@@ -1168,21 +1160,11 @@ rules_python:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_python/blob/{version}/LICENSE"
 
-rules_ruby:
-  project_name: "Ruby rules for Bazel"
-  project_desc: "Bazel rules for the Ruby language"
-  project_url: "https://github.com/protocolbuffers/rules_ruby"
-  release_date: "2023-01-12"
-  use_category:
-  - build
-  license: "Apache-2.0"
-  license_url: "https://github.com/protocolbuffers/rules_ruby/blob/{version}/LICENSE"
-
 rules_rust:
   project_name: "Bazel rust rules"
   project_desc: "Bazel rust rules (used by Wasm)"
   project_url: "https://github.com/bazelbuild/rules_rust"
-  release_date: "2026-02-26"
+  release_date: "2026-08-28"
   use_category:
   - controlplane
   - dataplane_core
@@ -1197,7 +1179,7 @@ rules_shell:
   project_name: "Shell script rules for Bazel"
   project_desc: "Bazel rules for shell scripts"
   project_url: "https://github.com/bazelbuild/rules_shell"
-  release_date: "2026-04-15"
+  release_date: "2026-11-16"
   use_category:
   - build
   - dataplane_core
@@ -1214,7 +1196,7 @@ shellcheck:
   project_desc: "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos."
   project_url: "https://github.com/aignas/rules_shellcheck"
   apparent_name: rules_shellcheck
-  release_date: "2025-08-13"
+  release_date: "2026-10-15"
   use_category:
   - build
   license: "MIT"
@@ -1281,6 +1263,16 @@ su_exec:
   license: "MIT"
   license_url: "https://github.com/ncopa/su-exec/blob/v{version}/LICENSE"
 
+tar.bzl:
+  project_name: "tar.bzl"
+  project_desc: "Hermetic tar (bsdtar) rules for Bazel, used for the release container image tarballs"
+  project_url: "https://github.com/bazel-contrib/tar.bzl"
+  release_date: "2025-11-15"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/tar.bzl/blob/v{version}/LICENSE"
+
 tclap:
   project_name: "tclap"
   project_desc: "Small, flexible library that provides a simple interface for defining and accessing command line arguments"
@@ -1318,7 +1310,7 @@ toolchains_llvm:
   project_name: "LLVM toolchain for Bazel"
   project_desc: "LLVM toolchain for Bazel"
   project_url: "https://github.com/bazel-contrib/toolchains_llvm"
-  release_date: "2026-08-29"
+  release_date: "2026-09-16"
   use_category:
   - build
   - dataplane_core
@@ -1382,7 +1374,7 @@ wamr:
   project_name: "Webassembly Micro Runtime"
   project_desc: "A standalone runtime with a small footprint for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasm-micro-runtime"
-  release_date: "2025-11-24"
+  release_date: "2026-06-29"
   use_category:
   - dataplane_ext
   extensions:
@@ -1394,7 +1386,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2026-06-15"
+  release_date: "2026-10-29"
   use_category:
   - dataplane_ext
   extensions:
@@ -1442,7 +1434,7 @@ yq_bzl:
   project_desc: "Bazel rules for yq"
   project_url: "https://github.com/bazel-contrib/yq.bzl"
   apparent_name: yq.bzl
-  release_date: "2025-05-26"
+  release_date: "2026-09-01"
   use_category:
   - build
   cpe: "N/A"
@@ -1465,7 +1457,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2026-10-06"
+  release_date: "2025-02-19"
   use_category:
   - dataplane_ext
   extensions:

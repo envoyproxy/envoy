@@ -301,6 +301,19 @@ public:
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
 
+  bool setMetadataStruct(std::string_view ns, std::string_view serialized_struct) override {
+    return envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{serialized_struct.data(),
+                                                serialized_struct.size()});
+  }
+
+  bool setTypedMetadata(std::string_view ns, std::string_view serialized_any) override {
+    return envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{serialized_any.data(), serialized_any.size()});
+  }
+
   void setSocketOptionInt(int64_t level, int64_t name, SocketOptionState state,
                           int64_t value) override {
     envoy_dynamic_module_callback_network_set_socket_option_int(
@@ -594,6 +607,11 @@ public:
       scheduler_ = std::make_shared<NetworkConfigSchedulerImpl>(host_config_ptr_);
     }
     return scheduler_;
+  }
+
+  std::unique_ptr<LoadShedPoint> getLoadShedPoint(std::string_view name) override {
+    return newLoadShedPoint(envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+        host_config_ptr_, envoy_dynamic_module_type_module_buffer{name.data(), name.size()}));
   }
 
   bool logEnabled(LogLevel level) override {

@@ -18,6 +18,7 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -26,6 +27,15 @@ using ::testing::Return;
 
 namespace Envoy {
 namespace Grpc {
+
+class GrpcServiceConfigWithHashKeyPeer {
+public:
+  static void setPreComputedHash(GrpcServiceConfigWithHashKey& config_with_hash_key,
+                                 std::size_t hash) {
+    config_with_hash_key.pre_computed_hash_ = hash;
+  }
+};
+
 namespace {
 
 class RawAsyncClientCacheTest : public testing::Test {
@@ -147,9 +157,7 @@ class RawAsyncClientCacheTestBusyLoop : public testing::Test {
 public:
   RawAsyncClientCacheTestBusyLoop() {
     timer_ = new Event::MockTimer();
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb) {
-      return timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb) { return timer_; });
     client_cache_ = std::make_unique<AsyncClientManagerImpl::RawAsyncClientCache>(
         dispatcher_, std::chrono::milliseconds(50000));
     EXPECT_CALL(*timer_, enableTimer(testing::Not(std::chrono::milliseconds(0)), _))
@@ -259,6 +267,78 @@ TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
             config_with_hash_key_c.getPreComputedHash());
 }
 
+// Equal configs give equal keys whatever the insertion order of their map fields.
+TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyIgnoresMapOrder) {
+  envoy::config::core::v3::GrpcService grpc_service_a;
+  envoy::config::core::v3::GrpcService grpc_service_b;
+  auto& args_a = *grpc_service_a.mutable_google_grpc()->mutable_channel_args()->mutable_args();
+  auto& args_b = *grpc_service_b.mutable_google_grpc()->mutable_channel_args()->mutable_args();
+  for (int i = 0; i < 32; i++) {
+    args_a[absl::StrCat("arg_", i)].set_int_value(i);
+    args_b[absl::StrCat("arg_", 31 - i)].set_int_value(31 - i);
+  }
+
+  const GrpcServiceConfigWithHashKey config_with_hash_key_a(grpc_service_a);
+  const GrpcServiceConfigWithHashKey config_with_hash_key_b(grpc_service_b);
+  EXPECT_TRUE(config_with_hash_key_a == config_with_hash_key_b);
+  EXPECT_EQ(config_with_hash_key_a.getPreComputedHash(),
+            config_with_hash_key_b.getPreComputedHash());
+}
+
+// Configs that differ in initial metadata give different keys.
+TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyDiffersByMetadata) {
+  envoy::config::core::v3::GrpcService grpc_service_a;
+  grpc_service_a.mutable_envoy_grpc()->set_cluster_name("foo");
+  auto* metadata = grpc_service_a.add_initial_metadata();
+  metadata->set_key("key");
+  metadata->set_value("a");
+  envoy::config::core::v3::GrpcService grpc_service_b = grpc_service_a;
+  grpc_service_b.mutable_initial_metadata(0)->set_value("b");
+
+  EXPECT_FALSE(GrpcServiceConfigWithHashKey(grpc_service_a) ==
+               GrpcServiceConfigWithHashKey(grpc_service_b));
+}
+
+// Keys with equal hashes differ when their configs differ.
+TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyComparesBytes) {
+  envoy::config::core::v3::GrpcService foo_service;
+  foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  envoy::config::core::v3::GrpcService bar_service;
+  bar_service.mutable_envoy_grpc()->set_cluster_name("bar");
+
+  const GrpcServiceConfigWithHashKey foo_config_with_hash_key(foo_service);
+  GrpcServiceConfigWithHashKey bar_config_with_hash_key(bar_service);
+  GrpcServiceConfigWithHashKeyPeer::setPreComputedHash(
+      bar_config_with_hash_key, foo_config_with_hash_key.getPreComputedHash());
+  EXPECT_FALSE(foo_config_with_hash_key == bar_config_with_hash_key);
+}
+
+// A default key equals the key of an empty config.
+TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyDefault) {
+  const GrpcServiceConfigWithHashKey config_with_hash_key;
+  const GrpcServiceConfigWithHashKey empty_config_with_hash_key(
+      envoy::config::core::v3::GrpcService{});
+  EXPECT_TRUE(config_with_hash_key == empty_config_with_hash_key);
+  EXPECT_EQ(config_with_hash_key.getPreComputedHash(),
+            empty_config_with_hash_key.getPreComputedHash());
+}
+
+// setConfig replaces the config that the key compares and hashes.
+TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeySetConfig) {
+  envoy::config::core::v3::GrpcService foo_service;
+  foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  envoy::config::core::v3::GrpcService bar_service;
+  bar_service.mutable_envoy_grpc()->set_cluster_name("bar");
+
+  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
+  config_with_hash_key.setConfig(bar_service);
+  const GrpcServiceConfigWithHashKey bar_config_with_hash_key(bar_service);
+  EXPECT_TRUE(config_with_hash_key == bar_config_with_hash_key);
+  EXPECT_FALSE(config_with_hash_key == GrpcServiceConfigWithHashKey(foo_service));
+  EXPECT_EQ(config_with_hash_key.getPreComputedHash(),
+            bar_config_with_hash_key.getPreComputedHash());
+}
+
 // Test the client cache time is correctly configured with seconds from the bootstrap proto.
 TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithSecondsConfig) {
   envoy::config::core::v3::GrpcService grpc_service;
@@ -354,9 +434,9 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](absl::string_view) {
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce([](absl::string_view) {
     return absl::InvalidArgumentError("failure");
-  }));
+  });
   EXPECT_EQ(
       async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
       "failure");

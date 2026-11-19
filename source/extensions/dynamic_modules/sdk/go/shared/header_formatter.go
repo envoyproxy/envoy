@@ -1,3 +1,4 @@
+//go:generate mockgen -source=header_formatter.go -destination=mocks/mock_header_formatter.go -package=mocks
 package shared
 
 // HeaderFormatterHandle is the per-message handle passed to

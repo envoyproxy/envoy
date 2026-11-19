@@ -50,15 +50,15 @@ protected:
     // Validate that callbacks after the drain sequence has started (or after the drain deadline
     // has been reached) are called with a random value between 0 (immediate) and the max
     // drain window (minus time that has passed).
-    EXPECT_CALL(cb_after_drain1, Call(_)).WillOnce(Invoke([](std::chrono::milliseconds delay) {
+    EXPECT_CALL(cb_after_drain1, Call(_)).WillOnce([](std::chrono::milliseconds delay) {
       EXPECT_THAT(delay.count(), Ge(0));
       EXPECT_THAT(delay.count(), Le(990));
       return absl::OkStatus();
-    }));
-    EXPECT_CALL(cb_after_drain2, Call(_)).WillOnce(Invoke([](std::chrono::milliseconds delay) {
+    });
+    EXPECT_CALL(cb_after_drain2, Call(_)).WillOnce([](std::chrono::milliseconds delay) {
       EXPECT_EQ(delay.count(), 0);
       return absl::OkStatus();
-    }));
+    });
 
     auto before_handle = drain_manager.addOnDrainCloseCb(Network::DrainDirection::All,
                                                          cb_before_drain.AsStdFunction());
@@ -222,14 +222,14 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
       auto& cb = cbs[i];
       if (drain_gradually) {
         auto step = 1000 / num_cbs;
-        EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+        EXPECT_CALL(cb, Call(_)).WillRepeatedly([i, step](std::chrono::milliseconds delay) {
           // Everything should happen within the first 1/4 of the drain time
           EXPECT_LT(delay.count(), 1001);
 
           // Validate that our wait times are spread out (within some small error)
           EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
           return absl::OkStatus();
-        }));
+        });
       } else {
         EXPECT_CALL(cb, Call(std::chrono::milliseconds{0}));
       }
@@ -262,14 +262,14 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
     for (auto i = 0; i < num_cbs; i++) {
       auto& cb = cbs[i];
       auto step = 1000.0 / num_cbs;
-      EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+      EXPECT_CALL(cb, Call(_)).WillRepeatedly([i, step](std::chrono::milliseconds delay) {
         // Everything should happen within the first 1/4 of the drain time
         EXPECT_LT(delay.count(), 1001);
 
         // Validate that our wait times are spread out (within some small error)
         EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
         return absl::OkStatus();
-      }));
+      });
 
       cb_handles[i] =
           drain_manager.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
@@ -297,14 +297,14 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
     for (auto i = 0; i < num_cbs; i++) {
       auto& cb = cbs[i];
       auto step = 250.0 / num_cbs;
-      EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([i, step](std::chrono::milliseconds delay) {
+      EXPECT_CALL(cb, Call(_)).WillRepeatedly([i, step](std::chrono::milliseconds delay) {
         // Everything should happen within the first 1/4 of the drain time
         EXPECT_LT(delay.count(), 251);
 
         // Validate that our wait times are spread out (within some small error)
         EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
         return absl::OkStatus();
-      }));
+      });
 
       cb_handles[i] =
           drain_manager.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
@@ -343,10 +343,10 @@ TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginImmediateStrategy) {
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb_after_drain;
 
   EXPECT_CALL(cb_before_drain, Call(_));
-  EXPECT_CALL(cb_after_drain, Call(_)).WillOnce(Invoke([](std::chrono::milliseconds delay) {
+  EXPECT_CALL(cb_after_drain, Call(_)).WillOnce([](std::chrono::milliseconds delay) {
     EXPECT_EQ(delay.count(), 0);
     return absl::OkStatus();
-  }));
+  });
 
   auto before_handle = drain_manager.addOnDrainCloseCb(Network::DrainDirection::All,
                                                        cb_before_drain.AsStdFunction());
@@ -387,14 +387,14 @@ TEST_F(DrainManagerImplTest, ParentDestructedBeforeChildren) {
   int called = 0;
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb_a1;
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb_b1;
-  EXPECT_CALL(cb_a1, Call(_)).WillRepeatedly(Invoke([&called](std::chrono::milliseconds) {
+  EXPECT_CALL(cb_a1, Call(_)).WillRepeatedly([&called](std::chrono::milliseconds) {
     called += 1;
     return absl::OkStatus();
-  }));
-  EXPECT_CALL(cb_b1, Call(_)).WillRepeatedly(Invoke([&called](std::chrono::milliseconds) {
+  });
+  EXPECT_CALL(cb_b1, Call(_)).WillRepeatedly([&called](std::chrono::milliseconds) {
     called += 1;
     return absl::OkStatus();
-  }));
+  });
   auto handle_a1 = child_a1->addOnDrainCloseCb(Network::DrainDirection::All, cb_a1.AsStdFunction());
   auto handle_b1 = child_b1->addOnDrainCloseCb(Network::DrainDirection::All, cb_b1.AsStdFunction());
   child_a->startDrainSequence(Network::DrainDirection::All, [] {});
@@ -437,10 +437,10 @@ TEST_F(DrainManagerImplTest, DrainingCascadesThroughAllNodesInTree) {
   std::array<testing::MockFunction<absl::Status(std::chrono::milliseconds)>, 7> cbs;
 
   for (auto& cb : cbs) {
-    EXPECT_CALL(cb, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+    EXPECT_CALL(cb, Call(_)).WillOnce([&call_count](std::chrono::milliseconds) {
       call_count++;
       return absl::OkStatus();
-    }));
+    });
   }
   auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cbs[0].AsStdFunction());
   auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cbs[1].AsStdFunction());
@@ -488,14 +488,14 @@ TEST_F(DrainManagerImplTest, DrainingIsIndependentToNeighbors) {
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb_f;
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb_g;
 
-  EXPECT_CALL(cb_d, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+  EXPECT_CALL(cb_d, Call(_)).WillOnce([&call_count](std::chrono::milliseconds) {
     call_count++;
     return absl::OkStatus();
-  }));
-  EXPECT_CALL(cb_e, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+  });
+  EXPECT_CALL(cb_e, Call(_)).WillOnce([&call_count](std::chrono::milliseconds) {
     call_count++;
     return absl::OkStatus();
-  }));
+  });
   // validate neighbor remains uneffected
   EXPECT_CALL(cb_f, Call(_)).Times(0);
   EXPECT_CALL(cb_g, Call(_)).Times(0);
@@ -526,14 +526,14 @@ TEST_F(DrainManagerImplTest, DrainOnlyCascadesDownwards) {
 
   // validate top-level callback is never fired
   EXPECT_CALL(cb_a, Call(_)).Times(0);
-  EXPECT_CALL(cb_b, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+  EXPECT_CALL(cb_b, Call(_)).WillOnce([&call_count](std::chrono::milliseconds) {
     call_count++;
     return absl::OkStatus();
-  }));
-  EXPECT_CALL(cb_c, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+  });
+  EXPECT_CALL(cb_c, Call(_)).WillOnce([&call_count](std::chrono::milliseconds) {
     call_count++;
     return absl::OkStatus();
-  }));
+  });
   auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cb_a.AsStdFunction());
   auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cb_b.AsStdFunction());
   auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cb_c.AsStdFunction());
@@ -558,10 +558,10 @@ TEST_F(DrainManagerImplTest, DrainChildExplicitlyAfterParent) {
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb;
 
   // validate top-level callback is never fired
-  EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([&call_count](std::chrono::milliseconds) {
+  EXPECT_CALL(cb, Call(_)).WillRepeatedly([&call_count](std::chrono::milliseconds) {
     call_count++;
     return absl::OkStatus();
-  }));
+  });
   auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
   auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
   auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
@@ -587,10 +587,10 @@ TEST_F(DrainManagerImplTest, DrainParentAfterChild) {
   testing::MockFunction<absl::Status(std::chrono::milliseconds)> cb;
 
   // validate top-level callback is never fired
-  EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([&call_count](std::chrono::milliseconds) {
+  EXPECT_CALL(cb, Call(_)).WillRepeatedly([&call_count](std::chrono::milliseconds) {
     call_count++;
     return absl::OkStatus();
-  }));
+  });
   auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
   auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
   auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
