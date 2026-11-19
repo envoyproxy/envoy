@@ -1,7 +1,10 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -10,6 +13,9 @@
 #include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/conn_pool.h"
+#include "envoy/router/retry.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -26,6 +32,7 @@
 #include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/network/utility.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/debug_config.h"
@@ -44,6 +51,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/struct_matchers.h"
@@ -9124,6 +9132,356 @@ TEST_F(RouterTest, ProdFilterDelegatesToRetryPolicyCreateRetryState) {
   EXPECT_EQ(&callbacks_.stream_info_, custom_policy->received_stream_info_);
 
   prod_filter.onDestroy();
+}
+
+TEST_F(RouterTest, GetEffectiveRetryPolicyUsesInitialClusterAcrossCrossClusterRetries) {
+  auto initial_cluster_policy = std::make_shared<NiceMock<TestRetryPolicy>>();
+  initial_cluster_policy->refresh_cluster_on_retry_ = true;
+  auto predicate = std::make_shared<NiceMock<MockRetryOptionsPredicate>>();
+  initial_cluster_policy->retry_options_predicates_.push_back(predicate);
+  cm_.thread_local_cluster_.cluster_.info_->retry_policy_ = initial_cluster_policy.get();
+
+  NiceMock<Upstream::MockThreadLocalCluster> alt_cluster;
+  alt_cluster.cluster_.info_->name_ = "alt_cluster";
+  alt_cluster.cluster_.info_->retry_policy_ = nullptr;
+  ON_CALL(alt_cluster, chooseHost(_)).WillByDefault([&alt_cluster] {
+    return Upstream::HostSelectionResponse{alt_cluster.lb_.host_};
+  });
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // First retry: refreshRouteCluster switches to alt_cluster (which has no cluster retry policy),
+  // moving the initial cluster into expired_clusters_.
+  EXPECT_CALL(*predicate, updateOptions(_))
+      .WillOnce(Return(Upstream::RetryOptionsPredicate::UpdateOptionsReturn{std::nullopt}));
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).WillOnce([this]() {
+    callbacks_.route_->route_entry_.cluster_name_ = "alt_cluster";
+  });
+  EXPECT_CALL(cm_, getThreadLocalCluster(absl::string_view("alt_cluster")))
+      .WillOnce(Return(&alt_cluster));
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      alt_cluster.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  EXPECT_CALL(alt_cluster.conn_pool_, newStream(_, _, _))
+      .WillOnce([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                    const Http::ConnectionPool::Instance::StreamOptions&)
+                    -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*router_->retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, alt_cluster.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
+        return nullptr;
+      });
+  router_->retry_state_->callback_();
+
+  // Second retry: cluster_ is now alt_cluster, so getEffectiveRetryPolicy() still returns the
+  // cached initial cluster retry policy and runs its predicate.
+  auto updated_options = std::make_shared<Network::Socket::Options>();
+  EXPECT_CALL(*predicate, updateOptions(_))
+      .WillOnce(Return(Upstream::RetryOptionsPredicate::UpdateOptionsReturn{updated_options}));
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(alt_cluster.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_EQ(updated_options, router_->upstreamSocketOptions());
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, RetryStatePerAttemptHooksAndResponseHeaderModification) {
+  setIncludeAttemptCountInRequest(true);
+  setIncludeAttemptCountInResponse(true);
+  ON_CALL(*callbacks_.route_->virtual_host_, includeIsTimeoutRetryHeader())
+      .WillByDefault(Return(true));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  EXPECT_CALL(*router_->retry_state_, prepareForRetry(_, Ref(callbacks_.stream_info_)))
+      .WillOnce([](Http::RequestHeaderMap& req_headers, StreamInfo::StreamInfo&) {
+        req_headers.setCopy(Http::LowerCaseString("x-prepared"), "candidate-2");
+      });
+  EXPECT_CALL(*router_->retry_state_, modifyRequestHeadersForRetry(_))
+      .WillOnce([](Http::RequestHeaderMap& req_headers) {
+        EXPECT_EQ("2", req_headers.getEnvoyAttemptCountValue());
+        EXPECT_EQ("false", req_headers.getEnvoyIsTimeoutRetryValue());
+        req_headers.setCopy(Http::LowerCaseString("x-post-host"), "host-selected");
+      });
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(encoder2, encodeHeaders(_, true))
+      .WillOnce([](const Http::RequestHeaderMap& retry_headers, bool) -> Http::Status {
+        EXPECT_EQ(
+            "candidate-2",
+            retry_headers.get(Http::LowerCaseString("x-prepared"))[0]->value().getStringView());
+        EXPECT_EQ(
+            "host-selected",
+            retry_headers.get(Http::LowerCaseString("x-post-host"))[0]->value().getStringView());
+        return Http::okStatus();
+      });
+
+  auto unrefreshed_route = std::make_shared<NiceMock<MockRoute>>();
+  unrefreshed_route->route_entry_.cluster_name_ = "wrong_cluster";
+  ON_CALL(callbacks_, routeSharedPtr()).WillByDefault(Return(unrefreshed_route));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+
+  router_->retry_state_->callback_();
+
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(*router_->retry_state_, modifyResponseHeaders(_, Ref(callbacks_.stream_info_)))
+      .WillOnce([](Http::ResponseHeaderMap& resp_headers, StreamInfo::StreamInfo&) {
+        EXPECT_EQ("2", resp_headers.getEnvoyAttemptCountValue());
+        resp_headers.setCopy(Http::LowerCaseString("x-routed-model"), "candidate-2");
+      });
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
+      .WillOnce([](Http::ResponseHeaderMap& resp_headers, bool) {
+        EXPECT_EQ("2", resp_headers.getEnvoyAttemptCountValue());
+        EXPECT_EQ(
+            "candidate-2",
+            resp_headers.get(Http::LowerCaseString("x-routed-model"))[0]->value().getStringView());
+      });
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+}
+
+TEST_F(RouterTest,
+       RetryRefreshesAutoSniAndClearsStaleRouterAutoSniWhenSwitchingToNonAutoSniCluster) {
+  envoy::config::core::v3::UpstreamHttpProtocolOptions upstream_options;
+  upstream_options.set_auto_sni(true);
+  upstream_options.set_auto_san_validation(true);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_http_protocol_options_ = upstream_options;
+  callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_ = true;
+
+  NiceMock<Upstream::MockThreadLocalCluster> fallback_cluster;
+  fallback_cluster.cluster_.info_->name_ = "fallback_no_auto_sni";
+  fallback_cluster.cluster_.info_->upstream_http_protocol_options_ = std::nullopt;
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  setRequestMetadata({{"model", "model-a"}});
+  Http::TestRequestHeaderMapImpl headers{{":authority", "model-a.example.com"},
+                                         {"x-envoy-retry-on", "5xx"},
+                                         {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setHost("model-a.example.com");
+  router_->decodeHeaders(headers, true);
+
+  ASSERT_NE(nullptr, router_->upstreamTransportSocketOptions());
+  EXPECT_EQ("model-a.example.com",
+            router_->upstreamTransportSocketOptions()->serverNameOverride().value_or(""));
+  EXPECT_THAT(router_->upstreamTransportSocketOptions()->verifySubjectAltNameListOverride(),
+              testing::ElementsAre("model-a.example.com"));
+
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  EXPECT_CALL(*router_->retry_state_, prepareForRetry(_, Ref(callbacks_.stream_info_)))
+      .WillOnce([](Http::RequestHeaderMap& request_headers,
+                   StreamInfo::StreamInfo& downstream_stream_info) {
+        request_headers.setHost("10.0.0.1:443");
+        Protobuf::Struct lb_meta;
+        (*lb_meta.mutable_fields())["model"].set_string_value("model-b");
+        downstream_stream_info.setDynamicMetadata(Envoy::Config::MetadataFilters::get().ENVOY_LB,
+                                                  lb_meta);
+      });
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).WillOnce([this]() {
+    callbacks_.route_->route_entry_.cluster_name_ = "fallback_no_auto_sni";
+  });
+  EXPECT_CALL(cm_, getThreadLocalCluster(absl::string_view("fallback_no_auto_sni")))
+      .WillOnce(Return(&fallback_cluster));
+  EXPECT_CALL(fallback_cluster, chooseHost(_))
+      .WillOnce([&](Upstream::LoadBalancerContext* lb_context) -> Upstream::HostSelectionResponse {
+        // Stale Attempt 1 router-generated SNI/SAN must be cleared when switching to a cluster
+        // without auto_sni / auto_san_validation.
+        EXPECT_EQ(nullptr, lb_context->upstreamTransportSocketOptions());
+        const auto* retry_criteria = lb_context->metadataMatchCriteria();
+        EXPECT_NE(nullptr, retry_criteria);
+        if (retry_criteria != nullptr && !retry_criteria->metadataMatchCriteria().empty()) {
+          EXPECT_EQ("model-b",
+                    retry_criteria->metadataMatchCriteria()[0]->value().value().string_value());
+        }
+        return Upstream::HostSelectionResponse{fallback_cluster.lb_.host_};
+      });
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      fallback_cluster.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  EXPECT_CALL(fallback_cluster.conn_pool_, newStream(_, _, _))
+      .WillOnce([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                    const Http::ConnectionPool::Instance::StreamOptions&)
+                    -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*router_->retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, fallback_cluster.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
+        return nullptr;
+      });
+  EXPECT_CALL(encoder2, encodeHeaders(_, true));
+
+  router_->retry_state_->callback_();
+
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(fallback_cluster.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+}
+
+TEST_F(RouterTest, RetryRefreshTransportAndLbRuntimeGuardDisabledPreservesInitialState) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_refresh_transport_and_lb_on_retry", "false"}});
+  recreateFilter();
+
+  envoy::config::core::v3::UpstreamHttpProtocolOptions upstream_options;
+  upstream_options.set_auto_sni(true);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_http_protocol_options_ = upstream_options;
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{":authority", "model-a.example.com"},
+                                         {"x-envoy-retry-on", "5xx"},
+                                         {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setHost("model-a.example.com");
+  router_->decodeHeaders(headers, true);
+
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  EXPECT_CALL(*router_->retry_state_, prepareForRetry(_, Ref(callbacks_.stream_info_)))
+      .WillOnce([](Http::RequestHeaderMap& request_headers, StreamInfo::StreamInfo&) {
+        request_headers.setHost("model-b.example.com");
+      });
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(encoder2, encodeHeaders(_, true));
+
+  router_->retry_state_->callback_();
+  ASSERT_NE(nullptr, router_->upstreamTransportSocketOptions());
+  EXPECT_EQ("model-a.example.com",
+            router_->upstreamTransportSocketOptions()->serverNameOverride().value_or(""));
+
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, DeferredLocalReplyOnUpstreamAbortInvokesModifyResponseHeadersOutOfStack) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                    const Http::ConnectionPool::Instance::StreamOptions&)
+                    -> Http::ConnectionPool::Cancellable* {
+        EXPECT_CALL(*router_->retry_state_, onHostAttempted(_));
+        EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _))
+            .WillOnce(Return(RetryStatus::No));
+        EXPECT_CALL(*router_->retry_state_, onRetryComplete(Ref(callbacks_.stream_info_)));
+        callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                "connect_fail", cm_.thread_local_cluster_.conn_pool_.host_);
+        return nullptr;
+      });
+
+  std::function<void(Http::ResponseHeaderMap&)> deferred_modify_headers;
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        // Capture modify_headers without running it inline, matching DownstreamFilterManager's
+        // prepareLocalReplyViaFilterChain when IsDecodingMask is set.
+        deferred_modify_headers = std::move(modify_headers);
+      });
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, router_->decodeHeaders(headers, true));
+
+  // Execute the deferred local reply out-of-stack after decodeHeaders and onUpstreamAbort returned.
+  ASSERT_TRUE(static_cast<bool>(deferred_modify_headers));
+  EXPECT_CALL(*router_->retry_state_, modifyResponseHeaders(_, Ref(callbacks_.stream_info_)))
+      .WillOnce([](Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo&) {
+        response_headers.addCopy(Http::LowerCaseString("x-retry-diag"), "deferred-ok");
+      });
+  Http::TestResponseHeaderMapImpl local_response_headers{{":status", "503"}};
+  deferred_modify_headers(local_response_headers);
+  EXPECT_EQ("deferred-ok", local_response_headers.get(Http::LowerCaseString("x-retry-diag"))[0]
+                               ->value()
+                               .getStringView());
+
+  router_->onDestroy();
 }
 
 } // namespace Router

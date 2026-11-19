@@ -220,6 +220,39 @@ public:
    * @return true if this retry state was automatically configured for HTTP/3.
    */
   virtual bool isAutomaticallyConfiguredForHttp3() const PURE;
+
+  /**
+   * Performs stateful per-request pre-retry preparation (for example, advancing candidate state
+   * or updating request headers, DynamicMetadata, or FilterState on StreamInfo) prior to upstream
+   * cluster refresh and host selection.
+   * @param request_headers the request headers for the upcoming retry attempt.
+   * @param downstream_stream_info the downstream stream info for the request.
+   */
+  virtual void prepareForRetry(Http::RequestHeaderMap& /*request_headers*/,
+                               StreamInfo::StreamInfo& /*downstream_stream_info*/) {}
+
+  /**
+   * Modifies the request headers for a retry attempt using per-request retry state after an
+   * upstream cluster and host have been selected.
+   * @param request_headers the request headers to modify.
+   */
+  virtual void modifyRequestHeadersForRetry(Http::RequestHeaderMap& /*request_headers*/) {}
+
+  /**
+   * Modifies response headers prior to forwarding downstream using per-request retry state.
+   * @param response_headers the response headers to modify.
+   * @param stream_info the stream info for the request.
+   */
+  virtual void modifyResponseHeaders(Http::ResponseHeaderMap& /*response_headers*/,
+                                     StreamInfo::StreamInfo& /*stream_info*/) {}
+
+  /**
+   * Called once when retries finish, are abandoned, or clean up so the retry state can cancel
+   * pending timers and release request-attempt resources while remaining alive until stream
+   * destruction for modifyResponseHeaders (including deferred local replies).
+   * @param stream_info the stream info for the request.
+   */
+  virtual void onRetryComplete(StreamInfo::StreamInfo& /*stream_info*/) {}
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;

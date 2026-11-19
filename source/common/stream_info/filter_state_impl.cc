@@ -1,5 +1,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
+#include <utility>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/common/compiled_string_map.h"
@@ -229,11 +231,19 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
     return;
   }
 
+  if (data == nullptr) {
+    if (indexed_data_storage_[idx] != nullptr) {
+      indexed_data_storage_[idx].reset();
+      --indexed_count_;
+    }
+    return;
+  }
+
   if (indexed_data_storage_[idx] == nullptr) {
     ++indexed_count_;
   }
   auto filter_object = std::make_unique<FilterStateImpl::IndexedFilterObject>();
-  filter_object->data_ = data;
+  filter_object->data_ = std::move(data);
   filter_object->stream_sharing_ = stream_sharing;
   indexed_data_storage_[idx] = std::move(filter_object);
 }

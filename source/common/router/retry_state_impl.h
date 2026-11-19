@@ -106,6 +106,7 @@ public:
   DoRetryType doRetryType() const override { return do_retry_type_; }
 
   bool isAutomaticallyConfiguredForHttp3() const override { return auto_configured_for_http3_; }
+  void onRetryComplete(StreamInfo::StreamInfo& stream_info) override;
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
