@@ -6,6 +6,8 @@
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -1337,6 +1339,45 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnDemandUnsubscribed) {
   foo_sub.reset();
 
   shutdownMux();
+}
+
+TEST_P(NewGrpcMuxImplTest, ReplaysCachedSecretToLateWatch) {
+  setup();
+  const std::string& type_url = Config::TestTypeUrl::get().Secret;
+  auto decoder = std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+      envoy::extensions::transport_sockets::tls::v3::Secret>>("name");
+  auto* replay_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  NiceMock<MockSubscriptionCallbacks> callbacks1;
+  auto watch1 = grpc_mux_->addWatch(type_url, {"alice"}, callbacks1, decoder, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+  response->set_nonce("n1");
+  envoy::extensions::transport_sockets::tls::v3::Secret secret;
+  secret.set_name("alice");
+  auto* resource = response->add_resources();
+  resource->set_name("alice");
+  resource->set_version("v1");
+  std::ignore = resource->mutable_resource()->PackFrom(secret);
+  EXPECT_CALL(callbacks1, onConfigUpdate(_, _, "1"));
+  onDiscoveryResponse(std::move(response));
+
+  // The name is already subscribed, so the late watch is caught up from the cache with the delta
+  // form of onConfigUpdate().
+  EXPECT_CALL(*replay_cb, scheduleCallbackNextIteration());
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  auto watch2 = grpc_mux_->addWatch(type_url, {"alice"}, callbacks2, decoder, {});
+  EXPECT_CALL(callbacks2, onConfigUpdate(_, _, "v1"))
+      .WillOnce([](const std::vector<DecodedResourceRef>& added,
+                   const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added.size());
+        EXPECT_TRUE(added[0].get().fromCache());
+        return absl::OkStatus();
+      });
+  replay_cb->invokeCallback();
 }
 
 } // namespace
