@@ -50,6 +50,8 @@ using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
 constexpr absl::string_view ErrorPrefix = "ext_proc_error";
+constexpr absl::string_view FailIncompleteLocalResponseRuntimeFlag =
+    "envoy.reloadable_features.ext_proc_fail_incomplete_local_response";
 constexpr int DefaultImmediateStatus = 200;
 constexpr absl::string_view FilterName = "envoy.filters.http.ext_proc";
 constexpr absl::string_view RemoteCloseTimeout =
@@ -2050,7 +2052,10 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
         Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.ext_proc_fail_close_spurious_resp") ||
         decoding_state_.localResponseStarted();
-    if (failureModeAllow() || !fail_close_spurious_resp) {
+    const bool fail_incomplete_local_response =
+        decoding_state_.localResponseStarted() &&
+        Runtime::runtimeFeatureEnabled(FailIncompleteLocalResponseRuntimeFlag);
+    if (!fail_incomplete_local_response && (failureModeAllow() || !fail_close_spurious_resp)) {
       // When a message is received out of order,and fail open is configured,
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
@@ -2113,7 +2118,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   stats_.server_half_closed_.inc();
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
-    logFailOpen();
+    if (!(decoding_state_.localResponseStarted() &&
+          Runtime::runtimeFeatureEnabled(FailIncompleteLocalResponseRuntimeFlag))) {
+      logFailOpen();
+    }
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -2154,7 +2162,8 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   closeStream();
   clearAsyncState(status);
 
-  if (decoding_state_.localResponseStarted()) {
+  if (decoding_state_.localResponseStarted() &&
+      Runtime::runtimeFeatureEnabled(FailIncompleteLocalResponseRuntimeFlag)) {
     // The processor closed its stream before it finished the local response it had started.
     // The filter is the terminal filter of that response, so nothing else can finish it: fail
     // the request. That resets the stream if the response headers have been sent downstream,

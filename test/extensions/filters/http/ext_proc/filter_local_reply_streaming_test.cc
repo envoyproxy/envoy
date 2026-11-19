@@ -626,6 +626,47 @@ TEST_F(StreamingLocalReplyTest, RequestTrailersAfterLocalResponseStartedAndStrea
   filter_->onDestroy();
 }
 
+// With the fail-on-incomplete guard disabled, the processor closing its stream does not fail the
+// request (the previous behaviour). The leak fixes are not guarded, so the request is still not
+// sent on once a local response has started.
+TEST_F(StreamingLocalReplyTest, RequestTrailersAfterStreamClosedGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_fail_incomplete_local_response", "false"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  Envoy::Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"},
+                                                                   {"x-some-other-header", "no"}};
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
+  processRequestHeadersAndStartLocalResponse(
+      [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
+        makeLocalResponseHeaders(header_resp, false);
+      });
+
+  // The request is not failed on close with the guard off.
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  stream_callbacks_->onGrpcClose();
+
+  // The leak fixes are not guarded: the trailers are still not sent on.
+  Buffer::OwnedImpl data("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+
+  filter_->onDestroy();
+}
+
 TEST_F(StreamingLocalReplyTest, DISABLED_RequestWithBodyTogetherDuplexAndLocalResponseWithBody) {
   initialize(R"EOF(
   grpc_service:
