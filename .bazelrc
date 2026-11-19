@@ -134,15 +134,23 @@ common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 common:clang-local --config=clang-common
 common:clang-local --config=libc++
 
-# Use gold linker for gcc compiler.
-build:gcc --config=libstdc++
+# Select the opt-in hermetic GCC toolchain (with its own libstdc++) for target and execution
+# configurations.
+build:gcc --@envoy//bazel:use_gcc
+build:gcc --@envoy//bazel:libc++=false
+build:gcc --@envoy//bazel:libstdc++=true
+# The RBE platform that the Clang builds use (the standard worker image): there is no GCC image.
+build:gcc --host_platform=@clang_platform
+build:gcc --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:gcc --test_env=HEAPCHECK=
-build:gcc --action_env=BAZEL_COMPILER=gcc
-build:gcc --action_env=CC=gcc --action_env=CXX=g++
 # This is to work around a bug in GCC that makes debug-types-section
 # option not play well with fission:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
 build:gcc --copt=-fno-debug-types-section
+# With `--gc-sections` (`-c opt`), LLD drops the link array sections upb's GCC build registers
+# extensions in, and their `__start_`/`__stop_` symbols are then undefined. Keep sections referenced
+# by those symbols, as LLD did before 13.
+build:gcc --linkopt=-Wl,-z,nostart-stop-gc
 # These trigger errors in multiple places both in Envoy dependecies
 # and in Envoy code itself when using GCC.
 # And in all cases the reports appear to be clear false positives.
@@ -157,9 +165,6 @@ build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --cxxopt=-Wno-trigraphs
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
-build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:gcc --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # libc++ - default for clang
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
@@ -170,7 +175,7 @@ common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 common:libc++ --define force_libcpp=enabled
 common:libc++ --@envoy//bazel:libc++=true
 
-# libstdc++ - currently only used for gcc
+# libstdc++ - not used by `--config=gcc`, which has its own
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --@envoy//bazel:libc++=false
 build:libstdc++ --@envoy//bazel:libstdc++=true

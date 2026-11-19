@@ -28,13 +28,11 @@ config_setting(
 configure_make(
     name = "liburing",
     configure_in_place = True,
-    env = {"ENABLE_SHARED": "0"} | select({
-        "//bazel:clang_build": {
-            "AR": "$(AR)",
-            "RANLIB": "$(AR) -s",
-        },
-        "//conditions:default": {},
-    }),
+    env = {
+        "AR": "$(AR)",
+        "ENABLE_SHARED": "0",
+        "RANLIB": "$(AR) -s",
+    },
     lib_source = "@liburing//:all",
     tags = [
         "nocompdb",
