@@ -8,6 +8,7 @@ HTTP cluster specifier
 
   dynamic_modules
   golang
+  header_weighted
   lua
   matcher
   priority_group
