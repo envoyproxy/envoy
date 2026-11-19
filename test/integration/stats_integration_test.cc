@@ -274,12 +274,9 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
 // Both modes must produce byte-for-byte identical flat names, tag-extracted names and tags for
 // every call site that has already been migrated, because any difference is a user-visible break.
 //
-// The mode is chosen once during server initialization, from the process-global
-// `envoy.reloadable_features.enable_stats_explicit_tags` flag, and that read happens before the
-// runtime loader exists (see `InstanceBase::initializeOrThrow`). So the flag has to be set
-// directly; `config_helper_.addRuntimeOverride()` would be applied too late to be observed. The
-// global `TestListener` restores all absl flags at the end of each test, so the override does not
-// leak into the rest of the binary.
+// The mode is chosen once during server initialization from the
+// `envoy.restart_features.enable_stats_explicit_tags` runtime guard, which can only be overridden
+// by the static runtime layers of the bootstrap, as `config_helper_.addRuntimeOverride()` does.
 //
 // A single expected stat: its flat name, the name it should be tag-extracted to, and the tags
 // that should be attached to it.
@@ -330,8 +327,8 @@ public:
   bool explicitTags() const { return std::get<1>(GetParam()); }
 
   void initialize() override {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
-                                  explicitTags());
+    config_helper_.addRuntimeOverride("envoy.restart_features.enable_stats_explicit_tags",
+                                      explicitTags() ? "true" : "false");
     BaseIntegrationTest::initialize();
   }
 
@@ -587,9 +584,8 @@ public:
   bool explicitTags() const { return std::get<1>(GetParam()); }
 
   void initialize() override {
-    // As above, the mode is latched during server initialization, so it has to be set directly.
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
-                                  explicitTags());
+    config_helper_.addRuntimeOverride("envoy.restart_features.enable_stats_explicit_tags",
+                                      explicitTags() ? "true" : "false");
     HttpIntegrationTest::initialize();
   }
 };
@@ -919,6 +915,34 @@ TEST_P(HttpStatsTagsModeIntegrationTest, RouterAndUpstreamFilterStatsAreIdentica
       {"http.config_test.stats_prefix_filter.rq_total",
        "http.stats_prefix_filter.rq_total",
        {{hcm_prefix, "config_test"}}},
+  };
+  for (const StatExpectation& expectation : expectations) {
+    checkExpectation(*test_server_, expectation);
+  }
+}
+
+TEST_P(StatsTagsModeIntegrationTest, CliStatsTagsAreAddedInBothModes) {
+  cli_stats_tags_ = {{"clitag", "clivalue"}};
+  initialize();
+
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
+
+  const std::pair<std::string, std::string> cli_tag{"clitag", "clivalue"};
+  const std::vector<StatExpectation> expectations{
+      // Scope tags, own tags and no tags at all: the CLI tag is added to each of them and leaves
+      // the flat name and the tag-extracted name unchanged.
+      {"cluster.cluster_0.upstream_cx_total",
+       "cluster.upstream_cx_total",
+       {{Config::TagNames::get().CLUSTER_NAME, "cluster_0"}, cli_tag}},
+      {absl::StrCat("listener.", mainListenerScope(), ".downstream_cx_total"),
+       "listener.downstream_cx_total",
+       {{Config::TagNames::get().LISTENER_ADDRESS, mainListenerScope()}, cli_tag}},
+      {"http.config_test.downstream_rq_total",
+       "http.downstream_rq_total",
+       {{Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX, "config_test"}, cli_tag}},
+      {"server.uptime", "server.uptime", {cli_tag}},
   };
   for (const StatExpectation& expectation : expectations) {
     checkExpectation(*test_server_, expectation);

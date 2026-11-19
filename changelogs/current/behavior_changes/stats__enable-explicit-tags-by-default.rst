@@ -5,6 +5,12 @@ only when the stats configuration carries no custom tag extraction rules, that i
 :ref:`stats_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.stats_tags>` is empty and
 :ref:`use_all_default_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>`
 is left at its default of ``true``; any other stats configuration keeps the legacy tag extraction
-logic. The flat stat names, the tag-extracted names and the tags are the same in both modes. The
-mode is chosen once at startup and can be reverted by setting the runtime guard
-``envoy.reloadable_features.enable_stats_explicit_tags`` to ``false``.
+logic. The flat stat names, the tag-extracted names and the tags are the same in both modes,
+including the tags added with the ``--stats-tag`` command line option. The mode is chosen once at
+startup and can be reverted by setting the runtime guard
+``envoy.restart_features.enable_stats_explicit_tags`` to ``false``. This guard can **only** be
+overridden in a
+:ref:`static layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer>` of the
+:ref:`layered runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>`: the
+mode is chosen before the runtime is loaded, so values set in disk, admin or RTDS layers have no
+effect. This guard replaces ``envoy.reloadable_features.enable_stats_explicit_tags``.

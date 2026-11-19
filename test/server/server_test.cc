@@ -580,10 +580,9 @@ TEST_P(ServerInstanceImplExplicitTagsTest, EnabledByDefault) {
 }
 
 TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByRuntimeGuard) {
-  // The guard is read during initialization, before the runtime loader exists, so it has to be
-  // set directly; the saver restores it when the test ends.
+  // The saver restores the guard when the test ends.
   absl::FlagSaver saver;
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", false);
   EXPECT_FALSE(bootServerAndGetExplicitTags("test/server/test_data/server/empty_bootstrap.yaml"));
 }
 
@@ -596,6 +595,36 @@ TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByCustomStatsTags) {
 TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByNoDefaultTags) {
   EXPECT_FALSE(bootServerAndGetExplicitTags(
       "test/server/test_data/server/stats_no_default_tags_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByStaticRuntimeLayer) {
+  EXPECT_FALSE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_explicit_tags_static_layer_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByNestedStaticRuntimeLayer) {
+  EXPECT_FALSE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_explicit_tags_nested_static_layer_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplExplicitTagsTest, LaterStaticRuntimeLayerWins) {
+  absl::FlagSaver saver;
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", false);
+  // false, then an admin layer, then true.
+  EXPECT_TRUE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_explicit_tags_layer_order_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplExplicitTagsTest, NonBoolStaticRuntimeLayerKeepsDefault) {
+  // A later string value replaces the earlier false, leaving the default (true).
+  EXPECT_TRUE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_explicit_tags_non_bool_static_layer_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplExplicitTagsTest, DisabledByNumericStaticRuntimeLayer) {
+  // The runtime loader parses 0 as false.
+  EXPECT_FALSE(bootServerAndGetExplicitTags(
+      "test/server/test_data/server/stats_explicit_tags_numeric_static_layer_bootstrap.yaml"));
 }
 
 // Validates that server stats are flushed even when server is stuck with initialization.

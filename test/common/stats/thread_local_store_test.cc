@@ -35,6 +35,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::NiceMock;
@@ -3208,6 +3209,39 @@ TEST_F(ThreadLocalStoreExplicitTagsTest, TagStatCreationMatrixOnTaggedScope) {
   EXPECT_EQ("cluster.foo.tx.with.method.get", c4.name());
   EXPECT_EQ("cluster.tx", c4.tagExtractedName());
   ASSERT_EQ(2, c4.tags().size());
+}
+
+TEST_F(ThreadLocalStoreExplicitTagsTest, FixedTagsAppliedToTaggedAndUntaggedStats) {
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  const TagVector cli_tags{{"clitag", "clivalue"}};
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, cli_tags).value());
+
+  // Untagged stats get the fixed tag from the tag producer.
+  Counter& untagged = scope_.counterFromString("plain.counter");
+  EXPECT_EQ("plain.counter", untagged.name());
+  EXPECT_THAT(untagged.tags(), ElementsAre(Tag{"clitag", "clivalue"}));
+
+  // Scope tags and own tags are kept, the fixed tag is appended and the flat name is unchanged.
+  StatNameTagVector prefix_tags{{makeStatName("cluster_name"), makeStatName("foo")}};
+  ScopeSharedPtr cluster = scope_.scopeFromTaggedName(
+      makeStatName("cluster"), StatNameTagSpan(prefix_tags), makeStatName("cluster.foo"));
+  Counter& scoped = cluster->counterFromString("rq");
+  EXPECT_EQ("cluster.foo.rq", scoped.name());
+  EXPECT_EQ("cluster.rq", scoped.tagExtractedName());
+  EXPECT_THAT(scoped.tags(), ElementsAre(Tag{"cluster_name", "foo"}, Tag{"clitag", "clivalue"}));
+
+  StatNameTagVector own{{makeStatName("method"), makeStatName("get")}};
+  Histogram& histogram = cluster->histogramFromTaggedName(
+      makeStatName("calls"), StatNameTagSpan(own), StatName(), Histogram::Unit::Unspecified);
+  EXPECT_EQ("cluster.foo.calls.method.get", histogram.name());
+  EXPECT_THAT(histogram.tags(), ElementsAre(Tag{"cluster_name", "foo"}, Tag{"method", "get"},
+                                            Tag{"clitag", "clivalue"}));
+
+  // A supplied tag with the same name (e.g. merged from a hot restart parent) is not duplicated.
+  StatNameTagVector merged{{makeStatName("clitag"), makeStatName("clivalue")}};
+  Counter& merged_counter = scope_.counterFromMergedStatName(
+      makeStatName("merged.rq"), makeStatName("merged.rq"), StatNameTagSpan(merged));
+  EXPECT_THAT(merged_counter.tags(), ElementsAre(Tag{"clitag", "clivalue"}));
 }
 
 } // namespace Stats

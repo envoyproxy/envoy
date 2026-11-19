@@ -78,10 +78,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
-// When true (and the stats config carries no custom tags extraction rules), the stats store uses
-// the explicit-tags scope logic that propagates scope-level tags onto every stat instead of
-// re-parsing the flat stat name. Evaluated once at startup.
-RUNTIME_GUARD(envoy_reloadable_features_enable_stats_explicit_tags);
 // Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
@@ -228,6 +224,12 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
 RUNTIME_GUARD(envoy_reloadable_features_zstd_compressor_flush);
 RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
+// When true (and the stats config carries no custom tags extraction rules), the stats store uses
+// the explicit-tags scope logic that propagates scope-level tags onto every stat instead of
+// re-parsing the flat stat name. Evaluated once at startup, before the runtime loader exists, so
+// it can ONLY be overridden by the static layers of the bootstrap `layered_runtime`; disk, admin
+// and RTDS layers have no effect on it.
+RUNTIME_GUARD(envoy_restart_features_enable_stats_explicit_tags);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 

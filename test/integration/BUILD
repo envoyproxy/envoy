@@ -1609,6 +1609,7 @@ envoy_cc_test_library(
         "//envoy/server:options_interface",
         "//envoy/server:process_context_interface",
         "//envoy/stats:stats_interface",
+        "//envoy/stats:tag_interface",
         "//source/common/api:api_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:lock_guard_lib",

@@ -207,7 +207,7 @@ public:
   // addRuntimeOverride().
   bool useExplicitTags() {
     const bool explicit_tags = version_ == Network::Address::IpVersion::v6;
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+    Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags",
                                   explicit_tags);
     return explicit_tags;
   }
