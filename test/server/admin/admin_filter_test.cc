@@ -167,6 +167,9 @@ TEST_P(AdminFilterChunkedTest, AllChunksAtOnceWithRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.admin_filter_yield_between_chunks", "false"}});
+  // The guard is latched when the filter is created.
+  AdminFilter filter(admin_);
+  filter.setDecoderFilterCallbacks(callbacks_);
   expectCountingRequest(3);
   EXPECT_CALL(callbacks_.dispatcher_, createSchedulableCallback_(_)).Times(0);
 
@@ -174,7 +177,23 @@ TEST_P(AdminFilterChunkedTest, AllChunksAtOnceWithRuntimeGuardDisabled) {
   expectData("0", false);
   expectData("1", false);
   expectData("2", true);
-  filter_.decodeHeaders(request_headers_, true);
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(request_destroyed_);
+  filter.onDestroy();
+}
+
+TEST_P(AdminFilterChunkedTest, ResetWhileEncodingStopsChunksWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.admin_filter_yield_between_chunks", "false"}});
+  AdminFilter filter(admin_);
+  filter.setDecoderFilterCallbacks(callbacks_);
+  expectCountingRequest(3);
+  // The stream is reset from under encodeData(), so the remaining chunks are dropped.
+  EXPECT_CALL(callbacks_, encodeData(_, false)).WillOnce([&filter](Buffer::Instance&, bool) {
+    filter.onDestroy();
+  });
+  filter.decodeHeaders(request_headers_, true);
   EXPECT_TRUE(request_destroyed_);
 }
 
