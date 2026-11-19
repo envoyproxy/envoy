@@ -1,18 +1,51 @@
---- rust/private/rustc.bzl
-+++ rust/private/rustc.bzl
-@@ -1612,7 +1612,7 @@ def rustc_compile_action(
-             **crate_info_dict
-         )
+diff --git cargo/private/cargo_build_script.bzl cargo/private/cargo_build_script.bzl
+index ae79b7f..50ac8e5 100644
+--- cargo/private/cargo_build_script.bzl
++++ cargo/private/cargo_build_script.bzl
+@@ -232,8 +232,37 @@ def _pwd_flags_fsanitize_ignorelist(args):
+             res.append(arg)
+     return res
  
--    if crate_info.type in ["staticlib", "cdylib"]:
-+    if crate_info.type in ["staticlib", "cdylib"] and not out_binary:
-         # These rules are not supposed to be depended on by other rust targets, and
-         # as such they shouldn't provide a CrateInfo. However, one may still want to
-         # write a rust_test for them, so we provide the CrateInfo wrapped in a provider
-
++def _pwd_flags_toolchain_dirs(args):
++    """Prefix execroot-relative paths of `-idirafter` and `-B` with ${pwd}.
++
++    These are how a toolchain that sets its own search paths (eg a hermetic GCC) gives them: the
++    path either joined to the flag, or as the argument after `-idirafter`.
++
++    Args:
++        args (list): List of tool arguments.
++
++    Returns:
++        list: The modified argument list.
++    """
++    res = []
++    fix_next_arg = False
++    for arg in args:
++        fixed = arg
++        if fix_next_arg:
++            if not paths.is_absolute(arg) and not arg.startswith("$"):
++                fixed = "${{pwd}}/{}".format(arg)
++        else:
++            for flag in ("-idirafter", "-B"):
++                path = arg[len(flag):]
++                if arg.startswith(flag) and "/" in path and not paths.is_absolute(path) and not path.startswith("$"):
++                    fixed = "{}${{pwd}}/{}".format(flag, path)
++                    break
++        res.append(fixed)
++        fix_next_arg = arg == "-idirafter"
++    return res
++
+ def _pwd_flags(args):
+-    return _pwd_flags_fsanitize_ignorelist(_pwd_flags_isystem(_pwd_flags_bindir(_pwd_flags_sysroot(args))))
++    return _pwd_flags_toolchain_dirs(_pwd_flags_fsanitize_ignorelist(_pwd_flags_isystem(_pwd_flags_bindir(_pwd_flags_sysroot(args)))))
+ 
+ def _feature_enabled(ctx, feature_name, default = False):
+     """Check if a feature is enabled.
+diff --git rust/private/rustc.bzl rust/private/rustc.bzl
+index 42616d8..ad7a43e 100644
 --- rust/private/rustc.bzl
 +++ rust/private/rustc.bzl
-@@ -1061,7 +1061,7 @@ def construct_arguments(
+@@ -1165,7 +1165,7 @@ def construct_arguments(
  
      if toolchain.llvm_cov and ctx.configuration.coverage_enabled:
          # https://doc.rust-lang.org/rustc/instrument-coverage.html
@@ -21,10 +54,20 @@
  
      if toolchain._experimental_link_std_dylib:
          rustc_flags.add("--codegen=prefer-dynamic")
-
+@@ -1728,7 +1728,7 @@ def rustc_compile_action(
+             **crate_info_dict
+         )
+ 
+-    if crate_info.type in ["staticlib", "cdylib"]:
++    if crate_info.type in ["staticlib", "cdylib"] and not out_binary:
+         # These rules are not supposed to be depended on by other rust targets, and
+         # as such they shouldn't provide a CrateInfo. However, one may still want to
+         # write a rust_test for them, so we provide the CrateInfo wrapped in a provider
+diff --git rust/toolchain.bzl rust/toolchain.bzl
+index 91e3032..b7f66c0 100644
 --- rust/toolchain.bzl
 +++ rust/toolchain.bzl
-@@ -152,7 +152,7 @@
+@@ -152,7 +152,7 @@ def _symlink_sysroot_tree(ctx, name, target, target_files = None):
      tree_files = []
      if target_files == None:
          target_files = target.files
@@ -33,10 +76,7 @@
          # Parse the path to the file relative to the workspace root so a
          # symlink matching this path can be created within the sysroot.
  
-
---- rust/toolchain.bzl
-+++ rust/toolchain.bzl
-@@ -284,11 +284,12 @@
+@@ -284,11 +284,12 @@ def _generate_sysroot(
                  linker.label,
              ))
          linker_bin = linker_files[0]

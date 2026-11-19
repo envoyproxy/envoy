@@ -5,14 +5,9 @@ CONTAINERS = """
 REPO = "{repo}"
 REPO_GCR = "{repo_gcr}"
 SHA = "{sha}"
-SHA_GCC = "{sha_gcc}"
 SHA_MOBILE = "{sha_mobile}"
 SHA_WORKER = "{sha_worker}"
 TAG = "{tag}"
-
-def image_gcc():
-    return "%s@sha256:%s" % (
-        REPO_GCR, SHA_GCC)
 
 def image_mobile():
     return "%s@sha256:%s" % (
@@ -85,7 +80,6 @@ def _envoy_repo_impl(repository_ctx):
         repo = build_image["repo"],
         repo_gcr = build_image["repo-gcr"],
         sha = build_image["sha"],
-        sha_gcc = build_image["sha-gcc"],
         sha_mobile = build_image["sha-mobile"],
         sha_worker = build_image["sha-worker"],
         tag = build_image["tag"],
@@ -139,13 +133,20 @@ def _envoy_repo_impl(repository_ctx):
     use_libstdcpp = repository_ctx.os.environ.get("BAZEL_USE_LIBSTDCPP", "False")
     use_libstdcpp = {"True": True, "False": False}.get(use_libstdcpp, False)
 
+    # An absolute GCC installation prefix (eg `/usr`) makes `--config=gcc` use that host GCC
+    # and not the hermetic one.
+    gcc_path = repository_ctx.os.environ.get("BAZEL_GCC_PATH", "")
+    if gcc_path and not gcc_path.startswith("/"):
+        fail("BAZEL_GCC_PATH must be an absolute GCC installation prefix")
+
     repository_ctx.file("compiler.bzl", """
+GCC_PATH = %s
 LLVM_PATH = '%s'
 LLVM_VERSION_LOCAL = '%s'
 LLVM_LIB_DIR = '%s'
 USE_LOCAL_SYSROOT = %s
 USE_LIBSTDCPP = %s
-""" % (llvm_path, llvm_version_local, llvm_lib_dir, local_sysroot, use_libstdcpp))
+""" % (repr(gcc_path), llvm_path, llvm_version_local, llvm_lib_dir, local_sysroot, use_libstdcpp))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
@@ -342,7 +343,7 @@ _envoy_repo = repository_rule(
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
     },
-    environ = ["BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT", "BAZEL_USE_LIBSTDCPP"],
+    environ = ["BAZEL_GCC_PATH", "BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT", "BAZEL_USE_LIBSTDCPP"],
 )
 
 def envoy_repo():

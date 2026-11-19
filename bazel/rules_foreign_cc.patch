@@ -1,3 +1,36 @@
+diff --git a/foreign_cc/built_tools/private/built_tools_framework.bzl b/foreign_cc/built_tools/private/built_tools_framework.bzl
+index d96af9e..b8e8fc2 100644
+--- a/foreign_cc/built_tools/private/built_tools_framework.bzl
++++ b/foreign_cc/built_tools/private/built_tools_framework.bzl
+@@ -50,6 +50,11 @@ FOREIGN_CC_BUILT_TOOLS_HOST_FRAGMENTS = [
+ def absolutize(workspace_name, text, force = False):
+     return absolutize_path_in_str(workspace_name, "$$EXT_BUILD_ROOT$$/", text, force)
+ 
++def _is_system_include_flag(flag):
++    # A toolchain that sets its system header search path itself (`-nostdinc` with `-idirafter`)
++    # needs it for the probes that omit CFLAGS, as it does the sysroot.
++    return flag == "-nostdinc" or (flag.startswith("-idirafter") and flag != "-idirafter")
++
+ def extract_sysroot_flags(flags):
+     """Function to return sysroot args from list of flags like cflags or ldflags
+ 
+@@ -67,7 +72,7 @@ def extract_sysroot_flags(flags):
+             if i + 1 < len(flags):
+                 ret_flags.append(flags[i])
+                 ret_flags.append(flags[i + 1])
+-        elif flags[i].startswith("--sysroot="):
++        elif flags[i].startswith("--sysroot=") or _is_system_include_flag(flags[i]):
+             ret_flags.append(flags[i])
+     return ret_flags
+ 
+@@ -86,6 +91,7 @@ def extract_non_sysroot_flags(flags):
+     for i in range(len(flags)):
+         if flags[i] == "--sysroot" or \
+            flags[i].startswith("--sysroot=") or \
++           _is_system_include_flag(flags[i]) or \
+            (i != 0 and flags[i - 1] == "--sysroot"):
+             continue
+         else:
 diff --git a/toolchains/private/BUILD.bazel b/toolchains/private/BUILD.bazel
 index 4ccdeef..25658e9 100644
 --- a/toolchains/private/BUILD.bazel
