@@ -228,7 +228,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
                               const envoy::config::core::v3::BindConfig& bind_config) {
   // Create HdsCluster.
   auto cluster_or_error =
-      HdsCluster::create(server_context_, std::move(cluster_config), bind_config, store_stats_,
+      HdsCluster::create(server_context_, cluster_config, bind_config, store_stats_,
                          ssl_context_manager_, false, *info_factory_, tls_);
   RETURN_IF_NOT_OK_REF(cluster_or_error.status());
   auto new_cluster = cluster_or_error.value();
