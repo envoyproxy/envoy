@@ -266,6 +266,68 @@ TEST(WuffsJsonCursorTest, TrailingGarbageInDifferentDataChunk) {
   EXPECT_THAT(cursor.feed("random_garbage)", /*closed=*/true), Not(IsOk()));
 }
 
+// Bytes after the root value must be rejected even in a non-final chunk;
+// otherwise a second document is skipped by the parser but still forwarded.
+TEST(WuffsJsonCursorTest, TrailingSecondDocumentInUnclosedChunkRejected) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_THAT(cursor.feed(R"({"valid":1} {"smuggled":"data"})", /*closed=*/false), Not(IsOk()));
+}
+
+TEST(WuffsJsonCursorTest, TrailingGarbageInUnclosedChunkRejected) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_THAT(cursor.feed(R"({"key":"val"}random_garbage)", /*closed=*/false), Not(IsOk()));
+}
+
+// Root completes in an unclosed chunk; a second document in a later chunk is rejected.
+TEST(WuffsJsonCursorTest, SecondDocumentInLaterChunkRejected) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_OK(cursor.feed(R"({"valid":1})", /*closed=*/false));
+  EXPECT_THAT(cursor.feed(R"({"smuggled":"data"})", /*closed=*/true), Not(IsOk()));
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].key, "valid");
+}
+
+// Same, but the second document also arrives in an unclosed chunk.
+TEST(WuffsJsonCursorTest, SecondDocumentInLaterUnclosedChunkRejected) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_OK(cursor.feed(R"({"valid":1})", /*closed=*/false));
+  EXPECT_THAT(cursor.feed(R"({"smuggled":"data"})", /*closed=*/false), Not(IsOk()));
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].key, "valid");
+}
+
+// After rejecting trailing bytes the cursor stays failed.
+TEST(WuffsJsonCursorTest, TrailingBytesErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_THAT(cursor.feed(R"({"valid":1} {"smuggled":"data"})", /*closed=*/false), Not(IsOk()));
+  EXPECT_THAT(cursor.feed("", /*closed=*/true), Not(IsOk()));
+}
+
+// Trailing whitespace split across unclosed chunks is still fine.
+TEST(WuffsJsonCursorTest, TrailingWhitespaceAcrossUnclosedChunksAccepted) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_OK(cursor.feed(R"({"key":"val"})", /*closed=*/false));
+  EXPECT_OK(cursor.feed("  \n", /*closed=*/false));
+  EXPECT_OK(cursor.feed("\t ", /*closed=*/true));
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].str_val, "val");
+}
+
+// Trailing whitespace in the chunk that completes the document is fine too.
+TEST(WuffsJsonCursorTest, TrailingWhitespaceInUnclosedCompletingChunkAccepted) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_OK(cursor.feed(R"({"key":"val"}  )", /*closed=*/false));
+  EXPECT_OK(cursor.feed("", /*closed=*/true));
+  ASSERT_EQ(h.fields.size(), 1u);
+}
+
 TEST(WuffsJsonCursorTest, DuplicateKeyRejected) {
   CapturingHandler h;
   EXPECT_THAT(parse(R"({"model":"gpt-4","model":"gpt-4o"})", h), Not(IsOk()));

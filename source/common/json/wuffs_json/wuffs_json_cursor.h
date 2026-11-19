@@ -177,6 +177,10 @@ public:
 
   // Feed one body chunk. Set closed=true on the final chunk (signals EOF to Wuffs).
   // Returns non-OK on malformed JSON or internal allocation failure.
+  //
+  // Exactly one root value is accepted; anything but whitespace after it is an
+  // error, in any chunk. Feeding after the root value has completed is also an
+  // error.
   absl::Status feed(absl::string_view chunk, bool closed);
 
   // One level of a structural pattern-path match: a dict key or an array wildcard.
