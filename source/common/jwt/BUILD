@@ -29,6 +29,7 @@ envoy_cc_library(
     deps = [
         "//bazel:ssl",
         "//source/common/protobuf",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",

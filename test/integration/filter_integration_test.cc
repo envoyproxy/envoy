@@ -1,3 +1,5 @@
+#include "envoy/registry/registry.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/logging.h"
 
@@ -38,6 +40,7 @@ public:
   void testNonTerminalEncodingFilterWithCompleteRequest();
   void testNonTerminalEncodingFilterWithIncompleteRequest();
   void testFilterAddsDataAndTrailersToHeaderOnlyRequest();
+  void testStopAllDecoderFilterRebuffersBody(bool async_lb);
 
   const int count_ = 70;
   const int size_ = 1000;
@@ -480,6 +483,226 @@ typed_config:
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
+}
+
+// An encoder filter adds response trailers in encodeData(end_stream=true) while the next encoder
+// filter is still paused on headers and buffers that data. The added trailers must still reach the
+// buffering filter so its default encodeTrailers() continues the chain and the client sees the
+// body, the trailers, and the end of the stream. Without
+// envoy.reloadable_features.filter_manager_forward_held_trailers the trailers are
+// dropped and the response never completes.
+TEST_P(MultiProtocolFilterIntegrationTest, AddedEncodedTrailersReachStoppedEncoderFilter) {
+  // prependFilter() inserts at the front of the chain, so add-trailers-filter ends up closest to
+  // the router and runs first on the encode path.
+  prependFilter(R"EOF(
+name: add-trailers-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+)EOF");
+  prependFilter(R"EOF(
+name: encoder-decoder-buffer-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(128, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(128, response->body().size());
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    ASSERT_NE(nullptr, response->trailers());
+    EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
+  }
+}
+
+// Same chain as AddedEncodedTrailersReachStoppedEncoderFilter with the runtime guard off: the
+// added trailers are dropped, so the buffering filter is never resumed and the response stays open
+// after the upstream has finished.
+TEST_P(FilterIntegrationTest, AddedEncodedTrailersDroppedOnStoppedEncoderFilterWithoutGuard) {
+  // Upstream HTTP filters do not observe the downstream stream staying open in the same way, and
+  // the stat-based checks below are specific to the downstream HCM.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.filter_manager_forward_held_trailers", "false");
+  prependFilter(R"EOF(
+name: add-trailers-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+)EOF");
+  prependFilter(R"EOF(
+name: encoder-decoder-buffer-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncoderDecoderBufferFilterConfig
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(128, true);
+
+  // The router finishes the upstream request before handing the final data frame to the encoder
+  // filters, so once it is gone the downstream stream has had its chance to complete.
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", testing::Eq(0));
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ(1, test_server_->gauge("http.config_test.downstream_rq_active")->value());
+
+  codec_client_->sendReset(encoder);
+  ASSERT_TRUE(response->waitForReset());
+  codec_client_->close();
+}
+
+struct StopAllRebufferDecodeCounters {
+  std::atomic<int> decode_trailers_calls{0};
+  std::atomic<int> decode_complete_calls{0};
+};
+
+class StopAllRebufferDecoderFilter : public Http::StreamDecoderFilter {
+public:
+  explicit StopAllRebufferDecoderFilter(std::shared_ptr<StopAllRebufferDecodeCounters> counters)
+      : counters_(std::move(counters)) {}
+
+  void onDestroy() override {
+    if (resume_timer_ != nullptr) {
+      resume_timer_->disableTimer();
+    }
+  }
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override {
+    if (end_stream) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    armResumeTimer();
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
+    return end_stream ? Http::FilterDataStatus::Continue
+                      : Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    counters_->decode_trailers_calls.fetch_add(1);
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  void decodeComplete() override { counters_->decode_complete_calls.fetch_add(1); }
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
+
+private:
+  void armResumeTimer() {
+    resume_timer_ = callbacks_->dispatcher().createTimer([this]() {
+      if (callbacks_->streamInfo().downstreamTiming().lastDownstreamRxByteReceived().has_value()) {
+        callbacks_->continueDecoding();
+        return;
+      }
+      armResumeTimer();
+    });
+    resume_timer_->enableTimer(std::chrono::milliseconds(5));
+  }
+
+  std::shared_ptr<StopAllRebufferDecodeCounters> counters_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Event::TimerPtr resume_timer_;
+};
+
+class StopAllRebufferDecoderFilterFactory
+    : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  static StopAllRebufferDecodeCounters& counters() {
+    static auto* instance = new StopAllRebufferDecodeCounters();
+    return *instance;
+  }
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamDecoderFilter(std::make_shared<StopAllRebufferDecoderFilter>(
+          std::shared_ptr<StopAllRebufferDecodeCounters>(&counters(),
+                                                         [](StopAllRebufferDecodeCounters*) {})));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "stop-all-rebuffer-decoder-filter"; }
+};
+
+static Registry::RegisterFactory<StopAllRebufferDecoderFilterFactory,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_stop_all_rebuffer_decoder_filter_;
+
+// End-to-end request-path coverage for a decoder filter pausing headers with
+// StopAllIterationAndBuffer, resuming once request body + trailers arrive, re-buffering body in
+// decodeData(false) with StopIterationAndBuffer, and returning Continue from decodeTrailers():
+// commonHandleAfterTrailersCallback() clears iterate_from_current_filter_ so the nested
+// continuation forwards the body and trailers once.
+void FilterIntegrationTest::testStopAllDecoderFilterRebuffersBody(bool async_lb) {
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  async_lb_ = async_lb;
+  auto& counters = StopAllRebufferDecoderFilterFactory::counters();
+  counters.decode_trailers_calls.store(0);
+  counters.decode_complete_calls.store(0);
+
+  prependFilter(R"EOF(
+name: stop-all-rebuffer-decoder-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, false);
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder, "payload", false);
+  codec_client_->sendTrailers(encoder, Http::TestRequestTrailerMapImpl{{"x-req-trailer", "val"}});
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("payload", upstream_request_->body().toString());
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_EQ("val", upstream_request_->trailers()
+                       ->get(Http::LowerCaseString("x-req-trailer"))[0]
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ(1, counters.decode_trailers_calls.load());
+  EXPECT_EQ(1, counters.decode_complete_calls.load());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// The router takes the body straight from the filter. With async host resolution the router's own
+// replay of the buffered body would hide a body that the filter failed to forward.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
+  testStopAllDecoderFilterRebuffersBody(false);
+}
+
+// The router is stopped on all frames too when the filter continues, and replays the body and
+// trailers once a host is selected.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailersAsyncLb) {
+  testStopAllDecoderFilterRebuffersBody(true);
 }
 
 // Tests missing headers needed for H/1 codec first line.
@@ -1488,50 +1711,6 @@ TEST_P(FilterIntegrationTest, LocalReplyFromEncodeMetadata) {
   cleanupUpstreamAndDownstream();
 }
 
-// Validate that adding trailers during encode/decodeData with end_stream==true works correctly
-// with half close enabled.
-TEST_P(FilterIntegrationTest, FilterAddsTrailersWithIndependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  prependFilter(R"EOF(
-  name: add-trailers-filter
-  typed_config:
-    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
-  )EOF");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":scheme", "http"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":authority", "sni.lyft.com"}});
-  auto request_encoder = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  // The add-body-filter will add trailers to the response
-  upstream_request_->encodeData(100, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(response->body().size(), 100);
-  // Make sure response trailers added by the filter were received by the client
-  EXPECT_EQ(response->trailers()->size(), 1);
-
-  Buffer::OwnedImpl data(std::string(100, 'r'));
-  codec_client_->sendData(*request_encoder, data, true);
-
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  ASSERT_TRUE(upstream_request_->complete());
-  // Make sure request trailers added by the filter were received by the upstream
-  EXPECT_EQ(upstream_request_->trailers()->size(), 1);
-  EXPECT_EQ(upstream_request_->bodyLength(), 100);
-}
-
 void FilterIntegrationTest::testNonTerminalEncodingFilterWithIncompleteRequest() {
   // Encoding by non-terminal upstream filter is not supported
   if (!testing_downstream_filter_) {
@@ -1562,17 +1741,8 @@ void FilterIntegrationTest::testNonTerminalEncodingFilterWithIncompleteRequest()
 }
 
 // Verify that when non terminal filter encodes end_stream with request still incomplete
-// the stream is reset. The behavior is the same with or without independent half-close enabled.
+// the stream is reset.
 TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithIncompleteRequest) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
-  testNonTerminalEncodingFilterWithIncompleteRequest();
-}
-
-TEST_P(FilterIntegrationTest,
-       NonTerminalEncodingFilterWithIncompleteRequestAndIdependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   testNonTerminalEncodingFilterWithIncompleteRequest();
 }
 
@@ -1612,17 +1782,8 @@ void FilterIntegrationTest::testNonTerminalEncodingFilterWithCompleteRequest() {
 }
 
 // Verify that when non terminal filter encodes end_stream with request complete
-// the stream is finished gracefully and not reset. The behavior is the same with or without
-// independent half-close enabled.
+// the stream is finished gracefully and not reset.
 TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequest) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
-  testNonTerminalEncodingFilterWithCompleteRequest();
-}
-
-TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequestAndIdependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   testNonTerminalEncodingFilterWithCompleteRequest();
 }
 
@@ -1691,16 +1852,7 @@ void FilterIntegrationTest::testFilterAddsDataAndTrailersToHeaderOnlyRequest() {
 
 // Validate that extending request lifetime by adding body and trailers to a header only request
 // and then pausing decoder filter chain, results in stream reset when encoding completes.
-// The behavior is the same with or without independent half-close enabled.
 TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequest) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
-  testFilterAddsDataAndTrailersToHeaderOnlyRequest();
-}
-
-TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequestWithIndependentHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   testFilterAddsDataAndTrailersToHeaderOnlyRequest();
 }
 
@@ -1797,6 +1949,36 @@ TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
     auto it = response->metadataMap().find(key);
     ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
     EXPECT_EQ(response->metadataMap().find(key)->second, key);
+  }
+}
+
+TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
+  // Encoding order: add-trailers-filter, wait-for-whole-request-and-response-filter.
+  prependFilter(R"EOF(
+  name: add-trailers-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.AddTrailersFilterConfig
+  )EOF");
+  prependFilter(R"EOF(
+  name: wait-for-whole-request-and-response-filter
+  typed_config:
+    "@type": type.googleapis.com/test.integration.filters.WaitForWholeRequestAndResponseFilterConfig
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  // The buffering filter waits for the end of the stream, which the added trailers now carry.
+  upstream_request_->encodeData(128, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(128, response->body().size());
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
   }
 }
 

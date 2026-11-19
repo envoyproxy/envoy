@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/utility.h"
 
 namespace Envoy {
@@ -24,7 +25,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
           parent.createListener(std::move(socket), *this, runtime, random, config, overload_state),
           config),
       tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
-      listen_address_(listen_address) {
+      listen_address_(listen_address), overload_state_(overload_state) {
   connection_balancer_.registerHandler(*this);
 }
 
@@ -123,6 +124,12 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
       target_handler.post(std::move(socket));
       return;
     }
+  }
+
+  // Rebind to this worker's own overload state handle now that the socket has settled here,
+  // in case it was handed off from a different worker via exact_balance. No-op otherwise.
+  if (auto* accepted_socket = dynamic_cast<Network::AcceptedSocketImpl*>(socket.get())) {
+    accepted_socket->setOverloadState(overload_state_);
   }
 
   auto active_socket = std::make_unique<ActiveTcpSocket>(

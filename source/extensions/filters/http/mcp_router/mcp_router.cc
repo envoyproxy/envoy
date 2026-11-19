@@ -68,7 +68,7 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
     std::string lower_key = absl::AsciiStrToLower(key);
 
     if (!kSkipHeaders.contains(lower_key) && headerCanBeForwarded(lower_key, header_forwarding)) {
-      dest.addCopy(Http::LowerCaseString(std::string(key)), header.value().getStringView());
+      dest.addCopy(Http::LowerCaseString(key), header.value().getStringView());
     }
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -162,7 +162,7 @@ Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   // Extract session ID from header
-  auto session_header = headers.get(Http::LowerCaseString(std::string(kSessionIdHeader)));
+  auto session_header = headers.get(Http::LowerCaseString(kSessionIdHeader));
   if (!session_header.empty()) {
     encoded_session_id_ = std::string(session_header[0]->value().getStringView());
   }
@@ -398,8 +398,19 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
   return true;
 }
 
+std::string McpRouterFilter::encodeCompositeSession(const std::string& composite) {
+  const std::string& key = config_->sessionSigningKey();
+  if (key.empty()) {
+    return SessionCodec::encode(composite);
+  }
+  return SessionCodec::encodeWithIntegrity(composite, key);
+}
+
 bool McpRouterFilter::decodeAndParseSession() {
-  std::string decoded = SessionCodec::decode(encoded_session_id_);
+  const std::string& key = config_->sessionSigningKey();
+  const std::string decoded = key.empty()
+                                  ? SessionCodec::decode(encoded_session_id_)
+                                  : SessionCodec::decodeWithIntegrity(encoded_session_id_, key);
   if (decoded.empty()) {
     ENVOY_LOG(warn, "Failed to decode session ID");
     config_->stats().rq_session_invalid_.inc();
@@ -978,7 +989,7 @@ void McpRouterFilter::handleInitialize() {
     absl::flat_hash_map<std::string, std::string> empty_sessions;
     std::string composite =
         SessionCodec::buildCompositeSessionId(route_name_, subject, empty_sessions);
-    std::string encoded_session = SessionCodec::encode(composite);
+    std::string encoded_session = encodeCompositeSession(composite);
     encoded_session_id_ = encoded_session;
 
     sendJsonResponse(response_body, encoded_session);
@@ -1015,7 +1026,7 @@ void McpRouterFilter::handleInitialize() {
     if (!sessions.empty()) {
       std::string composite =
           SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
-      encoded_session = SessionCodec::encode(composite);
+      encoded_session = self->encodeCompositeSession(composite);
     }
 
     self->sendJsonResponse(response_body, encoded_session);
@@ -1996,14 +2007,14 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
   } else if (request_headers_ != nullptr) {
     headers->setHost(request_headers_->getHostValue());
   }
-  headers->setContentType(std::string(kContentTypeJson));
+  headers->setContentType(kContentTypeJson);
 
   // Accept both JSON and SSE responses.
   headers->addCopy(Http::LowerCaseString("accept"),
                    absl::StrCat(kContentTypeSse, ", ", kContentTypeJson));
 
   if (!backend_session_id.empty()) {
-    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
+    headers->addCopy(Http::LowerCaseString(kSessionIdHeader), backend_session_id);
   }
 
   if (request_headers_) {
@@ -2073,11 +2084,11 @@ void McpRouterFilter::sendJsonResponse(const std::string& body, const std::strin
   // Standard JSON response path.
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
-  headers->setContentType(std::string(kContentTypeJson));
+  headers->setContentType(kContentTypeJson);
   headers->setContentLength(body.length());
 
   if (!session_id.empty()) {
-    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), session_id);
+    headers->addCopy(Http::LowerCaseString(kSessionIdHeader), session_id);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(headers), body.empty(), "mcp_router");
@@ -2093,7 +2104,7 @@ void McpRouterFilter::sendAccepted() {
   headers->setStatus(202);
 
   if (!encoded_session_id_.empty()) {
-    headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), encoded_session_id_);
+    headers->addCopy(Http::LowerCaseString(kSessionIdHeader), encoded_session_id_);
   }
 
   decoder_callbacks_->encodeHeaders(std::move(headers), true, "mcp_router");
@@ -2121,7 +2132,7 @@ void McpRouterFilter::resetStreamState() {
 void McpRouterFilter::updateEncodedSessionId() {
   std::string composite =
       SessionCodec::buildCompositeSessionId(route_name_, session_subject_, backend_sessions_);
-  encoded_session_id_ = SessionCodec::encode(composite);
+  encoded_session_id_ = encodeCompositeSession(composite);
 }
 
 void McpRouterFilter::lazyInitSingleBackend(const McpBackendConfig& backend,

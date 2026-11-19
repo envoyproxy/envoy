@@ -20,6 +20,7 @@ with the following statistics:
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_transport_socket_connect_timeout, Counter, Total connections that timed out during transport socket connection negotiation
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
+   downstream_cx_overload_close_idle, Counter, Total idle HTTP connections closed due to configured overload actions
    downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_global_cx_overflow, Counter, Total connections rejected due to enforcement of global connection limit
    connections_accepted_per_socket_event, Histogram, Number of connections accepted per listener socket event
@@ -135,8 +136,9 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    listener_stopped, Counter, Total listeners stopped.
    listener_create_success, Counter, Total listener objects successfully added to workers.
    listener_create_failure, Counter, Total failed listener object additions to workers.
-   listener_in_place_updated, Counter, Total listener objects created to execute filter chain update path.
+   listener_in_place_updated, Counter, Total listener objects created to execute filter chain or address update path.
    total_filter_chains_draining, Gauge, Number of currently draining filter chains.
+   total_listener_addresses_draining, Gauge, Number of currently draining listener addresses removed by address update path.
    total_listeners_warming, Gauge, Number of currently warming listeners.
    total_listeners_active, Gauge, Number of currently active listeners.
    total_listeners_draining, Gauge, Number of currently draining listeners.

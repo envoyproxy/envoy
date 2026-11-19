@@ -2,6 +2,7 @@
 
 #include <atomic>
 
+#include "envoy/common/time.h"
 #include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/instance.h"
 
@@ -41,12 +42,18 @@ public:
                           std::shared_ptr<Network::UdpListenerConfig> listener_config);
 
   private:
+    using WeakForwardEntry = std::pair<Network::Address::InstanceConstSharedPtr,
+                                       std::weak_ptr<Network::UdpListenerConfig>>;
+    using ListenerMap = absl::flat_hash_map<std::string, WeakForwardEntry>;
+
     // Builds the map key for an address string within a network namespace.
     static std::string key(absl::string_view network_namespace, absl::string_view address);
+    // Finds the entry for the key, erasing it if its config is gone.
+    ListenerMap::iterator findListener(const std::string& map_key);
 
     // Map keyed on network namespace and address as a string, because
     // Network::Address::Instance isn't hashable.
-    absl::flat_hash_map<std::string, ForwardEntry> listener_map_;
+    ListenerMap listener_map_;
   };
 
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
@@ -72,6 +79,13 @@ public:
   void mergeParentStats(Stats::Store& stats_store,
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);
 
+  // How long a request waits for the parent's reply before the parent is written off as
+  // unresponsive; see waitForParentReply().
+  static constexpr std::chrono::milliseconds PARENT_REPLY_TIMEOUT{30000};
+  // How often, while waiting for a reply, the parent's socket is probed to detect that the parent
+  // is gone (which a datagram socket does not otherwise report to the receiver).
+  static constexpr std::chrono::milliseconds PARENT_PROBE_INTERVAL{1000};
+
 protected:
   absl::Status onSocketEventUdpForwarding();
   // Delivers a packet forwarded by the parent to the listener bound to `listener_address`, or to
@@ -84,10 +98,31 @@ protected:
 
 private:
   bool abortDueToFailedParentConnection();
+  // Waits for the parent's reply to the request just sent on the main stream. The wait is not a
+  // plain blocking receive: forwarded UDP packets keep being serviced meanwhile, since the parent
+  // forwards them from its main thread and stalls there when our socket is full -- the same main
+  // thread that has to produce the reply. It is bounded by PARENT_REPLY_TIMEOUT and by liveness
+  // probes every PARENT_PROBE_INTERVAL. Returns nullptr when no reply came, after writing the
+  // parent off (see onParentUnreachable) so no later request waits on it or consumes its late
+  // reply.
+  std::unique_ptr<envoy::HotRestartMessage> waitForParentReply();
+  // Stops all further request/reply exchanges with the parent: stats are no longer merged, new
+  // listeners bind their own sockets, and the parent is still told to terminate at the end of
+  // the drain period (that request needs no reply).
+  void onParentUnreachable(absl::string_view reason);
+  // The parent is definitely gone (its socket refuses our datagrams): there is nothing left to
+  // drain from, so complete the drains as sendParentTerminateRequest() would.
+  void onParentGone(absl::string_view reason);
   friend class HotRestartUdpForwardingTestHelper;
   absl::Mutex registry_mu_;
   const int restart_epoch_;
   bool parent_terminated_;
+  // Set once the parent failed to answer a request in time; see onParentUnreachable().
+  bool parent_unresponsive_{false};
+  std::chrono::milliseconds parent_reply_timeout_{PARENT_REPLY_TIMEOUT};
+  std::chrono::milliseconds parent_probe_interval_{PARENT_PROBE_INTERVAL};
+  // The main dispatcher's time source, set by initialize(); waitForParentReply() measures with it.
+  TimeSource* time_source_{};
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   const bool skip_hot_restart_on_no_parent_;
   const bool skip_parent_stats_;

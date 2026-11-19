@@ -95,7 +95,6 @@ envoy_cc_test(
     data = [
         "mysql_test_config.yaml",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":mysql_test_utils_lib",
         "//contrib/mysql_proxy/filters/network/source:config",
@@ -118,7 +117,6 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "linux_x64_small",
     deps = [
         ":mysql_test_utils_lib",
         "//contrib/mysql_proxy/filters/network/source:config",

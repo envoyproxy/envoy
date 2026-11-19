@@ -57,6 +57,22 @@ If the new :ref:`filter chain <envoy_v3_api_msg_config.listener.v3.FilterChain>`
 is protobuf message equivalent, the corresponding filter chain runtime info survives. The connections owned by the
 survived filter chains remain open.
 
+An update of a TCP listener that also adds or removes
+:ref:`addresses <envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>` is executed the same way. The
+listener keeps the listen sockets of the kept addresses, and the connections accepted on them remain open unless their
+filter chain is removed. It stops accepting new connections on the removed addresses, and the connections accepted on
+them are drained. The :ref:`total_listener_addresses_draining <config_listener_manager_stats>` gauge counts the removed
+addresses until their drain completes. This is not supported on Windows, and requires every address to be a distinct
+socket address with a non-zero port, the kept addresses to keep their configuration, no
+:ref:`connection balancer <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`, the
+``envoy.reloadable_features.listener_in_place_address_update`` and
+``envoy.reloadable_features.use_connection_event_drain`` runtime guards enabled and an unchanged stats prefix, which is
+derived from the listener :ref:`address <envoy_v3_api_field_config.listener.v3.Listener.address>` unless
+:ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>` is set. A filter chain only update does
+not apply the other changes that it accepts, like an added empty ``tcp_keepalive`` or ``bind_to_port`` set to false, to
+the listen sockets and the workers, so an address update after it drains the entire listener. If the listener fails to
+listen on an added address, it drops the update and keeps serving its addresses.
+
 Not all the listener config updates can be executed by filter chain update. For example, if the listener metadata is
 updated within the new listener config, the new metadata must be picked up by the new filter chains. In this case, the
 entire listener is drained and updated.

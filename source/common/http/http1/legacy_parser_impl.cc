@@ -91,7 +91,14 @@ public:
     return CallbackResult::Success;
   }
 
-  int getErrno() { return HTTP_PARSER_ERRNO(&parser_); }
+  int getErrno() {
+    // HTTP_PARSER_ERRNO is a C macro with a C-style cast; http_parser.h is
+    // vendored and consumed from C++ here.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+    return HTTP_PARSER_ERRNO(&parser_);
+#pragma GCC diagnostic pop
+  }
 
   Envoy::Http::Code statusCode() const { return static_cast<Http::Code>(parser_.status_code); }
 

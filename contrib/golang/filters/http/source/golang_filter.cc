@@ -196,7 +196,9 @@ void Filter::log(const Formatter::Context& log_context, const StreamInfo::Stream
   case Envoy::AccessLog::AccessLogType::DownstreamPeriodic:
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
-    if (initRequest()) {
+    initRequest();
+    // decodeHeaders() is also skipped when an earlier filter sends a local reply.
+    if (request_headers_ == nullptr) {
       request_headers_ = const_cast<Http::RequestHeaderMap*>(log_context.requestHeaders().ptr());
     }
 
@@ -455,6 +457,10 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
     auto trailers = state.trailers;
     auto done = doTrailerGo(state, *trailers);
     if (done) {
+      state.continueDoData();
+      if (hasDestroyed()) {
+        return;
+      }
       state.continueProcessing();
     }
   }
@@ -1034,10 +1040,10 @@ CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_v
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    state.getDispatcher().post([this, s, weak_ptr, host_str] {
+    state.getDispatcher().post([this, s, weak_ptr, host_str, strict] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         s->setUpstreamOverrideHost(
-            Upstream::LoadBalancerContext::OverrideHost{std::string(host_str), false});
+            Upstream::LoadBalancerContext::OverrideHost{std::string(host_str), strict});
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
       }

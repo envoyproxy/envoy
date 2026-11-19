@@ -25,11 +25,13 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "opentelemetry_tracer_lib",
     srcs = [
+        "b3_span_context.cc",
         "opentelemetry_tracer_impl.cc",
         "span_context_extractor.cc",
         "tracer.cc",
     ],
     hdrs = [
+        "b3_span_context.h",
         "opentelemetry_tracer_impl.h",
         "span_context.h",
         "span_context_extractor.h",
@@ -43,9 +45,12 @@ envoy_cc_library(
     deps = [
         ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
+        "//envoy/tracing:trace_context_interface",
         "//source/common/config:utility_lib",
         "//source/common/http:http_service_headers_lib",
+        "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:trace_context_lib",
         "//source/common/tracing:tracer_config_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",

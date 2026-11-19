@@ -52,11 +52,14 @@ public:
 protected:
   // Sets the bootstrap node metadata the istio.stats Context and peer_metadata
   // propagation read (WORKLOAD_NAME, NAMESPACE, CLUSTER_ID, ISTIO_VERSION, LABELS).
+  // `app_qualified` / `version_qualified` set app.kubernetes.io/name and
+  // app.kubernetes.io/version when non-empty.
   static void setSidecarNode(ConfigHelper& helper, const std::string& workload,
                              const std::string& ns, const std::string& cluster,
                              const std::string& canonical_name,
                              const std::string& canonical_revision, const std::string& app,
-                             const std::string& version) {
+                             const std::string& version, const std::string& app_qualified = "",
+                             const std::string& version_qualified = "") {
     helper.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& node = *bootstrap.mutable_node();
       node.set_id(absl::StrCat(workload, "-id"));
@@ -72,6 +75,13 @@ protected:
           canonical_revision);
       labels[std::string(Istio::Common::AppNameLabel)].set_string_value(app);
       labels[std::string(Istio::Common::AppVersionLabel)].set_string_value(version);
+      if (!app_qualified.empty()) {
+        labels[std::string(Istio::Common::AppNameQualifiedLabel)].set_string_value(app_qualified);
+      }
+      if (!version_qualified.empty()) {
+        labels[std::string(Istio::Common::AppVersionQualifiedLabel)].set_string_value(
+            version_qualified);
+      }
     });
   }
 
@@ -224,7 +234,7 @@ typed_config:
     //    copy, no YAML re-parse) so the two sidecars share the same starting shape.
     server_config_ = std::make_unique<ConfigHelper>(version_, config_helper_.bootstrap());
     setSidecarNode(*server_config_, "server-v1", "server-ns", "server-cluster", "server-svc", "v1",
-                   "server-app", "v1");
+                   "server-app", server_version_, server_app_qualified_, server_version_qualified_);
     setTrafficDirection(*server_config_, envoy::config::core::v3::INBOUND, "inbound");
     prependSidecarFilters(*server_config_, /*is_client=*/false);
     if (http2_hops_) {
@@ -239,7 +249,7 @@ typed_config:
     // 3. CLIENT sidecar (OUTBOUND): [peer_metadata, istio.stats, router], cluster ->
     //    SERVER sidecar. This one is `test_server_`, the traffic entry point.
     setSidecarNode(config_helper_, "client-v1", "client-ns", "client-cluster", "client-svc", "v1",
-                   "client-app", "v1");
+                   "client-app", client_version_, client_app_qualified_, client_version_qualified_);
     setTrafficDirection(config_helper_, envoy::config::core::v3::OUTBOUND, "outbound");
     prependSidecarFilters(config_helper_, /*is_client=*/true);
     if (http2_hops_) {
@@ -341,6 +351,16 @@ typed_config:
   // When true, the SERVER sidecar also reads the upstream (app response) peer --
   // used to model a waypoint that reads both source and destination peers.
   bool server_upstream_discovery_{false};
+  // Raw version node label per side. Tests set it apart from the canonical revision
+  // ("v1") to check which label a peer's version comes from.
+  std::string client_version_{"v1"};
+  std::string server_version_{"v1"};
+  // Optional app.kubernetes.io/name and app.kubernetes.io/version node labels per
+  // side, set alongside the raw app/version labels. Empty means not set.
+  std::string client_app_qualified_;
+  std::string client_version_qualified_;
+  std::string server_app_qualified_;
+  std::string server_version_qualified_;
   // Extra HCM filters prepended ahead of istio.stats on each side.
   std::vector<std::string> client_extra_filters_;
   std::vector<std::string> server_extra_filters_;

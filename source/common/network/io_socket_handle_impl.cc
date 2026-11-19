@@ -22,6 +22,20 @@ namespace Envoy {
 
 namespace {
 
+#if defined(__APPLE__)
+sockaddr_in6 ipv4MappedAddress(const sockaddr_in& address) {
+  sockaddr_in6 mapped{};
+  mapped.sin6_family = AF_INET6;
+  mapped.sin6_port = address.sin_port;
+  mapped.sin6_addr.s6_addr[10] = 0xff;
+  mapped.sin6_addr.s6_addr[11] = 0xff;
+  // Copy network-order bytes without depending on platform-specific in6_addr union members.
+  safeMemcpyUnsafeDst(&mapped.sin6_addr.s6_addr[12], &address.sin_addr);
+  ASSERT(IN6_IS_ADDR_V4MAPPED(&mapped.sin6_addr));
+  return mapped;
+}
+#endif
+
 constexpr int messageTypeContainsIP() {
 #ifdef IP_RECVDSTADDR
   return IP_RECVDSTADDR;
@@ -190,6 +204,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   msghdr message;
   message.msg_name = reinterpret_cast<void*>(sock_addr);
   message.msg_namelen = address_base->sockAddrLen();
+#if defined(__APPLE__)
+  sockaddr_in6 mapped_address{};
+  if (domain_ == AF_INET6 && !socket_v6only_ && sock_addr->sa_family == AF_INET) {
+    // Received IPv4-mapped peers are normalized to IPv4 internally. Apple requires the
+    // destination sockaddr family to match the dual-stack socket at the syscall boundary.
+    mapped_address = ipv4MappedAddress(*reinterpret_cast<const sockaddr_in*>(sock_addr));
+    message.msg_name = &mapped_address;
+    message.msg_namelen = sizeof(mapped_address);
+  }
+#endif
   message.msg_iov = num_slices_to_write == 0 ? &empty_iov : iov.begin();
   message.msg_iovlen = num_slices_to_write == 0 ? 1 : num_slices_to_write;
   message.msg_flags = 0;

@@ -16,8 +16,6 @@
   } while (0)
 
 using testing::AnyNumber;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 
@@ -35,13 +33,11 @@ bool skipForUhv() {
 }
 
 void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
-  EXPECT_CALL(request_decoder, getRequestDecoderHandle())
-      .WillRepeatedly(Invoke([&request_decoder]() {
-        auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
-        ON_CALL(*handle, get())
-            .WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
-        return handle;
-      }));
+  EXPECT_CALL(request_decoder, getRequestDecoderHandle()).WillRepeatedly([&request_decoder]() {
+    auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+    ON_CALL(*handle, get()).WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
+    return handle;
+  });
 }
 
 // For organizational purposes only.
@@ -313,7 +309,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       bool stream_reset = false;
       EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(0);
       EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _))
-          .WillRepeatedly(InvokeWithoutArgs([&stream_reset] { stream_reset = true; }));
+          .WillRepeatedly([&stream_reset] { stream_reset = true; });
       bool codec_exception = false;
       auto status = codec.write(header.frame(), connection);
       if (isCodecProtocolError(status)) {
@@ -355,7 +351,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       bool stream_reset = false;
       EXPECT_CALL(codec.response_decoder_, decodeHeaders_(_, _)).Times(0);
       EXPECT_CALL(codec.client_stream_callbacks_, onResetStream(_, _))
-          .WillRepeatedly(InvokeWithoutArgs([&stream_reset] { stream_reset = true; }));
+          .WillRepeatedly([&stream_reset] { stream_reset = true; });
       bool codec_exception = false;
       auto status = codec.write(header.frame(), connection);
       if (isCodecProtocolError(status)) {

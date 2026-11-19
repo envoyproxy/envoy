@@ -13,7 +13,6 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/singleton/manager.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -59,50 +58,6 @@ void logSslErrorChain() {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-SINGLETON_MANAGER_REGISTRATION(tls_builtin_stat_names);
-
-TlsBuiltinStatNames::TlsBuiltinStatNames(Stats::SymbolTable& symbol_table)
-    : stat_name_set_(symbol_table.makeSet("TransportSockets::Tls")),
-      unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
-      unknown_ssl_curve_(stat_name_set_->add("unknown_ssl_curve")),
-      unknown_ssl_algorithm_(stat_name_set_->add("unknown_ssl_algorithm")),
-      unknown_ssl_version_(stat_name_set_->add("unknown_ssl_version")),
-      ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
-      ssl_versions_(stat_name_set_->add("ssl.versions")),
-      ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")) {
-  // Register stat names based on lists reported by BoringSSL. These are compile-time constant
-  // tables, so the resulting set is identical for every TLS context in the process.
-  std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
-  SSL_get_all_cipher_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_curve_names(nullptr, 0));
-  SSL_get_all_curve_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_signature_algorithm_names(nullptr, 0));
-  SSL_get_all_signature_algorithm_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_version_names(nullptr, 0));
-  SSL_get_all_version_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-}
-
-namespace {
-// Returns the server-wide shared TLS builtin stat names, creating them on first use. The set is
-// owned by the singleton manager (per-server, hence tied to a single symbol table) and kept alive
-// by the returned shared_ptr held by each ContextImpl.
-std::shared_ptr<TlsBuiltinStatNames>
-getTlsBuiltinStatNames(Server::Configuration::CommonFactoryContext& factory_context) {
-  return factory_context.singletonManager().getTyped<TlsBuiltinStatNames>(
-      SINGLETON_MANAGER_REGISTERED_NAME(tls_builtin_stat_names), [&factory_context] {
-        return std::make_shared<TlsBuiltinStatNames>(factory_context.serverScope().symbolTable());
-      });
-}
-} // namespace
 
 int ContextImpl::sslExtendedSocketInfoIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
@@ -237,6 +192,21 @@ ContextImpl::ContextImpl(
     }
   }
 
+  // Share parsed certificate material across contexts referencing identical PEM,
+  // so a cluster carrying a distinct certificate per endpoint - or a resend of
+  // such a cluster - parses each distinct certificate only once. Null caches
+  // select the per-context parse.
+  CertChainCache* cert_chain_cache = nullptr;
+  PrivateKeyCache* private_key_cache = nullptr;
+  std::shared_ptr<CertChainCache> cert_chain_cache_holder;
+  std::shared_ptr<PrivateKeyCache> private_key_cache_holder;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cache_parsed_tls_certificates")) {
+    cert_chain_cache_holder = getCertChainCache(factory_context.singletonManager());
+    private_key_cache_holder = getPrivateKeyCache(factory_context.singletonManager());
+    cert_chain_cache = cert_chain_cache_holder.get();
+    private_key_cache = private_key_cache_holder.get();
+  }
+
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
       auto& ctx = tls_contexts_[i];
@@ -246,8 +216,9 @@ ContextImpl::ContextImpl(
         creation_status = ctx.loadPkcs12(tls_certificate.pkcs12(), tls_certificate.pkcs12Path(),
                                          tls_certificate.password(), fips_mode);
       } else {
-        creation_status = ctx.loadCertificateChain(tls_certificate.certificateChain(),
-                                                   tls_certificate.certificateChainPath());
+        creation_status =
+            ctx.loadCertificateChain(tls_certificate.certificateChain(),
+                                     tls_certificate.certificateChainPath(), cert_chain_cache);
       }
       if (!creation_status.ok()) {
         return;
@@ -348,7 +319,7 @@ ContextImpl::ContextImpl(
         // Load private key.
         creation_status =
             ctx.loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
-                               tls_certificate.password(), fips_mode);
+                               tls_certificate.password(), fips_mode, private_key_cache);
         if (!creation_status.ok()) {
           return;
         }
@@ -553,13 +524,17 @@ ValidationResults ContextImpl::customVerifyCertChain(
   return result;
 }
 
-void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
-                             const Stats::StatName fallback) const {
+void ContextImpl::incCounter(const Stats::StatName name, const Stats::StatName tag_name,
+                             absl::string_view value, const Stats::StatName fallback) const {
   const Stats::StatName value_stat_name =
       builtin_stat_names_->statNameSet().getBuiltin(value, fallback);
   ENVOY_BUG(value_stat_name != fallback,
             absl::StrCat("Unexpected ", scope_.symbolTable().toString(name), " value: ", value));
-  Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
+  // The flat name is "<name>.<value>" and the value is the stat's tag, leaving the tag-extracted
+  // name "<name>".
+  const Stats::StatNameJoiner flat_name({name, value_stat_name}, scope_.symbolTable());
+  const Stats::StatNameTag tag{tag_name, value_stat_name};
+  scope_.counterFromTaggedName(name, Stats::StatNameTagSpan{tag}, flat_name.statName()).inc();
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
@@ -569,21 +544,25 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.session_reused_.inc();
   }
 
-  incCounter(builtin_stat_names_->ssl_ciphers_, SSL_get_cipher_name(ssl),
-             builtin_stat_names_->unknown_ssl_cipher_);
-  incCounter(builtin_stat_names_->ssl_versions_, SSL_get_version(ssl),
-             builtin_stat_names_->unknown_ssl_version_);
+  // The cipher tag name of the legacy extraction rules differs between the server (listener) and
+  // client (cluster) sides; the other tag names are shared.
+  incCounter(builtin_stat_names_->ssl_ciphers_,
+             SSL_is_server(ssl) ? builtin_stat_names_->ssl_cipher_tag_name_
+                                : builtin_stat_names_->ssl_cipher_suite_tag_name_,
+             SSL_get_cipher_name(ssl), builtin_stat_names_->unknown_ssl_cipher_);
+  incCounter(builtin_stat_names_->ssl_versions_, builtin_stat_names_->ssl_version_tag_name_,
+             SSL_get_version(ssl), builtin_stat_names_->unknown_ssl_version_);
 
   const uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    incCounter(builtin_stat_names_->ssl_curves_, SSL_get_curve_name(curve_id),
-               builtin_stat_names_->unknown_ssl_curve_);
+    incCounter(builtin_stat_names_->ssl_curves_, builtin_stat_names_->ssl_curve_tag_name_,
+               SSL_get_curve_name(curve_id), builtin_stat_names_->unknown_ssl_curve_);
   }
 
   const uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
-    incCounter(builtin_stat_names_->ssl_sigalgs_, sigalg,
+    incCounter(builtin_stat_names_->ssl_sigalgs_, builtin_stat_names_->ssl_sigalg_tag_name_, sigalg,
                builtin_stat_names_->unknown_ssl_algorithm_);
   }
 
@@ -722,56 +701,64 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) co
   return false;
 }
 
-absl::Status TlsContext::loadCertificateChain(const std::string& data,
-                                              const std::string& data_path) {
+absl::Status
+TlsContext::loadCertificateChain(const std::string& data, const std::string& data_path,
+                                 Extensions::TransportSockets::Tls::CertChainCache* cache) {
   cert_chain_file_path_ = data_path;
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
-  if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
+  auto parse = [&] { return Extensions::TransportSockets::Tls::parseCertChain(data, data_path); };
+  absl::StatusOr<Extensions::TransportSockets::Tls::CertChainSharedPtr> chain_or_error;
+  if (cache != nullptr) {
+    chain_or_error = cache->getOrCreate(data, parse);
+  } else {
+    chain_or_error = parse();
+  }
+  if (!chain_or_error.ok()) {
+    logSslErrorChain();
+    return chain_or_error.status();
+  }
+  shared_cert_chain_ = std::move(*chain_or_error);
+
+  cert_chain_ = bssl::UpRef(shared_cert_chain_->leaf.get());
+  if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
     logSslErrorChain();
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
   }
-  // Read rest of the certificate chain.
-  while (true) {
-    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-    if (cert == nullptr) {
-      break;
-    }
+  for (const bssl::UniquePtr<X509>& intermediate : shared_cert_chain_->intermediates) {
+    bssl::UniquePtr<X509> cert = bssl::UpRef(intermediate.get());
     if (!SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), cert.get())) {
+      logSslErrorChain();
       return absl::InvalidArgumentError(
           absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
     }
     // SSL_CTX_add_extra_chain_cert() takes ownership.
     cert.release();
   }
-  // Check for EOF.
-  const uint32_t err = ERR_peek_last_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-    ERR_clear_error();
-  } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
-  }
   return absl::OkStatus();
 }
 
 absl::Status TlsContext::loadPrivateKey(const std::string& data, const std::string& data_path,
-                                        const std::string& password, bool fips_mode) {
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
-  RELEASE_ASSERT(bio != nullptr, "");
-  bssl::UniquePtr<EVP_PKEY> pkey(
-      PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr,
-                              !password.empty() ? const_cast<char*>(password.c_str()) : nullptr));
+                                        const std::string& password, bool fips_mode,
+                                        Extensions::TransportSockets::Tls::PrivateKeyCache* cache) {
+  auto parse = [&] {
+    return Extensions::TransportSockets::Tls::parsePrivateKey(data, data_path, password, fips_mode);
+  };
+  absl::StatusOr<Extensions::TransportSockets::Tls::PrivateKeySharedPtr> pkey_or_error;
+  // Only unencrypted keys are shared through the cache.
+  if (cache != nullptr && password.empty()) {
+    pkey_or_error = cache->getOrCreate(data, parse);
+  } else {
+    pkey_or_error = parse();
+  }
+  RETURN_IF_NOT_OK_REF(pkey_or_error.status());
+  shared_private_key_ = std::move(*pkey_or_error);
 
-  if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
+  if (!SSL_CTX_use_PrivateKey(ssl_ctx_.get(), shared_private_key_.get())) {
     return absl::InvalidArgumentError(fmt::format(
         "Failed to load private key from {}, Cause: {}", data_path,
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
-
-  return checkPrivateKey(pkey, data_path, fips_mode);
+  return absl::OkStatus();
 }
 
 absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& data_path,
@@ -810,35 +797,7 @@ absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& 
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  return checkPrivateKey(pkey, data_path, fips_mode);
-}
-
-absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
-                                         const std::string& key_path, bool fips_mode) {
-  if (fips_mode) {
-    // Verify that private keys are passing FIPS pairwise consistency tests.
-    switch (EVP_PKEY_id(pkey.get())) {
-    case EVP_PKEY_EC: {
-      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
-      if (!EC_KEY_check_fips(ecdsa_private_key)) {
-        return absl::InvalidArgumentError(
-            fmt::format("Failed to load private key from {}, ECDSA key failed "
-                        "pairwise consistency test required in FIPS mode",
-                        key_path));
-      }
-    } break;
-    case EVP_PKEY_RSA: {
-      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
-      if (!RSA_check_fips(rsa_private_key)) {
-        return absl::InvalidArgumentError(
-            fmt::format("Failed to load private key from {}, RSA key failed "
-                        "pairwise consistency test required in FIPS mode",
-                        key_path));
-      }
-    } break;
-    }
-  }
-  return absl::OkStatus();
+  return Extensions::TransportSockets::Tls::checkPrivateKey(pkey, data_path, fips_mode);
 }
 
 } // namespace Ssl

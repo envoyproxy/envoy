@@ -16,12 +16,22 @@ class ProxyProtoIntegrationTest : public testing::TestWithParam<Network::Address
                                   public HttpIntegrationTest {
 public:
   ProxyProtoIntegrationTest();
+
+  // Whether the stats store derives tags with the explicit-tags logic rather than the legacy
+  // tag-extraction rules. Both modes must produce identical stat names, tag-extracted names and
+  // tags, so the two IP versions run the server in different modes.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+  void initialize() override;
 };
 
 class ProxyProtoTcpIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public BaseIntegrationTest {
 public:
   ProxyProtoTcpIntegrationTest();
+
+  // See ProxyProtoIntegrationTest::explicitTags().
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+  void initialize() override;
 };
 
 class ProxyProtoFilterChainMatchIntegrationTest : public ProxyProtoTcpIntegrationTest {

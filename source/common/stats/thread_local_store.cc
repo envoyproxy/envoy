@@ -641,11 +641,15 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     return null_stat;
   } else {
     // Stat creation here. Check limits.
+    RefcountPtr<StatType> stat;
     if constexpr (std::is_same_v<StatType, Counter>) {
       if (limits_.max_counters.has_value() &&
           central_cache_map.size() >= limits_.max_counters.value()) {
         parent_.counters_overflow_->inc();
         return null_stat;
+      }
+      if (!stat_name_tags.has_value()) {
+        stat = parent_.alloc_.findCounter(full_stat_name);
       }
     } else if constexpr (std::is_same_v<StatType, Gauge>) {
       if (limits_.max_gauges.has_value() &&
@@ -653,17 +657,25 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
         parent_.gauges_overflow_->inc();
         return null_stat;
       }
+      if (!stat_name_tags.has_value()) {
+        stat = parent_.alloc_.findGauge(full_stat_name);
+      }
     } else {
       // TextReadouts are currently not limited, but we must ensure they are the only
       // other type being handled. This static_assert will trigger a compilation error
       // if a new StatType is introduced in the future, forcing the developer to
       // explicitly decide how to handle its limits.
       static_assert(std::is_same_v<StatType, TextReadout>, "Unexpected StatType");
+      if (!stat_name_tags.has_value()) {
+        stat = parent_.alloc_.findTextReadout(full_stat_name);
+      }
     }
-    StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
-
-    RefcountPtr<StatType> stat = make_stat(
-        parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(), tag_helper.statNameTags());
+    // The allocator keeps the tags a stat was created with, so extract only for a name it lacks.
+    if (stat == nullptr) {
+      StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
+      stat = make_stat(parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(),
+                       tag_helper.statNameTags());
+    }
     ASSERT(stat != nullptr);
     if (stat_name_tags.has_value() && !stat_name_tags->empty()) {
       // The tags were supplied by the stat's creator rather than derived from the name, so tag
@@ -928,33 +940,43 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
                                                effectiveMatcher())) {
     return parent_.null_histogram_;
   } else {
-    StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), joiner.effectiveTags());
-
-    ConstSupportedBuckets* buckets = nullptr;
-    const auto string_stat_name = symbolTable().toString(final_stat_name);
-    buckets = &parent_.histogram_settings_->buckets(string_stat_name);
-    const auto bins = parent_.histogram_settings_->bins(string_stat_name);
-
     RefcountPtr<ParentHistogramImpl> stat;
-    {
+    if (!joiner.effectiveTags().has_value()) {
       Thread::LockGuard lock(parent_.hist_mutex_);
       auto iter = parent_.histogram_set_.find(final_stat_name);
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
-      } else {
-        if (limits_.max_histograms.has_value() &&
-            central_cache->histograms_.size() >= limits_.max_histograms.value()) {
-          parent_.histograms_overflow_->inc();
-          return parent_.null_histogram_;
-        }
-        stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
-                                       tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-                                       *buckets, bins, parent_.next_histogram_id_++);
-        if (!parent_.shutting_down_) {
-          parent_.histogram_set_.insert(stat.get());
-          if (parent_.sink_predicates_.has_value() &&
-              parent_.sink_predicates_->includeHistogram(*stat)) {
-            parent_.sinked_histograms_.insert(stat.get());
+      }
+    }
+    if (stat == nullptr) {
+      StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), joiner.effectiveTags());
+
+      ConstSupportedBuckets* buckets = nullptr;
+      const auto string_stat_name = symbolTable().toString(final_stat_name);
+      buckets = &parent_.histogram_settings_->buckets(string_stat_name);
+      const auto bins = parent_.histogram_settings_->bins(string_stat_name);
+
+      {
+        Thread::LockGuard lock(parent_.hist_mutex_);
+        // Supplied tags bypass the earlier probe, so check the registry here too.
+        auto iter = parent_.histogram_set_.find(final_stat_name);
+        if (iter != parent_.histogram_set_.end()) {
+          stat = RefcountPtr<ParentHistogramImpl>(*iter);
+        } else {
+          if (limits_.max_histograms.has_value() &&
+              central_cache->histograms_.size() >= limits_.max_histograms.value()) {
+            parent_.histograms_overflow_->inc();
+            return parent_.null_histogram_;
+          }
+          stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
+                                         tag_helper.tagExtractedName(), tag_helper.statNameTags(),
+                                         *buckets, bins, parent_.next_histogram_id_++);
+          if (!parent_.shutting_down_) {
+            parent_.histogram_set_.insert(stat.get());
+            if (parent_.sink_predicates_.has_value() &&
+                parent_.sink_predicates_->includeHistogram(*stat)) {
+              parent_.sinked_histograms_.insert(stat.get());
+            }
           }
         }
       }
@@ -1074,11 +1096,15 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
     }
   }
 
-  StatNameTagHelper tag_helper(*this, parent.statName(), std::nullopt);
+  StatNameTagVec tags;
+  parent.iterateTagStatNames([&tags](StatName name, StatName value) {
+    tags.emplace_back(name, value);
+    return true;
+  });
 
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
-                                   tag_helper.statNameTags(), symbolTable(), parent.bins()));
+      new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), parent.tagExtractedStatName(),
+                                   tags, symbolTable(), parent.bins()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 

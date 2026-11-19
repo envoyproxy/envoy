@@ -4,16 +4,15 @@ build-image:
   repo: docker.io/envoyproxy/envoy-build
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # default ci caching (ci)
-  sha: 0ec8c3295229234f5a5663b858d9e217fd409e2eba22afe7a9c6e4f634bd7ea8
-  sha-ci: 0ec8c3295229234f5a5663b858d9e217fd409e2eba22afe7a9c6e4f634bd7ea8
-  sha-devtools: c7f99061218bdd4ab3da8548826fccd20596545e62f2e825d031b935abfd965a
-  sha-docker: dfdbc6de8a85d0e7269073475a94936a2a690ceff2e48d550fe2cbdd58ad7a2b
-  sha-gcc: 66e7359c8dcc148ce12d0828e9547d7f29900b788b22b4c804dab664f724ad35
-  sha-mobile: ab4cb76a32f7fae2e3bfdfe1f1fd632897baa952334a5f9805107ed5f1233687
-  sha-worker: c531dd07f0755d990167f6d495f6b199ad399f8ca660887785b022da2d5b3031
+  sha: 8fdf16ea0d40cb0e4726b13f97df8b73e80e331b206b62b224ceb2498149a1d5
+  sha-ci: 8fdf16ea0d40cb0e4726b13f97df8b73e80e331b206b62b224ceb2498149a1d5
+  sha-devtools: 5914ff8694b377cbd137317acb4a0f91c9496e08a17e867743f942e15f4deb83
+  sha-docker: 75bc814bc49ea2c4fe8807bd487fdb513b4b1ce9b6cce19bb1781ae9d28f80cf
+  sha-mobile: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
+  sha-worker: 58abaea3f29aae5340f32dc99fc66c97a6c2fec0902345d03cf6d47684606a1d
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: ab4cb76a32f7fae2e3bfdfe1f1fd632897baa952334a5f9805107ed5f1233687
-  tag: v0.2.4
+  mobile-sha: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
+  tag: v0.2.5
 
 config:
   envoy:
@@ -34,8 +33,20 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
-    - check-build-openssl
-    - check-build-openssl-presubmit
+    - check-build-cto-asserts
+    - check-build-cto-gperftools
+    - check-build-cto-jemalloc
+    - check-build-cto-noadmin
+    - check-build-cto-nolog
+    - check-build-cto-wamr
+    - check-build-cto-wasmtime
+    - check-build-execution-context
+    - check-build-gcc-build
+    - check-build-gcc-test
+    - check-build-openssl-asan
+    - check-build-openssl-build
+    - check-build-openssl-test
+    - check-build-openssl-test-affected
     - check-coverage
     - check-runtime
     - check-san
@@ -155,12 +166,16 @@ checks:
           ```
     # yamllint enable rule:line-length
   publish:
-    name: >-
-      Envoy/Publish and verify
+    name: Envoy/Publish
     on-run:
     - release
     - verify
     - docs
+    required: true
+  verify:
+    name: Envoy/Verify
+    on-run:
+    - verify
     required: true
 
 run:
@@ -180,14 +195,297 @@ run:
   check-build:
     paths:
     - "**/*"
-  docs:
+  check-build-cto-asserts:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+  check-build-cto-gperftools:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-jemalloc:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-noadmin:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-nolog:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - envoy/**/*
+    - source/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+  check-build-cto-wamr:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-cto-wasmtime:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-execution-context:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - bazel/BUILD
+    - bazel/envoy_build_system.bzl
+    - bazel/envoy_internal.bzl
+    - bazel/execution_context_transition.bzl
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+  check-build-gcc-build:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-gcc-test:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - API_VERSION.txt
+    - BUILD
+    - Cargo.Bazel.envoy.lock
+    - Cargo.lock
+    - MODULE.bazel
+    - MODULE.bazel.lock
+    - VERSION.txt
+    - api/**/*
+    - bazel/**/*
+    - ci.bazelrc
+    - ci/bazel_fun.sh
+    - ci/build_setup.sh
+    - ci/do_ci.sh
+    - configs/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+    - third_party/**/*
+    - tools/api_versioning/**/*
+    - tools/base/requirements.txt
+    - tools/dev/requirements.txt
+    - tools/h3_request/**/*
+    - tools/socket_passing/**/*
+    - tools/type_whisperer/**/*
+  check-build-openssl-asan:
+    paths:
+    - compat/openssl/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+  check-build-openssl-build:
+    paths:
+    - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+  check-build-openssl-test:
     paths:
     - "**/*"
-    push: paths
-  check-build-openssl:
-    paths:
-    - "**/*"
-  check-build-openssl-presubmit:
+  check-build-openssl-test-affected:
     paths:
     - compat/openssl/**/*
     - source/common/tls/**/*
@@ -214,6 +512,10 @@ run:
   check-san:
     paths:
     - "**/*"
+  docs:
+    paths:
+    - "**/*"
+    push: paths
   mobile-android:
     paths:
     - .bazelrc
@@ -318,15 +620,6 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
-  mobile-perf:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - bazel/external/quiche.BUILD
-    - mobile/.bazelrc
-    - mobile/**/*
-    - tools/code_format/check_format.py
   mobile-python:
     paths:
     - .bazelrc
@@ -388,10 +681,15 @@ run:
     paths:
     - "**/*"
   release:
+    # Includes the publishing workflows (and so every path of `verify`, which needs the release's
+    # signed packages): a change to them runs the jobs they define.
     paths:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/_publish_*.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/envoy-verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*

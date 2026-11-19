@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/composite/config.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -11,6 +12,30 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
+
+namespace {
+
+// Returns a pointer that shares ownership of `ptr` and releases it on the main thread once the
+// last reference is dropped. The filter factory callback owns the match tree and the named filter
+// chains, but the filters it creates hold references to them too. When the callback is destroyed
+// first, e.g. by an ECDS update, the last reference is dropped by a filter on a worker thread,
+// whereas the delegated filter factories they own must be destroyed on the main thread.
+template <class T>
+std::shared_ptr<T> releaseOnMainThread(std::shared_ptr<T> ptr, Event::Dispatcher& main_dispatcher) {
+  if (ptr == nullptr) {
+    return nullptr;
+  }
+  T* raw = ptr.get();
+  return {raw, [owned = std::move(ptr), &main_dispatcher](T*) mutable {
+            if (main_dispatcher.isThreadSafe()) {
+              owned.reset();
+              return;
+            }
+            main_dispatcher.post([owned = std::move(owned)]() mutable { owned.reset(); });
+          }};
+}
+
+} // namespace
 
 class MatchTreeValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Envoy::Http::HttpMatchingData> {
@@ -89,7 +114,9 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
   // Compile named filter chains with FactoryContext access.
   auto named_chains_or_error = compileNamedFilterChains(proto_config, stats_prefix, context);
   RETURN_IF_NOT_OK(named_chains_or_error.status());
-  auto named_chains = std::move(named_chains_or_error.value());
+  Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
+  auto named_chains =
+      releaseOnMainThread(std::move(named_chains_or_error.value()), main_dispatcher);
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;
   if (proto_config.has_matcher()) {
@@ -101,7 +128,7 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
         .server_factory_context_ = context.serverFactoryContext()};
     auto match_tree_or_error = createMatcherTree(proto_config.matcher(), action_context);
     RETURN_IF_NOT_OK(match_tree_or_error.status());
-    match_tree = std::move(match_tree_or_error.value());
+    match_tree = releaseOnMainThread(std::move(match_tree_or_error.value()), main_dispatcher);
   }
 
   const auto& prefix = stats_prefix + "composite.";
@@ -109,7 +136,7 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
       FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), prefix))});
 
   return [stats, named_chains, match_tree](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), false /* is_upstream */,
+    auto filter = std::make_shared<Filter>(stats, callbacks.dispatcher(), false /* is_upstream */,
                                            match_tree, named_chains);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
@@ -134,7 +161,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> CompositeFilterFactory::createFilte
 
     auto match_tree_or_error = createMatcherTree(proto_config.matcher(), action_context);
     RETURN_IF_NOT_OK(match_tree_or_error.status());
-    match_tree = std::move(match_tree_or_error.value());
+    match_tree = releaseOnMainThread(std::move(match_tree_or_error.value()),
+                                     context.serverFactoryContext().mainThreadDispatcher());
   }
 
   // This method is called for upstream filters.
@@ -144,7 +172,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> CompositeFilterFactory::createFilte
       FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), prefix))});
 
   return [stats, match_tree](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), true /* is_upstream */,
+    auto filter = std::make_shared<Filter>(stats, callbacks.dispatcher(), true /* is_upstream */,
                                            match_tree, nullptr);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);

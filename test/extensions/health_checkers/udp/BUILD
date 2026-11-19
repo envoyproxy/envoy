@@ -15,6 +15,13 @@ envoy_extension_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/network:io_socket_error_lib",
@@ -36,7 +43,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["health_checker_integration_test.cc"],
     extension_names = ["envoy.health_checkers.udp"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = ["cpu:3"],
     deps = [
         "//source/extensions/health_checkers/udp:health_checker_lib",

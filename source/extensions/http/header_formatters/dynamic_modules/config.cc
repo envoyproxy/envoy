@@ -9,6 +9,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -40,8 +42,8 @@ DynamicModuleHeaderFormatterFactoryConfig::createFactoryFromProto(
   if (proto_config.has_header_formatter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.header_formatter_config());
     if (!config_or_error.ok()) {
-      return absl::InvalidArgumentError("Failed to parse header formatter config: " +
-                                        std::string(config_or_error.status().message()));
+      return absl::InvalidArgumentError(absl::StrCat("Failed to parse header formatter config: ",
+                                                     config_or_error.status().message()));
     }
     formatter_config = std::move(config_or_error.value());
   }
@@ -54,8 +56,9 @@ DynamicModuleHeaderFormatterFactoryConfig::createFactoryFromProto(
       context.serverFactoryContext().mainThreadDispatcher());
   if (!config.ok()) {
     // Keep the code, so a missing ABI symbol stays NotFound rather than becoming InvalidArgument.
-    return absl::Status(config.status().code(), "Failed to create header formatter config: " +
-                                                    std::string(config.status().message()));
+    return absl::Status(
+        config.status().code(),
+        absl::StrCat("Failed to create header formatter config: ", config.status().message()));
   }
 
   return Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr{std::move(config.value())};

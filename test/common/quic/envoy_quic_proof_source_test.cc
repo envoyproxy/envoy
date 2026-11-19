@@ -25,7 +25,6 @@
 #include "quiche/quic/test_tools/test_certificates.h"
 
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -186,7 +185,7 @@ public:
     }
     EXPECT_CALL(listen_socket_, ioHandle()).Times(times);
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](const Network::ConnectionSocket& connection_socket, const StreamInfo::StreamInfo&) {
               EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
                         *connection_socket.connectionInfoProvider().localAddress());
@@ -195,7 +194,7 @@ public:
               EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
               EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
               return &filter_chain_;
-            }));
+            });
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
@@ -295,18 +294,17 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   // No filter chain.
   EXPECT_CALL(listen_socket_, ioHandle()).Times(2);
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
-        return nullptr;
-      }));
+      .WillOnce(
+          [&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) { return nullptr; });
   bool cert_matched_sni;
   EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
                                                 &cert_matched_sni));
 
   // Cert not ready.
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+      .WillOnce([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
         return &filter_chain_;
-      }));
+      });
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillOnce(ReturnRef(*transport_socket_factory_));
   EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
@@ -351,9 +349,8 @@ GUy+n0vQNB0cXGzgcGI=
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
   EXPECT_CALL(listen_socket_, ioHandle());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
-        return nullptr;
-      }));
+      .WillOnce(
+          [&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) { return nullptr; });
 
   std::string signature;
   proof_source_.ComputeTlsSignature(
@@ -364,9 +361,9 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
   EXPECT_CALL(listen_socket_, ioHandle()).Times(testing::AnyNumber());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+      .WillRepeatedly([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
         return &filter_chain_;
-      }));
+      });
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 

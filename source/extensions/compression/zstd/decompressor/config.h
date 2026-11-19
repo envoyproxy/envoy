@@ -39,6 +39,8 @@ public:
 private:
   Stats::Scope& scope_;
   const uint32_t chunk_size_;
+  const uint32_t max_inflate_ratio_;
+  const uint32_t max_block_size_;
   ZstdDDictManagerPtr ddict_manager_{nullptr};
 };
 

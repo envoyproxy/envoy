@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "tcp_stats_test",
     srcs = ["tcp_stats_test.cc"],
     extension_names = ["envoy.transport_sockets.tcp_stats"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tcp_stats:config",
@@ -36,7 +42,11 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["tcp_stats_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.tcp_stats"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",

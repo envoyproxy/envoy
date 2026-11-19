@@ -166,7 +166,7 @@ unsafe fn config_from_ptr<'a>(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed by
 /// the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_config_validator_config_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_config_validator_config_new(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_config_validator_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -208,7 +208,7 @@ pub(crate) fn init_config_validator_config(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed by
 /// the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_config_validator_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_config_validator_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_config_validator_config_module_ptr,
 ) {
@@ -227,7 +227,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_config_validator_config_destroy
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed by
 /// the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_config_validator_validate")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_config_validator_validate(
   context_envoy_ptr: abi::envoy_dynamic_module_type_config_validator_context_envoy_ptr,
   config_module_ptr: abi::envoy_dynamic_module_type_config_validator_config_module_ptr,
@@ -264,7 +264,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_config_validator_validate(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed by
 /// the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_config_validator_validate_delta")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_config_validator_validate_delta(
   context_envoy_ptr: abi::envoy_dynamic_module_type_config_validator_context_envoy_ptr,
   config_module_ptr: abi::envoy_dynamic_module_type_config_validator_config_module_ptr,

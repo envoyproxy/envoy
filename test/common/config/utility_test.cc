@@ -743,9 +743,9 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
   std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
-  EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce([]() -> ProtobufTypes::MessagePtr {
     return ProtobufTypes::MessagePtr{new Protobuf::Timestamp()};
-  }));
+  });
 
   EXPECT_THROW_WITH_REGEX(
       Utility::translateAnyToFactoryConfig(typed_config,
@@ -761,9 +761,9 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
   std::ignore = typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
-  EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce([]() -> ProtobufTypes::MessagePtr {
     return ProtobufTypes::MessagePtr{new Protobuf::Duration()};
-  }));
+  });
 
   auto config = Utility::translateAnyToFactoryConfig(
       typed_config, ProtobufMessage::getStrictValidationVisitor(), factory);

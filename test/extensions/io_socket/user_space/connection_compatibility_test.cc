@@ -1,5 +1,7 @@
 #include <memory>
+#include <string>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -14,7 +16,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -67,10 +68,10 @@ TEST_F(InternalClientConnectionImplTest, ConnectCallbacksAreInvoked) {
   client_->connect();
   client_->noDelay(true);
   EXPECT_CALL(connection_callbacks, onEvent(_))
-      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+      .WillOnce([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(event, Network::ConnectionEvent::Connected);
         dispatcher_->exit();
-      }));
+      });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
@@ -93,6 +94,61 @@ TEST_F(InternalClientConnectionImplTest, ConnectFailed) {
 
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
+
+class InternalFlushWriteConnectionImplTest : public InternalClientConnectionImplTest,
+                                             public testing::WithParamInterface<bool> {
+public:
+  void TearDown() override {
+    if (client_ && client_->state() != Network::Connection::State::Closed) {
+      client_->removeConnectionCallbacks(connection_callbacks);
+      client_->close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+};
+
+TEST_P(InternalFlushWriteConnectionImplTest, FlushWriteCompletesWhenBlockedPeerCloses) {
+  // The write wakeup must work with and without read-side reset emulation.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_send_rst_on_user_space_socket",
+                               GetParam() ? "true" : "false"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  client_->addConnectionCallbacks(connection_callbacks);
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  client_->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Fill the peer directly, then queue a separate write in ConnectionImpl. This avoids relying
+  // on OS buffering or on the number of event-loop iterations needed to produce backpressure.
+  io_handle_peer_->setWatermarks(128);
+  Buffer::OwnedImpl initial_data(std::string(256, 'a'));
+  ASSERT_TRUE(client_->ioHandle().write(initial_data).ok());
+  ASSERT_FALSE(io_handle_peer_->canReceiveData());
+
+  auto pending_write_drained = std::make_shared<bool>(false);
+  Buffer::OwnedImpl pending_data("pending response");
+  pending_data.addDrainTracker([pending_write_drained]() { *pending_write_drained = true; });
+  client_->write(pending_data, false);
+  client_->close(Network::ConnectionCloseType::FlushWrite);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_EQ(Network::Connection::State::Closing, client_->state());
+  EXPECT_FALSE(*pending_write_drained);
+
+  // Half-close makes CloseAfterFlush listen only for Write. Closing the peer must wake that
+  // blocked write even though its EOF/reset notification cannot deliver a Read event here.
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(Network::Connection::State::Closed, client_->state());
+  EXPECT_TRUE(*pending_write_drained);
+}
+
+INSTANTIATE_TEST_SUITE_P(ResetEmulation, InternalFlushWriteConnectionImplTest, testing::Bool());
 
 TEST_F(InternalClientConnectionImplTest, AbortResetEmitsConnectionResetToPeerGuardEnabled) {
   TestScopedRuntime scoped_runtime;
@@ -142,10 +198,10 @@ TEST_F(InternalClientConnectionImplTest, AbortResetEmitsEofToPeerGuardDisabled) 
   EXPECT_EQ(nullptr, read_res.err_);
 }
 
-// With half-close enabled and the feature on, a peer full close surfaces as ECONNRESET once
-// pending data drains and fires RemoteClose. Without this, tcp_proxy CONNECT tunneling through
-// an internal_listener leaks upstream streams. The connection is fully connected before the
-// peer closes so the close is observed on the read path, not through connect completion.
+// With half-close enabled and the feature on, a peer full close delivers all pending data with
+// end_stream=true first and then fires a normal RemoteClose. Without end_stream=true, consumers
+// like Http::Tcp::TcpUpstream reset the stream with INTERNAL_ERROR; without RemoteClose,
+// half-close peers over internal_listener leak until idle timeout.
 TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagatesRemoteClose) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -164,13 +220,122 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagates
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  Buffer::OwnedImpl payload("hello");
+  ASSERT_TRUE(io_handle_peer_->write(payload).ok());
   io_handle_peer_->close();
+
+  testing::InSequence s;
+  EXPECT_CALL(*read_filter, onData(testing::_, true))
+      .WillOnce([](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        EXPECT_EQ("hello", data.toString());
+        data.drain(data.length());
+        return Network::FilterStatus::StopIteration;
+      });
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
+}
+
+// Two-turn schedule: peer writes data + shutdown(WR) on turn 1 (delivering end_stream=true while
+// keeping the connection open), then calls close() on turn 2. Even if a filter leaves data in
+// read_buffer_, turn 2 must not duplicate end_stream or hit ASSERT(read_buffer_size == 0), and
+// must close cleanly as DetectedCloseType::Normal.
+TEST_F(InternalClientConnectionImplTest,
+       HalfCloseEnabledPeerFullCloseAfterEofReadEmitsCleanRemoteClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  auto read_filter = std::make_shared<NiceMock<Network::MockReadFilter>>();
+  client_->addReadFilter(read_filter);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  Buffer::OwnedImpl payload("hello");
+  ASSERT_TRUE(io_handle_peer_->write(payload).ok());
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  EXPECT_CALL(*read_filter, onData(testing::_, true))
+      .WillOnce([](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        EXPECT_EQ("hello", data.toString());
+        return Network::FilterStatus::StopIteration;
+      });
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose)).Times(0);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(*read_filter, onData(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  io_handle_peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
+}
+
+// Backpressure preservation: if reading is disabled when the peer writes data and calls close(),
+// Closed event observation must not destroy unread data; resuming reads must deliver payload with
+// end_stream=true first, followed by a normal RemoteClose.
+TEST_F(InternalClientConnectionImplTest,
+       HalfCloseEnabledReadDisabledPeerFullCloseDeliversDataOnResume) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  auto read_filter = std::make_shared<NiceMock<Network::MockReadFilter>>();
+  client_->addReadFilter(read_filter);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  client_->readDisable(true);
+  Buffer::OwnedImpl payload("hello");
+  ASSERT_TRUE(io_handle_peer_->write(payload).ok());
+  io_handle_peer_->close();
+
+  // Because enable_half_close_ is true, Closed events while read-disabled must not bypass queued
+  // unread bytes and drop the payload.
+  EXPECT_CALL(*read_filter, onData(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose)).Times(0);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  testing::InSequence s;
+  EXPECT_CALL(*read_filter, onData(testing::_, true))
+      .WillOnce([](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        EXPECT_EQ("hello", data.toString());
+        data.drain(data.length());
+        return Network::FilterStatus::StopIteration;
+      });
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  client_->readDisable(false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
 }
 
 // Feature off: legacy half-close behavior preserved. No RemoteClose on peer full close.
@@ -193,7 +358,7 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullCloseLegacyBeha
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // With the feature off, the peer full close reads as a half-close: no RemoteClose.
@@ -225,7 +390,7 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerShutdownWritePreser
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Peer half-closes (shutdown(WR)) instead of fully closing. RemoteClose must not fire.
@@ -259,7 +424,7 @@ TEST_F(InternalClientConnectionImplTest,
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Client half-closes its write side.
@@ -271,7 +436,7 @@ TEST_F(InternalClientConnectionImplTest,
   // Peer then fully closes. Because client already sent EOF, this completes the graceful
   // four-way shutdown. The connection must fire RemoteClose with DetectedCloseType::Normal.
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   io_handle_peer_->close();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 

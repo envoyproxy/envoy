@@ -300,6 +300,10 @@ transport_socket_matches:
 
   // Checks if the cluster counters are correct
   void checkCounters(int requests, int responses, int successes, int failures) {
+    // The health check result can be reported before the test reads the counters, so wait for
+    // them before checking the exact values.
+    test_server_->waitForCounter("cluster.anna.health_check.success", testing::Ge(successes));
+    test_server_->waitForCounter("cluster.anna.health_check.failure", testing::Ge(failures));
     EXPECT_EQ(requests, test_server_->counter("hds_delegate.requests")->value());
     EXPECT_LE(responses, test_server_->counter("hds_delegate.responses")->value());
     EXPECT_EQ(successes, test_server_->counter("cluster.anna.health_check.success")->value());
@@ -435,6 +439,56 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
 
   // Clean up connections
   cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+TEST_P(HdsIntegrationTest, EmptyLocalitySkippedInResponse) {
+  initialize();
+
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+
+  auto initial_specifier =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(initial_specifier);
+  test_server_->waitForCounter("hds_delegate.requests", Ge(++hds_requests_));
+
+  healthcheckEndpoints();
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY,
+                                           host_upstream_->localAddress(), 0, 0, 0));
+  cleanupHostConnections();
+
+  // Keep the locality in the HDS update, but remove its only endpoint.
+  auto updated_specifier = initial_specifier;
+  updated_specifier.mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->clear_endpoints();
+  hds_stream_->sendGrpcMessage(updated_specifier);
+  test_server_->waitForCounter("hds_delegate.requests", Ge(++hds_requests_));
+
+  Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+  while (true) {
+    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+    if (response_.has_endpoint_health_response() &&
+        response_.endpoint_health_response().cluster_endpoints_health_size() == 1 &&
+        response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health_size() == 0) {
+      break;
+    }
+    ASSERT_TRUE(bound.withinBound());
+  }
+
+  const auto& health_response = response_.endpoint_health_response();
+  ASSERT_EQ(health_response.cluster_endpoints_health_size(), 1);
+  const auto& cluster_response = health_response.cluster_endpoints_health(0);
+  EXPECT_EQ(cluster_response.cluster_name(), "anna");
+  EXPECT_EQ(cluster_response.locality_endpoints_health_size(), 0);
+  EXPECT_EQ(health_response.endpoints_health_size(), 0);
+
   cleanupHdsConnection();
 }
 

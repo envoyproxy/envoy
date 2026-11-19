@@ -163,7 +163,8 @@ private:
 
     // On-demand and glob watch interest are only supported by the delta muxes; this legacy
     // state-of-the-world mux does not implement them.
-    void append(const absl::flat_hash_set<std::string>&) override {}
+    void update(const absl::flat_hash_set<std::string>&,
+                const absl::flat_hash_set<std::string>&) override {}
     void accept(const absl::flat_hash_set<std::string>&) override {}
 
     // Maintain deterministic wire ordering via ordered std::set.

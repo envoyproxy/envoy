@@ -108,7 +108,7 @@ FactoryFunctions::FactoryFunctions(EnvoyQuicConnectionIdGeneratorFactory& factor
     : concurrency_(concurrency),
       worker_selector_(factory.getCompatibleConnectionIdWorkerSelector(concurrency_)) {
 #ifdef SUPPORTS_TESTING_BPF_PROG
-  opt_ = factory.createCompatibleLinuxBpfSocketOption(concurrency);
+  opt_ = factory.createCompatibleLinuxBpfSocketOption(concurrency).value();
   // Using a mock socket to capture the socket option which otherwise cannot be
   // extracted from the private field in the Socket::Option.
   Network::MockListenSocket mock_socket;

@@ -64,7 +64,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum1SingleCluster) {
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
   MinimumClustersValidator validator(config, ClusterTypeUrl);
 
-  auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  Protobuf::Arena arena;
+  auto cluster = Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena);
   cluster->set_name("cluster1");
   std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   added_resources.emplace_back(
@@ -83,9 +84,10 @@ TEST_F(MinimumClustersValidatorTest, Minimum1TwoClustersSameName) {
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
   MinimumClustersValidator validator(config, ClusterTypeUrl);
 
-  auto cluster1 = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  Protobuf::Arena arena;
+  auto cluster1 = Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena);
   cluster1->set_name("clusterA");
-  auto cluster2 = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  auto cluster2 = Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena);
   cluster2->set_name("clusterA");
   std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   added_resources.emplace_back(
@@ -209,7 +211,8 @@ TEST_F(MinimumClustersValidatorTest, Minimum5AddingOneCluster) {
   Upstream::MockClusterManager::ClusterInfoMaps cluster_info{{}, {}, 0};
   MinimumClustersValidator validator(config, ClusterTypeUrl);
 
-  auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  Protobuf::Arena arena;
+  auto cluster = Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena);
   cluster->set_name("cluster1");
   std::vector<Envoy::Config::DecodedResourcePtr> added_resources;
   added_resources.emplace_back(

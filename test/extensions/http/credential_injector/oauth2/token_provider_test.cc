@@ -195,13 +195,12 @@ TEST(TokenProvider, TokenFetchResponseWithoutStatus) {
   Envoy::Http::AsyncClient::Callbacks* callbacks = nullptr;
   EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_,
               send_(testing::_, testing::_, testing::_))
-      .WillOnce(testing::Invoke([&](Envoy::Http::RequestMessagePtr&,
-                                    Envoy::Http::AsyncClient::Callbacks& cb,
-                                    const Envoy::Http::AsyncClient::RequestOptions&)
-                                    -> Envoy::Http::AsyncClient::Request* {
+      .WillOnce([&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
+                    const Envoy::Http::AsyncClient::RequestOptions&)
+                    -> Envoy::Http::AsyncClient::Request* {
         callbacks = &cb;
         return &request;
-      }));
+      });
 
   // The TokenProvider constructor dispatches the initial token fetch.
   auto token_provider =

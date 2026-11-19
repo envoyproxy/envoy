@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <regex>
 #include <string>
 
@@ -14,7 +15,10 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+
+#include "absl/strings/str_split.h"
 
 using testing::Combine;
 using testing::HasSubstr;
@@ -247,6 +251,42 @@ TEST_F(AdminStatsTest, HandlerStatsHtml) {
        {"No Histograms found", "scope.g2: 2"});      // not expected
   test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
        {"scope1.scope2.unset"});                     // not expected
+}
+
+// Stat names may contain downstream-controlled bytes, so every place a stat name
+// is written into the HTML stats page must be escaped.
+TEST_F(AdminStatsTest, HandlerStatsHtmlSanitizesNames) {
+  const std::string payload = "</script><script>alert(1)</script>";
+  const std::string html_escaped = "&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;";
+
+  store_->counterFromString(absl::StrCat("counter", payload)).add(1);
+  store_->gaugeFromString(absl::StrCat("gauge", payload), Stats::Gauge::ImportMode::Accumulate)
+      .set(2);
+  store_->textReadoutFromString(absl::StrCat("text", payload)).set(payload);
+  endpoints_helper_.makeCluster(absl::StrCat("cluster", payload), 1);
+  Stats::Histogram& h = store_->histogramFromString(absl::StrCat("histogram", payload),
+                                                    Stats::Histogram::Unit::Unspecified);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h), 200));
+  h.recordValue(200);
+  store_->mergeHistograms([]() -> void {});
+
+  const std::vector<std::string> expected_names = {
+      absl::StrCat("counter", html_escaped, ": 1"),
+      absl::StrCat("gauge", html_escaped, ": 2"),
+      absl::StrCat("text", html_escaped, ": \"", html_escaped, "\""),
+      absl::StrCat("cluster.cluster", html_escaped, ".endpoint.127.0.0.1_80.c1: 11"),
+      absl::StrCat("histogram", html_escaped),
+  };
+  for (absl::string_view buckets :
+       {"", "&histogram_buckets=summary", "&histogram_buckets=cumulative",
+        "&histogram_buckets=disjoint", "&histogram_buckets=detailed"}) {
+    CodeResponse code_response = handlerStats(absl::StrCat("/stats?format=html", buckets));
+    EXPECT_EQ(Http::Code::OK, code_response.first);
+    EXPECT_THAT(code_response.second, Not(HasSubstr(payload))) << buckets;
+    for (const std::string& expected : expected_names) {
+      EXPECT_THAT(code_response.second, HasSubstr(expected)) << buckets;
+    }
+  }
 }
 #endif
 
@@ -1440,6 +1480,13 @@ public:
         makeStat("control_plane.identifier"), Stats::StatNameTagSpan(c1Tags), {});
     t1.set("cp-1");
   }
+
+  // Unsorted output can come in any order, so compare the sorted lines.
+  static std::vector<std::string> sortedLines(absl::string_view output) {
+    std::vector<std::string> lines = absl::StrSplit(output, '\n');
+    std::sort(lines.begin(), lines.end());
+    return lines;
+  }
 };
 
 class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest, public testing::Test {
@@ -1461,7 +1508,7 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_EQ(expected_response, code_response.second);
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
 }
 
 TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
@@ -1628,7 +1675,28 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_THAT(expected_response, code_response.second);
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusSortedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prometheus_stats_unsorted", "false"}});
+  createTestStats();
+
+  // Exact match: families and series are sorted by name.
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+# TYPE envoy_control_plane_identifier gauge
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
+)EOF";
+
+  const CodeResponse code_response = handlerStats("/stats?format=prometheus&text_readouts");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
 }
 
 } // namespace Server

@@ -229,11 +229,11 @@ BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSoc
   ASSERT(upstream_socket_interface != nullptr,
          "Socket interface type should be validated during cluster creation");
 
-  // TLS is initialized in onServerInitialized() which is called after cluster creation but before
+  // TLS is initialized in onWorkerThreadInitialized() which is called before
   // request handling, so it should always be available when this method is called.
   auto* tls_registry = upstream_socket_interface->getLocalRegistry();
   ASSERT(tls_registry != nullptr,
-         "TLS should be initialized by onServerInitialized() before request handling");
+         "TLS should be initialized by onWorkerThreadInitialized() before request handling");
 
   return tls_registry->socketManager();
 }

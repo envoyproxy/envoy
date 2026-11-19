@@ -20,6 +20,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
+    "downstream_direct_remote_address" => {
+      Some(Box::new(DownstreamDirectRemoteAddressFilterConfig {}))
+    },
     "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
       streams_total: envoy_filter_config
         .define_counter("streams_total")
@@ -96,6 +99,33 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "response_flags_callbacks" => Some(Box::new(ResponseFlagsCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {name}"),
+  }
+}
+
+struct DownstreamDirectRemoteAddressFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DownstreamDirectRemoteAddressFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(DownstreamDirectRemoteAddressFilter {})
+  }
+}
+
+struct DownstreamDirectRemoteAddressFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DownstreamDirectRemoteAddressFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let address = envoy_filter
+      .get_downstream_direct_remote_address()
+      .map(|address| address.as_slice().to_vec());
+    envoy_filter.set_request_header(
+      "x-downstream-peer",
+      address.as_deref().unwrap_or(b"unavailable"),
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 
@@ -279,6 +309,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.clear_route_cache();
     envoy_filter.clear_route_cluster_cache();
+    envoy_filter.drain_connection_upon_completion();
 
     // Test single getter API.
     let single_value = envoy_filter
@@ -887,7 +918,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
     envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
 
-    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in filter_test.cc.
+    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in
+    // filter_test.cc.
     envoy_filter.set_dynamic_metadata_bytes("ns_req_header_bytes", "key", &[0xff, 0x00, 0xfe]);
 
     // Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
@@ -1244,6 +1276,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
     assert!(filter_state.is_some());
     assert_eq!(filter_state.unwrap().as_slice(), b"req_header_value");
+    let ok = envoy_filter.set_filter_state_value(
+      b"shared_filter_state_key",
+      b"shared_filter_state_value",
+      abi::envoy_dynamic_module_type_filter_state_life_span::Connection,
+      abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+    );
+    assert!(ok);
+    let shared_state = envoy_filter.get_filter_state_bytes(b"shared_filter_state_key");
+    assert!(shared_state.is_some());
+    assert_eq!(
+      shared_state.unwrap().as_slice(),
+      b"shared_filter_state_value"
+    );
     let filter_state = envoy_filter.get_filter_state_bytes(b"key");
     assert!(filter_state.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -1386,7 +1431,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
+      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -1497,7 +1542,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
+        self.request_body.borrow_mut().extend_from_slice(&buf[.. n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 
@@ -1516,7 +1561,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
+        self.request_body.borrow_mut().extend_from_slice(&buf[.. n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 

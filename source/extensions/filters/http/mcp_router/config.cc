@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/config/datasource.h"
 #include "source/extensions/filters/http/mcp_router/mcp_router.h"
 
 namespace Envoy {
@@ -15,7 +16,18 @@ absl::StatusOr<Http::FilterFactoryCb> McpRouterFilterConfigFactory::createFilter
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
     Stats::Scope& scope) {
 
-  auto config = std::make_shared<McpRouterConfigImpl>(proto_config, stats_prefix, scope, context);
+  std::string session_signing_key;
+  if (proto_config.has_session_signing_key()) {
+    // An explicitly configured but unreadable or empty key is a config error: silently ignoring
+    // it would leave sessions unsigned while the operator believes tampering is rejected.
+    auto key_or_error =
+        Config::DataSource::read(proto_config.session_signing_key(), false, context.api());
+    RETURN_IF_NOT_OK_REF(key_or_error.status());
+    session_signing_key = std::move(key_or_error.value());
+  }
+
+  auto config = std::make_shared<McpRouterConfigImpl>(proto_config, stats_prefix, scope, context,
+                                                      std::move(session_signing_key));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<McpRouterFilter>(config));

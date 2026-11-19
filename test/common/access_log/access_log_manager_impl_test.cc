@@ -20,7 +20,6 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::ByMove;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -41,12 +40,11 @@ protected:
                 createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                     Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})))
         .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file_))))
-        .WillRepeatedly(
-            Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
-              NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
-              EXPECT_CALL(*file, path()).WillRepeatedly(Return("foo"));
-              return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
-            }));
+        .WillRepeatedly([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
+          NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
+          EXPECT_CALL(*file, path()).WillRepeatedly(Return("foo"));
+          return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
+        });
     EXPECT_CALL(*file_, path()).WillRepeatedly(Return("foo"));
     EXPECT_CALL(api_, fileSystem()).WillRepeatedly(ReturnRef(file_system_));
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
@@ -86,14 +84,13 @@ TEST_F(AccessLogManagerImplTest, BadFile) {
 
 TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(*file_, open_(_))
-      .WillOnce(Invoke([](Filesystem::FlagSet flags) -> Api::IoCallBoolResult {
-        EXPECT_FALSE(flags[Filesystem::File::Operation::Read]);
-        EXPECT_TRUE(flags[Filesystem::File::Operation::Write]);
-        EXPECT_TRUE(flags[Filesystem::File::Operation::Append]);
-        EXPECT_TRUE(flags[Filesystem::File::Operation::Create]);
-        return Filesystem::resultSuccess<bool>(true);
-      }));
+  EXPECT_CALL(*file_, open_(_)).WillOnce([](Filesystem::FlagSet flags) -> Api::IoCallBoolResult {
+    EXPECT_FALSE(flags[Filesystem::File::Operation::Read]);
+    EXPECT_TRUE(flags[Filesystem::File::Operation::Write]);
+    EXPECT_TRUE(flags[Filesystem::File::Operation::Append]);
+    EXPECT_TRUE(flags[Filesystem::File::Operation::Create]);
+    return Filesystem::resultSuccess<bool>(true);
+  });
   EXPECT_NE(nullptr, access_log_manager_
                          .createAccessLog(
                              Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})
@@ -116,15 +113,13 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
   EXPECT_EQ(0UL, store_.counter("filesystem.write_buffered").value());
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
-        EXPECT_EQ(
-            4UL,
-            store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-        EXPECT_EQ(0, data.compare("test"));
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([&](absl::string_view data) -> Api::IoCallSizeResult {
+    EXPECT_EQ(4UL,
+              store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
+                  .value());
+    EXPECT_EQ(0, data.compare("test"));
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
 
   log_file->write("test");
 
@@ -135,15 +130,13 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
   EXPECT_TRUE(waitForGauge("filesystem.write_total_buffered", Eq(0)));
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
-        EXPECT_EQ(
-            5UL,
-            store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-        EXPECT_EQ(0, data.compare("test2"));
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([&](absl::string_view data) -> Api::IoCallSizeResult {
+    EXPECT_EQ(5UL,
+              store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
+                  .value());
+    EXPECT_EQ(0, data.compare("test2"));
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
 
   log_file->write("test2");
   EXPECT_EQ(2UL, store_.counter("filesystem.write_buffered").value());
@@ -178,19 +171,17 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   // The first write to a given file will start the flush thread. Because AccessManagerImpl::write
   // holds the write_lock_ when the thread is started, the thread will flush on its first loop, once
   // it obtains the write_lock_. Perform a write to get all that out of the way.
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
   log_file->write("prime-it");
   uint32_t expected_writes = 1;
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, expected_writes));
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        EXPECT_EQ(0, data.compare("test"));
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
+    EXPECT_EQ(0, data.compare("test"));
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
 
   log_file->write("test");
 
@@ -206,11 +197,10 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   EXPECT_TRUE(waitForCounter("filesystem.write_completed", Eq(2)));
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        EXPECT_EQ(0, data.compare("test2"));
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
+    EXPECT_EQ(0, data.compare("test2"));
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
 
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
@@ -234,11 +224,10 @@ TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
 
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        EXPECT_EQ(0, data.compare("test"));
-        return Filesystem::resultFailure<ssize_t>(2UL, ENOSPC);
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
+    EXPECT_EQ(0, data.compare("test"));
+    return Filesystem::resultFailure<ssize_t>(2UL, ENOSPC);
+  });
 
   log_file->write("test");
 
@@ -264,10 +253,10 @@ TEST_F(AccessLogManagerImplTest, ReopenFile) {
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(0, data.compare("before"));
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   log_file->write("before");
   timer->invokeCallback();
@@ -282,10 +271,10 @@ TEST_F(AccessLogManagerImplTest, ReopenFile) {
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(0, data.compare("reopened"));
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   EXPECT_CALL(*file_, close_())
       .InSequence(sq)
@@ -316,10 +305,10 @@ TEST_F(AccessLogManagerImplTest, ReopenFileNoWrite) {
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(0, data.compare("before"));
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   log_file->write("before");
   timer->invokeCallback();
@@ -353,10 +342,10 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
 
   EXPECT_CALL(*file_, write_(_))
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(0, data.compare("before reopen"));
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   AccessLogFileSharedPtr log_file =
       access_log_manager_
@@ -381,14 +370,14 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
   EXPECT_CALL(*file_, write_(_))
       .Times(2)
       .InSequence(sq)
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(data, "retry reopen");
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      })
+      .WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(data, "after reopen");
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   EXPECT_CALL(*file_, close_())
       .InSequence(sq)
@@ -425,23 +414,21 @@ TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
           .createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})
           .value();
 
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        EXPECT_EQ(0, data.compare("a"));
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
+    EXPECT_EQ(0, data.compare("a"));
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
 
   log_file->write("a");
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 1));
 
   // First write happens without waiting on thread_flush_. Now make a big string and it should be
   // flushed even when timer is not enabled
-  EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
-        std::string expected(1024 * 64 + 1, 'b');
-        EXPECT_EQ(0, data.compare(expected));
-        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+  EXPECT_CALL(*file_, write_(_)).WillOnce([](absl::string_view data) -> Api::IoCallSizeResult {
+    std::string expected(1024 * 64 + 1, 'b');
+    EXPECT_EQ(0, data.compare(expected));
+    return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+  });
 
   std::string big_string(1024 * 64 + 1, 'b');
   log_file->write(big_string);
@@ -468,11 +455,11 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
               createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                   Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"})))
       .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))))
-      .WillRepeatedly(Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
+      .WillRepeatedly([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
         NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
         EXPECT_CALL(*file, path()).WillRepeatedly(Return("bar"));
         return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
-      }));
+      });
 
   Sequence sq2;
   EXPECT_CALL(*file2, open_(_))
@@ -495,14 +482,14 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
 
   // Test that reopen reopens all of the files
   EXPECT_CALL(*file_, write_(_))
-      .WillRepeatedly(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillRepeatedly([](absl::string_view data) -> Api::IoCallSizeResult {
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   EXPECT_CALL(*file2, write_(_))
-      .WillRepeatedly(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillRepeatedly([](absl::string_view data) -> Api::IoCallSizeResult {
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
-      }));
+      });
 
   EXPECT_CALL(*file_, close_())
       .InSequence(sq)

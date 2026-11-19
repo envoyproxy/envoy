@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -86,9 +85,9 @@ public:
 TEST_F(FilterTest, InlineOK) {
   setupMockConfig();
   // A successful authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::Ok);
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -151,18 +150,16 @@ TEST_F(FilterTest, TestSetExtractedData) {
   setupMockConfig();
   Protobuf::Struct extracted_data;
   // A successful authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*mock_verifier_, verify(_))
-      .WillOnce(Invoke([&extracted_data](ContextSharedPtr context) {
-        context->callback()->setExtractedData(extracted_data);
-        context->callback()->onComplete(Status::Ok);
-      }));
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([&extracted_data](ContextSharedPtr context) {
+    context->callback()->setExtractedData(extracted_data);
+    context->callback()->onComplete(Status::Ok);
+  });
 
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(
-          Invoke([&extracted_data](const std::string& ns, const Protobuf::Struct& out_payload) {
-            EXPECT_EQ(ns, "envoy.filters.http.jwt_authn");
-            EXPECT_TRUE(TestUtility::protoEqual(out_payload, extracted_data));
-          }));
+      .WillOnce([&extracted_data](const std::string& ns, const Protobuf::Struct& out_payload) {
+        EXPECT_EQ(ns, "envoy.filters.http.jwt_authn");
+        EXPECT_TRUE(TestUtility::protoEqual(out_payload, extracted_data));
+      });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -180,9 +177,9 @@ TEST_F(FilterTest, InlineUnauthorizedFailure) {
   // A failed authentication completed inline: callback is called inside verify().
 
   EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtBadFormat);
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -202,9 +199,9 @@ TEST_F(FilterTest, InlineForbiddenFailure) {
   // A failed authentication completed inline: callback is called inside verify().
 
   EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtAudienceNotAllowed);
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -222,9 +219,9 @@ TEST_F(FilterTest, OutBoundOK) {
   setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([&m_cb](ContextSharedPtr context) {
     m_cb = context->callback();
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -247,9 +244,9 @@ TEST_F(FilterTest, OutBoundUnauthorizedFailure) {
   setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([&m_cb](ContextSharedPtr context) {
     m_cb = context->callback();
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -276,9 +273,9 @@ TEST_F(FilterTest, OutBoundForbiddenFailure) {
   setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([&m_cb](ContextSharedPtr context) {
     m_cb = context->callback();
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -315,9 +312,9 @@ TEST_F(FilterTest, TestNoRequirementMatched) {
 // Bypass paths must still sanitize payload/claim headers before Continue.
 TEST_F(FilterTest, TestNoRequirementMatchedSanitizesPayloadHeaders) {
   EXPECT_CALL(*mock_config_.get(), sanitizePayloadHeaders(_))
-      .WillOnce(Invoke([](Http::RequestHeaderMap& headers) {
+      .WillOnce([](Http::RequestHeaderMap& headers) {
         headers.remove(Http::LowerCaseString("x-jwt-claim-sub"));
-      }));
+      });
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
 
   auto headers = Http::TestRequestHeaderMapImpl{{"x-jwt-claim-sub", "spoofed"}};
@@ -336,9 +333,9 @@ TEST_F(FilterTest, TestPerRouteBypassSanitizesPayloadHeaders) {
   EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
       .WillOnce(Return(std::make_pair(nullptr, EMPTY_STRING)));
   EXPECT_CALL(*mock_config_.get(), sanitizePayloadHeaders(_))
-      .WillOnce(Invoke([](Http::RequestHeaderMap& headers) {
+      .WillOnce([](Http::RequestHeaderMap& headers) {
         headers.remove(Http::LowerCaseString("sec-istio-auth-userinfo"));
-      }));
+      });
 
   auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", "spoofed"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -447,9 +444,9 @@ TEST_F(FilterTest, TestPerRouteVerifierOK) {
       .WillOnce(Return(std::make_pair(mock_verifier_.get(), EMPTY_STRING)));
 
   // A successful authentication
-  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
+  EXPECT_CALL(*mock_verifier_, verify(_)).WillOnce([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::Ok);
-  }));
+  });
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

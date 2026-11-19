@@ -13,7 +13,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -85,10 +84,13 @@ public:
 
   /**
    * @param resource some opaque resource (Protobuf::Any).
-   * @return ProtobufTypes::MessagePtr decoded protobuf message in the opaque resource, e.g. the
-   *         RouteConfiguration for an Any containing envoy.config.route.v3.RouteConfiguration.
+   * @param arena the arena on which to allocate the decoded resource.
+   * @return Protobuf::Arena::UniquePtr<Protobuf::Message> decoded protobuf message in the opaque
+   *         resource, e.g. the RouteConfiguration for an Any containing
+   *         envoy.config.route.v3.RouteConfiguration.
    */
-  virtual ArenaWrappedProto<Protobuf::Message> decodeResource(const Protobuf::Any& resource) PURE;
+  virtual Protobuf::Arena::UniquePtr<Protobuf::Message>
+  decodeResource(const Protobuf::Any& resource, Protobuf::Arena& arena) PURE;
 
   /**
    * @param resource some opaque resource (Protobuf::Message).
@@ -96,6 +98,11 @@ public:
    *         the route config name for a envoy.config.route.v3.RouteConfiguration message.
    */
   virtual std::string resourceName(const Protobuf::Message& resource) PURE;
+
+  /**
+   * Returns arena options optimized for this resource type.
+   */
+  virtual const Protobuf::ArenaOptions& arenaOptions() const PURE;
 };
 
 using OpaqueResourceDecoderSharedPtr = std::shared_ptr<OpaqueResourceDecoder>;
@@ -257,9 +264,23 @@ public:
 
   /**
    * Creates a discovery request for resources.
+   *
+   * NOTE: This method is deprecated in favor of update().
+   *
    * @param add_these_names resource ids for inclusion in the discovery request.
+   * @deprecated Use update() instead.
    */
+  [[deprecated("Use update instead")]]
   virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
+
+  /**
+   * Modifies the set of resources the subscription is interested in by adding and/or removing
+   * resources.
+   * @param add_these_names resource ids for inclusion in the discovery request.
+   * @param remove_these_names resource ids to unsubscribe from in the discovery request.
+   */
+  virtual void update(const absl::flat_hash_set<std::string>& add_these_names,
+                      const absl::flat_hash_set<std::string>& remove_these_names) PURE;
 
   /**
    * Declares the resource-name patterns this subscription ACCEPTS for routing. This affects routing
