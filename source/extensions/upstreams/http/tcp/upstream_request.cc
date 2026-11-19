@@ -13,6 +13,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 namespace Envoy {
@@ -71,6 +72,7 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   Envoy::Http::ResponseHeaderMapPtr headers{
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Status, "200"}})};
+  downstream_headers_sent_ = true;
   upstream_request_->decodeHeaders(std::move(headers), /*end_stream=*/false);
   return Envoy::Http::okStatus();
 }
@@ -95,6 +97,9 @@ void TcpUpstream::resetStream() {
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   bytes_meter_->addWireBytesReceived(data.length());
+  if (end_stream && downstream_headers_sent_) {
+    saw_end_stream_ = true;
+  }
   // Without independent half close, this may destroy this object.
   upstream_request_->decodeData(data, end_stream);
 }
@@ -103,7 +108,19 @@ void TcpUpstream::onEvent(Network::ConnectionEvent event) {
   if ((event == Network::ConnectionEvent::LocalClose ||
        event == Network::ConnectionEvent::RemoteClose) &&
       upstream_request_) {
-    upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
+    // If the upstream already delivered end_stream and then closed cleanly (e.g. a user-space
+    // socket peer finishing a graceful close while the downstream request half is still open), end
+    // the downstream stream without errors rather than recording 503.
+    const bool no_error_reset =
+        saw_end_stream_ &&
+        upstream_conn_data_->connection().detectedCloseType() ==
+            StreamInfo::DetectedCloseType::Normal &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tcp_upstream_no_error_reset_after_end_stream");
+    upstream_request_->onResetStream(no_error_reset
+                                         ? Envoy::Http::StreamResetReason::RemoteResetNoError
+                                         : Envoy::Http::StreamResetReason::ConnectionTermination,
+                                     "");
   }
 }
 

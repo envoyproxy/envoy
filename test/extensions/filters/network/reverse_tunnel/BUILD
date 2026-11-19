@@ -21,7 +21,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/extensions/filters/network/reverse_tunnel:config",
@@ -38,7 +44,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.reverse_tunnel"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     shard_count = 4,
     deps = [
@@ -85,8 +98,9 @@ envoy_extension_cc_test(
         "envoy.filters.network.echo",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":jwt_test_data_lib",

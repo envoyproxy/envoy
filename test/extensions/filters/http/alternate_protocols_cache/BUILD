@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/event:event_mocks",
@@ -29,7 +35,16 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
+    },
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/http:http_mocks",
@@ -49,8 +64,23 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "default": {"test": "linux_x64_medium"},
+        "gcc": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     shard_count = 2,
     tags = [

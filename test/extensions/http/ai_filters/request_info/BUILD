@@ -53,7 +53,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.request_info"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -76,9 +82,12 @@ envoy_extension_cc_test(
         "envoy.filters.http.ai_protocol_manager",
     ],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/filters/http/ai_protocol_manager:config",

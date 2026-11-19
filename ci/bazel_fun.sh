@@ -113,7 +113,8 @@ lockfiles_generate() {
 }
 
 # Bazel never compares the crate_universe lockfile with Cargo.toml and Cargo.lock, so it is always
-# repinned. The crate extension does not track CARGO_BAZEL_REPIN, so a new server must evaluate it.
+# repinned. The crate extension's result is otherwise taken from MODULE.bazel.lock, which records
+# CARGO_BAZEL_REPIN as an input, so setting it re-evaluates the extension.
 cargo_lockfile_generate() {
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
     CARGO_BAZEL_REPIN=true bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci --repo=@envoy_rust_crate_index
@@ -330,6 +331,16 @@ deps_update() {
         run_in_nested_mods _deps_update_mod "$dep"
     done
     lockfiles_generate
+    deps_release_dates "$@"
+}
+
+# Fix the release dates in the dependency metadata (`deps.yaml`) of the given `name[=version]`
+# modules, which the module updater does not touch. Only these are looked up (it is a request to
+# GitHub for each), and a module with no metadata is skipped.
+deps_release_dates() {
+    echo "Update release dates ..."
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:release_dates \
+          -- --skip-unknown "${@%%=*}"
 }
 
 _deps_update_mod() {
@@ -387,6 +398,10 @@ registry_update() {
         registry_modules_update "${updates[@]}"
     fi
     lockfiles_generate
+    # With `all` the updated modules are not known here: their dates are left to the `deps` check.
+    if (( ${#updates[@]} )) && [[ "${updates[0]}" != "all" && "${updates[0]}" != "*" ]]; then
+        deps_release_dates "${updates[@]}"
+    fi
 }
 
 registry_modules_update() {

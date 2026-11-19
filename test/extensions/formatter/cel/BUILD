@@ -14,14 +14,21 @@ envoy_package()
 envoy_extension_cc_test(
     name = "cel_test",
     srcs = ["cel_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.formatter.cel"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
@@ -34,13 +41,7 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@cel-cpp//parser",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ] + select(
-        {
-            "//bazel:windows_x86_64": [],
-            "//conditions:default": [
-                "@cel-cpp//parser",
-            ],
-        },
-    ),
+    ],
 )
