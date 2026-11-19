@@ -92,7 +92,7 @@ jobs:
     # nothing records what triggered it. The triggering run saves the id of its request run
     # (`save-request`). Anything in that run could have written it: the request is only trusted
     # once it has been checked below.
-    - uses: envoyproxy/toolshed/actions/github/artifact/download@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/artifact/download@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Download request id
       if: ${{ inputs.runs-after == true }}
       with:
@@ -116,7 +116,7 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/actions/github/env/load@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/env/load@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Load env
       id: data
       with:
@@ -142,7 +142,7 @@ jobs:
         if-no-files-found: error
 
     #  Update the check
-    - uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Appauth
       id: appauth
       with:
@@ -172,7 +172,7 @@ jobs:
         RUN_ID: ${{ inputs.run-id }}
         SHA: ${{ fromJSON(steps.data.outputs.data).data.request.sha }}
 
-    - uses: envoyproxy/toolshed/actions/github/checks@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/checks@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -180,7 +180,7 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Print request summary
       with:
         input: |
@@ -199,7 +199,7 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: request-output
       name: Load request
       with:
