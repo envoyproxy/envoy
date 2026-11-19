@@ -569,13 +569,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(penguingao): consider add request only / response only AI filter chain
-  // when there is a need. Currently, all AI filters handle both request and
-  // response.
-  // Only a declared endpoint's response is the AI filters' to rewrite.
-  const bool can_filter_response =
-      filter_manager_ != nullptr && isAiEndpoint() && !payload_rejected_;
-
   // Route scoping: only declared AI endpoints are inspected unless the filter
   // opted into unconfigured routes, so enabling token usage on a mixed
   // listener does not silently parse unrelated JSON/SSE responses. Resolved
@@ -600,6 +593,11 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
       config_->tokenUsageEnabled() &&
       (route_config != nullptr || filter_state_request_api != LLMProtocol::Unspecified ||
        config_->includeUnconfiguredRoutes());
+  // A response runs the AI filters when its request was an AI call -- a declared endpoint, or one
+  // whose API a filter named -- and one of them handles responses.
+  const bool can_filter_response =
+      filter_manager_ != nullptr && !payload_rejected_ && filter_manager_->handlesResponse() &&
+      (isAiEndpoint() || filter_state_request_api != LLMProtocol::Unspecified);
 
   if (!can_filter_response && !want_token_usage) {
     return Http::FilterHeadersStatus::Continue;

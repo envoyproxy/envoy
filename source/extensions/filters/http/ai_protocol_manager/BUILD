@@ -422,6 +422,7 @@ envoy_cc_library(
     hdrs = ["request_filter_manager.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
         ":filter_pipeline_lib",
@@ -459,6 +460,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
     ],

@@ -703,6 +703,17 @@ TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
   EXPECT_EQ(read->model, "claude-sonnet-4-5");
 }
 
+// Only an instance with a response leg has the AI Protocol Manager send it responses.
+TEST_F(TranscoderFilterTest, HandlesResponsesWithAResponseLeg) {
+  const auto handles = [this](TranscoderProto::Direction response_handling) {
+    return TranscoderFilter(makeConfig(TranscoderProto::TO_IR, response_handling),
+                            makeContext(LLMProtocol::OpenAiChatCompletions))
+        .handlesResponse();
+  };
+  EXPECT_TRUE(handles(TranscoderProto::FROM_IR));
+  EXPECT_FALSE(handles(TranscoderProto::DIRECTION_UNSPECIFIED));
+}
+
 // The bindings an instance applies follow its request leg, so the AI Protocol Manager can count a
 // route binding no instance applies.
 TEST_F(TranscoderFilterTest, AppliesTheBindingsOfItsRequestLeg) {

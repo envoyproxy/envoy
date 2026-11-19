@@ -274,6 +274,10 @@ BindingUse TranscoderFilter::bindingUse() const {
   return {.request = !renders, .response = renders};
 }
 
+bool TranscoderFilter::handlesResponse() const {
+  return config_->responseHandling() != TranscoderProto::DIRECTION_UNSPECIFIED;
+}
+
 absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstructions() {
   const StreamInfo::FilterState& filter_state = *filter_state_;
   const LLMProtocol route_target_protocol = target_protocol_;

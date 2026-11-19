@@ -2369,6 +2369,8 @@ public:
     co_return co_await std::move(propagate_request)(std::move(request));
   }
 
+  bool handlesResponse() const override { return true; }
+
   Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver receive_event,
                                           SseStreamPropagator propagate_event) override {
     while (true) {
@@ -2421,9 +2423,9 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverSseResponse) {
             "data: {\"a\":1,\"first\":true,\"second\":true}\n\ndata: [DONE]\n\n");
 }
 
-// Only the request of an unconfigured route runs the AI filters: its response passes through, even
-// one they could not parse.
-TEST_F(AiProtocolManagerFilterTest, ResponseOnUnconfiguredRoutePassesThrough) {
+// A request no filter named an API for is not an AI call, so its response passes through, even one
+// the AI filters could not parse.
+TEST_F(AiProtocolManagerFilterTest, ResponseToUndetectedRequestPassesThrough) {
   createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
     return std::make_shared<SseTaggingAiFilter>("tagged");
   }});
@@ -2442,6 +2444,73 @@ TEST_F(AiProtocolManagerFilterTest, ResponseOnUnconfiguredRoutePassesThrough) {
   Buffer::OwnedImpl resp_body("not json");
   EXPECT_EQ(filter_->encodeData(resp_body, true), Http::FilterDataStatus::Continue);
   EXPECT_EQ(resp_body.toString(), "not json");
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+}
+
+// Names the request's API, as schema validation does on detecting it.
+class ApiNamingAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    request->setProtocol(LLMProtocol::AnthropicMessages);
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+};
+
+// An API a filter detects on an unconfigured route makes the request an AI call: the API is
+// published, and the response runs the AI filters.
+TEST_F(AiProtocolManagerFilterTest, ResponseToDetectedRequestRunsAiFilters) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<ApiNamingAiFilter>();
+                             },
+                             [](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<SseTaggingAiFilter>("tagged");
+                             }});
+  // A stream has one StreamInfo; the mocks carry one each.
+  ON_CALL(encoder_callbacks_, streamInfo())
+      .WillByDefault(testing::ReturnRef(callbacks_.stream_info_));
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"claude"})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+  EXPECT_EQ(RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState()),
+            LLMProtocol::AnthropicMessages);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encoded_injected_.toString(), "data: {\"a\":1,\"tagged\":true}\n\n");
+}
+
+// A chain in which no filter handles responses leaves a declared endpoint's response untouched.
+TEST_F(AiProtocolManagerFilterTest, ResponseSkipsAChainThatHandlesNoResponse) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<PassThroughAiFilter>();
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "8"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(resp_headers.getContentLengthValue(), "8");
+
+  Buffer::OwnedImpl resp_body("not json");
+  EXPECT_EQ(filter_->encodeData(resp_body, true), Http::FilterDataStatus::Continue);
   EXPECT_EQ(encode_local_reply_calls_, 0);
 }
 
@@ -2508,6 +2577,8 @@ public:
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
     co_return co_await std::move(propagate_request)(std::move(request));
   }
+
+  bool handlesResponse() const override { return true; }
 
   Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
                                             AiResponseStreamPropagator propagate) override {

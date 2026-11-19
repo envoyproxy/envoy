@@ -5,6 +5,8 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/algorithm/container.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -56,6 +58,11 @@ void FilterManager::startUnaryResponse(ExternalBufferFactory& buffer_factory,
 void FilterManager::onResponseData(Buffer::Instance& data, bool end_stream) {
   ASSERT(response_manager_ != nullptr);
   response_manager_->onData(data, end_stream);
+}
+
+bool FilterManager::handlesResponse() const {
+  return absl::c_any_of(filters_,
+                        [](const AiFilterSharedPtr& filter) { return filter->handlesResponse(); });
 }
 
 void FilterManager::cancel() {
