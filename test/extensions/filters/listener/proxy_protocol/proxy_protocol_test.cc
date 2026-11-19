@@ -2188,6 +2188,215 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateWithBase64Encoding) {
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateAsUnsignedIntegerBigEndian) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x26, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv_psc_id[] = {0xe0, 0x00, 0x08, 0x00, 0x00, 0x00,
+                                    0x00, 0x00, 0x00, 0x01, 0x02};
+  constexpr uint8_t tlv_max[] = {0xe1, 0x00, 0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+  constexpr uint8_t tlv_one_byte[] = {0xe2, 0x00, 0x01, 0x07};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_tlv_location(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
+  for (const auto& [tlv_type, key] : std::vector<std::pair<uint32_t, std::string>>{
+           {0xe0, "psc_id"}, {0xe1, "max"}, {0xe2, "one_byte"}}) {
+    auto rule = proto_config.add_rules();
+    rule->set_tlv_type(tlv_type);
+    rule->mutable_on_tlv_present()->set_key(key);
+    rule->mutable_on_tlv_present()->set_value_string_encoding(
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+            UNSIGNED_INTEGER_BIG_ENDIAN);
+  }
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_psc_id, sizeof(tlv_psc_id));
+  write(tlv_max, sizeof(tlv_max));
+  write(tlv_one_byte, sizeof(tlv_one_byte));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+  const auto* tlv_obj = filter_state->getDataReadOnlyGeneric(kFilterStateKey);
+  ASSERT_NE(nullptr, tlv_obj);
+
+  // The raw TLV values are read as unsigned big-endian integers and stored as decimal strings.
+  auto psc_id = tlv_obj->getField("psc_id");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(psc_id));
+  EXPECT_EQ("258", absl::get<absl::string_view>(psc_id));
+
+  auto max = tlv_obj->getField("max");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(max));
+  EXPECT_EQ("18446744073709551615", absl::get<absl::string_view>(max));
+
+  auto one_byte = tlv_obj->getField("one_byte");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(one_byte));
+  EXPECT_EQ("7", absl::get<absl::string_view>(one_byte));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_invalid").value(), 0);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVAsUnsignedIntegerBigEndianInvalidLength) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1b, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // A 9-byte value is too long for a 64-bit integer, and an empty value has no integer.
+  constexpr uint8_t tlv_too_long[] = {0xe0, 0x00, 0x09, 0x01, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  constexpr uint8_t tlv_empty[] = {0xe1, 0x00, 0x00};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  for (const auto& [tlv_type, key] :
+       std::vector<std::pair<uint32_t, std::string>>{{0xe0, "too_long"}, {0xe1, "empty"}}) {
+    auto rule = proto_config.add_rules();
+    rule->set_tlv_type(tlv_type);
+    rule->mutable_on_tlv_present()->set_key(key);
+    rule->mutable_on_tlv_present()->set_value_string_encoding(
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+            UNSIGNED_INTEGER_BIG_ENDIAN);
+  }
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_too_long, sizeof(tlv_too_long));
+  write(tlv_empty, sizeof(tlv_empty));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  // Values that cannot be encoded are not stored, and the connection is not rejected.
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_invalid").value(), 2);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_missing").value(), 0);
+}
+
+TEST_P(ProxyProtocolTest, V2RejectIfAbsentWithTlvPresent) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x17, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv_psc_id[] = {0xe0, 0x00, 0x08, 0x00, 0x00, 0x00,
+                                    0x00, 0x00, 0x00, 0x01, 0x02};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("psc_id");
+  rule->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          UNSIGNED_INTEGER_BIG_ENDIAN);
+  rule->set_reject_if_absent(true);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_psc_id, sizeof(tlv_psc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_THAT(server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+              UnorderedElementsAre(Pair(ProxyProtocol, HasStructFields(UnorderedElementsAre(
+                                                           IsStructString("psc_id", "258"))))));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_missing").value(), 0);
+}
+
+TEST_P(ProxyProtocolTest, V2RejectIfAbsentWithTlvMissing) {
+  // The header carries a TLV, but not the required one.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
+                                0x49, 0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02,
+                                0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00,
+                                0x02, 0xe1, 0x00, 0x01, 0x07, 'D',  'A',  'T',  'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("psc_id");
+  rule->set_reject_if_absent(true);
+
+  connect(false, &proto_config);
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_missing").value(), 1);
+  EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 0);
+}
+
+TEST_P(ProxyProtocolTest, V2RejectIfAbsentWithInvalidTlvValue) {
+  // The required TLV is present, but its 9-byte value cannot be encoded as an integer.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x21, 0x11, 0x00, 0x18, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
+                                0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 0xe0, 0x00, 0x09, 0x01, 0x00,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 'D',  'A',  'T',  'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("psc_id");
+  rule->mutable_on_tlv_present()->set_value_string_encoding(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
+          UNSIGNED_INTEGER_BIG_ENDIAN);
+  rule->set_reject_if_absent(true);
+
+  connect(false, &proto_config);
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_invalid").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_missing").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V1RejectIfAbsent) {
+  // A version 1 header carries no TLVs, so a required TLV is always missing.
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("psc_id");
+  rule->set_reject_if_absent(true);
+
+  connect(false, &proto_config);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectConnectionError();
+
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_missing").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, NoProxyProtocolRejectIfAbsent) {
+  // A connection let through without a PROXY protocol header carries no TLVs either.
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("psc_id");
+  rule->set_reject_if_absent(true);
+
+  connect(false, &proto_config);
+  write("data");
+  expectConnectionError();
+
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.tlv_missing").value(), 1);
+}
+
 TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateDefaultBehavior) {
   // Test that default behavior (DYNAMIC_METADATA) still works when tlv_location is not set
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -3095,6 +3304,34 @@ TEST(ConfigTest, StatsAreTagged) {
   EXPECT_EQ("proxy_proto.found", plain_stats.v1_.found_.tagExtractedName());
   EXPECT_THAT(tags_of(plain_stats.v1_.found_),
               UnorderedElementsAre(Pair("envoy.proxy_protocol_version", "1")));
+}
+
+TEST(ConfigTest, RejectIfAbsentFollowsTheLastRuleForATlvType) {
+  Stats::TestUtil::TestStore stats_store;
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  // 0xe0: a required rule followed by a rule that is not required.
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("required_first");
+  rule->set_reject_if_absent(true);
+  rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe0);
+  rule->mutable_on_tlv_present()->set_key("optional_last");
+  // 0xe1: a rule that is not required followed by a required rule.
+  rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe1);
+  rule->mutable_on_tlv_present()->set_key("optional_first");
+  rule = proto_config.add_rules();
+  rule->set_tlv_type(0xe1);
+  rule->mutable_on_tlv_present()->set_key("required_last");
+  rule->set_reject_if_absent(true);
+
+  Config config(*stats_store.rootScope(), proto_config);
+  EXPECT_FALSE(config.isTlvTypeRequired(0xe0));
+  EXPECT_TRUE(config.isTlvTypeRequired(0xe1));
+  EXPECT_EQ(1, config.numberOfRequiredTlvTypes());
+  EXPECT_EQ("optional_last", config.isTlvTypeNeeded(0xe0)->key());
+  EXPECT_EQ("required_last", config.isTlvTypeNeeded(0xe1)->key());
 }
 
 } // namespace
