@@ -24,6 +24,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "dynamo_integration_test",
+    size = "large",
+    srcs = ["dynamo_integration_test.cc"],
+    deps = [
+        "//contrib/dynamo/filters/http/source:config",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/config:well_known_names",
+        "//test/integration:http_integration_lib",
+        "//test/integration:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "dynamo_request_parser_test",
     srcs = ["dynamo_request_parser_test.cc"],
     deps = [
@@ -40,7 +53,9 @@ envoy_cc_test(
     deps = [
         "//contrib/dynamo/filters/http/source:dynamo_stats_lib",
         "//source/common/stats:stats_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

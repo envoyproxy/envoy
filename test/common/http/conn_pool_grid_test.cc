@@ -65,7 +65,7 @@ public:
     ASSERT(!http3_alternate_pool_);
     ConnectionPool::InstancePtr ret = createMockPool("alternate");
     ON_CALL(*static_cast<ConnectionPool::MockInstance*>(ret.get()), newStream(_, _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
                 const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
               if (!alternate_immediate_) {
@@ -79,7 +79,7 @@ public:
                 callbacks.onPoolReady(*encoder_, host(), *info_, std::nullopt);
               }
               return nullptr;
-            }));
+            });
     return ret;
   }
   ConnectionPool::InstancePtr createHttp2Pool() override { return createMockPool("http2"); }
@@ -97,29 +97,29 @@ public:
   ConnectionPool::InstancePtr createMockPool(absl::string_view type) {
     ConnectionPool::MockInstance* instance = new NiceMock<ConnectionPool::MockInstance>();
     ON_CALL(*instance, newStream(_, _, _))
-        .WillByDefault(
-            Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
-                                      const ConnectionPool::Instance::StreamOptions& options)
-                       -> ConnectionPool::Cancellable* {
-              if (ConnectivityGridForTest::hasHttp3FailedRecently(grid)) {
-                EXPECT_FALSE(options.can_send_early_data_);
-              }
-              if (immediate_success_) {
-                callbacks.onPoolReady(*encoder_, host(), *info_, std::nullopt);
-                return nullptr;
-              }
-              if (immediate_failure_) {
-                callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                        "reason", host());
-                return nullptr;
-              }
-              if (second_pool_immediate_success_) {
-                second_pool_immediate_success_ = false;
-                immediate_success_ = true;
-              }
-              callbacks_.push_back(&callbacks);
-              return cancel_;
-            }));
+        .WillByDefault([&, &grid = *this](Http::ResponseDecoder&,
+                                          ConnectionPool::Callbacks& callbacks,
+                                          const ConnectionPool::Instance::StreamOptions& options)
+                           -> ConnectionPool::Cancellable* {
+          if (ConnectivityGridForTest::hasHttp3FailedRecently(grid)) {
+            EXPECT_FALSE(options.can_send_early_data_);
+          }
+          if (immediate_success_) {
+            callbacks.onPoolReady(*encoder_, host(), *info_, std::nullopt);
+            return nullptr;
+          }
+          if (immediate_failure_) {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host());
+            return nullptr;
+          }
+          if (second_pool_immediate_success_) {
+            second_pool_immediate_success_ = false;
+            immediate_success_ = true;
+          }
+          callbacks_.push_back(&callbacks);
+          return cancel_;
+        });
     EXPECT_CALL(*instance, protocolDescription()).Times(AnyNumber()).WillRepeatedly(Return(type));
     return absl::WrapUnique(instance);
   }
@@ -1681,12 +1681,12 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
     grid_->createHttp3AlternatePool();
     EXPECT_CALL(*grid_->alternate(), newStream)
-        .WillOnce(Invoke(
+        .WillOnce(
             [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
                 const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
               grid_->callbacks_.push_back(&callbacks);
               return grid_->cancel_;
-            }));
+            });
   }
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
@@ -1730,13 +1730,13 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenTCPThenAlternate) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
     grid_->createHttp3AlternatePool();
     EXPECT_CALL(*grid_->alternate(), newStream)
-        .WillOnce(Invoke(
+        .WillOnce(
             [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
                 const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
               callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                       "reason", host_);
               return nullptr;
-            }));
+            });
   }
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
@@ -1848,14 +1848,14 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
       .WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
-      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+      .WillOnce([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
         sockaddr_in* addr_in = reinterpret_cast<sockaddr_in*>(addr);
         addr_in->sin_family = AF_INET;
         addr_in->sin_port = 0;
         inet_pton(AF_INET, "127.0.0.1", &addr_in->sin_addr.s_addr);
         *addrlen = sizeof(sockaddr_in);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
@@ -1882,10 +1882,10 @@ TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
 
   NiceMock<Network::MockTransportSocketFactory> tcp_factory;
   EXPECT_CALL(tcp_factory, createTransportSocket(_, _))
-      .WillRepeatedly(Invoke([](Network::TransportSocketOptionsConstSharedPtr,
-                                std::shared_ptr<const Upstream::HostDescription>) {
+      .WillRepeatedly([](Network::TransportSocketOptionsConstSharedPtr,
+                         std::shared_ptr<const Upstream::HostDescription>) {
         return std::make_unique<NiceMock<Network::MockTransportSocket>>();
-      }));
+      });
 
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);

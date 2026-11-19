@@ -223,10 +223,10 @@ Protobuf::Struct MetadataMapHelper::loadStruct(lua_State* state) {
 }
 
 MetadataMapIterator::MetadataMapIterator(MetadataMapWrapper& parent)
-    : parent_{parent}, current_{parent.metadata_.fields().begin()} {}
+    : parent_{parent}, current_{parent.metadata().fields().begin()} {}
 
 int MetadataMapIterator::luaPairsIterator(lua_State* state) {
-  if (current_ == parent_.metadata_.fields().end()) {
+  if (current_ == parent_.metadata().fields().end()) {
     parent_.iterator_.reset();
     return 0;
   }
@@ -238,10 +238,17 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
   return 2;
 }
 
+const Protobuf::Struct& MetadataMapWrapper::metadata() const {
+  if (const auto* borrowed = absl::get_if<const Protobuf::Struct*>(&metadata_)) {
+    return **borrowed;
+  }
+  return absl::get<Protobuf::Struct>(metadata_);
+}
+
 int MetadataMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
-  const auto filter_it = metadata_.fields().find(key);
-  if (filter_it == metadata_.fields().end()) {
+  const auto filter_it = metadata().fields().find(key);
+  if (filter_it == metadata().fields().end()) {
     return 0;
   }
 

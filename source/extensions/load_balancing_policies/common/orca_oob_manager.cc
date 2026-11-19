@@ -308,9 +308,8 @@ void OrcaOobManager::OobSession::connectAndStream() {
   request_encoder_ = &codec_client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  auto headers_message =
-      Grpc::Common::prepareHeaders(authority(*dial_address), std::string(kOrcaOobServiceFullName),
-                                   std::string(kStreamCoreMetricsMethod), std::nullopt);
+  auto headers_message = Grpc::Common::prepareHeaders(
+      authority(*dial_address), kOrcaOobServiceFullName, kStreamCoreMetricsMethod, std::nullopt);
   headers_message->headers().setReferenceScheme(secure_transport
                                                     ? Http::Headers::get().SchemeValues.Https
                                                     : Http::Headers::get().SchemeValues.Http);

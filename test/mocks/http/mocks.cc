@@ -23,15 +23,15 @@ MockServerConnectionCallbacks::MockServerConnectionCallbacks() = default;
 MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
 
 MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
-  ON_CALL(*this, informationalHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+  ON_CALL(*this, informationalHeaders()).WillByDefault([this]() -> ResponseHeaderMapOptRef {
     return makeOptRefFromPtr(informational_headers_.get());
-  }));
-  ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
+  });
+  ON_CALL(*this, responseHeaders()).WillByDefault([this]() -> ResponseHeaderMapOptRef {
     return makeOptRefFromPtr(response_headers_.get());
-  }));
-  ON_CALL(*this, responseTrailers()).WillByDefault(Invoke([this]() -> ResponseTrailerMapOptRef {
+  });
+  ON_CALL(*this, responseTrailers()).WillByDefault([this]() -> ResponseTrailerMapOptRef {
     return makeOptRefFromPtr(response_trailers_.get());
-  }));
+  });
 }
 MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 
@@ -42,7 +42,7 @@ MockCodecEventCallbacks::MockCodecEventCallbacks() = default;
 MockCodecEventCallbacks::~MockCodecEventCallbacks() = default;
 
 MockServerConnection::MockServerConnection() {
-  ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
+  ON_CALL(*this, protocol()).WillByDefault([this]() { return protocol_; });
 }
 
 MockServerConnection::~MockServerConnection() = default;
@@ -58,20 +58,20 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   callbacks.route_.reset(new NiceMock<Router::MockRoute>());
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, streamInfo()).WillByDefault(ReturnRef(callbacks.stream_info_));
-  ON_CALL(callbacks, route()).WillByDefault(Invoke([&callbacks]() -> OptRef<const Router::Route> {
+  ON_CALL(callbacks, route()).WillByDefault([&callbacks]() -> OptRef<const Router::Route> {
     return makeOptRefFromPtr<const Router::Route>(callbacks.route_.get());
-  }));
-  ON_CALL(callbacks, routeSharedPtr())
-      .WillByDefault(
-          Invoke([&callbacks]() -> Router::RouteConstSharedPtr { return callbacks.route_; }));
+  });
+  ON_CALL(callbacks, routeSharedPtr()).WillByDefault([&callbacks]() -> Router::RouteConstSharedPtr {
+    return callbacks.route_;
+  });
   ON_CALL(callbacks, clusterInfo())
-      .WillByDefault(Invoke([&callbacks]() -> OptRef<const Upstream::ClusterInfo> {
+      .WillByDefault([&callbacks]() -> OptRef<const Upstream::ClusterInfo> {
         return makeOptRefFromPtr<const Upstream::ClusterInfo>(callbacks.cluster_info_.get());
-      }));
+      });
   ON_CALL(callbacks, clusterInfoSharedPtr())
-      .WillByDefault(Invoke([&callbacks]() -> Upstream::ClusterInfoConstSharedPtr {
+      .WillByDefault([&callbacks]() -> Upstream::ClusterInfoConstSharedPtr {
         return callbacks.cluster_info_;
-      }));
+      });
   ON_CALL(callbacks, downstreamCallbacks())
       .WillByDefault(
           Return(OptRef<DownstreamStreamFilterCallbacks>{callbacks.downstream_callbacks_}));
@@ -83,47 +83,46 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, decodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
 
   ON_CALL(*this, addDownstreamWatermarkCallbacks(_))
-      .WillByDefault(Invoke([this](DownstreamWatermarkCallbacks& callbacks) -> void {
+      .WillByDefault([this](DownstreamWatermarkCallbacks& callbacks) -> void {
         callbacks_.push_back(&callbacks);
-      }));
+      });
 
   ON_CALL(*this, removeDownstreamWatermarkCallbacks(_))
-      .WillByDefault(Invoke([this](DownstreamWatermarkCallbacks& callbacks) -> void {
+      .WillByDefault([this](DownstreamWatermarkCallbacks& callbacks) -> void {
         callbacks_.remove(&callbacks);
-      }));
+      });
 
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig())
       .WillByDefault(Return(makeOptRef<const Tracing::Config>(tracing_config_)));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
-      .WillByDefault(Invoke([this](Code code, absl::string_view body,
-                                   std::function<void(ResponseHeaderMap & headers)> modify_headers,
-                                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                                   absl::string_view details) {
+      .WillByDefault([this](Code code, absl::string_view body,
+                            std::function<void(ResponseHeaderMap & headers)> modify_headers,
+                            const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                            absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
-      }));
+      });
   ON_CALL(*this, routeConfig())
       .WillByDefault(Return(std::optional<Router::ConfigConstSharedPtr>()));
   ON_CALL(*this, upstreamOverrideHost())
       .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
-      .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
+      .WillByDefault([this]() -> const Router::RouteSpecificFilterConfig* {
         auto route = this->route();
         if (!route) {
           return nullptr;
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
-      }));
-  ON_CALL(*this, perFilterConfigs())
-      .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
-        auto route = this->route();
-        if (!route) {
-          return {};
-        }
-        return route->perFilterConfigs("envoy.filter");
-      }));
+      });
+  ON_CALL(*this, perFilterConfigs()).WillByDefault([this]() -> Router::RouteSpecificFilterConfigs {
+    auto route = this->route();
+    if (!route) {
+      return {};
+    }
+    return route->perFilterConfigs("envoy.filter");
+  });
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
@@ -157,50 +156,49 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
-      .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
+      .WillByDefault([this]() -> const Router::RouteSpecificFilterConfig* {
         auto route = this->route();
         if (!route) {
           return nullptr;
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
-      }));
-  ON_CALL(*this, perFilterConfigs())
-      .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
-        auto route = this->route();
-        if (!route) {
-          return {};
-        }
-        return route->perFilterConfigs("envoy.filter");
-      }));
+      });
+  ON_CALL(*this, perFilterConfigs()).WillByDefault([this]() -> Router::RouteSpecificFilterConfigs {
+    auto route = this->route();
+    if (!route) {
+      return {};
+    }
+    return route->perFilterConfigs("envoy.filter");
+  });
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() = default;
 
 MockStreamDecoderFilter::MockStreamDecoderFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke(
-          [this](StreamDecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+      .WillByDefault(
+          [this](StreamDecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; });
 }
 
 MockStreamDecoderFilter::~MockStreamDecoderFilter() = default;
 
 MockStreamEncoderFilter::MockStreamEncoderFilter() {
   ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke(
-          [this](StreamEncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+      .WillByDefault(
+          [this](StreamEncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; });
 }
 
 MockStreamEncoderFilter::~MockStreamEncoderFilter() = default;
 
 MockStreamFilter::MockStreamFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+      .WillByDefault([this](StreamDecoderFilterCallbacks& callbacks) -> void {
         decoder_callbacks_ = &callbacks;
-      }));
+      });
   ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke([this](StreamEncoderFilterCallbacks& callbacks) -> void {
+      .WillByDefault([this](StreamEncoderFilterCallbacks& callbacks) -> void {
         encoder_callbacks_ = &callbacks;
-      }));
+      });
 }
 
 MockStreamFilter::~MockStreamFilter() = default;

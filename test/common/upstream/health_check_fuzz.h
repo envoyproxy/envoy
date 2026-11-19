@@ -25,7 +25,10 @@ public:
   virtual void respond(test::common::upstream::Respond respond, bool last_action) PURE;
 
   virtual void initialize(test::common::upstream::HealthCheckTestCase input) PURE;
-  virtual void triggerIntervalTimer(bool expect_client_create) PURE;
+  // Fires the interval timer if it is enabled. Whether the health checker then reuses its client
+  // or creates a new one is entirely up to it: clients are created on demand (see
+  // setupClientCreate()), so the harness does not need to know.
+  virtual void triggerIntervalTimer() PURE;
   virtual void triggerTimeoutTimer(bool last_action) PURE;
   virtual void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) PURE;
   // Only implemented by gRPC, otherwise no-op
@@ -44,7 +47,7 @@ public:
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
   void respond(test::common::upstream::Respond respond, bool last_action) override;
-  void triggerIntervalTimer(bool expect_client_create) override;
+  void triggerIntervalTimer() override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   // No op
@@ -60,7 +63,7 @@ public:
   void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
   void respond(test::common::upstream::Respond respond, bool last_action) override;
-  void triggerIntervalTimer(bool expect_client_create) override;
+  void triggerIntervalTimer() override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   // No op
@@ -81,7 +84,7 @@ public:
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
   // This has three components, headers, raw bytes, and trailers
   void respond(test::common::upstream::Respond respond, bool last_action) override;
-  void triggerIntervalTimer(bool expect_client_create) override;
+  void triggerIntervalTimer() override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   void raiseGoAway(bool no_error) override;
@@ -111,8 +114,8 @@ public:
   TestSessionPtr test_session_;
 
   void expectSessionCreate();
-  void expectClientCreate();
-  void expectStreamCreate();
+  // See HttpHealthCheckerImplTestBase::setupClientCreate().
+  void setupClientCreate();
 
   std::shared_ptr<NiceMock<TestGrpcHealthCheckerImpl>> health_checker_;
 };

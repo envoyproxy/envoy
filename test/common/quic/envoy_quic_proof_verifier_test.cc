@@ -167,12 +167,12 @@ typed_config:
   EXPECT_TRUE(verify_timer->enabled());
 
   EXPECT_CALL(*quic_verify_callback, Run(true, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
             EXPECT_NE(verify_details, nullptr);
             auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
             EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
-          }));
+          });
   verify_timer->invokeCallback();
 }
 
@@ -273,12 +273,12 @@ typed_config:
 
   EXPECT_CALL(*quic_verify_callback,
               Run(false, "Leaf certificate doesn't match hostname: unknown.org", _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
             EXPECT_NE(verify_details, nullptr);
             auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
             EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
-          }));
+          });
   verify_timer->invokeCallback();
 }
 

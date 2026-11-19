@@ -15,7 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -161,17 +160,17 @@ public:
   BufferManagerTest() {
     // The in-memory buffer delivers write completions via dispatcher.post().
     // Capture those callbacks so the test can run the event loop deterministically.
-    ON_CALL(dispatcher_, post(testing::_)).WillByDefault(Invoke([this](Event::PostCb cb) {
+    ON_CALL(dispatcher_, post(testing::_)).WillByDefault([this](Event::PostCb cb) {
       posted_.push_back(std::move(cb));
-    }));
+    });
     // The manager creates its replay callback on first replay, so the mock is manufactured on
     // demand: arming a one-shot expectation up front would leave it unmet in every test that
     // never replays.
     ON_CALL(dispatcher_, createSchedulableCallback_(testing::_))
-        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+        .WillByDefault([this](std::function<void()> cb) -> Event::SchedulableCallback* {
           replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, cb);
           return replay_cb_;
-        }));
+        });
     resetManager(factory_);
   }
 
@@ -1273,9 +1272,9 @@ TEST_F(BufferManagerTest, OnReplayResumedWhileBudgetYieldedDoesNotScheduleCurren
 
   // Capture calls to scheduleCallbackCurrentIteration vs NextIteration during watermark lower.
   int current_iter_calls = 0;
-  ON_CALL(*replay_cb_, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([&]() {
+  ON_CALL(*replay_cb_, scheduleCallbackCurrentIteration()).WillByDefault([&]() {
     ++current_iter_calls;
-  }));
+  });
 
   // First continuation consumes the 8-chunk budget and yields via scheduleCallbackNextIteration().
   replay_cb_->invokeCallback();

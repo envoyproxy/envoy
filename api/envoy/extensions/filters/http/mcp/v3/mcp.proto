@@ -74,6 +74,27 @@ message Mcp {
 
   message TraceContextPropagationConfig {
     option (xds.annotations.v3.message_status).work_in_progress = true;
+
+    enum TraceContextPropagationMode {
+      // Copy the request body's trace context to headers without modification.
+      COPY = 0;
+
+      // Copy the request body's trace context to headers without modification.
+      // Also reparents the active span based on the body's traceparent. In this
+      // mode, upstream spans will not descend from the active span; the subtree
+      // of spans will be a sibling of the active span.
+      COPY_AND_REPARENT_SPAN = 1;
+
+      // Rewrite the request body's trace context after reparenting the active
+      // span based on the body's trace context. In this mode, upstream spans will
+      // be descend from the active span.
+      REWRITE_AND_REPARENT_SPAN = 2;
+    }
+
+    // Controls how the request body's trace context is propagated.
+    //
+    // [#not-implemented-hide:]
+    TraceContextPropagationMode mode = 1;
   }
 
   message BaggagePropagationConfig {

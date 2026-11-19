@@ -3,11 +3,13 @@ use crate::{
   abi,
   drop_wrapped_c_void_ptr,
   ffi_export,
+  new_load_shed_point,
   str_to_module_buffer,
   wrap_into_c_void_ptr,
   EnvoyCounterId,
   EnvoyGaugeId,
   EnvoyHistogramId,
+  EnvoyLoadShedPoint,
   NewListenerFilterConfigFunction,
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
@@ -78,6 +80,13 @@ pub trait EnvoyListenerFilterConfig {
 
   /// Create a new implementation of the [`EnvoyListenerFilterConfigScheduler`] trait.
   fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static;
+
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the connection processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name or the listener
+  /// of the filter bypasses the overload manager.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
 }
 
 /// The trait that represents the configuration for an Envoy listener filter configuration.
@@ -146,6 +155,7 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
   fn on_close(&mut self, _envoy_filter: &mut ELF) {}
 
   /// This is called when the HTTP callout response is received initiated by a listener filter.
+  /// Envoy reports a failure of a callout in flight from a later callback on the same thread.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   /// * `callout_id` is the ID of the callout. This is used to differentiate between multiple calls.
@@ -285,6 +295,21 @@ pub trait EnvoyListenerFilter {
     namespace: &'a str,
     entries: &'a [(&'a str, &'a str)],
   );
+
+  /// Merge a serialized `google.protobuf.Struct` into a dynamic metadata namespace. Existing
+  /// entries with the same key are overwritten. An empty struct is a no-op and does not create
+  /// the namespace.
+  ///
+  /// Returns true if the struct was merged, false if the buffer does not parse as a
+  /// `google.protobuf.Struct`.
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) -> bool;
+
+  /// Set the `typed_filter_metadata` entry of a namespace from a serialized `google.protobuf.Any`,
+  /// replacing an existing entry.
+  ///
+  /// Returns true if the entry was set, false if the buffer does not parse as a
+  /// `google.protobuf.Any` with a type URL.
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool;
 
   /// Get the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
@@ -758,6 +783,15 @@ impl EnvoyListenerFilterConfig for EnvoyListenerFilterConfigImpl {
       }
     }
   }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+        self.raw,
+        str_to_module_buffer(name),
+      )
+    })
+  }
 }
 
 /// The implementation of [`EnvoyListenerFilter`] for the Envoy listener filter.
@@ -1083,6 +1117,26 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
         str_to_module_buffer(namespace),
         entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
         entries.len(),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+        self.raw,
+        str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+        self.raw,
+        str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_any),
       )
     }
   }

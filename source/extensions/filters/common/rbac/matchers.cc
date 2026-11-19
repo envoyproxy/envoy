@@ -281,7 +281,7 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   if (ip == nullptr) {
     return false;
   }
-  return !trie_->getData(address).empty();
+  return trie_->getDataSet(address).has_value();
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
@@ -329,8 +329,7 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
     return true;
   }
 
-  // If set, The URI SAN  or DNS SAN in that order is used as Principal, otherwise the subject field
-  // is used.
+  // The principal matches if any URI SAN, any DNS SAN, or the subject field matches.
   if (!ssl->uriSanPeerCertificate().empty()) {
     for (const std::string& uri : ssl->uriSanPeerCertificate()) {
       if (matcher_.value().match(uri)) {

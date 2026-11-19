@@ -3,6 +3,8 @@
 #include "envoy/http/filter_factory.h"
 #include "envoy/server/filter_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -279,9 +281,40 @@ private:
 };
 
 /**
+ * GenericFactoryContext view of a ServerFactoryContext and an ExtraFactoryContext, so that the
+ * filters only have to deal with one context.
+ *
+ * NOTE: this holds references only and is expected to be created on the stack at the call site,
+ * the same as ExtraFactoryContext.
+ */
+class ExtraGenericFactoryContext : public Server::Configuration::GenericFactoryContext {
+public:
+  ExtraGenericFactoryContext(Server::Configuration::ServerFactoryContext& context,
+                             Server::Configuration::ExtraFactoryContext& extra_context)
+      : context_(context), extra_context_(extra_context) {}
+
+  // Server::Configuration::GenericFactoryContext
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() override { return context_; }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return extra_context_.visitor;
+  }
+  Init::Manager& initManager() override {
+    return extra_context_.init_manager.has_value() ? extra_context_.init_manager.ref()
+                                                   : context_.initManager();
+  }
+  Stats::Scope& scope() override { return extra_context_.statsPrefixScopeOr(context_); }
+  Stats::Scope& statsScope() override { return extra_context_.statsPrefixScopeOr(context_); }
+
+private:
+  Server::Configuration::ServerFactoryContext& context_;
+  Server::Configuration::ExtraFactoryContext& extra_context_;
+};
+
+/**
  * Base class for HTTP filter factory registrations. This is the recommended base class for all
  * the HTTP filter factories. It supports both the downstream and the upstream HTTP filter chains
- * and only requires the single createHttpFilterFactoryFromProtoTyped() entry point.
+ * and requires either the createFilterFactoryTyped() or the createHttpFilterFactoryFromProtoTyped()
+ * entry point to be overridden.
  */
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class UnifiedFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
@@ -319,9 +352,62 @@ public:
         context, extra_context);
   }
 
-  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const ConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext& extra_context) PURE;
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createHttpFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                        Server::Configuration::ServerFactoryContext& context,
+                                        Server::Configuration::ExtraFactoryContext& extra_context) {
+    ExtraGenericFactoryContext generic_context(context, extra_context);
+    return createFilterFactoryTyped(proto_config, generic_context);
+  }
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfigTyped(
+      const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    ExtraGenericFactoryContext generic_context(context, extra_context);
+    return createRouteConfigTyped(proto_config, generic_context);
+  }
+
+protected:
+  /**
+   * Entry point for creating the filter factory of this filter. The generic factory context
+   * provides the core features that most extensions require. If a more detailed context is
+   * necessary, either override the more specific createHttpFilterFactoryFromProtoTyped() instead,
+   * which is given the full ExtraFactoryContext, or extend the GenericFactoryContext: it is a
+   * simple wrapper of the ServerFactoryContext and the ExtraFactoryContext and is easy to extend.
+   *
+   * The stats of the filter should be created in context.scope() and should not be prefixed by
+   * the stat prefix of the filter chain: the scope already carries it. NOTE: if the
+   * envoy.reloadable_features.use_stats_prefix_scope_for_http_filter runtime flag is explicitly
+   * flipped to false, the scope does not carry the stat prefix and the stats created in it will
+   * lose their correct prefix. Filters that must keep the legacy stat names in that case should
+   * override createHttpFilterFactoryFromProtoTyped() and use
+   * ExtraFactoryContext::statsPrefixScopeOr() and ExtraFactoryContext::statsPrefixOr().
+   *
+   * The context is only valid during this call and must not be stored.
+   */
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryTyped(const ConfigProto&, Server::Configuration::GenericFactoryContext&) {
+    return absl::UnimplementedError(absl::StrCat(
+        "UnifiedFactoryBase: no filter factory creation is implemented for ", this->name()));
+  }
+
+  /**
+   * Entry point for creating the route specific filter configuration of this filter. The generic
+   * factory context provides the core features that most extensions require. If a more detailed
+   * context is necessary, either override the more specific createHttpFilterRouteConfigTyped()
+   * instead, which is given the full ExtraFactoryContext, or extend the GenericFactoryContext: it
+   * is a simple wrapper of the ServerFactoryContext and the ExtraFactoryContext and is easy to
+   * extend.
+   *
+   * The context is only valid during this call and must not be stored.
+   */
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteConfigTyped(const RouteConfigProto& proto_config,
+                         Server::Configuration::GenericFactoryContext& context) {
+    // Delegate to createRouteSpecificFilterConfigTyped for backwards compatibility.
+    return this->createRouteSpecificFilterConfigTyped(proto_config, context.serverFactoryContext(),
+                                                      context.messageValidationVisitor());
+  }
 };
 
 } // namespace Common

@@ -978,6 +978,28 @@ TEST_F(ResponseHandlerTest, OversizedSkippableEventDoesNotDegrade) {
   EXPECT_EQ(stats_.sse_event_too_large_.value(), 1);
 }
 
+TEST_F(ResponseHandlerTest, OversizedSkippableEventSplitNameDoesNotDegrade) {
+  SseResponseHandler handler(LLMProtocol::AnthropicMessages, /*max_event_size=*/256,
+                             TestMaxParsedEvents, stats_);
+  const std::string start = "event: message_start\n"
+                            "data: {\"type\":\"message_start\",\"message\":{"
+                            "\"usage\":{\"input_tokens\":9,\"output_tokens\":1}}}\n\n";
+  feed(handler, start, start.size(), /*end_stream=*/false);
+  // Split mid-`event:` across frames to verify incremental name classification.
+  const std::string head = "event: content_";
+  feed(handler, head, head.size(), /*end_stream=*/false);
+  const std::string tail = "block_delta\ndata: " + std::string(400, 'y') + "\n\n";
+  feed(handler, tail, tail.size(), /*end_stream=*/false);
+  feed(handler,
+       "event: message_delta\n"
+       "data: {\"type\":\"message_delta\",\"delta\":{},"
+       "\"usage\":{\"output_tokens\":7}}\n\n",
+       4096);
+  EXPECT_FALSE(handler.degraded());
+  EXPECT_EQ(handler.usage().output_tokens, 7);
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 1);
+}
+
 // An oversized event with no classifiable name (an unnamed Chat Completions
 // chunk) still degrades: it could have carried the usage.
 TEST_F(ResponseHandlerTest, OversizedUnnamedEventStillDegrades) {

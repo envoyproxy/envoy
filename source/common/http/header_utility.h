@@ -56,6 +56,9 @@ public:
 
     const std::string& backingString() const { return result_backing_string_; }
 
+    // Moves the backing string out. result() must not be used afterwards.
+    std::string releaseBackingString() && { return std::move(result_backing_string_); }
+
   private:
     std::optional<absl::string_view> result_;
     // Valid only if result_ relies on memory allocation that must live beyond the call. See above.

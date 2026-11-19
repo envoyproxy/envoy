@@ -16,7 +16,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnNew;
 using testing::ReturnRef;
@@ -314,24 +313,24 @@ public:
   void mockSysCallForPeek(const std::vector<uint8_t>& client_hello) {
 #ifdef WIN32
     EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
               const size_t amount_to_copy = std::min(iov->iov_len, client_hello.size());
               if (amount_to_copy > 0 && iov->iov_base != nullptr && !client_hello.empty()) {
                 memcpy(iov->iov_base, client_hello.data(), amount_to_copy);
               }
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }));
+            });
 #else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
               const size_t amount_to_copy = std::min(length, client_hello.size());
               if (amount_to_copy > 0 && buffer != nullptr && !client_hello.empty()) {
                 memcpy(buffer, client_hello.data(), amount_to_copy);
               }
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }));
+            });
 #endif
   }
 

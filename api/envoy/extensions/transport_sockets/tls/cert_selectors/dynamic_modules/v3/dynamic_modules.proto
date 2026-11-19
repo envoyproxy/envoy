@@ -5,6 +5,7 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -25,6 +26,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // certificate. This works for both downstream and upstream TLS contexts. QUIC listeners are not
 // supported.
 //
+// The listeners and clusters that use the TLS context warm until the module calls
+// ``envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete``, so that
+// the module can provide its dynamic certificates before the first handshake. A module without
+// asynchronous initialization calls it while its configuration is created. The wait has no
+// timeout, so a module that never calls it keeps them warming, which also holds the initialization
+// of the server when it waits for them.
+//
 // Example:
 //
 // .. validated-code-block:: yaml
@@ -38,6 +46,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //         name: my_module
 //       selector_name: my_selector
 //
+// [#next-free-field: 6]
 message DynamicModuleTlsCertificateSelector {
   // Dynamic module configuration. See :ref:`dynamic module configuration
   // <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>` for details.
@@ -66,17 +75,30 @@ message DynamicModuleTlsCertificateSelector {
   // Allows the module to provide certificates at runtime in addition to the ones configured in the
   // TLS context. Each dynamic certificate is built with the settings of the TLS context, including
   // its certificate validation, and a handshake that selects one that is not provided yet can wait
-  // until the module provides or removes it.
+  // until the module provides or removes it, or until :ref:`dynamic_certificate_request_timeout
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3.DynamicModuleTlsCertificateSelector.dynamic_certificate_request_timeout>`
+  // expires.
   //
-  // A downstream TLS context must set both
-  // :ref:`disable_stateless_session_resumption
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
-  // and :ref:`disable_stateful_session_resumption
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>`,
-  // and an upstream TLS context must set :ref:`max_session_keys
+  // The module also selects the certificate of a downstream handshake that resumes a session. A
+  // session that a dynamic certificate established resumes only when the selected certificate has
+  // the same subject common name, subject alternative names and issuer, and the certificate
+  // validation of the TLS context has not changed since. An upstream TLS context must set
+  // :ref:`max_session_keys
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.max_session_keys>`
-  // to 0, since a resumed session reuses the certificate of the original handshake.
+  // to 0, since a resumed upstream session keeps the client certificate of its original handshake
+  // without asking the module.
   //
   // Defaults to false.
   bool allow_dynamic_certificates = 4;
+
+  // How long Envoy waits for the module to provide or remove a dynamic certificate after requesting
+  // it. When it expires, the handshakes that wait for the certificate fail, and the next handshake
+  // that selects it requests it again. Setting it to 0 disables the timeout, and a positive value
+  // below 1 ms is rounded up to 1 ms. It has no effect unless :ref:`allow_dynamic_certificates
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3.DynamicModuleTlsCertificateSelector.allow_dynamic_certificates>`
+  // is set.
+  //
+  // If not specified, defaults to 15 seconds.
+  google.protobuf.Duration dynamic_certificate_request_timeout = 5
+      [(validate.rules).duration = {gte {}}];
 }

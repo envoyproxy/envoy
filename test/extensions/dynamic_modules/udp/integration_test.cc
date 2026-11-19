@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/integration/base_overload_integration_test.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -32,7 +33,8 @@ public:
   void SetUp() override { setDynamicModulesSearchPath("udp_no_op", "c"); }
 
   void setup(const std::string& module_name = "udp_no_op",
-             const std::string& filter_name = "test_filter") {
+             const std::string& filter_name = "test_filter",
+             const std::string& module_filter_config = "some_config") {
     FakeUpstreamConfig::UdpConfig config;
     setUdpFakeUpstream(config);
 
@@ -46,9 +48,9 @@ typed_config:
   filter_name: "{}"
   filter_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
-    value: "some_config"
+    value: "{}"
 )EOF",
-                                                  module_name, filter_name);
+                                                  module_name, filter_name, module_filter_config);
 
     // addListenerFilter() prepends filters, so add udp_proxy first to produce
     // [dynamic_modules, udp_proxy].
@@ -176,6 +178,76 @@ TEST_P(DynamicModulesUdpIntegrationTest, GoSdkRewriteDatagram) {
   Network::UdpRecvData request_datagram;
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
   EXPECT_EQ("rewritten", request_datagram.buffer_->toString());
+}
+
+class DynamicModulesUdpLoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
+                                                      public DynamicModulesUdpIntegrationTest {
+public:
+  // Saturates the trigger of the load shed point that the module checks.
+  void initializeOverloadedLoadShedPoint(bool bypass_overload_manager) {
+    setupOverloadManagerConfig(
+        TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "test.dynamic_module_load_shed_point"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+    config_helper_.addConfigModifier(
+        [this, bypass_overload_manager](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          *bootstrap.mutable_overload_manager() = overload_manager_config_;
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->set_bypass_overload_manager(
+              bypass_overload_manager);
+        });
+    setDynamicModulesSearchPath("udp_listener_integration_test", "go");
+    setup("udp_listener_integration_test", "load_shed_point",
+          "test.dynamic_module_load_shed_point");
+    updateResource(0.95);
+    test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                               testing::Eq(100));
+  }
+
+  Network::Address::InstanceConstSharedPtr listenerAddress() {
+    return *Network::Utility::resolveUrl(
+        fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()),
+                    lookupPort("listener_0")));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesUdpLoadShedPointIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModulesUdpLoadShedPointIntegrationTest, ShedsLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false);
+
+  Network::Test::UdpSyncPeer client(GetParam());
+  client.write("shed", *listenerAddress());
+  test_server_->waitForCounter("overload.test.dynamic_module_load_shed_point.shed_load_count",
+                               testing::Eq(1));
+
+  updateResource(0.8);
+  test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                             testing::Eq(0));
+  client.write("accepted", *listenerAddress());
+  // Had the first datagram not been shed, it would arrive first, since udp_proxy forwards the
+  // datagrams of a peer in order.
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("accepted", request_datagram.buffer_->toString());
+}
+
+TEST_P(DynamicModulesUdpLoadShedPointIntegrationTest,
+       ListenerBypassingOverloadManagerDoesNotShedLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/true);
+
+  Network::Test::UdpSyncPeer client(GetParam());
+  client.write("accepted", *listenerAddress());
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("accepted", request_datagram.buffer_->toString());
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
 }
 
 } // namespace

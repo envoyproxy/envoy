@@ -1,9 +1,13 @@
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
@@ -203,6 +207,38 @@ direct_response:
       cluster->MergeFrom(bootstrap.static_resources().clusters(0));
       cluster->set_name("canary");
     });
+  }
+
+  // Configures the virtual host to count requests for /rides in its rides virtual cluster, and the
+  // specifier to declare rides, bikes and the catch all virtual cluster for the virtual host with
+  // no sampled comparison.
+  void setupVirtualClusterTest(bool prefer_selection) {
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          TestUtility::loadFromYaml(
+              R"EOF(
+name: rides
+headers:
+- name: ":path"
+  string_match: {prefix: "/rides"}
+)EOF",
+              *hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_virtual_clusters());
+        });
+    // The two IP versions run the server in the two stats modes, which it reads before the runtime
+    // loader exists.
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  useExplicitStatsTags());
+    setupTest(absl::StrCat(R"EOF(
+virtual_cluster_override:
+  virtual_host_name: integration
+  names: [rides, bikes, other]
+  verify_one_in: 0
+  prefer_selection: )EOF",
+                           prefer_selection ? "true" : "false", "\n"));
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(nullptr, store);
+    EXPECT_EQ(useExplicitStatsTags(), store->useExplicitTags());
   }
 
   // Configures the virtual host to run the shadow example module, which routes to intended_cluster
@@ -578,6 +614,86 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, SetRouteNameSurfacesInAccessL
 
   const std::string log = waitForAccessLog(access_log_name_);
   EXPECT_NE(std::string::npos, log.find("module_route"));
+}
+
+// A preferred selection is the virtual cluster the router counts the request in, with the
+// statistics of the virtual cluster of that name on the virtual host, and the
+// %VIRTUAL_CLUSTER_NAME% access log command operator reports it. A declared virtual cluster the
+// virtual host does not configure names and tags its statistics like one it configures, a direct
+// response is counted in no virtual cluster, a name the specifier does not declare or a selection
+// of none leaves the request to the virtual host, and other counts it in the catch all virtual
+// cluster.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PreferredVirtualClusterSelection) {
+  useAccessLog("%VIRTUAL_CLUSTER_NAME%");
+  setupVirtualClusterTest(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(1));
+  EXPECT_EQ(1, counterValue("vhost.integration.vcluster.rides.upstream_rq_total"));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_).find("rides"));
+
+  response = sendRequest({{"x-virtual-cluster", "bikes"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.bikes.upstream_rq_200", testing::Eq(1));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_, 1).find("bikes"));
+  EXPECT_EQ(1, counterValue("vhost.integration.vcluster.bikes.upstream_rq_total"));
+  for (const std::string name : {"bikes", "rides"}) {
+    expectStatTags(absl::StrCat("vhost.integration.vcluster.", name, ".upstream_rq_total"),
+                   "vhost.vcluster.upstream_rq_total",
+                   {{"envoy.virtual_host", "integration"}, {"envoy.virtual_cluster", name}});
+  }
+  EXPECT_EQ(2, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_selected"));
+
+  response = sendRequest({{"x-template", "direct"}, {"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("204", response->headers().getStatusValue());
+  EXPECT_EQ(std::string::npos, waitForAccessLog(access_log_name_, 2).find("rides"));
+  EXPECT_EQ(2, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_selected"));
+
+  response = sendRequest({{"x-virtual-cluster", "unknown"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(1));
+  EXPECT_EQ(1, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_unknown"));
+
+  response = sendRequest({{"x-virtual-cluster", ""}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(2));
+  EXPECT_EQ(1, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_none"));
+
+  response = sendRequest({{":path", "/rides"}, {"x-virtual-cluster", "other"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(3));
+  EXPECT_EQ(std::string::npos, waitForAccessLog(access_log_name_, 5).find("other"));
+  EXPECT_EQ(3, counterValue("dynamicmodulescustom.route_specifier.test.virtual_cluster_selected"));
+}
+
+// Without prefer_selection the router counts the request in the virtual cluster the virtual host
+// matches, which the access log reports, and counts whether the selection agrees with it.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ComparedVirtualClusterSelection) {
+  useAccessLog("%VIRTUAL_CLUSTER_NAME%");
+  setupVirtualClusterTest(false);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/rides"}, {"x-virtual-cluster", "bikes"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.virtual_cluster_disagree",
+                               testing::Eq(1));
+  EXPECT_EQ(0, counterValue("vhost.integration.vcluster.bikes.upstream_rq_total"));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_).find("rides"));
+
+  response = sendRequest({{":path", "/rides"}, {"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(2));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.virtual_cluster_agree",
+                               testing::Eq(1));
+
+  response = sendRequest({{"x-virtual-cluster", "other"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_200", testing::Eq(1));
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.virtual_cluster_agree",
+                               testing::Eq(2));
 }
 
 // A recorded prefix rewrite replaces the matched prefix of the path sent upstream, keeping the
@@ -1038,6 +1154,37 @@ typed_config:
                           {"x-echo", "previous-route-metadata"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("absent", header(response->headers(), "x-echo-result"));
+
+  // The read finds no string under a key that holds a number, under a key that is missing, or in a
+  // namespace that is missing.
+  for (const auto& [name, value] : std::vector<std::pair<std::string, std::string>>{
+           {"x-metadata-key", "number"},
+           {"x-metadata-key", "missing"},
+           {"x-metadata-namespace", "envoy.test.missing"}}) {
+    response =
+        sendRequest({{"x-template", "full"}, {"x-echo", "previous-route-metadata"}, {name, value}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("absent", header(response->headers(), "x-echo-result")) << value;
+  }
+}
+
+// The route metadata getters read only a value of the kind they ask for, under a key and in a
+// namespace the route holds.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsRouteMetadataOfTheKindAskedFor) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (const auto& [echo, name, value] :
+       std::vector<std::tuple<std::string, std::string, std::string>>{
+           {"route-metadata", "x-metadata-key", "number"},
+           {"route-metadata", "x-metadata-key", "missing"},
+           {"route-metadata", "x-metadata-namespace", "envoy.test.missing"},
+           {"route-metadata-number", "x-metadata-key", "key"},
+           {"route-metadata-number", "x-metadata-key", "missing"},
+           {"route-metadata-number", "x-metadata-namespace", "envoy.test.missing"}}) {
+    auto response = sendRequest({{"x-template", "full"}, {"x-echo", echo}, {name, value}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("absent", header(response->headers(), "x-echo-result")) << echo << " " << value;
+  }
 }
 
 // ReusePrevious without a previous route is rejected and the failure policy passes it through.
@@ -1081,6 +1228,49 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteUserDataFiresDestroyHook
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.route_destroy",
                                testing::Ge(1));
+}
+
+// User data a decision builds no route for is handed back through the user data discard hook
+// instead of the route destroy hook.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, UnusedRouteUserDataFiresDiscardHook) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The module counts the values it got back for the whole process, which outlives this server.
+  const auto discards = [this]() {
+    auto response = sendRequest({{"x-echo", "discard-count"}});
+    uint64_t count = 0;
+    EXPECT_TRUE(absl::SimpleAtoi(header(response->headers(), "x-echo-result"), &count));
+    return count;
+  };
+  const uint64_t discards_before = discards();
+
+  auto response = sendRequest({{"x-decision", "pass-through"}, {"x-user-data", "42"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(discards_before + 1, discards());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.user_data_discard",
+                               testing::Eq(1));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.route_specifier.test.route_destroy"));
+}
+
+// A module reads whether its configuration caches built routes.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsWhetherTheConfigurationCachesBuiltRoutes) {
+  setupTest(R"EOF(
+built_route_cache:
+  max_entries_per_worker: 16
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequest({{"x-echo", "has-built-route-cache"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("true", header(response->headers(), "x-echo-result"));
+}
+
+// A module reads that a configuration without built_route_cache caches no built routes.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsThatTheConfigurationCachesNoBuiltRoutes) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequest({{"x-echo", "has-built-route-cache"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("false", header(response->headers(), "x-echo-result"));
 }
 
 // A decision that stops the chain skips the specifiers configured after it, which the second

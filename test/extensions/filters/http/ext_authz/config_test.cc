@@ -29,7 +29,6 @@
 
 using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
@@ -94,12 +93,11 @@ public:
     // Delegate call to mock async client manager to real async client manager.
     ON_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClientWithHashKey(_, _, _))
-        .WillByDefault(
-            Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                       Stats::Scope& scope, bool skip_cluster_check) {
-              return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
-                  config_with_hash_key, scope, skip_cluster_check);
-            }));
+        .WillByDefault([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                           Stats::Scope& scope, bool skip_cluster_check) {
+          return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+              config_with_hash_key, scope, skip_cluster_check);
+        });
     ExtAuthzFilterConfig factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_).value();
   }
@@ -268,7 +266,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
   EXPECT_FALSE(typed_config.disabled());
   EXPECT_TRUE(typed_config.grpcService().has_value());
 
-  const auto& grpc_service = typed_config.grpcService().value();
+  const auto& grpc_service = typed_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
 
@@ -429,7 +427,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitchingHttpToGrpc) {
   EXPECT_TRUE(merged_config.grpcService().has_value());
   EXPECT_FALSE(merged_config.httpService().has_value());
 
-  const auto& grpc_service = merged_config.grpcService().value();
+  const auto& grpc_service = merged_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_grpc_cluster");
   EXPECT_EQ(grpc_service.envoy_grpc().authority(), "ext-authz.example.com");
@@ -500,7 +498,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceWithTimeout) {
   EXPECT_TRUE(typed_config.grpcService().has_value());
   EXPECT_FALSE(typed_config.httpService().has_value());
 
-  const auto& grpc_service = typed_config.grpcService().value();
+  const auto& grpc_service = typed_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_custom_grpc");
   EXPECT_EQ(grpc_service.envoy_grpc().authority(), "custom-ext-authz.example.com");
@@ -546,7 +544,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteEmptyContextExtensionsMerging) {
 
   // Should use gRPC service from more specific
   EXPECT_TRUE(merged_config.grpcService().has_value());
-  EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "specific_cluster");
+  EXPECT_EQ(merged_config.grpcService()->config().envoy_grpc().cluster_name(), "specific_cluster");
 
   // Should preserve context extensions from less specific since more specific has none
   const auto& context_extensions = merged_config.contextExtensions();
@@ -600,7 +598,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
 
   // Check that more specific gRPC service is used
   EXPECT_TRUE(merged_config.grpcService().has_value());
-  const auto& grpc_service = merged_config.grpcService().value();
+  const auto& grpc_service = merged_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
 
@@ -722,15 +720,14 @@ TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
       &context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_);
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
               send_(_, _, _))
-      .WillOnce(Invoke([&async_request](Http::RequestMessagePtr&,
-                                        Http::AsyncClient::Callbacks& callbacks,
-                                        const Http::AsyncClient::RequestOptions&)
-                           -> Http::AsyncClient::Request* {
+      .WillOnce([&async_request](
+                    Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
         Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
             Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
         callbacks.onSuccess(async_request, std::move(response));
         return nullptr;
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
@@ -913,9 +910,9 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, true))
       .WillRepeatedly(
-          Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                     Stats::Scope& scope,
-                     bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+          [&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+              Stats::Scope& scope,
+              bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
             // The per-route gRPC client creation should call getOrCreateRawAsyncClientWithHashKey
             // with a config matching the per-route cluster "per_route_ext_authz_cluster".
             if (config_with_hash_key.config().envoy_grpc().cluster_name() ==
@@ -927,7 +924,7 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
             // A client is made for the default cluster during initialization.
             return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
                 config_with_hash_key, scope, skip_cluster_check);
-          }));
+          });
 
   EXPECT_CALL(*mock_per_route_grpc_client, sendRaw(_, _, _, _, _, _))
       .WillRepeatedly([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,

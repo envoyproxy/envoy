@@ -59,6 +59,22 @@ TEST_F(FilterTest, BasicAuth) {
   EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
 }
 
+TEST_F(FilterTest, BasicAuthSchemeIsCaseInsensitive) {
+  for (absl::string_view scheme : {"basic", "BASIC", "bAsIc"}) {
+    // user1:test1
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"Authorization", absl::StrCat(scheme, " dXNlcjE6dGVzdDE=")}};
+    request_headers.setScheme("http");
+    request_headers.setHost("host");
+    request_headers.setPath("/");
+    ON_CALL(decoder_filter_callbacks_, requestHeaders())
+        .WillByDefault(testing::Return(Http::RequestHeaderMapOptRef(request_headers)));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ("user1", request_headers.get_("x-username"));
+  }
+}
+
 TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
@@ -76,9 +92,9 @@ TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setDynamicMetadata("envoy.filters.http.basic_auth", _))
-      .WillOnce(Invoke([&](const std::string&, const Protobuf::Struct& metadata) {
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         captured_metadata = metadata;
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
 
@@ -106,10 +122,10 @@ TEST_F(FilterTest, UserNotExist) {
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
       .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Invalid username/password combination.", body);
 
@@ -121,7 +137,7 @@ TEST_F(FilterTest, UserNotExist) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "invalid_credential_for_basic_auth");
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_user1, true));
 }
@@ -136,10 +152,10 @@ TEST_F(FilterTest, InvalidPassword) {
       .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Invalid username/password combination.", body);
 
@@ -151,7 +167,7 @@ TEST_F(FilterTest, InvalidPassword) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "invalid_credential_for_basic_auth");
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_user1, true));
 }
@@ -165,10 +181,10 @@ TEST_F(FilterTest, NoAuthHeader) {
       .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Missing username and password.", body);
 
@@ -180,7 +196,7 @@ TEST_F(FilterTest, NoAuthHeader) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "no_credential_for_basic_auth");
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_user1, true));
 }
@@ -194,10 +210,10 @@ TEST_F(FilterTest, HasAuthHeaderButNotForBasic) {
       .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Expected 'Basic' authentication scheme.", body);
 
@@ -209,7 +225,7 @@ TEST_F(FilterTest, HasAuthHeaderButNotForBasic) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "invalid_scheme_for_basic_auth");
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_user1, true));
 }
@@ -223,10 +239,10 @@ TEST_F(FilterTest, HasAuthHeaderButNoColon) {
       .WillOnce(testing::Return(makeOptRef(request_headers_user1)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Invalid basic credential format.", body);
 
@@ -238,7 +254,7 @@ TEST_F(FilterTest, HasAuthHeaderButNoColon) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "invalid_format_for_basic_auth");
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_user1, true));
 }
@@ -270,10 +286,10 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
       .WillByDefault(testing::Return(&basic_auth_per_route));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Missing username and password.", body);
 
@@ -285,7 +301,7 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "no_credential_for_basic_auth");
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(empty_request_headers, true));
@@ -355,16 +371,16 @@ TEST_F(FilterTest, FixedRealmUsedInWWWAuthenticate) {
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([&](Http::Code code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
         modify_headers(response_headers);
         EXPECT_EQ(
             "Basic realm=\"myapp\"",
             response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
 }
 
@@ -378,15 +394,15 @@ TEST_F(FilterTest, EmptyRealmFallsBackToUri) {
       .WillOnce(testing::Return(makeOptRef(request_headers)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
         modify_headers(response_headers);
         EXPECT_EQ(
             "Basic realm=\"http://host/\"",
             response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
 }
@@ -408,16 +424,16 @@ TEST_F(FilterTest, RealmWithSpecialCharsIsEscaped) {
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
         modify_headers(response_headers);
         // `\` → `\\`, `"` → `\"` inside the quoted-string
         EXPECT_EQ(
             R"(Basic realm="Corp\\\"SSO\"")",
             response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
 }
 
@@ -444,16 +460,16 @@ TEST_F(FilterTest, BasicAuthPerRouteRealmOverridesFilterLevel) {
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([&](Http::Code code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
         modify_headers(response_headers);
         EXPECT_EQ(
             "Basic realm=\"route-realm\"",
             response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
 }
 
@@ -480,15 +496,15 @@ TEST_F(FilterTest, BasicAuthPerRouteEmptyRealmFallsBackToFilterLevel) {
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([&](Http::Code, absl::string_view,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
         modify_headers(response_headers);
         EXPECT_EQ(
             "Basic realm=\"filter-realm\"",
             response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
 }
 
@@ -561,10 +577,10 @@ TEST_F(AllowMissingFilterTest, InvalidBasicCredentialsRejected) {
       .WillOnce(testing::Return(makeOptRef(request_headers)));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         EXPECT_EQ("User authentication failed. Invalid username/password combination.", body);
 
@@ -576,7 +592,7 @@ TEST_F(AllowMissingFilterTest, InvalidBasicCredentialsRejected) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "invalid_credential_for_basic_auth");
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
 }
@@ -591,9 +607,9 @@ TEST_F(AllowMissingFilterTest, SuccessSetsDynamicMetadata) {
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setDynamicMetadata("envoy.filters.http.basic_auth", _))
-      .WillOnce(Invoke([&](const std::string&, const Protobuf::Struct& metadata) {
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         captured_metadata = metadata;
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 

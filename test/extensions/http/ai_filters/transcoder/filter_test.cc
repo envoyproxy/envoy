@@ -378,6 +378,72 @@ TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilter
   EXPECT_EQ(counterValue("transcoded"), 2);
 }
 
+// A request bound for Anthropic leaves with the API's own path and version header, from its
+// binding, with no route config saying so.
+TEST_F(TranscoderFilterTest, FromIrToAnthropicSetsThePathAndTheVersionHeader) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
+    "model": "claude-sonnet-4-5", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/messages");
+  EXPECT_EQ(request_headers_.get_("anthropic-version"), "2023-06-01");
+  EXPECT_EQ(forwarded()["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(counterValue("transcoded"), 1);
+}
+
+// A version the request already carries is kept: the client may ask for a newer API.
+TEST_F(TranscoderFilterTest, FromIrToAnthropicKeepsAVersionHeaderTheRequestHas) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  request_headers_ = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/v1/chat/completions"}, {"anthropic-version", "2025-01-01"}};
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::FROM_IR), makeContext(LLMProtocol::OpenAiChatCompletions)));
+  runDecodeChain(std::move(filters), R"({
+    "model": "claude-sonnet-4-5", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.get_("anthropic-version"), "2025-01-01");
+}
+
+// The header an Anthropic client sends is the provider's: it goes back out to Anthropic as the
+// client sent it, and not at all to a backend of another API. Two tests, as each needs a fresh
+// stream: the transcoder records what it read once per stream.
+class ClientBindingHeaderTest : public TranscoderFilterTest {
+public:
+  void runBothLegs(LLMProtocol target) {
+    target_protocol_ = target;
+    request_headers_ = Http::TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", "/v1/messages"}, {"anthropic-version", "2024-01-01"}};
+    const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
+    runDecodeChain(
+        {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context),
+         std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context)},
+        R"({"model": "claude-sonnet-4-5", "max_tokens": 16,)"
+        R"( "messages": [{"role": "user", "content": "Hi"}]})");
+    ASSERT_TRUE(status_.ok()) << status_;
+  }
+};
+
+TEST_F(ClientBindingHeaderTest, GoesBackOutToTheSameApiAsSent) {
+  runBothLegs(LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/messages");
+  EXPECT_EQ(request_headers_.get_("anthropic-version"), "2024-01-01");
+  EXPECT_EQ(forwarded()["model"], "claude-sonnet-4-5");
+}
+
+TEST_F(ClientBindingHeaderTest, DoesNotReachAnotherApi) {
+  runBothLegs(LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/claude-sonnet-4-5:generateContent");
+  EXPECT_TRUE(request_headers_.get_("anthropic-version").empty());
+}
+
 // Bidirectional unary response transcoding. The response chain runs in reverse, so a Gemini
 // backend's response is converted to the IR by `backend_boundary_filter` (`response_handling:
 // TO_IR`), passes `mid_filter`, and is converted to Anthropic Messages for the client by
@@ -501,16 +567,45 @@ TEST_F(TranscoderFilterTest, RejectsToIrWhenSourceProtocolIsUnspecified) {
   EXPECT_EQ(counterValue("transcoded"), 0);
 }
 
-// Rejects `FROM_IR` when the route declared no response protocol, so the target backend protocol
-// is `Unspecified`.
-TEST_F(TranscoderFilterTest, RejectsFromIrWhenTargetProtocolIsUnspecified) {
+// `FROM_IR` with no backend API named by the route or filter state takes the backend to speak the
+// client's API: the request leaves as it came, counted as `backend_defaulted`, not `unresolved`.
+// This is a route with no backend, such as a local reply, with the client's API named ahead.
+TEST_F(TranscoderFilterTest, FromIrWithNoBackendApiAssumesTheClients) {
+  const std::string payload =
+      R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})";
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, payload);
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(local_reply_code_, Http::Code::OK);
+  EXPECT_EQ(forwarded(), nlohmann::json::parse(payload));
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  EXPECT_EQ(counterValue("backend_defaulted"), 1);
+  EXPECT_EQ(counterValue("unresolved"), 0);
+  EXPECT_EQ(counterValue("failed"), 0);
+}
+
+// A backend named by the route is not defaulted, so a request that translates does not count.
+TEST_F(TranscoderFilterTest, FromIrWithABackendApiDoesNotDefault) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
                   R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})");
 
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_THAT(local_reply_details_, testing::HasSubstr("no target backend protocol is set"));
-  EXPECT_EQ(counterValue("unresolved"), 1);
-  EXPECT_EQ(counterValue("transcoded"), 0);
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(counterValue("backend_defaulted"), 0);
+}
+
+// A route that declares a response binding but no response API: the backend is defaulted to the
+// client's, and the route's binding still applies, since the backend is still the route's.
+TEST_F(TranscoderFilterTest, RouteResponseBindingAppliesToADefaultedBackend) {
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{chat|chat-stream}");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/gateway/gpt-4o/chat");
+  EXPECT_EQ(counterValue("backend_defaulted"), 1);
+  EXPECT_EQ(counterValue("unresolved"), 0);
 }
 
 // When `request_handling` is unset (`DIRECTION_UNSPECIFIED`), the filter forwards the request
@@ -886,9 +981,9 @@ TEST_F(TranscoderFilterTest, JsonBindingSendsTheRequestToClaudeOnVertexAi) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
   setBinding(FilterStateKeys::BindingResponse, R"({
     "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
-    "mutations": [
-      {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    "body_mutations": [
+      {"remove": "model"},
+      {"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "ADD_IF_ABSENT"}}
     ]
   })");
   setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");

@@ -19,11 +19,13 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -190,7 +192,7 @@ class FilterConfig {
 
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               Stats::Scope& scope, const std::string& stats_prefix,
+               Stats::Scope& scope, Stats::Scope& stats_scope, const std::string& stats_prefix,
                Server::Configuration::ServerFactoryContext& factory_context,
                absl::Status& creation_status);
 
@@ -271,8 +273,11 @@ public:
 
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
-  void incCounter(Stats::Scope& scope, Stats::StatName name) {
-    scope.counterFromStatName(name).inc();
+  // Increments the given 'ext_authz[.<stat_prefix>].<leaf>' stat of the given (cluster) scope.
+  // Without tags, name() and baseName() are the same StatName and this degenerates to the plain
+  // counterFromStatName() path.
+  void incCounter(Stats::Scope& scope, const Stats::TaggedStatName& name) {
+    scope.counterFromTaggedName(name.baseName(), name.tags(), name.name()).inc();
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
@@ -309,7 +314,13 @@ private:
   ExtAuthzFilterStats generateStats(const std::string& prefix,
                                     const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_authz.", filter_stats_prefix);
-    return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+    const Stats::TagStringView tag{Envoy::Config::TagNames::get().EXT_AUTHZ_PREFIX,
+                                   filter_stats_prefix};
+    Stats::LiteScopeHelper helper(scope, absl::StrCat(prefix, "ext_authz."),
+                                  filter_stats_prefix.empty() ? Stats::TagStringViewSpan()
+                                                              : Stats::TagStringViewSpan{tag},
+                                  final_prefix, /*sanitize=*/false);
+    return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER(helper))};
   }
 
   // This generates ext_authz.<optional filter_stats_prefix>.name, for example: ext_authz.waf.ok
@@ -320,6 +331,18 @@ private:
                         filter_stats_prefix.empty() ? EMPTY_STRING
                                                     : absl::StrCat(".", filter_stats_prefix),
                         ".", name);
+  }
+
+  // The tagged form of a cluster scope stat name: 'ext_authz[.<filter_stats_prefix>].<name>' with
+  // the filter's stat prefix as its tag when it has one.
+  Stats::TaggedStatName createTaggedPoolStatName(const std::string& filter_stats_prefix,
+                                                 const std::string& name) {
+    const Stats::TagStringView tag{Envoy::Config::TagNames::get().EXT_AUTHZ_PREFIX,
+                                   filter_stats_prefix};
+    return {scope_.symbolTable(), createPoolStatName(EMPTY_STRING, name),
+            filter_stats_prefix.empty() ? Stats::TagStringViewSpan()
+                                        : Stats::TagStringViewSpan{tag},
+            createPoolStatName(filter_stats_prefix, name), /*sanitize=*/false};
   }
 
   const bool allow_partial_message_;
@@ -350,9 +373,6 @@ private:
   const std::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
   const std::optional<Runtime::FeatureFlag> deny_at_disable_;
 
-  // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
-  Stats::StatNamePool pool_;
-
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
   const std::vector<std::string> route_metadata_context_namespaces_;
@@ -372,11 +392,12 @@ private:
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
   // (ExtAuthzFilterStats stats_).
-  const Stats::StatName ext_authz_ok_;
-  const Stats::StatName ext_authz_denied_;
-  const Stats::StatName ext_authz_error_;
-  const Stats::StatName ext_authz_invalid_;
-  const Stats::StatName ext_authz_failure_mode_allowed_;
+  // The full names of the cluster scope stats, charged through incCounter().
+  const Stats::TaggedStatName ext_authz_ok_;
+  const Stats::TaggedStatName ext_authz_denied_;
+  const Stats::TaggedStatName ext_authz_error_;
+  const Stats::TaggedStatName ext_authz_invalid_;
+  const Stats::TaggedStatName ext_authz_failure_mode_allowed_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -400,7 +421,8 @@ public:
                             : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
         disabled_(config.disabled()),
         grpc_service_(config.has_check_settings() && config.check_settings().has_grpc_service()
-                          ? std::make_optional(config.check_settings().grpc_service())
+                          ? std::make_optional<const Grpc::GrpcServiceConfigWithHashKey>(
+                                config.check_settings().grpc_service())
                           : std::nullopt),
         http_service_(config.has_check_settings() && config.check_settings().has_http_service()
                           ? std::make_optional(config.check_settings().http_service())
@@ -430,8 +452,6 @@ public:
    * @return Context extensions to add to the CheckRequest.
    */
   const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
-  // Allow moving the context extensions out of this object.
-  ContextExtensionsMap&& takeContextExtensions() { return std::move(context_extensions_); }
 
   bool disabled() const { return disabled_; }
 
@@ -440,9 +460,9 @@ public:
   }
 
   /**
-   * @return The gRPC service override for this route, if any.
+   * @return The gRPC service override for this route with its client cache key, if any.
    */
-  const std::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
+  const std::optional<const Grpc::GrpcServiceConfigWithHashKey>& grpcService() const {
     return grpc_service_;
   }
 
@@ -460,12 +480,10 @@ public:
   const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
 
 private:
-  // We save the context extensions as a protobuf map instead of a std::map as this allows us to
-  // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   const bool disabled_;
-  const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const std::optional<const Grpc::GrpcServiceConfigWithHashKey> grpc_service_;
   const std::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
       http_service_;
   std::optional<bool> emit_client_span_;
@@ -543,7 +561,7 @@ private:
 
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
-  createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
+  createPerRouteGrpcClient(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key);
 
   // Create a new HTTP client for per-route HTTP service configuration.
   Filters::Common::ExtAuthz::ClientPtr createPerRouteHttpClient(
