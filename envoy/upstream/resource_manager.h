@@ -2,12 +2,17 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/resource.h"
 
 namespace Envoy {
+namespace Event {
+class Dispatcher;
+}
 namespace Upstream {
 
 /**
@@ -44,6 +49,14 @@ public:
    * @return ResourceLimit& active TCP connections and UDP sessions.
    */
   virtual ResourceLimit& connections() PURE;
+
+  /**
+   * Register for connection capacity becoming available, including capacity already available
+   * when registering. Notifications are coalesced and posted to the supplied dispatcher; they do
+   * not reserve capacity. Destroy the handle on that dispatcher to cancel the callback.
+   */
+  virtual Common::CallbackHandlePtr
+  addConnectionCapacityCallback(Event::Dispatcher& dispatcher, std::function<void()> callback) PURE;
 
   /**
    * @return ResourceLimit& active pending requests (requests that have not yet been attached to a
