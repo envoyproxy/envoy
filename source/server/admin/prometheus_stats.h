@@ -1,6 +1,8 @@
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/stats/custom_stat_namespaces.h"
@@ -67,6 +69,67 @@ public:
   private:
     HistogramType histogram_type_;
   };
+
+  /**
+   * Renders prometheus output in chunks. All metrics are grouped by tag-extracted name in the
+   * constructor, and each call to nextChunk() emits whole metric families, so a family is never
+   * split across chunks.
+   *
+   * The metric vectors, custom_namespaces and output_format must outlive this object. The
+   * cluster_manager and params are only used in the constructor.
+   */
+  class ChunkedRenderer {
+  public:
+    ChunkedRenderer(const std::vector<Stats::CounterSharedPtr>& counters,
+                    const std::vector<Stats::GaugeSharedPtr>& gauges,
+                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+                    const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
+                    const Stats::CustomStatNamespaces& custom_namespaces,
+                    OutputFormat& output_format);
+    ~ChunkedRenderer();
+
+    /**
+     * Appends metric families to response until at least chunk_size bytes were added, or all
+     * families were rendered.
+     * @return true if more families remain to be rendered.
+     */
+    bool nextChunk(Buffer::Instance& response, uint64_t chunk_size);
+
+    /**
+     * @return the number of metric families rendered so far.
+     */
+    uint64_t metricNameCount() const { return metric_name_count_; }
+
+    // The metric families of one stat type, in output order.
+    class MetricFamilies {
+    public:
+      virtual ~MetricFamilies() = default;
+      virtual bool done() const PURE;
+      // Renders the next family. Returns 1 if it was rendered, 0 if it was skipped because its
+      // name is not a valid prometheus name.
+      virtual uint64_t renderNext(Buffer::Instance& response, const OutputFormat& output_format,
+                                  const Stats::CustomStatNamespaces& custom_namespaces) PURE;
+    };
+
+  private:
+    // Skips the stat types with no families left. Returns false when everything is rendered.
+    bool advance();
+
+    const Stats::CustomStatNamespaces& custom_namespaces_;
+    const OutputFormat& output_format_;
+    std::vector<std::unique_ptr<MetricFamilies>> phases_;
+    size_t phase_index_{0};
+    uint64_t metric_name_count_{0};
+  };
+
+  /**
+   * Creates the output format (text or protobuf) for the request, and sets the response content
+   * type for protobuf.
+   */
+  static std::unique_ptr<OutputFormat>
+  makeOutputFormat(const StatsParams& params, const Http::RequestHeaderMap& request_headers,
+                   Http::ResponseHeaderMap& response_headers);
 
   /**
    * Extracts counters and gauges and relevant tags, appending them to

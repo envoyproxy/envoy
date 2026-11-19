@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <regex>
 #include <string>
 
@@ -14,7 +15,10 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+
+#include "absl/strings/str_split.h"
 
 using testing::Combine;
 using testing::HasSubstr;
@@ -83,7 +87,7 @@ public:
    * @param url the admin endpoint to query.
    * @return the Http Code and the response body as a string.
    */
-  CodeResponse handlerStats(absl::string_view url) {
+  CodeResponse handlerStats(absl::string_view url, bool prometheus_endpoint = false) {
     NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
@@ -94,7 +98,8 @@ public:
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
-    Admin::RequestPtr request = handler.makeRequest(admin_stream_);
+    Admin::RequestPtr request = prometheus_endpoint ? handler.makePrometheusRequest(admin_stream_)
+                                                    : handler.makeRequest(admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;
@@ -1476,6 +1481,13 @@ public:
         makeStat("control_plane.identifier"), Stats::StatNameTagSpan(c1Tags), {});
     t1.set("cp-1");
   }
+
+  // Unsorted output can come in any order, so compare the sorted lines.
+  static std::vector<std::string> sortedLines(absl::string_view output) {
+    std::vector<std::string> lines = absl::StrSplit(output, '\n');
+    std::sort(lines.begin(), lines.end());
+    return lines;
+  }
 };
 
 class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest, public testing::Test {
@@ -1497,7 +1509,7 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_EQ(expected_response, code_response.second);
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
 }
 
 TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
@@ -1664,7 +1676,58 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::OK, code_response.first);
-  EXPECT_THAT(expected_response, code_response.second);
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusSortedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prometheus_stats_unsorted", "false"}});
+  createTestStats();
+
+  // Exact match: families and series are sorted by name.
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+# TYPE envoy_control_plane_identifier gauge
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
+)EOF";
+
+  const CodeResponse code_response = handlerStats("/stats?format=prometheus&text_readouts");
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpoint) {
+  createTestStats();
+  const CodeResponse code_response = handlerStats("/stats/prometheus?text_readouts", true);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+# TYPE envoy_control_plane_identifier gauge
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
+)EOF";
+  // The output is not sorted by default.
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointInvalidRegex) {
+  const CodeResponse code_response = handlerStats("/stats/prometheus?filter=(+invalid)", true);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointUnsupportedBucketMode) {
+  const CodeResponse code_response =
+      handlerStats("/stats/prometheus?histogram_buckets=disjoint", true);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("unsupported prometheus histogram bucket mode", code_response.second);
 }
 
 } // namespace Server

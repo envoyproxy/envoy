@@ -33,47 +33,11 @@ public:
                                               Buffer::Instance& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap& response_headers,
                                              Buffer::Instance& response, AdminStream&);
-  Http::Code handlerPrometheusStats(Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response, AdminStream&);
 
   /**
-   * Parses and executes a prometheus stats request.
-   *
-   * @param path_and_query the URL path and query
-   * @param response buffer into which to write response
-   * @return http response code
+   * Creates a chunked request for /stats/prometheus.
    */
-  Http::Code prometheusStats(const Http::RequestHeaderMap& request_headers,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
-
-  /**
-   * Checks the server_ to see if a flush is needed, and then renders the
-   * prometheus stats request.
-   *
-   * @params params the already-parsed parameters.
-   * @param response buffer into which to write response
-   */
-  Http::Code prometheusFlushAndRender(const StatsParams& params,
-                                      const Http::RequestHeaderMap& request_headers,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response);
-
-  /**
-   * Renders the stats as prometheus. This is broken out as a separately
-   * callable API to facilitate the benchmark
-   * (test/server/admin/stats_handler_speed_test.cc) which does not have a
-   * server object.
-   *
-   * @params stats the stats store to read
-   * @param custom_namespaces namespace mappings used for prometheus
-   * @params params the already-parsed parameters.
-   * @param response buffer into which to write response
-   */
-  static void
-  prometheusRender(Stats::Store& stats, const Stats::CustomStatNamespaces& custom_namespaces,
-                   const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
-                   const Http::RequestHeaderMap& request_headers,
-                   Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+  Admin::RequestPtr makePrometheusRequest(AdminStream& admin_stream);
 
   Http::Code handlerContention(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
