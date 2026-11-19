@@ -155,6 +155,21 @@ single_version_override(
     version = "3.5.9.bcr.1",
 )
 
+# TESTING ONLY: SBOM generation (envoyproxy/toolshed#5638), from the fork.
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "d004057a54f6d8fe01d41046d02ceb2804f291fe",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "d004057a54f6d8fe01d41046d02ceb2804f291fe",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
+
 # testing/debugging
 # local_path_override(
 #     module_name = "envoy_toolshed",

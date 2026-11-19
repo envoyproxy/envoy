@@ -806,6 +806,21 @@ case $CI_TARGET in
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
               -- -v warn \
                  -c release_dates releases
+        echo "Generate the SBOM ..."
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel //tools/dependency:sbom
+        "$JQ_BIN" -r '
+            "SBOM: \(.bomFormat) \(.specVersion) for \(.metadata.component.purl)",
+            "  components:    \(.components | length)",
+            "  with a CPE:    \([.components[] | select(.cpe)] | length)",
+            "  SPDX license:  \([.components[] | select(.licenses[0].license.id or .licenses[0].expression)] | length)",
+            "  named license: \([.components[] | select(.licenses[0].license.name)] | length)",
+            "  with a digest: \([.components[] | select(.hashes)] | length)",
+            "  github purl:   \([.components[] | select(.purl | startswith("pkg:github/"))] | length)",
+            "  generic purl:  \([.components[] | select(.purl | startswith("pkg:generic/"))] | length)",
+            (.components[] | "  - \(.name) \(.version) \(.purl | split("?")[0])"),
+            "First components:",
+            (.components[0:2] | tojson)' \
+            "$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)/tools/dependency/sbom.cdx.json"
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
