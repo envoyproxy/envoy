@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
@@ -155,6 +156,12 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
   const std::string body_sent(2 * 1024 * 1024, 's');
   initializeConfigDuplexStreamed(false);
 
+  // Retain `FakeStream` instances until `processor_connection_` is disconnected so the
+  // `FakeUpstream` HTTP/2 codec never holds a dangling `StreamCallbacks` or `RequestDecoder`
+  // pointer to a freed `FakeStream`.
+  std::vector<FakeStreamPtr> processor_streams;
+  processor_streams.reserve(30);
+
   // Sends 30 consecutive requests, each carrying 2MB data.
   // The processor gRPC connection is established once on the first iteration and reused across all
   // iterations; each iteration opens a new gRPC stream on that persistent connection. This matches
@@ -192,6 +199,8 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     const std::string body_upstream(total_resp_body_msg * 64 * 1024, 'r');
     serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_, /*end_of_stream*/ true,
                                      /*response*/ false, body_response);
+    // Finish server side stream so that graceful close does not hang waiting for it.
+    processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
     handleUpstreamRequest();
     EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
@@ -199,8 +208,13 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     verifyDownstreamResponse(*response, 200);
 
     // Clean up per-iteration upstream/downstream state; processor_connection_ stays alive.
+    processor_streams.push_back(std::move(processor_stream_));
     cleanupUpstreamAndDownstream();
   }
+
+  ASSERT_TRUE(processor_connection_->close());
+  ASSERT_TRUE(processor_connection_->waitForDisconnect());
+  processor_connection_.reset();
 }
 
 // Buffer the whole message including header, body and trailer before sending response.
