@@ -158,6 +158,14 @@ typed_config:
     }
   }
 
+  void switchFakeUpstreamConnection(FakeUpstream& upstream) {
+    FakeHttpConnectionPtr next_connection;
+    ASSERT_TRUE(upstream.waitForHttpConnection(*dispatcher_, next_connection));
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    fake_upstream_connection_ = std::move(next_connection);
+  }
+
   void stripConnectUpgradeAndRespond(bool include_content_length = false) {
     // Strip the CONNECT upgrade - expect RFC 9110 compliant request with Host header.
     std::string prefix_data;
@@ -346,7 +354,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The request should be sent to fake upstream 2, due to the connect-proxy header.
-  ASSERT_TRUE(fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  switchFakeUpstreamConnection(*fake_upstreams_[2]);
   stripConnectUpgradeAndRespond();
 
   ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
@@ -405,7 +413,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The request should be sent to fake upstream 0.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  switchFakeUpstreamConnection(*fake_upstreams_[0]);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // No encapsulation.
