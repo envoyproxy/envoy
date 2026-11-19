@@ -341,8 +341,10 @@ envoy.filters.http.ai_protocol_manager:
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
 envoy.filters.http.aws_lambda:

@@ -33,6 +33,8 @@ AlternateProtocolsCacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
  */
 REGISTER_FACTORY(AlternateProtocolsCacheFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAlternateProtocolsCacheFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace AlternateProtocolsCache
 } // namespace HttpFilters
