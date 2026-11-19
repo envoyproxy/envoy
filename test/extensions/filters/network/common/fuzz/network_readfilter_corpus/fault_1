@@ -1,0 +1,20 @@
+config {
+  name: "envoy.filters.network.fault"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.fault.v3.NetworkFault"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "hello"
+  }
+}
+actions {
+  on_data {
+    end_stream: true
+  }
+}

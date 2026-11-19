@@ -268,6 +268,7 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                                 "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                            "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.ext_proc":                             "//source/extensions/filters/network/ext_proc:config",
+    "envoy.filters.network.fault":                                "//source/extensions/filters/network/fault:config",
     "envoy.filters.network.reverse_tunnel":                       "//source/extensions/filters/network/reverse_tunnel:config",
     "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager": "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",

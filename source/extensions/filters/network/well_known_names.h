@@ -61,6 +61,8 @@ public:
   const std::string Wasm = "envoy.filters.network.wasm";
   // Network external processor filter
   const std::string NetworkExternalProcessor = "envoy.filters.network.ext_proc";
+  // Network fault injection filter
+  const std::string Fault = "envoy.filters.network.fault";
   // Geoip network filter
   const std::string Geoip = "envoy.filters.network.geoip";
   // Network match delegate filter
