@@ -173,7 +173,7 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, OtherErrorCodesNoRetry) {
   writePacketAndVerifyResult(quic::WRITE_STATUS_ERROR, SOCKET_ERROR_PERM);
 }
 
-TEST_F(QuicPlatformPacketWriterFactoryTest, SocketCreationFailureReturnsNullWriterAndSocket) {
+TEST_F(QuicPlatformPacketWriterFactoryTest, SocketCreationFailureReturnsUnopenedSocket) {
   ON_CALL(os_sys_calls_, socket(_, _, _))
       .WillByDefault(Return(Api::SysCallSocketResult{-1, SOCKET_ERROR_NOT_SUP}));
 
@@ -185,8 +185,10 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, SocketCreationFailureReturnsNullWrit
         QuicClientPacketWriterFactory::CreationResult result =
             factory_.createSocketAndQuicPacketWriter(peer_address, /*network=*/123, local_address,
                                                      nullptr);
-        EXPECT_EQ(result.writer_, nullptr);
-        EXPECT_EQ(result.socket_, nullptr);
+        EXPECT_NE(result.writer_, nullptr);
+        ASSERT_NE(result.socket_, nullptr);
+        EXPECT_FALSE(result.socket_->isOpen());
+        EXPECT_FALSE(result.socket_->ioHandle().isOpen());
       },
       "socket(2) failed");
 }

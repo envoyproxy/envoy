@@ -1,8 +1,12 @@
 #include <chrono>
 #include <memory>
 
+#include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 
 #include "test/common/upstream/utility.h"
@@ -238,7 +242,11 @@ TEST_P(QuicNetworkConnectionTest, PreBindSocketOptionsFailure) {
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
-  EXPECT_EQ(client_connection, nullptr);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
 }
 
 TEST_P(QuicNetworkConnectionTest, PostBindSocketOptionsFailure) {
@@ -256,7 +264,11 @@ TEST_P(QuicNetworkConnectionTest, PostBindSocketOptionsFailure) {
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
-  EXPECT_EQ(client_connection, nullptr);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
 }
 
 TEST_P(QuicNetworkConnectionTest, ListeningSocketOptionsFailure) {
@@ -288,6 +300,21 @@ public:
   Api::SysCallSocketResult socket(int, int, int) override { return {-1, SOCKET_ERROR_NOT_SUP}; }
 };
 
+class UnopenedSocketWriterFactory : public QuicClientPacketWriterFactory {
+public:
+  CreationResult createSocketAndQuicPacketWriter(
+      Network::Address::InstanceConstSharedPtr server_addr, quic::QuicNetworkHandle /*network*/,
+      Network::Address::InstanceConstSharedPtr& local_addr,
+      const Network::ConnectionSocket::OptionsSharedPtr& /*options*/) override {
+    auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+        std::make_unique<Network::IoSocketHandleImpl>(), local_addr, server_addr);
+    connection_socket->setDetectedTransportProtocol("quic");
+    auto writer = std::make_unique<EnvoyQuicPacketWriter>(
+        std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
+    return {std::move(writer), std::move(connection_socket)};
+  }
+};
+
 TEST_P(QuicNetworkConnectionTest, SocketCreationFailure) {
   initialize();
   // Release the bound peer_socket_ port so threadsafe death test re-exec can bind PEER_PORT.
@@ -297,14 +324,43 @@ TEST_P(QuicNetworkConnectionTest, SocketCreationFailure) {
 
   EXPECT_ENVOY_BUG(
       {
+        Network::MockConnectionCallbacks connection_callbacks;
         std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
             *quic_info_, crypto_config_,
             quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
             dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
             nullptr, nullptr, connection_id_generator_, *factory_);
-        EXPECT_EQ(client_connection, nullptr);
+        ASSERT_NE(client_connection, nullptr);
+        EnvoyQuicClientSession* session =
+            static_cast<EnvoyQuicClientSession*>(client_connection.get());
+        session->Initialize();
+        client_connection->addConnectionCallbacks(connection_callbacks);
+        EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+        client_connection->connect();
+        EXPECT_FALSE(session->connection()->connected());
+        EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
       },
       "socket(2) failed");
+}
+
+TEST_P(QuicNetworkConnectionTest, UnopenSocketConnectClosesCleanly) {
+  initialize();
+  quic_info_->writer_factory_ = std::make_unique<UnopenedSocketWriterFactory>();
+
+  Network::MockConnectionCallbacks connection_callbacks;
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
+      dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
+      nullptr, nullptr, connection_id_generator_, *factory_);
+  ASSERT_NE(client_connection, nullptr);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->addConnectionCallbacks(connection_callbacks);
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  client_connection->connect();
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
 }
 
 TEST_P(QuicNetworkConnectionTest, LocalAddress) {
@@ -347,7 +403,12 @@ TEST_P(QuicNetworkConnectionTest, GetV6OnlySocketOptionFailure) {
       quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, local_address_, quic_stat_names_, {}, *store_.rootScope(),
       nullptr, nullptr, connection_id_generator_, *factory_);
-  EXPECT_EQ(client_connection, nullptr);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
 }
 
 TEST_P(QuicNetworkConnectionTest, Srtt) {
