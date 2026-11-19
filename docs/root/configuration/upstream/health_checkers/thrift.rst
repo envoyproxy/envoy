@@ -15,15 +15,11 @@ check request must be configured to enable Thrift health checks. The sequence id
 An example for :ref:`custom_health_check <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`
 using the Thrift health checker is shown below:
 
-
-.. code-block:: yaml
-
-  custom_health_check:
-    name: envoy.health_checkers.thrift
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.health_checkers.thrift.v3.Thrift
-        method_name: ping
-        transport: HEADER
-        protocol: BINARY
+.. literalinclude:: _include/thrift-health-check.yaml
+    :language: yaml
+    :lines: 30-39
+    :lineno-start: 30
+    :linenos:
+    :caption: :download:`thrift-health-check.yaml <_include/thrift-health-check.yaml>`
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`

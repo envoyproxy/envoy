@@ -37,37 +37,9 @@ The following code block shows how to adjust all three fields mentioned above, t
 the only one which needs to be amended is the listener
 :ref:`per_connection_buffer_limit_bytes <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_limit_bytes>`
 
-.. code-block:: yaml
-
-  static_resources:
-    listeners:
-      name: http
-      address:
-        socket_address:
-          address: '::1'
-          portValue: 0
-      filter_chains:
-        filters:
-          name: envoy.filters.network.http_connection_manager
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-            http2_protocol_options:
-              initial_stream_window_size: 65535
-            route_config: {}
-            codec_type: HTTP2
-            http_filters: []
-            stat_prefix: config_test
-      per_connection_buffer_limit_bytes: 1024
-    clusters:
-      name: cluster_0
-      connect_timeout: 5s
-      per_connection_buffer_limit_bytes: 1024
-      load_assignment:
-        cluster_name: some_service
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: ::1
-                    port_value: 46685
+.. literalinclude:: _include/buffer-limits.yaml
+    :language: yaml
+    :lines: 1-23
+    :lineno-start: 1
+    :linenos:
+    :caption: :download:`buffer-limits.yaml <_include/buffer-limits.yaml>`
