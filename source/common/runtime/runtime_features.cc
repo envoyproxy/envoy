@@ -373,9 +373,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
 // Enable histograms of HTTP/2 header sizes, including cookie size.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 
-// TODO: Flip back to true once TLS certificate compression with brotli (RFC 8879) has been
-// validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
-// no certificate compression.
+// TODO: remove in favor of CommonTlsContext.certificate_compression, which overrides it.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 
 // When an on-demand cluster discovery asks for a cluster its config source has already answered
