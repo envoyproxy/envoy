@@ -1,46 +1,259 @@
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+#include <string>
+#include <vector>
+
 #include "source/common/common/assert.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
+#include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Tls {
 namespace Test {
 
-std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_max_version,
-                                         const std::string& sni_name, const std::string& alpn) {
-  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_with_buffers_method()));
+namespace {
 
-  SSL_CTX_set_min_proto_version(ctx.get(), tls_min_version);
-  SSL_CTX_set_max_proto_version(ctx.get(), tls_max_version);
-  static const uint16_t kGroups[] = {SSL_GROUP_X25519, SSL_GROUP_SECP256R1, SSL_GROUP_SECP384R1};
-  SSL_CTX_set1_group_ids(ctx.get(), kGroups, std::size(kGroups));
+// The following values are defined here because not every supported TLS library build exposes
+// constants for them.
+// ContentType handshake from https://www.rfc-editor.org/rfc/rfc8446#section-5.1.
+constexpr uint8_t kRecordTypeHandshake = 22;
+// HandshakeType client_hello from https://www.rfc-editor.org/rfc/rfc8446#section-4.
+constexpr uint8_t kHandshakeTypeClientHello = 1;
+// Size of the ClientHello random from https://www.rfc-editor.org/rfc/rfc8446#section-4.1.2.
+constexpr size_t kRandomSize = 32;
+// ECPointFormat uncompressed from https://www.rfc-editor.org/rfc/rfc8422#section-5.1.2.
+constexpr uint8_t kEcPointFormatUncompressed = 0;
+// TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 from https://www.rfc-editor.org/rfc/rfc5289#section-3.2.
+constexpr uint16_t kEcdheRsaWithAes256GcmSha384 = 0xc030;
+// `psk_dhe_ke` from https://www.rfc-editor.org/rfc/rfc8446#section-4.2.9.
+constexpr uint8_t kPskDheKe = 1;
+// Size of an X25519 public key.
+constexpr size_t kX25519KeyShareSize = 32;
 
-  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+// The cipher suite constants carry a 0x0300 prefix. The value on the wire is the low 16 bits.
+constexpr uint16_t cipherSuiteId(uint32_t cipher) { return static_cast<uint16_t>(cipher & 0xffff); }
 
-  // Ownership of these is passed to *ssl
-  BIO* in = BIO_new(BIO_s_mem());
-  BIO* out = BIO_new(BIO_s_mem());
-  SSL_set_bio(ssl.get(), in, out);
+using AddContents = std::function<void(CBB*)>;
 
-  SSL_set_connect_state(ssl.get());
-  const char* const PREFERRED_CIPHERS = "HIGH:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4";
-  SSL_set_cipher_list(ssl.get(), PREFERRED_CIPHERS);
+void addBytes(CBB* cbb, absl::string_view data) {
+  RELEASE_ASSERT(CBB_add_bytes(cbb, reinterpret_cast<const uint8_t*>(data.data()), data.size()),
+                 "");
+}
+
+void addZeros(CBB* cbb, size_t size) {
+  const std::vector<uint8_t> zeros(size, 0);
+  RELEASE_ASSERT(CBB_add_bytes(cbb, zeros.data(), zeros.size()), "");
+}
+
+// Returns the bytes that `add_contents` writes to a new `CBB`.
+std::vector<uint8_t> build(const AddContents& add_contents) {
+  bssl::ScopedCBB cbb;
+  RELEASE_ASSERT(CBB_init(cbb.get(), 64), "");
+  add_contents(cbb.get());
+  return {CBB_data(cbb.get()), CBB_data(cbb.get()) + CBB_len(cbb.get())};
+}
+
+// Appends the bytes written by `add_contents`, prefixed with their length as a big-endian integer
+// of `prefix_bytes` bytes (1, 2 or 3).
+void addLengthPrefixed(CBB* cbb, size_t prefix_bytes, const AddContents& add_contents) {
+  const std::vector<uint8_t> contents = build(add_contents);
+  const size_t size = contents.size();
+  switch (prefix_bytes) {
+  case 1:
+    RELEASE_ASSERT(size <= 0xff, "");
+    RELEASE_ASSERT(CBB_add_u8(cbb, static_cast<uint8_t>(size)), "");
+    break;
+  case 2:
+    RELEASE_ASSERT(size <= 0xffff, "");
+    RELEASE_ASSERT(CBB_add_u16(cbb, static_cast<uint16_t>(size)), "");
+    break;
+  case 3:
+    RELEASE_ASSERT(size <= 0xffffff, "");
+    RELEASE_ASSERT(CBB_add_u8(cbb, static_cast<uint8_t>(size >> 16)), "");
+    RELEASE_ASSERT(CBB_add_u16(cbb, static_cast<uint16_t>(size & 0xffff)), "");
+    break;
+  default:
+    PANIC("unsupported length prefix size");
+  }
+  RELEASE_ASSERT(CBB_add_bytes(cbb, contents.data(), size), "");
+}
+
+// Appends a 16-bit length-prefixed list of 16-bit values.
+void addU16List(CBB* cbb, const std::vector<uint16_t>& values) {
+  addLengthPrefixed(cbb, 2, [&](CBB* list) {
+    for (const uint16_t value : values) {
+      RELEASE_ASSERT(CBB_add_u16(list, value), "");
+    }
+  });
+}
+
+// Appends an extension of the given type. `add_body` writes the extension body.
+void addExtension(CBB* extensions, uint16_t type, const AddContents& add_body) {
+  RELEASE_ASSERT(CBB_add_u16(extensions, type), "");
+  addLengthPrefixed(extensions, 2, add_body);
+}
+
+void addEmptyExtension(CBB* extensions, uint16_t type) {
+  addExtension(extensions, type, [](CBB*) {});
+}
+
+std::vector<uint16_t> cipherSuites(uint16_t tls_min_version, uint16_t tls_max_version) {
+  std::vector<uint16_t> ciphers;
+  if (tls_max_version >= TLS1_3_VERSION) {
+    ciphers.insert(ciphers.end(), {
+                                      cipherSuiteId(TLS1_3_CK_AES_128_GCM_SHA256),
+                                      cipherSuiteId(TLS1_3_CK_AES_256_GCM_SHA384),
+                                      cipherSuiteId(TLS1_3_CK_CHACHA20_POLY1305_SHA256),
+                                  });
+  }
+  if (tls_min_version <= TLS1_2_VERSION && tls_max_version >= TLS1_2_VERSION) {
+    ciphers.insert(ciphers.end(),
+                   {
+                       cipherSuiteId(TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256),
+                       cipherSuiteId(TLS1_CK_ECDHE_RSA_WITH_AES_128_GCM_SHA256),
+                       cipherSuiteId(TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384),
+                       kEcdheRsaWithAes256GcmSha384,
+                       cipherSuiteId(TLS1_CK_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256),
+                       cipherSuiteId(TLS1_CK_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256),
+                   });
+  }
+  if (tls_min_version <= TLS1_2_VERSION) {
+    ciphers.insert(ciphers.end(), {
+                                      cipherSuiteId(TLS1_CK_ECDHE_ECDSA_WITH_AES_128_CBC_SHA),
+                                      cipherSuiteId(TLS1_CK_ECDHE_RSA_WITH_AES_128_CBC_SHA),
+                                      cipherSuiteId(TLS1_CK_ECDHE_ECDSA_WITH_AES_256_CBC_SHA),
+                                      cipherSuiteId(TLS1_CK_ECDHE_RSA_WITH_AES_256_CBC_SHA),
+                                  });
+  }
+  return ciphers;
+}
+
+void addServerName(CBB* extensions, absl::string_view sni_name) {
+  addExtension(extensions, TLSEXT_TYPE_server_name, [&](CBB* body) {
+    addLengthPrefixed(body, 2, [&](CBB* server_name_list) {
+      RELEASE_ASSERT(CBB_add_u8(server_name_list, TLSEXT_NAMETYPE_host_name), "");
+      addLengthPrefixed(server_name_list, 2,
+                        [&](CBB* host_name) { addBytes(host_name, sni_name); });
+    });
+  });
+}
+
+void addAlpn(CBB* extensions, absl::string_view alpn) {
+  addExtension(extensions, TLSEXT_TYPE_application_layer_protocol_negotiation, [&](CBB* body) {
+    addLengthPrefixed(body, 2,
+                      [&](CBB* protocol_name_list) { addBytes(protocol_name_list, alpn); });
+  });
+}
+
+void addTls13Extensions(CBB* extensions, uint16_t tls_min_version, uint16_t tls_max_version) {
+  addExtension(extensions, TLSEXT_TYPE_key_share, [](CBB* body) {
+    addLengthPrefixed(body, 2, [](CBB* client_shares) {
+      RELEASE_ASSERT(CBB_add_u16(client_shares, SSL_GROUP_X25519), "");
+      // The TLS inspector never completes the handshake, so the key share can be a dummy value.
+      addLengthPrefixed(client_shares, 2,
+                        [](CBB* key_exchange) { addZeros(key_exchange, kX25519KeyShareSize); });
+    });
+  });
+  addExtension(extensions, TLSEXT_TYPE_psk_key_exchange_modes, [](CBB* body) {
+    addLengthPrefixed(body, 1,
+                      [](CBB* modes) { RELEASE_ASSERT(CBB_add_u8(modes, kPskDheKe), ""); });
+  });
+  addExtension(extensions, TLSEXT_TYPE_supported_versions, [&](CBB* body) {
+    addLengthPrefixed(body, 1, [&](CBB* versions) {
+      // This relies on the TLS version code points being contiguous.
+      for (uint16_t version = tls_max_version; version >= tls_min_version; version--) {
+        RELEASE_ASSERT(CBB_add_u16(versions, version), "");
+      }
+    });
+  });
+}
+
+void addExtensions(CBB* extensions, uint16_t tls_min_version, uint16_t tls_max_version,
+                   absl::string_view sni_name, absl::string_view alpn) {
+  const bool offers_pre_tls13 = tls_min_version <= TLS1_2_VERSION;
   if (!sni_name.empty()) {
-    SSL_set_tlsext_host_name(ssl.get(), sni_name.c_str());
+    addServerName(extensions, sni_name);
+  }
+  if (offers_pre_tls13) {
+    addEmptyExtension(extensions, TLSEXT_TYPE_extended_master_secret);
+    // An empty `renegotiated_connection` field.
+    addExtension(extensions, TLSEXT_TYPE_renegotiate,
+                 [](CBB* body) { RELEASE_ASSERT(CBB_add_u8(body, 0), ""); });
+  }
+  addExtension(extensions, TLSEXT_TYPE_supported_groups, [](CBB* body) {
+    addU16List(body, {SSL_GROUP_X25519, SSL_GROUP_SECP256R1, SSL_GROUP_SECP384R1});
+  });
+  if (offers_pre_tls13) {
+    addExtension(extensions, TLSEXT_TYPE_ec_point_formats, [](CBB* body) {
+      addLengthPrefixed(body, 1, [](CBB* formats) {
+        RELEASE_ASSERT(CBB_add_u8(formats, kEcPointFormatUncompressed), "");
+      });
+    });
+    addEmptyExtension(extensions, TLSEXT_TYPE_session_ticket);
   }
   if (!alpn.empty()) {
-    SSL_set_alpn_protos(ssl.get(), reinterpret_cast<const uint8_t*>(alpn.data()), alpn.size());
+    addAlpn(extensions, alpn);
   }
-  SSL_do_handshake(ssl.get());
-  const uint8_t* data = nullptr;
-  size_t data_len = 0;
-  BIO_mem_contents(out, &data, &data_len);
-  ASSERT(data_len > 0);
-  std::vector<uint8_t> buf(data, data + data_len);
-  return buf;
+  if (tls_max_version >= TLS1_2_VERSION) {
+    addExtension(extensions, TLSEXT_TYPE_signature_algorithms, [](CBB* body) {
+      addU16List(body, {
+                           SSL_SIGN_ECDSA_SECP256R1_SHA256,
+                           SSL_SIGN_RSA_PSS_RSAE_SHA256,
+                           SSL_SIGN_RSA_PKCS1_SHA256,
+                           SSL_SIGN_ECDSA_SECP384R1_SHA384,
+                           SSL_SIGN_RSA_PSS_RSAE_SHA384,
+                           SSL_SIGN_RSA_PKCS1_SHA384,
+                           SSL_SIGN_RSA_PSS_RSAE_SHA512,
+                           SSL_SIGN_RSA_PKCS1_SHA512,
+                           SSL_SIGN_RSA_PKCS1_SHA1,
+                       });
+    });
+  }
+  if (tls_max_version >= TLS1_3_VERSION) {
+    addTls13Extensions(extensions, tls_min_version, tls_max_version);
+  }
+}
+
+} // namespace
+
+// The ClientHello is built byte by byte, rather than generated by a TLS library, so that the
+// tests (and the JA4 fingerprints they expect) do not depend on the library's defaults
+// (cipher suites, signature algorithms, extensions, ...), which can change over time.
+std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_max_version,
+                                         const std::string& sni_name, const std::string& alpn) {
+  RELEASE_ASSERT(TLS1_VERSION <= tls_min_version && tls_min_version <= tls_max_version &&
+                     tls_max_version <= TLS1_3_VERSION,
+                 "unsupported TLS version range");
+  return build([&](CBB* record) {
+    // Record header.
+    RELEASE_ASSERT(CBB_add_u8(record, kRecordTypeHandshake), "");
+    RELEASE_ASSERT(CBB_add_u16(record, TLS1_VERSION), "");
+    addLengthPrefixed(record, 2, [&](CBB* handshake) {
+      // Handshake header.
+      RELEASE_ASSERT(CBB_add_u8(handshake, kHandshakeTypeClientHello), "");
+      addLengthPrefixed(handshake, 3, [&](CBB* client_hello) {
+        RELEASE_ASSERT(
+            CBB_add_u16(client_hello, std::min<uint16_t>(tls_max_version, TLS1_2_VERSION)), "");
+        addZeros(client_hello, kRandomSize);
+        RELEASE_ASSERT(CBB_add_u8(client_hello, 0), ""); // Empty `legacy_session_id`.
+        addU16List(client_hello, cipherSuites(tls_min_version, tls_max_version));
+        addLengthPrefixed(client_hello, 1, [](CBB* compression_methods) {
+          RELEASE_ASSERT(CBB_add_u8(compression_methods, 0), ""); // The null compression method.
+        });
+        addLengthPrefixed(client_hello, 2, [&](CBB* extensions) {
+          addExtensions(extensions, tls_min_version, tls_max_version, sni_name, alpn);
+        });
+      });
+    });
+  });
 }
 
 std::vector<uint8_t> generateClientHelloWithoutExtensions(uint16_t tls_max_version) {
