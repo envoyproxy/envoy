@@ -234,6 +234,7 @@ envoy_cc_benchmark_binary(
         "//source/server/admin:admin_lib",
         "//test/common/stats:real_thread_test_base",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_time_lib",
         "@benchmark",
     ],
 )
