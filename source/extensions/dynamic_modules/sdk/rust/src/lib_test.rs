@@ -15746,11 +15746,12 @@ mod xds_tests {
       }
       fn on_xds_update(
         &self,
-        _: &mut dyn EnvoyBootstrapExtensionConfig,
+        envoy: &mut dyn EnvoyBootstrapExtensionConfig,
         type_url: &str,
         status: XdsUpdateStatus,
         error_details: &str,
       ) {
+        assert!(envoy.set_xds_notifications(false));
         self
           .0
           .lock()
@@ -15761,6 +15762,8 @@ mod xds_tests {
     let observed = Arc::new(Mutex::new(Vec::new()));
     let config: Box<dyn BootstrapExtensionConfig> = Box::new(Observer(Arc::clone(&observed)));
     let config_ptr = std::ptr::from_ref(&config).cast();
+    let mut host = TestHost { enabled: true };
+    let envoy_ptr = std::ptr::from_mut(&mut host).cast();
     for (status, error_details) in [
       (XdsUpdateStatus::Accepted, b"".as_slice()),
       (XdsUpdateStatus::Rejected, b"rejected".as_slice()),
@@ -15771,7 +15774,7 @@ mod xds_tests {
       // the live boxed trait object and URL outlive the synchronous hook
       unsafe {
         envoy_dynamic_module_on_bootstrap_extension_xds_update(
-          std::ptr::null_mut(),
+          envoy_ptr,
           config_ptr,
           abi::envoy_dynamic_module_type_envoy_buffer {
             ptr: b"type".as_ptr().cast(),
@@ -15791,7 +15794,7 @@ mod xds_tests {
     }
     unsafe {
       envoy_dynamic_module_on_bootstrap_extension_xds_update(
-        std::ptr::null_mut(),
+        envoy_ptr,
         config_ptr,
         abi::envoy_dynamic_module_type_envoy_buffer {
           ptr: b"\xff".as_ptr().cast(),
@@ -15804,6 +15807,7 @@ mod xds_tests {
         },
       );
     }
+    assert!(!host.enabled);
     assert_eq!(
       *observed.lock().unwrap(),
       [

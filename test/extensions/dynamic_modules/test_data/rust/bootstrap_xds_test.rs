@@ -49,11 +49,20 @@ impl BootstrapExtensionConfig for XdsConfig {
 
   fn on_xds_update(
     &self,
-    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    envoy: &mut dyn EnvoyBootstrapExtensionConfig,
     type_url: &str,
     status: XdsUpdateStatus,
     error_details: &str,
   ) {
+    if status == XdsUpdateStatus::Rejected {
+      assert!(envoy.set_xds_notifications(false));
+    }
+    if status == XdsUpdateStatus::Unsubscribed {
+      assert!(!envoy
+        .active_resource_names(ActiveResourceKind::Cluster)
+        .iter()
+        .any(|name| name == "eds_cluster"));
+    }
     writeln!(
       self.updates.lock().unwrap(),
       "{status:?}: {type_url}: {error_details}"

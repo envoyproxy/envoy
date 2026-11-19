@@ -181,13 +181,24 @@ prefix, tagged with ``config_name`` set to the extension name, or ``default`` if
 xDS Notifications
 -----------------
 
-After server initialization, a module can opt in to accepted, rejected and unsubscribe xDS
-notifications with ``envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications``.
-The optional ``envoy_dynamic_module_on_bootstrap_extension_xds_update`` hook receives a borrowed
-resource type URL, an outcome and rejection error details, without resource payloads. The error
-details are empty for accepted updates and unsubscriptions. It runs on the main thread during
-xDS processing. Notifications stop when disabled or when shutdown begins. A rejected response
-may have applied some resources.
+After server initialization, enable gRPC xDS notifications with
+``envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications``. The optional
+``envoy_dynamic_module_on_bootstrap_extension_xds_update`` hook receives the resource type URL,
+outcome and rejection error details. Enabling fails in ``--mode init_only``.
+
+Accepted follows successful processing, before ACK; resources may still be warming.
+Rejected precedes NACK and may follow partial application. Its error details are the NACK
+message and may quote rejected configuration. They are empty for other outcomes.
+
+The hook runs on the main thread and must not block or reenter xDS processing.
+Envoy posts unsubscription notifications to the dispatcher to avoid calling the hook during
+cluster destruction.
+
+Disabling notifications discards queued unsubscriptions. Re-enabling does not replay them.
+Delivery stops when shutdown begins.
+
+Events support per-type metrics and scheduling config collection. They omit resource names,
+response versions, nonces and payloads. Strings are valid only during the callback.
 
 Use Cases
 ---------

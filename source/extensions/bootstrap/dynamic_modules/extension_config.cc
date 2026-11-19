@@ -146,11 +146,20 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
 
 bool DynamicModuleBootstrapExtensionConfig::setXdsNotifications(bool enabled) {
   if (!enabled) {
+    ++xds_notifications_generation_;
     xds_update_handle_.reset();
     return true;
   }
-  if (!server_initialized_ || extension_destroyed_ || !shutdownNotificationExpected() ||
-      on_bootstrap_extension_xds_update_ == nullptr) {
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot enable xDS notifications before server is initialized");
+    return false;
+  }
+  if (extension_destroyed_ || !shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot enable xDS notifications once shutdown started or in init only mode");
+    return false;
+  }
+  if (on_bootstrap_extension_xds_update_ == nullptr) {
+    ENVOY_LOG(error, "cannot enable xDS notifications without the xDS update hook");
     return false;
   }
   if (xds_update_handle_ != nullptr) {
@@ -187,7 +196,16 @@ void DynamicModuleBootstrapExtensionConfig::onConfigRejected(
 
 void DynamicModuleBootstrapExtensionConfig::onResourceUnsubscribed(absl::string_view type_url,
                                                                    absl::string_view) {
-  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
+  // unsubscription can happen while the cluster manager is destroying a cluster
+  main_thread_dispatcher_.post([weak_config = weak_from_this(), type_url = std::string(type_url),
+                                generation = xds_notifications_generation_]() {
+    auto config = weak_config.lock();
+    if (config != nullptr && config->xds_update_handle_ != nullptr &&
+        config->xds_notifications_generation_ == generation) {
+      config->notifyXdsUpdate(type_url,
+                              envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
+    }
+  });
 }
 
 void DynamicModuleBootstrapExtensionConfig::notifyXdsUpdate(

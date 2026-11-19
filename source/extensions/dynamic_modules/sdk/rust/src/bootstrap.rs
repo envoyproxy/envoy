@@ -293,9 +293,12 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
 
-  /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications. Main thread
-  /// only, after server initialization. Calls are idempotent. Enabling fails after shutdown or
-  /// when the module does not implement the xDS hook.
+  /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications.
+  ///
+  /// Call on the main thread, typically during or after
+  /// [`BootstrapExtension::on_server_initialized`]. Calls are idempotent. Disabling returns `true`.
+  /// Enabling returns `false` before server initialization, after shutdown begins, or in
+  /// `--mode init_only`. Calling off the main thread reports an Envoy bug and returns `false`.
   fn set_xds_notifications(&self, enabled: bool) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See
@@ -635,8 +638,15 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// Called during xDS processing on the main thread. Must not block or reenter xDS processing.
-  /// Error details contain the rejection reason and are empty for other outcomes.
+  /// Reports gRPC xDS outcomes on the main thread. Must not block or reenter xDS processing.
+  ///
+  /// Accepted follows successful response processing, before ACK; resources may still be warming.
+  /// Rejected precedes NACK and may follow partial application. `error_details` is the NACK
+  /// message, which may quote rejected configuration, and is empty for other outcomes.
+  /// Unsubscribed is posted when a watch drops interest. Disabling notifications discards pending
+  /// unsubscriptions, even if re-enabled before delivery.
+  ///
+  /// Events omit resource names, response versions, nonces and payloads.
   fn on_xds_update(
     &self,
     _envoy: &mut dyn EnvoyBootstrapExtensionConfig,

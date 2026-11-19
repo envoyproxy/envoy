@@ -9841,10 +9841,23 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
     envoy_dynamic_module_type_envoy_buffer listener_name);
 
 /**
- * Optional main-thread hook for xDS processing outcomes. type_url and error_details are borrowed
- * for this call. error_details contains the rejection reason when status is Rejected, and is empty
- * otherwise. No resource payloads are copied. Called only after opting in with
- * set_xds_notifications. Implementations must not block or reenter xDS processing.
+ * Optional main-thread hook for gRPC xDS outcomes, enabled with
+ * envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications.
+ *
+ * Accepted is reported after successful response processing, before ACK; resources may still be
+ * warming. Rejected is reported before NACK and may follow partial application.
+ * Unsubscribed is posted to the main dispatcher when a watch drops interest. Disabling
+ * notifications discards pending unsubscriptions, even if re-enabled before delivery.
+ *
+ * Implementations must not block or reenter xDS processing. Events omit resource names,
+ * response versions, nonces and payloads.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param type_url is the resource type URL, borrowed for this call.
+ * @param status is the processing outcome or client-initiated unsubscription.
+ * @param error_details is the NACK message for Rejected, or empty otherwise. It may quote rejected
+ * configuration and is borrowed for this call.
  */
 void envoy_dynamic_module_on_bootstrap_extension_xds_update(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
@@ -10513,9 +10526,15 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
 // -------------------- Bootstrap Extension Callbacks - xDS Notifications --------------------
 
 /**
- * Enables xDS notifications when enabled is true, or unregisters them when false. Main thread
- * only, after server initialization. Enabling returns false before initialization, after shutdown,
- * or when the module does not implement the optional xDS hook. Repeated calls are idempotent.
+ * Enables or disables envoy_dynamic_module_on_bootstrap_extension_xds_update notifications.
+ * Call on the main thread, typically during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls are idempotent.
+ * Notifications stop when shutdown begins.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param enabled is true to enable notifications, or false to unregister them.
+ * @return true on success. Enabling returns false before server initialization, after shutdown
+ * begins, in --mode init_only, or if the module does not export the hook.
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, bool enabled);

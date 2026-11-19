@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -56,6 +57,62 @@ public:
 
   std::string testDataDir(const std::string& subdir) {
     return TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/" + subdir);
+  }
+
+  void testXdsUnsubscriptions(Grpc::SotwOrDelta mode) {
+    use_lds_ = false;
+    defer_listener_finalization_ = true;
+    sotw_or_delta_ = mode;
+    const bool delta = mode == Grpc::SotwOrDelta::Delta || mode == Grpc::SotwOrDelta::UnifiedDelta;
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      mode == Grpc::SotwOrDelta::UnifiedSotw ||
+                                              mode == Grpc::SotwOrDelta::UnifiedDelta
+                                          ? "true"
+                                          : "false");
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    config_helper_.addConfigModifier([delta](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* dynamic_resources = bootstrap.mutable_dynamic_resources();
+      auto* ads = dynamic_resources->mutable_ads_config();
+      ads->set_api_type(delta ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                              : envoy::config::core::v3::ApiConfigSource::GRPC);
+      ads->set_transport_api_version(envoy::config::core::v3::V3);
+      ads->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_0");
+      auto* cds = dynamic_resources->mutable_cds_config();
+      cds->mutable_ads();
+      cds->set_resource_api_version(envoy::config::core::v3::V3);
+    });
+    initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_xds_test");
+    registerTestServerPorts({});
+    EXPECT_EQ(writerModuleRequest("/xds", "enable", ""), "");
+
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_));
+    ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+    xds_stream_->startGrpcStream();
+    const auto cluster_type = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+    const auto endpoint_type =
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+    ASSERT_TRUE(compareDiscoveryRequest(cluster_type, "", {}, {}, {}, true));
+    auto cluster = ConfigHelper::buildCluster("eds_cluster");
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cluster_type, {cluster}, {cluster},
+                                                               {}, "1");
+    ASSERT_TRUE(
+        compareDiscoveryRequest(endpoint_type, "", {"eds_cluster"}, {"eds_cluster"}, {}, true));
+    auto endpoints = ConfigHelper::buildClusterLoadAssignment(
+        "eds_cluster", Network::Test::getLoopbackAddressString(version_),
+        fake_upstreams_[0]->localAddress()->ip()->port());
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        endpoint_type, {endpoints}, {endpoints}, {}, "1");
+    ASSERT_TRUE(compareDiscoveryRequest(cluster_type, "1", {}, {}, {}, true));
+    ASSERT_TRUE(compareDiscoveryRequest(endpoint_type, "1", {"eds_cluster"}, {}, {}, true));
+    test_server_->waitUntilListenersReady();
+
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cluster_type, {}, {},
+                                                               {"eds_cluster"}, "2");
+    ASSERT_TRUE(compareDiscoveryRequest(endpoint_type, "1", {}, {}, {"eds_cluster"}, true));
+    ASSERT_TRUE(compareDiscoveryRequest(cluster_type, "2", {}, {}, {}, true));
+    test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
+    EXPECT_THAT(writerModuleRequest("/xds", "", ""),
+                testing::HasSubstr(absl::StrCat("Unsubscribed: ", endpoint_type, ": \n")));
   }
 
   // Starts Envoy with a Rust writer test module, which gets the serialized startup resource as its
@@ -360,10 +417,29 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, XdsOutcomesRust) {
       absl::StrCat(accepted, "Rejected: ", type_url, ": ", nack.error_detail().message(), "\n");
   EXPECT_EQ(writerModuleRequest("/xds", "", ""), rejected);
 
-  EXPECT_EQ(writerModuleRequest("/xds", "disable", ""), rejected);
   sendSotwDiscoveryResponse<envoy::config::cluster::v3::Cluster>(type_url, {}, "3");
   ASSERT_TRUE(compareSotwDiscoveryRequest(type_url, "3", {}));
   EXPECT_EQ(writerModuleRequest("/xds", "", ""), rejected);
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, XdsUnsubscriptionsSotwRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  testXdsUnsubscriptions(Grpc::SotwOrDelta::Sotw);
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, XdsUnsubscriptionsDeltaRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  testXdsUnsubscriptions(Grpc::SotwOrDelta::Delta);
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, XdsUnsubscriptionsUnifiedSotwRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  testXdsUnsubscriptions(Grpc::SotwOrDelta::UnifiedSotw);
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, XdsUnsubscriptionsUnifiedDeltaRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  testXdsUnsubscriptions(Grpc::SotwOrDelta::UnifiedDelta);
 }
 
 // This test verifies that a bootstrap extension can register a function in the process-wide

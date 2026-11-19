@@ -437,6 +437,7 @@ private:
   bool listener_lifecycle_enabled_ = false;
 
   Common::CallbackHandlePtr xds_update_handle_;
+  uint64_t xds_notifications_generation_ = 0;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

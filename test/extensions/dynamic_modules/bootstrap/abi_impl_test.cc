@@ -2116,8 +2116,10 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsRequireOptInAndReleaseOnDisableAndS
         EXPECT_EQ(&tracker, static_cast<Config::XdsConfigTracker*>(config.get()));
         return trackers.add(tracker);
       });
-  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
-      config->thisAsVoidPtr(), true));
+  EXPECT_LOG_CONTAINS(
+      "error", "cannot enable xDS notifications before server is initialized",
+      EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+          config->thisAsVoidPtr(), true)));
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
   trackers.onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
@@ -2147,7 +2149,9 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsRequireOptInAndReleaseOnDisableAndS
   config->onShutdown();
   trackers.onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
   EXPECT_EQ(outcomes.values.size(), 5);
-  EXPECT_FALSE(config->setXdsNotifications(true));
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable xDS notifications once shutdown started or in init only mode",
+                      EXPECT_FALSE(config->setXdsNotifications(true)));
 }
 
 TEST_F(BootstrapAbiImplTest, XdsNotificationsRefusedWithoutHookOrInInitOnlyMode) {
@@ -2157,11 +2161,91 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsRefusedWithoutHookOrInInitOnlyMode)
   EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_)).Times(0);
   config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {};
   ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::InitOnly));
-  EXPECT_FALSE(config->setXdsNotifications(true));
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable xDS notifications once shutdown started or in init only mode",
+                      EXPECT_FALSE(config->setXdsNotifications(true)));
   ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::Serve));
   config->on_bootstrap_extension_xds_update_ = nullptr;
-  EXPECT_FALSE(config->setXdsNotifications(true));
+  EXPECT_LOG_CONTAINS("error", "cannot enable xDS notifications without the xDS update hook",
+                      EXPECT_FALSE(config->setXdsNotifications(true)));
   EXPECT_TRUE(config->setXdsNotifications(false));
+}
+
+TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsArePostedAndCancelledWhenDisabled) {
+  auto config = newOptionalHooksConfig();
+  Config::XdsConfigTrackers trackers;
+  std::vector<Event::PostCb> posts;
+  EXPECT_CALL(dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb callback) {
+    posts.push_back(std::move(callback));
+  });
+  struct ObservedUpdates {
+    mutable uint64_t count = 0;
+  } outcomes;
+  config->in_module_config_ = &outcomes;
+  config->on_bootstrap_extension_xds_update_ =
+      [](auto envoy, auto module, envoy_dynamic_module_type_envoy_buffer type_url, auto status,
+         envoy_dynamic_module_type_envoy_buffer error_details) {
+        EXPECT_NE(envoy, nullptr);
+        EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), "test-type");
+        EXPECT_EQ(status, envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
+        EXPECT_EQ(error_details.length, 0);
+        ++static_cast<const ObservedUpdates*>(module)->count;
+      };
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .Times(3)
+      .WillRepeatedly([&](Config::XdsConfigTracker& tracker) { return trackers.add(tracker); });
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  {
+    const std::string type_url = "test-type";
+    trackers.onResourceUnsubscribed(type_url, "resource");
+  }
+  EXPECT_EQ(outcomes.count, 0);
+  ASSERT_EQ(posts.size(), 1);
+  posts[0]();
+  EXPECT_EQ(outcomes.count, 1);
+
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(config->setXdsNotifications(false));
+  ASSERT_EQ(posts.size(), 2);
+  posts[1]();
+  EXPECT_EQ(outcomes.count, 1);
+
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(config->setXdsNotifications(false));
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  ASSERT_EQ(posts.size(), 3);
+  posts[2]();
+  EXPECT_EQ(outcomes.count, 1);
+
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  config->onShutdown();
+  ASSERT_EQ(posts.size(), 4);
+  posts[3]();
+  EXPECT_EQ(outcomes.count, 1);
+}
+
+TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsAreDroppedAfterConfigDestruction) {
+  Config::XdsConfigTrackers trackers;
+  auto config = newOptionalHooksConfig();
+  Event::PostCb post;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb callback) {
+    post = std::move(callback);
+  });
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {
+    ADD_FAILURE() << "xDS callback invoked after module config destruction";
+  };
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .WillOnce([&](Config::XdsConfigTracker& tracker) { return trackers.add(tracker); });
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(post);
+  config.reset();
+  post();
 }
 
 TEST_F(BootstrapAbiImplTest, XdsNotificationsReleaseBeforeModuleConfigDestruction) {
