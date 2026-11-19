@@ -1,6 +1,7 @@
 #include "source/server/admin/prometheus_stats.h"
 
 #include <cmath>
+#include <limits>
 #include <map>
 #include <set>
 
@@ -82,7 +83,7 @@ struct PrimitiveMetricSnapshotLessThan {
 
 class TextFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedCounter>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, counters, prefixed_tag_extracted_name);
   }
@@ -93,7 +94,7 @@ public:
     generateNumericOutput(output, std::move(counters), prefixed_tag_extracted_name);
   }
 
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Gauge*>& gauges,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedGauge>& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, gauges, prefixed_tag_extracted_name);
   }
@@ -148,7 +149,8 @@ private:
   }
 
   template <class StatType>
-  void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
+  void generateNumericOutput(Buffer::Instance& output,
+                             const std::vector<CapturedMetric<StatType>>& metrics,
                              const std::string& prefixed_tag_extracted_name) const {
     absl::string_view type;
     if constexpr (std::is_same_v<Stats::Counter, StatType>) {
@@ -160,10 +162,11 @@ private:
     }
 
     generateTypeOutput(output, type, prefixed_tag_extracted_name);
-    for (const auto* metric : metrics) {
-      const std::string formatted_tags = PrometheusStatsFormatter::formattedTags(metric->tags());
+    for (const auto& captured : metrics) {
+      const std::string formatted_tags =
+          PrometheusStatsFormatter::formattedTags(captured.metric_->tags());
       output.add(fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, formatted_tags,
-                             metric->value()));
+                             captured.value_));
     }
   }
 
@@ -269,7 +272,7 @@ public:
       : native_histogram_max_buckets_(
             native_histogram_max_buckets.value_or(kDefaultMaxNativeHistogramBuckets)) {}
 
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedCounter>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, counters, prefixed_tag_extracted_name,
                           io::prometheus::client::MetricType::COUNTER);
@@ -284,7 +287,7 @@ public:
   }
 
   // Return the prometheus output for a group of Gauges.
-  void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Gauge*>& gauges,
+  void generateOutput(Buffer::Instance& output, const std::vector<CapturedGauge>& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, gauges, prefixed_tag_extracted_name,
                           io::prometheus::client::MetricType::GAUGE);
@@ -364,7 +367,8 @@ private:
   }
 
   template <class StatType>
-  void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
+  void generateNumericOutput(Buffer::Instance& output,
+                             const std::vector<CapturedMetric<StatType>>& metrics,
                              const std::string& prefixed_tag_extracted_name,
                              io::prometheus::client::MetricType type) const {
     ASSERT(!metrics.empty());
@@ -374,17 +378,17 @@ private:
     metric_family.set_type(type);
     metric_family.mutable_metric()->Reserve(metrics.size());
 
-    for (const auto* metric : metrics) {
+    for (const auto& captured : metrics) {
       auto* prom_metric = metric_family.add_metric();
-      addLabelsToMetric(prom_metric, metric->tags());
+      addLabelsToMetric(prom_metric, captured.metric_->tags());
 
       // Set value based on type
       if (type == io::prometheus::client::MetricType::COUNTER) {
         auto* counter = prom_metric->mutable_counter();
-        counter->set_value(metric->value());
+        counter->set_value(captured.value_);
       } else {
         auto* gauge = prom_metric->mutable_gauge();
-        gauge->set_value(metric->value());
+        gauge->set_value(captured.value_);
       }
     }
 
@@ -701,158 +705,178 @@ private:
   uint32_t native_histogram_max_buckets_{kDefaultMaxNativeHistogramBuckets};
 };
 
-/**
- * Processes a stat type (counter, gauge, histogram) by generating all output lines, sorting
- * them by tag-extracted metric name, and then outputting them in the correct sorted order into
- * response.
+/*
+ * From
+ * https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#grouping-and-sorting:
  *
- * @param response The buffer to put the output into.
- * @param used_only Whether to only output stats that are used.
- * @param regex A filter on which stats to output.
- * @param metrics The metrics to output stats for. This must contain all stats of the given type
- *        to be included in the same output.
- * @param generate_output A function which returns the output text for this metric.
- * @param type The name of the prometheus metric type for used in TYPE annotations.
+ * All lines for a given metric must be provided as one single group, with the optional HELP and
+ * TYPE lines first (in no particular order). Beyond that, reproducible sorting in repeated
+ * expositions is preferred but not required, i.e. do not sort if the computational cost is
+ * prohibitive.
+ *
+ * So all metrics of a stat type are grouped by their tag-extracted name up front, and each group is
+ * rendered as a whole. The metrics inside a group are only sorted when the group is rendered, which
+ * spreads most of the cost across chunks.
+ *
+ * Counter and gauge values are captured while grouping, so the values of one response are read
+ * together rather than when each chunk is rendered. Reading the value there is cheap, as the
+ * metric is already being visited.
  */
 template <class StatType>
-uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
-                        const std::vector<Stats::RefcountPtr<StatType>>& metrics,
-                        const PrometheusStatsFormatter::OutputFormat& output_format,
-                        const Stats::CustomStatNamespaces& custom_namespaces) {
-
-  /*
-   * From
-   * https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#grouping-and-sorting:
-   *
-   * All lines for a given metric must be provided as one single group, with the optional HELP and
-   * TYPE lines first (in no particular order). Beyond that, reproducible sorting in repeated
-   * expositions is preferred but not required, i.e. do not sort if the computational cost is
-   * prohibitive.
-   */
-
-  // This is an unsorted collection of dumb-pointers (no need to increment then decrement every
-  // refcount; ownership is held throughout by `metrics`). It is unsorted for efficiency, but will
-  // be sorted before producing the final output to satisfy the "preferred" ordering from the
-  // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
-  // consistent across calls.
-  using StatTypeUnsortedCollection = std::vector<const StatType*>;
-
-  // Return early to avoid crashing when getting the symbol table from the first metric.
-  if (metrics.empty()) {
-    return 0;
-  }
-
-  // There should only be one symbol table for all of the stats in the admin
-  // interface. If this assumption changes, the name comparisons in this function
-  // will have to change to compare to convert all StatNames to strings before
-  // comparison.
-  const Stats::SymbolTable& global_symbol_table = metrics.front()->constSymbolTable();
-
-  // Collection of metrics by their tagExtractedName.
-  // Sorting will be done on the names separately.
-  absl::flat_hash_map<Stats::StatName, StatTypeUnsortedCollection> groups;
-
-  for (const auto& metric : metrics) {
-    ASSERT(&global_symbol_table == &metric->constSymbolTable());
-    if (!params.shouldShowMetric(*metric)) {
-      continue;
+class StatFamilies : public PrometheusStatsFormatter::ChunkedRenderer::MetricFamilies {
+public:
+  StatFamilies(const std::vector<Stats::RefcountPtr<StatType>>& metrics, const StatsParams& params)
+      : sort_(!params.unordered_) {
+    // Return early to avoid crashing when getting the symbol table from the first metric.
+    if (metrics.empty()) {
+      return;
     }
-    groups[metric->tagExtractedStatName()].push_back(metric.get());
+
+    // There should only be one symbol table for all of the stats in the admin
+    // interface. If this assumption changes, the name comparisons in this class
+    // will have to change to compare to convert all StatNames to strings before
+    // comparison.
+    symbol_table_ = &metrics.front()->constSymbolTable();
+
+    // Unsorted collections of dumb-pointers: ownership is held by `metrics` throughout.
+    absl::flat_hash_map<Stats::StatName, Group> groups;
+    for (const auto& metric : metrics) {
+      ASSERT(symbol_table_ == &metric->constSymbolTable());
+      if (!params.shouldShowMetric(*metric)) {
+        continue;
+      }
+      groups[metric->tagExtractedStatName()].push_back(makeEntry(*metric));
+    }
+
+    families_.reserve(groups.size());
+    for (auto& [name, group] : groups) {
+      families_.emplace_back(name, std::move(group));
+    }
+    if (sort_) {
+      Stats::StatNameLessThan comp(*symbol_table_);
+      std::sort(families_.begin(), families_.end(),
+                [&comp](const Family& a, const Family& b) { return comp(a.first, b.first); });
+    }
   }
 
-  std::vector<Stats::StatName> sorted_stat_names;
-  sorted_stat_names.reserve(groups.size());
-  for (const auto& [group, _] : groups) {
-    sorted_stat_names.push_back(group);
-  }
-  Stats::StatNameLessThan comp(global_symbol_table);
-  std::sort(sorted_stat_names.begin(), sorted_stat_names.end(), comp);
+  bool done() const override { return next_ == families_.size(); }
 
-  auto result = groups.size();
-  for (auto& group_name : sorted_stat_names) {
-    auto& group = groups[group_name];
+  uint64_t renderNext(Buffer::Instance& response,
+                      const PrometheusStatsFormatter::OutputFormat& output_format,
+                      const Stats::CustomStatNamespaces& custom_namespaces) override {
+    ASSERT(!done());
+    auto& [name, group] = families_[next_++];
     const std::optional<std::string> prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group_name),
-                                             custom_namespaces);
+        PrometheusStatsFormatter::metricName(symbol_table_->toString(name), custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
-      --result;
-      continue;
+      Group().swap(group);
+      return 0;
     }
 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.begin(), group.end(), MetricLessThan());
+    if (sort_) {
+      std::sort(group.begin(), group.end(), [](const Entry& a, const Entry& b) {
+        return MetricLessThan()(metricOf(a), metricOf(b));
+      });
+    }
 
     output_format.generateOutput(response, group, prefixed_tag_extracted_name.value());
-  }
-  return result;
-}
-
-template <class StatType, class OutputFormat>
-uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& params,
-                                 std::vector<StatType>&& metrics, const OutputFormat& output_format,
-                                 const Stats::CustomStatNamespaces& custom_namespaces) {
-
-  /*
-   * From
-   * https:*github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#grouping-and-sorting:
-   *
-   * All lines for a given metric must be provided as one single group, with the optional HELP and
-   * TYPE lines first (in no particular order). Beyond that, reproducible sorting in repeated
-   * expositions is preferred but not required, i.e. do not sort if the computational cost is
-   * prohibitive.
-   */
-
-  // This is an unsorted collection of dumb-pointers (no need to increment then decrement every
-  // refcount; ownership is held throughout by `metrics`). It is unsorted for efficiency, but will
-  // be sorted before producing the final output to satisfy the "preferred" ordering from the
-  // prometheus spec: metrics will be sorted by their tags' textual representation, which will be
-  // consistent across calls.
-  using StatTypeUnsortedCollection = std::vector<StatType*>;
-
-  // Return early to avoid crashing when getting the symbol table from the first metric.
-  if (metrics.empty()) {
-    return 0;
+    Group().swap(group);
+    return 1;
   }
 
-  // Collection of metrics sorted by their tagExtractedName.
-  // We satisfy the requirements of the exposition format by iterating over the sorted keys.
-  absl::flat_hash_map<std::string, StatTypeUnsortedCollection> groups;
+private:
+  static constexpr bool kCaptureValue =
+      std::is_same_v<StatType, Stats::Counter> || std::is_same_v<StatType, Stats::Gauge>;
+  using Entry = std::conditional_t<kCaptureValue, CapturedMetric<StatType>, const StatType*>;
 
-  for (auto& metric : metrics) {
-    if (!params.shouldShowMetric(metric)) {
-      continue;
+  static Entry makeEntry(const StatType& metric) {
+    if constexpr (kCaptureValue) {
+      return {&metric, metric.value()};
+    } else {
+      return &metric;
     }
-    groups[metric.tagExtractedName()].push_back(&metric);
   }
 
-  std::vector<std::string> sorted_group_names;
-  sorted_group_names.reserve(groups.size());
-  for (const auto& [group, _] : groups) {
-    sorted_group_names.push_back(group);
+  static const StatType* metricOf(const Entry& entry) {
+    if constexpr (kCaptureValue) {
+      return entry.metric_;
+    } else {
+      return entry;
+    }
   }
-  std::sort(sorted_group_names.begin(), sorted_group_names.end());
 
-  auto result = groups.size();
-  for (auto& group_name : sorted_group_names) {
-    auto& group = groups[group_name];
+  using Group = std::vector<Entry>;
+  using Family = std::pair<Stats::StatName, Group>;
+
+  const bool sort_;
+  const Stats::SymbolTable* symbol_table_{};
+  std::vector<Family> families_;
+  size_t next_{0};
+};
+
+// Same as StatFamilies, but for the per-endpoint primitive metric snapshots, which are owned here.
+template <class SnapshotType>
+class PrimitiveFamilies : public PrometheusStatsFormatter::ChunkedRenderer::MetricFamilies {
+public:
+  PrimitiveFamilies(std::vector<SnapshotType>&& metrics, const StatsParams& params)
+      : sort_(!params.unordered_), metrics_(std::move(metrics)) {
+    absl::flat_hash_map<std::string, Group> groups;
+    for (auto& metric : metrics_) {
+      if (!params.shouldShowMetric(metric)) {
+        continue;
+      }
+      groups[metric.tagExtractedName()].push_back(&metric);
+    }
+
+    families_.reserve(groups.size());
+    for (auto& [name, group] : groups) {
+      families_.emplace_back(name, std::move(group));
+    }
+    if (sort_) {
+      std::sort(families_.begin(), families_.end(),
+                [](const Family& a, const Family& b) { return a.first < b.first; });
+    }
+  }
+
+  bool done() const override { return next_ == families_.size(); }
+
+  uint64_t renderNext(Buffer::Instance& response,
+                      const PrometheusStatsFormatter::OutputFormat& output_format,
+                      const Stats::CustomStatNamespaces& custom_namespaces) override {
+    ASSERT(!done());
+    auto& [name, group] = families_[next_++];
     const std::optional<std::string> prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(std::move(group_name), custom_namespaces);
+        PrometheusStatsFormatter::metricName(std::move(name), custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
-      --result;
-      continue;
+      Group().swap(group);
+      return 0;
     }
 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.begin(), group.end(), PrimitiveMetricSnapshotLessThan());
+    if (sort_) {
+      std::sort(group.begin(), group.end(), PrimitiveMetricSnapshotLessThan());
+    }
 
     output_format.generateOutput(response, std::move(group), prefixed_tag_extracted_name.value());
+    Group().swap(group);
+    return 1;
   }
-  return result;
-}
+
+private:
+  using Group = std::vector<SnapshotType*>;
+  using Family = std::pair<std::string, Group>;
+
+  const bool sort_;
+  // Owns the snapshots which the groups point into. It is not modified after construction.
+  std::vector<SnapshotType> metrics_;
+  std::vector<Family> families_;
+  size_t next_{0};
+};
 
 // Determine the format based on Accept header, using first-match priority.
 // Per HTTP spec, clients SHOULD send media types in priority order.
@@ -963,15 +987,14 @@ PrometheusStatsFormatter::metricName(std::string&& extracted_name,
   return absl::StrCat("envoy_", extracted_name);
 }
 
-uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
+PrometheusStatsFormatter::ChunkedRenderer::ChunkedRenderer(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-    const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
-    const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces,
-    OutputFormat& output_format) {
-
+    const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
+    const Stats::CustomStatNamespaces& custom_namespaces, OutputFormat& output_format)
+    : custom_namespaces_(custom_namespaces), output_format_(output_format) {
   OutputFormat::HistogramType hist_type;
 
   // Validation of bucket modes is handled separately.
@@ -997,22 +1020,17 @@ uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
 
   output_format.setHistogramType(hist_type);
 
-  uint64_t metric_name_count = 0;
-  metric_name_count +=
-      outputStatType<Stats::Counter>(response, params, counters, output_format, custom_namespaces);
-
-  metric_name_count +=
-      outputStatType<Stats::Gauge>(response, params, gauges, output_format, custom_namespaces);
-
-  metric_name_count += outputStatType<Stats::TextReadout>(response, params, text_readouts,
-                                                          output_format, custom_namespaces);
-
-  metric_name_count += outputStatType<Stats::ParentHistogram>(response, params, histograms,
-                                                              output_format, custom_namespaces);
+  phases_.push_back(std::make_unique<StatFamilies<Stats::Counter>>(counters, params));
+  phases_.push_back(std::make_unique<StatFamilies<Stats::Gauge>>(gauges, params));
+  phases_.push_back(std::make_unique<StatFamilies<Stats::TextReadout>>(text_readouts, params));
+  phases_.push_back(std::make_unique<StatFamilies<Stats::ParentHistogram>>(histograms, params));
 
   // Note: This assumes that there is no overlap in stat name between per-endpoint stats and all
   // other stats. If this is not true, then the counters/gauges for per-endpoint need to be combined
   // with the above counter/gauge calls so that stats can be properly grouped.
+  //
+  // The cluster manager may only be read here: the snapshots are copied so that rendering can
+  // happen later.
   std::vector<Stats::PrimitiveCounterSnapshot> host_counters;
   std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges;
   Upstream::HostUtility::forEachHostMetric(
@@ -1021,13 +1039,61 @@ uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
         host_counters.emplace_back(std::move(metric));
       },
       [&](Stats::PrimitiveGaugeSnapshot&& metric) { host_gauges.emplace_back(std::move(metric)); });
+  phases_.push_back(std::make_unique<PrimitiveFamilies<Stats::PrimitiveCounterSnapshot>>(
+      std::move(host_counters), params));
+  phases_.push_back(std::make_unique<PrimitiveFamilies<Stats::PrimitiveGaugeSnapshot>>(
+      std::move(host_gauges), params));
+}
 
-  metric_name_count += outputPrimitiveStatType(response, params, std::move(host_counters),
-                                               output_format, custom_namespaces);
-  metric_name_count += outputPrimitiveStatType(response, params, std::move(host_gauges),
-                                               output_format, custom_namespaces);
+PrometheusStatsFormatter::ChunkedRenderer::~ChunkedRenderer() = default;
 
-  return metric_name_count;
+bool PrometheusStatsFormatter::ChunkedRenderer::advance() {
+  while (phase_index_ < phases_.size() && phases_[phase_index_]->done()) {
+    ++phase_index_;
+  }
+  return phase_index_ < phases_.size();
+}
+
+bool PrometheusStatsFormatter::ChunkedRenderer::nextChunk(Buffer::Instance& response,
+                                                          uint64_t chunk_size) {
+  const uint64_t starting_length = response.length();
+  while (advance()) {
+    metric_name_count_ +=
+        phases_[phase_index_]->renderNext(response, output_format_, custom_namespaces_);
+    if (response.length() - starting_length >= chunk_size) {
+      return advance();
+    }
+  }
+  return false;
+}
+
+std::unique_ptr<PrometheusStatsFormatter::OutputFormat>
+PrometheusStatsFormatter::makeOutputFormat(const StatsParams& params,
+                                           const Http::RequestHeaderMap& request_headers,
+                                           Http::ResponseHeaderMap& response_headers) {
+  if (!useProtobufFormat(params, request_headers)) {
+    return std::make_unique<TextFormat>();
+  }
+  response_headers.setReferenceContentType(
+      "application/vnd.google.protobuf; "
+      "proto=io.prometheus.client.MetricFamily; encoding=delimited");
+  return std::make_unique<ProtobufFormat>(params.native_histogram_max_buckets_);
+}
+
+uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
+    const std::vector<Stats::CounterSharedPtr>& counters,
+    const std::vector<Stats::GaugeSharedPtr>& gauges,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
+    const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces,
+    OutputFormat& output_format) {
+  ChunkedRenderer renderer(counters, gauges, histograms, text_readouts, cluster_manager, params,
+                           custom_namespaces, output_format);
+  // Render everything in one chunk.
+  while (renderer.nextChunk(response, std::numeric_limits<uint64_t>::max())) {
+  }
+  return renderer.metricNameCount();
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheusText(

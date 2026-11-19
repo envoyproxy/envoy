@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -21,8 +22,13 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 using testing::NiceMock;
 using testing::Ref;
@@ -3167,6 +3173,250 @@ TEST_F(NativeHistogramBucketIndexTest, IntegerValuesMatchPrometheusClient) {
 // indices.
 TEST_F(NativeHistogramBucketIndexTest, PercentValuesMatchPrometheusClient) {
   verifyBucketIndices(Stats::Histogram::Unit::Percent, kPercentBucketIndexCases);
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputUnordered) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+  }
+  addClusterEndpoints("cluster1", 2, {{"a.tag-name", "a.tag-value"}});
+
+  Buffer::OwnedImpl sorted_response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, sorted_response,
+                                                  StatsParams(), custom_namespaces);
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_response;
+  ASSERT_EQ(Http::Code::OK, params.parse("", parse_response));
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, response, params,
+                                                  custom_namespaces);
+
+  // Same lines, in any order.
+  std::vector<std::string> sorted_lines = absl::StrSplit(sorted_response.toString(), '\n');
+  std::vector<std::string> lines = absl::StrSplit(response.toString(), '\n');
+  EXPECT_THAT(lines, testing::UnorderedElementsAreArray(sorted_lines));
+
+  // Each family is still one contiguous group led by its TYPE line.
+  absl::flat_hash_set<std::string> families;
+  std::string family;
+  for (const std::string& line : lines) {
+    if (line.empty()) {
+      continue;
+    }
+    if (absl::StartsWith(line, "# TYPE ")) {
+      std::vector<std::string> parts = absl::StrSplit(line, ' ');
+      ASSERT_EQ(4, parts.size());
+      family = parts[2];
+      EXPECT_TRUE(families.insert(family).second) << "family split: " << family;
+      continue;
+    }
+    EXPECT_TRUE(absl::StartsWith(line, family)) << line << " is outside of family " << family;
+  }
+  EXPECT_GT(families.size(), 3);
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputSortedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prometheus_stats_unsorted", "false"}});
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+  }
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_response;
+  ASSERT_EQ(Http::Code::OK, params.parse("", parse_response));
+  EXPECT_FALSE(params.unordered_);
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, response, params,
+                                                  custom_namespaces);
+
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_connect_fail counter
+envoy_cluster_upstream_cx_connect_fail{cluster="aaa"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="bbb"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="ccc"} 0
+# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="aaa"} 0
+envoy_cluster_upstream_cx_total{cluster="bbb"} 0
+envoy_cluster_upstream_cx_total{cluster="ccc"} 0
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="aaa"} 0
+envoy_cluster_upstream_cx_active{cluster="bbb"} 0
+envoy_cluster_upstream_cx_active{cluster="ccc"} 0
+)EOF",
+            response.toString());
+}
+
+class PrometheusChunkedRendererTest : public PrometheusStatsFormatterTest {
+protected:
+  PrometheusChunkedRendererTest() {
+    custom_namespaces_.registerStatNamespace("promtest");
+    h1_cumulative_.setHistogramValues({50, 20, 30, 70, 100, 5000, 200});
+  }
+
+  // Families from different stat types, several series per family, per-endpoint stats, and a
+  // family that is skipped because of its invalid name.
+  void addMetrics() {
+    addCounter("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
+    addCounter("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c2")}});
+    addCounter("cluster.upstream_rq_total", {{makeStat("cluster"), makeStat("c1")}});
+    addGauge("cluster.upstream_cx_active", {{makeStat("cluster"), makeStat("c1")}});
+    addGauge("promtest.1234abcd.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
+    addTextReadout("control_plane.identifier", "cp-1", {{makeStat("cluster"), makeStat("c1")}});
+    addClusterEndpoints("cluster1", 2, {{"a.tag-name", "a.tag-value"}});
+
+    auto histogram =
+        makeHistogram("cluster.upstream_rq_time", {{makeStat("cluster"), makeStat("c1")}});
+    ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics_));
+    addHistogram(histogram);
+  }
+
+  std::string renderAllAtOnce(uint64_t& metric_name_count) {
+    Buffer::OwnedImpl response;
+    metric_name_count = PrometheusStatsFormatter::statsAsPrometheusText(
+        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+        StatsParams(), custom_namespaces_);
+    return response.toString();
+  }
+
+  std::unique_ptr<PrometheusStatsFormatter::ChunkedRenderer> makeRenderer() {
+    output_format_ = PrometheusStatsFormatter::makeOutputFormat(StatsParams(), request_headers_,
+                                                                response_headers_);
+    return std::make_unique<PrometheusStatsFormatter::ChunkedRenderer>(
+        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, StatsParams(),
+        custom_namespaces_, *output_format_);
+  }
+
+  Stats::CustomStatNamespacesImpl custom_namespaces_;
+  HistogramWrapper h1_cumulative_;
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics_{h1_cumulative_.getHistogram()};
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+  std::unique_ptr<PrometheusStatsFormatter::OutputFormat> output_format_;
+};
+
+TEST_F(PrometheusChunkedRendererTest, OneFamilyPerChunkMatchesSingleShotOutput) {
+  addMetrics();
+  uint64_t expected_count;
+  const std::string expected = renderAllAtOnce(expected_count);
+
+  auto renderer = makeRenderer();
+  std::vector<std::string> chunks;
+  bool more_data;
+  do {
+    Buffer::OwnedImpl chunk;
+    more_data = renderer->nextChunk(chunk, 1);
+    chunks.push_back(chunk.toString());
+  } while (more_data);
+
+  EXPECT_EQ(expected, absl::StrJoin(chunks, ""));
+  EXPECT_EQ(expected_count, renderer->metricNameCount());
+  ASSERT_EQ(expected_count, chunks.size());
+  for (const std::string& chunk : chunks) {
+    // Each chunk is exactly one whole family.
+    EXPECT_THAT(chunk, testing::StartsWith("# TYPE "));
+    EXPECT_EQ(1, std::count(chunk.begin(), chunk.end(), '#')) << chunk;
+  }
+  EXPECT_THAT(chunks[0],
+              HasSubstr("{cluster=\"c1\"} 0\nenvoy_cluster_upstream_cx_total{cluster=\"c2\"}"));
+}
+
+TEST_F(PrometheusChunkedRendererTest, LargeChunkRendersEverythingInOneCall) {
+  addMetrics();
+  uint64_t expected_count;
+  const std::string expected = renderAllAtOnce(expected_count);
+
+  auto renderer = makeRenderer();
+  Buffer::OwnedImpl response;
+  EXPECT_FALSE(renderer->nextChunk(response, std::numeric_limits<uint64_t>::max()));
+  EXPECT_EQ(expected, response.toString());
+  EXPECT_EQ(expected_count, renderer->metricNameCount());
+}
+
+TEST_F(PrometheusChunkedRendererTest, NoMetrics) {
+  auto renderer = makeRenderer();
+  Buffer::OwnedImpl response;
+  EXPECT_FALSE(renderer->nextChunk(response, 1));
+  EXPECT_EQ(0, response.length());
+  EXPECT_EQ(0, renderer->metricNameCount());
+}
+
+TEST_F(PrometheusChunkedRendererTest, ProtobufChunksAreWholeFamilies) {
+  addMetrics();
+  request_headers_.addCopy("accept", "application/vnd.google.protobuf");
+  Http::TestResponseHeaderMapImpl single_shot_headers;
+  Buffer::OwnedImpl expected;
+  const uint64_t expected_count = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, single_shot_headers,
+      expected, StatsParams(), custom_namespaces_);
+
+  auto renderer = makeRenderer();
+  EXPECT_EQ(single_shot_headers.getContentTypeValue(), response_headers_.getContentTypeValue());
+  std::string all;
+  bool more_data;
+  do {
+    Buffer::OwnedImpl chunk;
+    more_data = renderer->nextChunk(chunk, 1);
+    // Each chunk parses as exactly one delimited MetricFamily.
+    EXPECT_EQ(1, parsePrometheusProtobuf(chunk.toString()).size());
+    all += chunk.toString();
+  } while (more_data);
+  EXPECT_EQ(expected.toString(), all);
+  EXPECT_EQ(expected_count, renderer->metricNameCount());
+}
+
+TEST_F(PrometheusChunkedRendererTest, TextValuesCapturedWhenGrouped) {
+  addCounter("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
+  addGauge("cluster.upstream_cx_active", {{makeStat("cluster"), makeStat("c1")}});
+  counters_[0]->add(5);
+  gauges_[0]->set(7);
+
+  auto renderer = makeRenderer();
+  // Updates after the renderer is created are not rendered.
+  counters_[0]->add(100);
+  gauges_[0]->set(200);
+
+  Buffer::OwnedImpl response;
+  EXPECT_FALSE(renderer->nextChunk(response, std::numeric_limits<uint64_t>::max()));
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 5
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 7
+)EOF",
+            response.toString());
+}
+
+TEST_F(PrometheusChunkedRendererTest, ProtobufValuesCapturedWhenGrouped) {
+  addCounter("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
+  addGauge("cluster.upstream_cx_active", {{makeStat("cluster"), makeStat("c1")}});
+  counters_[0]->add(5);
+  gauges_[0]->set(7);
+  request_headers_.addCopy("accept", "application/vnd.google.protobuf");
+
+  auto renderer = makeRenderer();
+  // Updates after the renderer is created are not rendered.
+  counters_[0]->add(100);
+  gauges_[0]->set(200);
+
+  Buffer::OwnedImpl response;
+  EXPECT_FALSE(renderer->nextChunk(response, std::numeric_limits<uint64_t>::max()));
+  const auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(2, families.size());
+  ASSERT_EQ(1, families[0].metric_size());
+  EXPECT_EQ(5, families[0].metric(0).counter().value());
+  ASSERT_EQ(1, families[1].metric_size());
+  EXPECT_EQ(7, families[1].metric(0).gauge().value());
 }
 
 } // namespace Server

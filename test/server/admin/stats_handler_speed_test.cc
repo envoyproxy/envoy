@@ -5,11 +5,14 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_handler.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/stats/real_thread_test_base.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_time.h"
 
 #include "benchmark/benchmark.h"
 
@@ -203,9 +206,7 @@ public:
     auto request_headers = Http::RequestHeaderMapImpl::create();
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     if (params.format_ == StatsFormat::Prometheus) {
-      StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, *request_headers,
-                                     *response_headers, data);
-      return data.length();
+      return prometheusChunked(params, *request_headers, *response_headers);
     }
     Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params, cm_);
     request->start(*response_headers);
@@ -219,8 +220,61 @@ public:
     return count;
   }
 
+  // Renders like PrometheusRequest does, one DefaultChunkSize chunk at a time, and records how
+  // long each chunk took.
+  uint64_t prometheusChunked(const StatsParams& params,
+                             const Http::RequestHeaderMap& request_headers,
+                             Http::ResponseHeaderMap& response_headers) {
+    num_chunks_ = 0;
+    first_chunk_ = std::chrono::nanoseconds::zero();
+    max_chunk_ = std::chrono::nanoseconds::zero();
+
+    MonotonicTime start = time_system_.monotonicTime();
+    std::vector<Stats::CounterSharedPtr> counters = store_->counters();
+    std::vector<Stats::GaugeSharedPtr> gauges = store_->gauges();
+    std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+    std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+    if (params.prometheus_text_readouts_) {
+      text_readouts = store_->textReadouts();
+    }
+    std::unique_ptr<PrometheusStatsFormatter::OutputFormat> output_format =
+        PrometheusStatsFormatter::makeOutputFormat(params, request_headers, response_headers);
+    PrometheusStatsFormatter::ChunkedRenderer renderer(counters, gauges, histograms, text_readouts,
+                                                       cm_, params, custom_namespaces_,
+                                                       *output_format);
+
+    Buffer::OwnedImpl data;
+    uint64_t count = 0;
+    bool more = true;
+    do {
+      more = renderer.nextChunk(data, StatsRequest::DefaultChunkSize);
+      const MonotonicTime end = time_system_.monotonicTime();
+      // The first chunk includes the snapshot and grouping done above.
+      const auto elapsed = end - start;
+      if (num_chunks_++ == 0) {
+        first_chunk_ = elapsed;
+      }
+      max_chunk_ =
+          std::max(max_chunk_, std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed));
+      count += data.length();
+      data.drain(data.length());
+      start = time_system_.monotonicTime();
+    } while (more);
+    return count;
+  }
+
+  void reportChunks(::benchmark::State& state) const {
+    state.counters["chunks"] = num_chunks_;
+    state.counters["first_chunk_ms"] = first_chunk_.count() / 1e6;
+    state.counters["max_chunk_ms"] = max_chunk_.count() / 1e6;
+  }
+
   std::vector<Stats::ScopeSharedPtr> scopes_;
   Envoy::Stats::CustomStatNamespacesImpl custom_namespaces_;
+  Event::TestRealTimeSystem time_system_;
+  uint64_t num_chunks_{0};
+  std::chrono::nanoseconds first_chunk_{0};
+  std::chrono::nanoseconds max_chunk_{0};
   FastMockClusterManager cm_;
   bool endpoint_stats_initialized_{false};
 };
@@ -384,6 +438,7 @@ static void BM_AllCountersPrometheus(benchmark::State& state, bool per_endpoint_
 
   auto label = absl::StrCat("output per iteration: ", count);
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK_CAPTURE(BM_AllCountersPrometheus, per_endpoint_stats_disabled, false)
     ->Unit(benchmark::kMillisecond);
@@ -407,6 +462,7 @@ static void BM_UsedCountersPrometheus(benchmark::State& state, bool per_endpoint
 
   auto label = absl::StrCat("output per iteration: ", count);
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK_CAPTURE(BM_UsedCountersPrometheus, per_endpoint_stats_disabled, false)
     ->Unit(benchmark::kMillisecond);
@@ -428,6 +484,7 @@ static void BM_FilteredCountersPrometheus(benchmark::State& state, bool per_endp
 
   auto label = absl::StrCat("output per iteration: ", count);
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK_CAPTURE(BM_FilteredCountersPrometheus, per_endpoint_stats_disabled, false)
     ->Unit(benchmark::kMillisecond);
@@ -453,6 +510,7 @@ static void BM_PrometheusFull(benchmark::State& state, bool per_endpoint_stats) 
 
   auto label = absl::StrCat("output per iteration: ", count);
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK_CAPTURE(BM_PrometheusFull, per_endpoint_stats_disabled, false)
     ->Unit(benchmark::kMillisecond);
@@ -496,6 +554,7 @@ static void BM_TraditionalHistogramsPrometheusProtobuf(benchmark::State& state) 
 
   auto label = absl::StrCat("output per iteration: ", count, " (19 buckets/histogram)");
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK(BM_TraditionalHistogramsPrometheusProtobuf)->Unit(benchmark::kMillisecond);
 
@@ -513,6 +572,7 @@ static void bmTraditionalHistogramsPrometheusText(benchmark::State& state) {
 
   auto label = absl::StrCat("output per iteration: ", count, " (19 buckets/histogram)");
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK(bmTraditionalHistogramsPrometheusText)->Unit(benchmark::kMillisecond);
 
@@ -532,5 +592,6 @@ static void BM_NativeHistogramsPrometheusProtobuf(benchmark::State& state) {
 
   auto label = absl::StrCat("output per iteration: ", count, " (max 19 buckets/histogram)");
   state.SetLabel(label);
+  test_context.reportChunks(state);
 }
 BENCHMARK(BM_NativeHistogramsPrometheusProtobuf)->Unit(benchmark::kMillisecond);
