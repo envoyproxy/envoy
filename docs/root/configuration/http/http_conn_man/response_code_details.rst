@@ -47,6 +47,9 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    request_payload_exceeded_retry_buffer_limit, Envoy is doing streaming proxying but too much data arrived while waiting to attempt a retry.
    request_payload_too_large, Envoy is doing non-streaming proxying and the request payload exceeded configured limits.
    response_payload_too_large, Envoy is doing non-streaming proxying and the response payload exceeded configured limits.
+   response_timeout, The request was fully sent upstream but the route timeout fired before response headers arrived.
+   response_timeout{connecting}, The route timeout fired before the upstream connection pool handed a connection to the request. The request was still queued or the TCP connect or TLS handshake had not finished.
+   response_timeout{sending_request}, The route timeout fired after the upstream connection was ready but before the request had been fully sent upstream.
    route_configuration_not_found, The request was rejected because there was no route configuration found.
    route_not_found, The request was rejected because there was no route found.
    stream_idle_timeout, The per-stream keepalive timeout was exceeded.
@@ -55,7 +58,6 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    upstream_per_try_timeout, The final upstream try timed out.
    upstream_reset_after_response_started{details}, The upstream connection was reset after a response was started. This may include further details about the cause of the disconnect.
    upstream_reset_before_response_started{details}, The upstream connection was reset before a response was started This may include further details about the cause of the disconnect.
-   upstream_response_timeout, The upstream response timed out.
    via_upstream, The response code was set by the upstream.
 
 
