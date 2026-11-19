@@ -16,6 +16,7 @@ namespace Runtime {
 
 bool hasRuntimePrefix(absl::string_view feature);
 bool isRuntimeFeature(absl::string_view feature);
+bool isRestartFeature(absl::string_view feature);
 
 // Returns true if the feature is one of the legacy runtime features that uses the
 // `envoy.reloadable_features` prefix but is not implemented like all other runtime

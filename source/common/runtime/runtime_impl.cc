@@ -22,6 +22,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/flags/flag.h"
@@ -46,12 +47,7 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 }
 
 void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
-                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults,
-                            bool restart_features_frozen) {
-  const auto frozen = [restart_features_frozen](absl::string_view name) {
-    return restart_features_frozen && absl::StartsWith(name, "envoy.restart_features.");
-  };
-
+                            absl::node_hash_map<std::string, bool>& runtime_feature_defaults) {
   for (const auto& it : flag_map) {
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       runtime_feature_defaults.try_emplace(it.first, Runtime::runtimeFeatureEnabled(it.first));
@@ -60,20 +56,14 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
 
   for (const auto& it : runtime_feature_defaults) {
     const auto flag = flag_map.find(it.first);
-    if ((flag == flag_map.end() || !flag->second.bool_value_.has_value()) && !frozen(it.first)) {
+    if (flag == flag_map.end() || !flag->second.bool_value_.has_value()) {
       maybeSetRuntimeGuard(it.first, it.second);
     }
   }
 
   for (const auto& it : flag_map) {
-    if (!it.second.bool_value_.has_value() || !isRuntimeFeature(it.first)) {
-      continue;
-    }
-    if (!frozen(it.first)) {
+    if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
-    } else if (it.second.bool_value_.value() != Runtime::runtimeFeatureEnabled(it.first)) {
-      ENVOY_LOG_MISC(error, "ignoring {}={}: restart features only change with a restart", it.first,
-                     it.second.bool_value_.value());
     }
   }
 #ifdef ENVOY_ENABLE_QUIC
@@ -103,6 +93,16 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
   }
   markRuntimeInitialized();
 }
+
+constexpr std::string_view FrozenRestartFeaturesLayerName = "frozen_restart_features";
+
+class FrozenRestartFeaturesLayer : public OverrideLayerImpl {
+public:
+  explicit FrozenRestartFeaturesLayer(Snapshot::EntryMap&& values)
+      : OverrideLayerImpl{FrozenRestartFeaturesLayerName} {
+    values_ = std::move(values);
+  }
+};
 
 } // namespace
 
@@ -525,6 +525,9 @@ absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
     if (!ret.second) {
       return absl::InvalidArgumentError(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
+    if (layer.name() == FrozenRestartFeaturesLayerName) {
+      return absl::InvalidArgumentError(absl::StrCat("Reserved layer name: ", layer.name()));
+    }
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
       // Nothing needs to be done here.
@@ -679,7 +682,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_, restart_features_frozen_);
+  refreshReloadableFlags(ptr->values(), runtime_feature_defaults_);
 
   {
     absl::MutexLock lock(snapshot_mutex_);
@@ -711,9 +714,9 @@ absl::Status LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std:
   }
   if (restart_features_frozen_) {
     for (const auto& [key, value] : values) {
-      if (absl::StartsWith(key, "envoy.restart_features.")) {
-        return absl::FailedPreconditionError(
-            fmt::format("{} is a restart feature, it only changes with a restart", key));
+      if (isRestartFeature(key)) {
+        return absl::FailedPreconditionError(fmt::format(
+            "{} is a restart feature, set it in a runtime layer present at startup", key));
       }
     }
   }
@@ -730,6 +733,67 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   RuntimeStats stats{
       ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
+}
+
+void LoaderImpl::maybeAddFrozenRestartFeaturesLayer(
+    std::vector<Snapshot::OverrideLayerConstPtr>& layers) {
+  absl::flat_hash_map<std::string, const Snapshot::Entry*> layered_entries;
+  absl::flat_hash_map<std::string, absl::string_view> entry_layers;
+  for (const auto& [feature, default_value] : runtime_feature_defaults_) {
+    if (isRestartFeature(feature)) {
+      layered_entries.emplace(feature, nullptr);
+    }
+  }
+  for (const auto& layer : layers) {
+    for (const auto& [feature, layered_entry] : layer->values()) {
+      if (isRestartFeature(feature)) {
+        layered_entries.insert_or_assign(feature, &layered_entry);
+        entry_layers.insert_or_assign(feature, layer->name());
+      }
+    }
+  }
+
+  Snapshot::EntryMap frozen_entries;
+  absl::flat_hash_set<std::string> ignored_features;
+  for (const auto& [feature, layered_entry] : layered_entries) {
+    const bool frozen_value = Runtime::runtimeFeatureEnabled(feature);
+    std::optional<bool> layered_value =
+        layered_entry != nullptr ? layered_entry->bool_value_ : std::nullopt;
+    if (!layered_value.has_value()) {
+      if (const auto default_entry = runtime_feature_defaults_.find(feature);
+          default_entry != runtime_feature_defaults_.end()) {
+        layered_value = default_entry->second;
+      }
+    }
+    // Nothing to override when the layers would leave the flag at its frozen value.
+    if (!layered_value.has_value() || layered_value.value() == frozen_value) {
+      continue;
+    }
+
+    SnapshotImpl::addEntry(frozen_entries, feature, ValueUtil::boolValue(frozen_value), "");
+
+    ignored_features.insert(feature);
+    if (ignored_restart_features_.contains(feature)) {
+      continue;
+    }
+
+    if (layered_entry == nullptr) {
+      ENVOY_LOG(error,
+                "ignoring removal of {}: restart features are only set by runtime layers present "
+                "at startup",
+                feature);
+    } else {
+      ENVOY_LOG(error,
+                "ignoring {}={} in layer {}: restart features are only set by runtime layers "
+                "present at startup",
+                feature, layered_entry->raw_string_value_, entry_layers.at(feature));
+    }
+    stats_.restart_feature_ignored_.inc();
+  }
+  ignored_restart_features_ = std::move(ignored_features);
+  if (!frozen_entries.empty()) {
+    layers.push_back(std::make_unique<const FrozenRestartFeaturesLayer>(std::move(frozen_entries)));
+  }
 }
 
 absl::StatusOr<SnapshotImplPtr> LoaderImpl::createNewSnapshot() {
@@ -791,6 +855,9 @@ absl::StatusOr<SnapshotImplPtr> LoaderImpl::createNewSnapshot() {
     }
   }
   stats_.num_layers_.set(layers.size());
+  if (restart_features_frozen_) {
+    maybeAddFrozenRestartFeaturesLayer(layers);
+  }
   auto snapshot = std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
   if (error_layers == 0) {
     stats_.load_success_.inc();

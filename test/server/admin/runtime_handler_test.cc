@@ -110,8 +110,8 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
 TEST_P(AdminInstanceTest, RuntimeModifyRestartFeature) {
   Runtime::MockLoader loader;
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-  const std::string error =
-      "envoy.restart_features.test_feature is a restart feature, it only changes with a restart";
+  const std::string error = "envoy.restart_features.test_feature is a restart feature, set it in a "
+                            "runtime layer present at startup";
   EXPECT_CALL(loader, mergeValues(testing::_))
       .WillOnce(testing::Return(absl::FailedPreconditionError(error)));
 

@@ -427,6 +427,10 @@ bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
 
+bool isRestartFeature(absl::string_view feature) {
+  return absl::StartsWith(feature, "envoy.restart_features.") && isRuntimeFeature(feature);
+}
+
 bool isLegacyRuntimeFeature(absl::string_view feature) {
   return feature == Http::MaxRequestHeadersCountOverrideKey ||
          feature == Http::MaxResponseHeadersCountOverrideKey ||

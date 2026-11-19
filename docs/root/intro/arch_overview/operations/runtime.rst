@@ -29,11 +29,13 @@ Restart features
 ----------------
 
 Runtime guards named ``envoy.restart_features.*`` can only be changed by a restart. Set them in
-static layers or in the files of disk layers present at startup. They are ignored in RTDS layers and
-in later changes of disk layers, which is logged as an error, and :ref:`/runtime_modify
+static layers or in the files of disk layers present at startup. Values set later, in RTDS layers or
+by changing disk layers, are ignored and logged as an error. :ref:`/runtime_modify
 <operations_admin_interface_runtime_modify>` rejects them with ``400 Bad Request``. Setting
 ``envoy.restart_features.freeze_restart_features`` to ``false`` in a static or disk layer present at
-startup lets restart features change at runtime again.
+startup lets restart features change at runtime again. Ignored values are counted in
+``runtime.restart_feature_ignored``. A disk layer that fails to load drops its values, so the
+restart features it set are reported as removed.
 
 .. _arch_overview_runtime_breaking_changes:
 

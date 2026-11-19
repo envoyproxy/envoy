@@ -285,6 +285,7 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   load_error, Counter, Total number of load attempts that resulted in an error in any layer
   load_success, Counter, Total number of load attempts that were successful at all layers
   num_keys, Gauge, Number of keys currently loaded
-  num_layers, Gauge, Number of layers currently active (without loading errors)
+  num_layers, Gauge, Number of layers currently active (excluding layers that failed to load and the ``frozen_restart_features`` layer)
   override_dir_exists, Counter, Total number of loads that did use an override directory
   override_dir_not_exists, Counter, Total number of loads that did not use an override directory
+  restart_feature_ignored, Counter, Total number of :ref:`restart feature <arch_overview_runtime_restart_features>` values ignored when loading runtime layers

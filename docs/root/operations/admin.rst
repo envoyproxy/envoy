@@ -938,6 +938,8 @@ modify different aspects of the server:
   more information on how these values are configured and utilized. The output include the list of
   the active runtime override layers and the stack of layer values for each key. Empty strings
   indicate no value, and the final active value from the stack also is included in a separate key.
+  Ignored :ref:`restart feature <arch_overview_runtime_restart_features>` values are overridden by
+  a final ``frozen_restart_features`` layer holding the values in use.
   Example output:
 
 .. code-block:: json
