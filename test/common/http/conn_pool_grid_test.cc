@@ -1931,9 +1931,7 @@ TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
 
 TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingHappyEyeballsCancelAvoidsUaf) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http3_happy_eyeballs", "true"},
-       {"envoy.reloadable_features.conn_pool_grid_fix_immediate_failure", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
 
   initialize();
   grid_->alternate_immediate_ = false;
@@ -1970,9 +1968,7 @@ TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingHappyEyeballsCancelAvo
 
 TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingHappyEyeballsSucceedsLater) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http3_happy_eyeballs", "true"},
-       {"envoy.reloadable_features.conn_pool_grid_fix_immediate_failure", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
 
   initialize();
   grid_->alternate_immediate_ = false;
@@ -2001,9 +1997,7 @@ TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingHappyEyeballsSucceedsL
 
 TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingTcpFallbackCancelAvoidsUaf) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http3_happy_eyeballs", "false"},
-       {"envoy.reloadable_features.conn_pool_grid_fix_immediate_failure", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "false"}});
 
   initialize();
   addHttp3AlternateProtocol();
@@ -2036,9 +2030,7 @@ TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingTcpFallbackCancelAvoid
 
 TEST_F(ConnectivityGridTest, ParallelH3AlternateImmediateFailureKeepsHandleAndStartsTcp) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.http3_happy_eyeballs", "true"},
-       {"envoy.reloadable_features.conn_pool_grid_fix_immediate_failure", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
 
   initialize();
   grid_->alternate_immediate_ = false;

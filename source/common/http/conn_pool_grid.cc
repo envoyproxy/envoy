@@ -477,32 +477,17 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       std::make_unique<WrapperCallbacks>(*this, decoder, callbacks, overriding_options);
   WrapperCallbacks* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.conn_pool_grid_fix_immediate_failure")) {
-    ret->newStream(*pool);
+  ret->newStream(*pool);
+  if (ret->hasNotifiedCaller()) {
+    // If newStream succeeded or exhausted all failover pools inline, return nullptr as the caller
+    // has received their callback and does not need a cancellable handle. At this point the
+    // WrapperCallbacks object is queued to be deleted.
+    return nullptr;
+  }
+  if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
+    ret->attemptSecondHttp3Connection();
     if (ret->hasNotifiedCaller()) {
-      // If newStream succeeded or exhausted all failover pools inline, return nullptr as the caller
-      // has received their callback and does not need a cancellable handle. At this point the
-      // WrapperCallbacks object is queued to be deleted.
       return nullptr;
-    }
-    if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
-      ret->attemptSecondHttp3Connection();
-      if (ret->hasNotifiedCaller()) {
-        return nullptr;
-      }
-    }
-  } else {
-    if (ret->newStream(*pool) == StreamCreationResult::ImmediateResult) {
-      // If newStream succeeds, return nullptr as the caller has received their
-      // callback and does not need a cancellable handle. At this point the
-      // WrappedCallbacks object is queued to be deleted.
-      return nullptr;
-    }
-    if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
-      if (ret->attemptSecondHttp3Connection() == StreamCreationResult::ImmediateResult) {
-        return nullptr;
-      }
     }
   }
   if (!delay_tcp_attempt) {

@@ -451,12 +451,8 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
     // This currently only happens for HTTP/3 if secrets aren't yet loaded.
     // Trigger connection failure.
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-    onPoolFailure(Runtime::runtimeFeatureEnabled(
-                      "envoy.reloadable_features.conn_pool_grid_fix_immediate_failure")
-                      ? host_
-                      : nullptr,
-                  absl::string_view(), ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                  context);
+    onPoolFailure(host_, absl::string_view(),
+                  ConnectionPool::PoolFailureReason::LocalConnectionFailure, context);
     return nullptr;
   } else if (result == ConnectionResult::LoadShed) {
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
