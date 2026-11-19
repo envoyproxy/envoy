@@ -30,21 +30,24 @@ using testing::HasSubstr;
 using testing::Return;
 using testing::ReturnRef;
 
-absl::string_view sotwGrpcMuxFactoryName(bool unified_mux) {
-  return unified_mux ? "envoy.config_mux.sotw_grpc_mux_factory"
-                     : "envoy.config_mux.grpc_mux_factory";
+absl::string_view sotwGrpcMuxFactoryName() {
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")
+             ? "envoy.config_mux.sotw_grpc_mux_factory"
+             : "envoy.config_mux.grpc_mux_factory";
 }
 
-absl::string_view deltaGrpcMuxFactoryName(bool unified_mux) {
-  return unified_mux ? "envoy.config_mux.delta_grpc_mux_factory"
-                     : "envoy.config_mux.new_grpc_mux_factory";
+absl::string_view deltaGrpcMuxFactoryName() {
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")
+             ? "envoy.config_mux.delta_grpc_mux_factory"
+             : "envoy.config_mux.new_grpc_mux_factory";
 }
 
 // A gRPC MuxFactory that returns a MockGrpcMux instance when trying to instantiate a mux for the
-// configured mux factory name. This enables testing call expectations on the ADS gRPC mux.
+// `envoy.config_mux.grpc_mux_factory` type. This enables testing call expectations on the ADS gRPC
+// mux.
 class MockGrpcMuxFactory : public MuxFactory {
 public:
-  explicit MockGrpcMuxFactory(absl::string_view name) : name_(name) {
+  MockGrpcMuxFactory(absl::string_view name = sotwGrpcMuxFactoryName()) : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(
             [](std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
@@ -113,22 +116,20 @@ public:
   MOCK_METHOD(Config::SubscriptionPtr, create, (SubscriptionData & data), (override));
 };
 
-class XdsManagerImplTest : public testing::TestWithParam<std::tuple<bool, bool>> {
+class XdsManagerImplTest : public testing::TestWithParam<bool> {
 public:
   XdsManagerImplTest()
       : xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
-    scoped_runtime_.mergeValues({
-        {"envoy.restart_features.use_cached_grpc_client_for_xds",
-         useCachedGrpcClient() ? "true" : "false"},
-        {"envoy.reloadable_features.unified_mux", useUnifiedMux() ? "true" : "false"},
-    });
+    if (GetParam()) {
+      scoped_runtime_.mergeValues(
+          {{"envoy.restart_features.use_cached_grpc_client_for_xds", "true"}});
+    } else {
+      scoped_runtime_.mergeValues(
+          {{"envoy.restart_features.use_cached_grpc_client_for_xds", "false"}});
+    }
   }
-
-  bool useCachedGrpcClient() const { return std::get<0>(GetParam()); }
-  bool useUnifiedMux() const { return std::get<1>(GetParam()); }
-  absl::string_view sotwMuxFactoryName() const { return sotwGrpcMuxFactoryName(useUnifiedMux()); }
 
   void initialize(const std::string& bootstrap_yaml = "") {
     if (!bootstrap_yaml.empty()) {
@@ -151,7 +152,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(XdsManagerImplTest, XdsManagerImplTest,
-                         ::testing::Combine(::testing::Bool(), ::testing::Bool()));
+                         ::testing::ValuesIn({false, true}));
 
 // Validates that a call to shutdown succeeds.
 TEST_P(XdsManagerImplTest, ShutdownSuccessful) {
@@ -201,7 +202,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
 TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
   scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   // Replace the created GrpcMux mock.
   std::shared_ptr<NiceMock<MockGrpcMux>> ads_mux_shared(std::make_shared<NiceMock<MockGrpcMux>>());
@@ -259,7 +260,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
                   address: 127.0.0.1
                   port_value: 11002
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be the second ADS cluster.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -290,7 +291,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
 TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
   scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   // Replace the created GrpcMux mock.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_shared(
@@ -351,7 +352,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
                   address: 127.0.0.1
                   port_value: 11002
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be the second ADS cluster.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -383,7 +384,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
 // Validates that setAdsConfigSource validation failure is detected.
 TEST_P(XdsManagerImplTest, AdsReplacementInvalidConfig) {
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
 
   // Start with a single static cluster, and set it to be the ADS cluster.
@@ -411,7 +412,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementInvalidConfig) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   envoy::config::core::v3::ApiConfigSource new_ads_config;
   new_ads_config.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -426,7 +427,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementInvalidConfig) {
 // Validates that ADS replacement with unknown cluster fails.
 TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
 
   // Start with a single static cluster, and set it to be the ADS cluster.
@@ -454,7 +455,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be the second ADS cluster.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -467,7 +468,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
   )EOF",
                             new_ads_config);
 
-  if (useCachedGrpcClient()) {
+  if (GetParam()) {
     // Emulates an error for gRPC-cluster not found.
     EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Return(
@@ -487,7 +488,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
 TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
   scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
 
   // Start with 2 static clusters, and set the first to be the ADS cluster, and
@@ -531,7 +532,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
                   address: 127.0.0.1
                   port_value: 11002
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be the second ADS cluster.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -549,7 +550,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
   // Emulates a successful finding of the primary_ads_cluster.
   envoy::config::core::v3::GrpcService expected_primary_grpc_service;
   expected_primary_grpc_service.mutable_envoy_grpc()->set_cluster_name("primary_ads_cluster");
-  if (useCachedGrpcClient()) {
+  if (GetParam()) {
     EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Return(ByMove(std::make_shared<Grpc::MockAsyncClient>())));
   } else {
@@ -561,7 +562,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
   envoy::config::core::v3::GrpcService expected_failover_grpc_service;
   expected_failover_grpc_service.mutable_envoy_grpc()->set_cluster_name(
       "non_existent_failover_ads_cluster");
-  if (useCachedGrpcClient()) {
+  if (GetParam()) {
     // Emulates an error for gRPC-cluster not found.
     EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Return(ByMove(absl::InvalidArgumentError(
@@ -579,7 +580,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
 
 // Validates that ADS replacement fails when ADS type is different (SotW <-> Delta).
 TEST_P(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
 
   // Change between SotW -> Delta-xDS, and see that it fails.
@@ -607,7 +608,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
                     address: 127.0.0.1
                     port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be a delta-xDS one.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -627,7 +628,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
 
 // Validates that ADS replacement fails when a wrong backoff strategy is used.
 TEST_P(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
 
   initialize(R"EOF(
@@ -654,7 +655,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config with an invalid backoff strategy.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -677,7 +678,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
 
 // Validates that ADS replacement of unsupported API type is rejected.
 TEST_P(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
 
   // Use GRPC type which is supported, but make sure that it will return
@@ -707,7 +708,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config with an unsupported API type.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -728,7 +729,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
 // Validates that ADS replacement fails when there are a different number of custom validators
 // defined between the original ADS config and the replacement.
 TEST_P(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
   FakeConfigValidatorFactory fake_config_validator_factory;
   Registry::InjectFactory<ConfigValidatorFactory> registry2(fake_config_validator_factory);
@@ -761,7 +762,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
                     address: 127.0.0.1
                     port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be a delta-xDS one.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -782,7 +783,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
 // Validates that ADS replacement fails when a custom validators with some
 // different contents is used compared to the original ADS config.
 TEST_P(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   FakeConfigValidatorFactory fake_config_validator_factory;
   Registry::InjectFactory<ConfigValidatorFactory> registry2(fake_config_validator_factory);
@@ -817,7 +818,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
                     address: 127.0.0.1
                     port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   // Replace the ADS config to be a delta-xDS one.
   envoy::config::core::v3::ApiConfigSource new_ads_config;
@@ -843,7 +844,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
 
 // Validates that ADS initialization fails when the primary gRPC client is null.
 TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
-  NiceMock<MockGrpcMuxFactory> factory(sotwMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
   initialize(R"EOF(
   dynamic_resources:
@@ -870,7 +871,7 @@ TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
                   port_value: 11001
   )EOF");
 
-  if (useCachedGrpcClient()) { // use_cached_grpc_client_for_xds is true
+  if (GetParam()) { // use_cached_grpc_client_for_xds is true
     EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(nullptr))));
   } else { // use_cached_grpc_client_for_xds is false
@@ -890,20 +891,14 @@ TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
 /*
  * Tests that cover the usage of xDS-TP based configuration-sources.
  */
-class XdsManagerImplXdstpConfigSourcesTest : public testing::TestWithParam<bool> {
+class XdsManagerImplXdstpConfigSourcesTest : public testing::Test {
 public:
   XdsManagerImplXdstpConfigSourcesTest()
-      : grpc_mux_factory_(sotwMuxFactoryName()), grpc_mux_registry_(grpc_mux_factory_),
+      : grpc_mux_registry_(grpc_mux_factory_),
         xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.unified_mux", useUnifiedMux() ? "true" : "false"}});
   }
-
-  bool useUnifiedMux() const { return GetParam(); }
-  absl::string_view sotwMuxFactoryName() const { return sotwGrpcMuxFactoryName(useUnifiedMux()); }
-  absl::string_view deltaMuxFactoryName() const { return deltaGrpcMuxFactoryName(useUnifiedMux()); }
 
   void initialize(const std::string& bootstrap_yaml = "", bool enable_authority_a = false,
                   bool enable_authority_b = false, bool enable_default_authority = false) {
@@ -963,7 +958,6 @@ public:
     }
   }
 
-  TestScopedRuntime scoped_runtime_;
   NiceMock<MockGrpcMuxFactory> grpc_mux_factory_;
   Registry::InjectFactory<MuxFactory> grpc_mux_registry_;
   NiceMock<Server::MockInstance> server_;
@@ -983,12 +977,9 @@ public:
       std::make_shared<NiceMock<MockGrpcMux>>()};
 };
 
-INSTANTIATE_TEST_SUITE_P(XdsManagerImplXdstpConfigSourcesTest, XdsManagerImplXdstpConfigSourcesTest,
-                         ::testing::Bool());
-
 // Validates that when only a default config source defined with no authority, a gRPC connection is
 // established.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoAuthority) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoAuthority) {
   testing::InSequence s;
   // Have a single default_config_source with no authorities in it.
   initialize(R"EOF(
@@ -1020,7 +1011,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoAuthority) {
 
 // Validates that when a default config source that is not gRPC based is
 // rejected as this is currently not supported.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
   // Temporarily remove the config mux factories.
   auto saved_factories = Registry::FactoryRegistry<MuxFactory>::factories();
   Registry::FactoryRegistry<MuxFactory>::factories().clear();
@@ -1052,7 +1043,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
   )EOF");
   const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(res.message(), HasSubstr(fmt::format("{} not found", sotwMuxFactoryName())));
+  EXPECT_THAT(res.message(), HasSubstr(absl::StrCat(sotwGrpcMuxFactoryName(), " not found")));
   // Restore the mux factories.
   Registry::FactoryRegistry<MuxFactory>::factories() = saved_factories;
   Registry::InjectFactory<MuxFactory>::resetTypeMappings();
@@ -1060,7 +1051,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
 
 // Validates that when a default config source that is not gRPC based is
 // rejected as this is currently not supported.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
   // Temporarily remove the config mux factories.
   auto saved_factories = Registry::FactoryRegistry<MuxFactory>::factories();
   Registry::FactoryRegistry<MuxFactory>::factories().clear();
@@ -1092,7 +1083,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
   )EOF");
   const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(res.message(), HasSubstr(fmt::format("{} not found", deltaMuxFactoryName())));
+  EXPECT_THAT(res.message(), HasSubstr(absl::StrCat(deltaGrpcMuxFactoryName(), " not found")));
   // Restore the mux factories.
   Registry::FactoryRegistry<MuxFactory>::factories() = saved_factories;
   Registry::InjectFactory<MuxFactory>::resetTypeMappings();
@@ -1100,7 +1091,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
 
 // Validates that a default config source is used but the gRPC extension
 // isn't linked, the config is rejected.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoExtensionLinked) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoExtensionLinked) {
   // Have a single default_config_source configured with ADS.
   initialize(R"EOF(
   default_config_source:
@@ -1130,7 +1121,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoExtensionLinke
 }
 
 // Test only a default config source defined with two authorities.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceTwoAuthorities) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceTwoAuthorities) {
   testing::InSequence s;
   // Have a single default_config_source with two authorities in it.
   initialize(R"EOF(
@@ -1165,7 +1156,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceTwoAuthorities) 
 }
 
 // Test only a default config source with wrong api_type.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceWrongApi) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceWrongApi) {
   testing::InSequence s;
   // Have a single default_config_source with non-aggregated api type.
   initialize(R"EOF(
@@ -1201,7 +1192,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceWrongApi) {
 }
 
 // Test a non-default only config source with repeated authority (invalid).
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceRepeatedAuthority) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceRepeatedAuthority) {
   testing::InSequence s;
   // Have a single default_config_source with repeated authority_D1.com in it.
   initialize(R"EOF(
@@ -1239,7 +1230,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceRepeatedAuthorit
 }
 
 // Test only a non-default config source defined with no authority (should fail).
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) {
   testing::InSequence s;
   // Have a single config_source with no authorities in it.
   initialize(R"EOF(
@@ -1273,10 +1264,10 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) 
 }
 
 // Test only a non-default config source with an authority using AGGREGATED_DELTA_GRPC.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
   testing::InSequence s;
   // Replace the created GrpcMux mock with a delta-xDS one.
-  NiceMock<MockGrpcMuxFactory> factory(deltaMuxFactoryName());
+  NiceMock<MockGrpcMuxFactory> factory(deltaGrpcMuxFactoryName());
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
@@ -1318,11 +1309,11 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 }
 
 // Test only a non-default config source defined with two authorities.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceTwoAuthorities) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceTwoAuthorities) {
   testing::InSequence s;
   // Have a single config_source with two authorities in it.
   initialize(R"EOF(
@@ -1356,7 +1347,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceTwoAuthoritie
 }
 
 // Test a non-default and default config source (valid) with the same authority in both.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultConfigSources) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultConfigSources) {
   testing::InSequence s;
   // Have a config-source and default_config_source with authority_2.com in each of them.
   initialize(R"EOF(
@@ -1412,7 +1403,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultConfigSources) 
 }
 
 // Test a default only config source with repeated authority (invalid).
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAuthority) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAuthority) {
   testing::InSequence s;
   // Have a single config_source option with repeated authorities in it.
   initialize(R"EOF(
@@ -1451,7 +1442,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAutho
 
 // Validate that both the non-default and default config source mux objects are
 // started.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultMuxesStarted) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultMuxesStarted) {
   testing::InSequence s;
   // Have a config-source and default_config_source.
   initialize(R"EOF(
@@ -1512,7 +1503,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultMuxesStarted) {
 
 // Validates that when a single valid config source is defined, a subscription to a resource
 // under that authority uses the config source's gRPC mux.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
   testing::InSequence s;
   initialize(R"EOF(
   config_sources:
@@ -1571,7 +1562,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
 
 // Validates that when multiple config sources are defined and the first one is valid
 // for the resource's authority, that first config source's gRPC mux is used.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseFirstConfigSource) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseFirstConfigSource) {
   testing::InSequence s;
   initialize(R"EOF(
   config_sources:
@@ -1655,7 +1646,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseFirstConfig
 // Validates that when multiple config sources are defined and the first one is NOT valid
 // for the resource's authority, but a subsequent one IS, that subsequent config source's
 // gRPC mux is used.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseSecondConfigSource) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseSecondConfigSource) {
   testing::InSequence s;
   initialize(R"EOF(
   config_sources:
@@ -1738,7 +1729,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseSecondConfi
 
 // Validates that when multiple config sources are defined and non are valid for the resource's
 // authority, then the non-xDS-TP based subscription is used.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
   testing::InSequence s;
   initialize(R"EOF(
   config_sources:
@@ -1825,7 +1816,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
 
 // Validates that subscribeToSingletonResource with SingletonSubscriptionCallbacks succeeds with
 // authority.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionSuccessWithAuthority) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionSuccessWithAuthority) {
   initialize(R"EOF(
   config_sources:
   - authorities:
@@ -1867,7 +1858,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionSuccessWithAut
 }
 
 // Validates that a non-xDS-TP singleton subscription without config fails.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionNonXdstpWithoutConfigFails) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionNonXdstpWithoutConfigFails) {
   initialize();
   NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
   auto result = xds_manager_impl_.subscribeToSingletonResource(
@@ -1877,7 +1868,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionNonXdstpWithou
 }
 
 // Validates that an invalid xDS-TP URN fails.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionInvalidXdstpUrnFails) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionInvalidXdstpUrnFails) {
   initialize();
   NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
   auto result = xds_manager_impl_.subscribeToSingletonResource(
@@ -1888,7 +1879,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionInvalidXdstpUr
 
 // Validates that when config_sources is empty and a valid default_config_source is provided,
 // a subscription to a resource matching the default authority uses the default_config_source's mux.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenConfigSourcesIsEmpty) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenConfigSourcesIsEmpty) {
   testing::InSequence s;
   initialize(R"EOF(
   default_config_source:
@@ -1951,7 +1942,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenConfigSourcesI
 // Validates that when config_sources has entries but none match the resource's authority,
 // and a valid default_config_source IS provided and matches, the default_config_source's mux is
 // used.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenAllConfigSourcesAreInvalid) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenAllConfigSourcesAreInvalid) {
   testing::InSequence s;
   initialize(R"EOF(
   config_sources:
@@ -2056,7 +2047,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenAllConfigSourc
 
 // Validates that if config_sources is empty (or all invalid) and default_config_source is also
 // not present or invalid for the resource, the subscription fails with NotFoundError.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, SubscriptionFailsIfNoValidSourceIncludingDefault) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscriptionFailsIfNoValidSourceIncludingDefault) {
   // Bootstrap with no config_sources and no default_config_source.
   initialize(R"EOF(
   static_resources:
@@ -2074,7 +2065,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, SubscriptionFailsIfNoValidSourceInc
                   address: 127.0.0.1
                   port_value: 11004
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   NiceMock<MockSubscriptionCallbacks> callbacks;
   SubscriptionOptions options;
@@ -2093,7 +2084,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, SubscriptionFailsIfNoValidSourceInc
 
 // Validates that an xdstp resource subscription fails with NotFoundError when there are
 // config_sources defined, but none match the authority, and no default_config_source is present.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest,
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
        XdstpResourceNoMatchingAuthorityAndNoDefaultConfigSource) {
   // Bootstrap with a config_source for "authority_A.com" but no default_config_source.
   initialize(R"EOF(
@@ -2152,7 +2143,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest,
 }
 
 // Validates that a non-xdstp resource subscription uses the SubscriptionFactory directly.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
   // No GrpcMuxFactory needed for this type of subscription if not using ADS for it.
   // Initialize with a basic bootstrap.
   initialize(R"EOF(
@@ -2172,7 +2163,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
                   port_value: 11005
   )EOF");
   // This call is still needed to initialize the subscription_factory_.
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   NiceMock<MockSubscriptionCallbacks> callbacks;
   SubscriptionOptions options;
@@ -2212,7 +2203,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
 
 // Validates that when an xdstp resource is subscribed with a peer ConfigSource
 // that has a matching authority, an UnimplementedError is returned.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest,
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
        XdstpResourceWithMatchingPeerConfigSourceAuthorityReturnsUnimplemented) {
   // Initialize with a basic bootstrap. The bootstrap config_sources are not used in this path.
   initialize(R"EOF(
@@ -2231,7 +2222,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest,
                   address: 127.0.0.1
                   port_value: 11006
   )EOF");
-  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 
   NiceMock<MockSubscriptionCallbacks> callbacks;
   SubscriptionOptions options;
@@ -2260,7 +2251,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest,
 // Validates that when a peer ConfigSource is provided with non-matching authorities
 // for an xdstp resource, and bootstrap config_sources also don't match,
 // the subscription falls back to the bootstrap default_config_source.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest,
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
        PeerConfigSourceAuthoritiesDontMatchResourceFallsBackToBootstrapDefault) {
   testing::InSequence s;
   initialize(R"EOF(
@@ -2341,7 +2332,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest,
 // Validates that when a peer ConfigSource is provided with non-matching authorities
 // for an xdstp resource, the subscription falls back to bootstrap config sources (default in this
 // case).
-TEST_P(XdsManagerImplXdstpConfigSourcesTest,
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
        PeerConfigSourceAuthoritiesDontMatchResourceFallsBackToDefault) {
   testing::InSequence s;
   initialize(R"EOF(
@@ -2429,7 +2420,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest,
 }
 
 // Validates that when a non-xDS-TP resource is passed, then config_source must be passed.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceRequiresConfigSource) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceRequiresConfigSource) {
   testing::InSequence s;
   initialize(R"EOF(
   default_config_source:
@@ -2477,7 +2468,7 @@ TEST_P(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceRequiresConfigSourc
 }
 
 // Validate that the pause-resume works on all gRPC-based ADS mux objects.
-TEST_P(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
   testing::InSequence s;
   // Have a config-source and default_config_source with authority_2.com in each of them.
   initialize(R"EOF(
