@@ -723,7 +723,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
               : less_specific.processing_request_modifier_factory_cb_) {}
 
 void Filter::updateDownstreamWatermarkPushback() {
-  // Only enable downstream watermark pushback on the side-stream for
+  // Only enable downstream watermark push back on the side-stream for
   // FULL_DUPLEX_STREAMED mode, also when the complete downstream request
   // has arrived. So pausing the side-stream won't cause deadlocks.
   // For STREAMED mode, the flow control is done by the chunk_queue size check.
