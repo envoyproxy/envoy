@@ -31,8 +31,6 @@ on:
     outputs:
       build-image:
         value: ${{ jobs.request.outputs.build-image }}
-      build-image-mobile:
-        value: ${{ jobs.request.outputs.build-image-mobile }}
       request:
         value: ${{ jobs.request.outputs.request }}
       trusted:
@@ -55,7 +53,6 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       build-image: ${{ toJSON(fromJSON(steps.env.outputs.data).request.build-image) }}
-      build-image-mobile: ${{ fromJSON(steps.env.outputs.data).request.build-image-mobile }}
       request: ${{ steps.env.outputs.data }}
       trusted: true
     steps:
