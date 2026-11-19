@@ -145,6 +145,13 @@ protected:
     EXPECT_EQ(num_base_symbols_, symbol_table_->numSymbols());
   }
 
+  // Unsorted output can come in any order, so compare the sorted lines.
+  static std::vector<std::string> sortedLines(absl::string_view output) {
+    std::vector<std::string> lines = absl::StrSplit(output, '\n');
+    std::sort(lines.begin(), lines.end());
+    return lines;
+  }
+
   Stats::TestUtil::TestSymbolTable symbol_table_;
   // Symbols pre-encoded by the table itself (the well-known stat names).
   const uint64_t num_base_symbols_{symbol_table_->numSymbols()};
@@ -3196,10 +3203,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputUnordered) {
                                                   endpoints_helper_->cm_, response, params,
                                                   custom_namespaces);
 
-  // Same lines, in any order.
-  std::vector<std::string> sorted_lines = absl::StrSplit(sorted_response.toString(), '\n');
+  EXPECT_EQ(sortedLines(sorted_response.toString()), sortedLines(response.toString()));
+
   std::vector<std::string> lines = absl::StrSplit(response.toString(), '\n');
-  EXPECT_THAT(lines, testing::UnorderedElementsAreArray(sorted_lines));
 
   // Each family is still one contiguous group led by its TYPE line.
   absl::flat_hash_set<std::string> families;
