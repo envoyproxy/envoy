@@ -150,8 +150,10 @@ envoy_cc_test(
     deps = [
         ":admin_instance_lib",
         "//source/common/common:regex_lib",
+        "//source/common/stats:tag_producer_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/server/admin:prometheus_stats_lib",
         "//source/server/admin:utils_lib",
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:server_factory_context_mocks",

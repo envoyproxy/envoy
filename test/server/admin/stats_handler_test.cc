@@ -4,7 +4,9 @@
 
 #include "source/common/common/regex.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_handler.h"
 #include "source/server/admin/stats_request.h"
 
@@ -1728,6 +1730,70 @@ TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointUnsupportedBucketMod
       handlerStats("/stats/prometheus?histogram_buckets=disjoint", true);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
   EXPECT_EQ("unsupported prometheus histogram bucket mode", code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, FamiliesFromManyScopesAreNotSplitAcrossChunks) {
+  // Default tag extractors turn cluster.<name>.<stat> into cluster.<stat>.
+  store_->setTagProducer(Stats::TagProducerImpl::createTagProducer({}, {}).value());
+
+  // Interleave the scopes so that rendering scope by scope would split each family.
+  Stats::ScopeSharedPtr c2 = store_->createScope("cluster.c2");
+  c2->counterFromString("upstream_rq_total").add(21);
+  c2->counterFromString("upstream_cx_total").add(20);
+  c2->gaugeFromString("upstream_cx_active", Stats::Gauge::ImportMode::Accumulate).set(22);
+  Stats::ScopeSharedPtr empty = store_->createScope("");
+  empty->counterFromString("cluster.c3.upstream_cx_total").add(30);
+  empty->gaugeFromString("cluster.c3.upstream_cx_active", Stats::Gauge::ImportMode::Accumulate)
+      .set(32);
+  Stats::ScopeSharedPtr c1 = store_->createScope("cluster.c1");
+  c1->counterFromString("upstream_cx_total").add(10);
+  c1->counterFromString("upstream_rq_total").add(11);
+  Stats::ScopeSharedPtr c4 = store_->createScope("cluster")->createScope("c4");
+  c4->counterFromString("upstream_cx_total").add(40);
+  store_->rootScope()->counterFromString("cluster.c5.upstream_cx_total").add(50);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  const StatsParams params;
+  std::unique_ptr<PrometheusStatsFormatter::OutputFormat> output_format =
+      PrometheusStatsFormatter::makeOutputFormat(params, request_headers, response_headers);
+  const std::vector<Stats::CounterSharedPtr> counters = store_->counters();
+  const std::vector<Stats::GaugeSharedPtr> gauges = store_->gauges();
+  const std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  const std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  PrometheusStatsFormatter::ChunkedRenderer renderer(counters, gauges, histograms, text_readouts,
+                                                     endpoints_helper_.cm_, params,
+                                                     custom_namespaces_, *output_format);
+
+  std::vector<std::string> chunks;
+  bool more_data;
+  do {
+    Buffer::OwnedImpl chunk;
+    more_data = renderer.nextChunk(chunk, 1);
+    chunks.push_back(chunk.toString());
+  } while (more_data);
+
+  // One chunk per family, each holding every scope's series.
+  ASSERT_EQ(3, chunks.size());
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c1"} 10
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c2"} 20
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c3"} 30
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c4"} 40
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c5"} 50
+)EOF",
+            chunks[0]);
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_rq_total counter
+envoy_cluster_upstream_rq_total{envoy_cluster_name="c1"} 11
+envoy_cluster_upstream_rq_total{envoy_cluster_name="c2"} 21
+)EOF",
+            chunks[1]);
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{envoy_cluster_name="c2"} 22
+envoy_cluster_upstream_cx_active{envoy_cluster_name="c3"} 32
+)EOF",
+            chunks[2]);
+  EXPECT_EQ(3, renderer.metricNameCount());
 }
 
 } // namespace Server
