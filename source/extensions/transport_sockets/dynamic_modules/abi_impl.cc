@@ -15,12 +15,22 @@
 #include "source/extensions/transport_sockets/dynamic_modules/splice_pump.h"
 #include "source/extensions/transport_sockets/dynamic_modules/transport_socket.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace TransportSockets {
-namespace DynamicModules {
+// NOLINT(namespace-envoy)
 
 namespace {
+
+namespace LinkedList = Envoy::LinkedList;
+
+using Envoy::LinkedObject;
+
+using Envoy::Extensions::TransportSockets::DynamicModules::DynamicModuleTransportSocket;
+using Envoy::Extensions::TransportSockets::DynamicModules::SplicePump;
+using Envoy::Extensions::TransportSockets::DynamicModules::SplicePumpPtr;
+namespace Api = Envoy::Api;
+namespace Buffer = Envoy::Buffer;
+namespace Event = Envoy::Event;
+namespace Network = Envoy::Network;
+namespace StreamInfo = Envoy::StreamInfo;
 
 DynamicModuleTransportSocket*
 toSocket(envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
@@ -201,10 +211,11 @@ bool fillIpAddress(const Network::Address::InstanceConstSharedPtr& address,
   return true;
 }
 
-} // namespace
-
 // Transport socket callbacks. These are the strong definitions that override the weak stubs in
 // source/extensions/dynamic_modules/abi_impl.cc when this extension is linked.
+
+} // namespace
+
 extern "C" {
 
 envoy_dynamic_module_type_transport_socket_io_status
@@ -514,8 +525,3 @@ void envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace TransportSockets
-} // namespace Extensions
-} // namespace Envoy

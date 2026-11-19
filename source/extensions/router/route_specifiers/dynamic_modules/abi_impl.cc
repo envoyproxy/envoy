@@ -15,15 +15,26 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/router/route_specifiers/dynamic_modules/route_specifier.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace RouteSpecifiers {
-namespace DynamicModules {
+// NOLINT(namespace-envoy)
+
+namespace {
+
+using Envoy::OptRef;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::BuiltRouteCache;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::BuiltRouteLookup;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::CachedRoute;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::DeclaredVirtualClusterSet;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::DynamicModuleRouteSpecifierConfig;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::HeaderMutation;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::PrefixRewriteRule;
+using Envoy::Extensions::RouteSpecifiers::DynamicModules::RouteSpecifierContext;
+namespace Http = Envoy::Http;
+namespace Protobuf = Envoy::Protobuf;
+namespace ThreadLocal = Envoy::ThreadLocal;
+namespace Upstream = Envoy::Upstream;
 
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
-
-namespace {
 
 RouteSpecifierContext*
 routeSpecifierContext(envoy_dynamic_module_type_route_specifier_context_envoy_ptr ptr) {
@@ -1139,8 +1150,3 @@ bool envoy_dynamic_module_callback_route_specifier_remove_response_header(
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace RouteSpecifiers
-} // namespace Extensions
-} // namespace Envoy

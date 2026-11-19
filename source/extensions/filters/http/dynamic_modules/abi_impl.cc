@@ -17,14 +17,40 @@
 #include "source/extensions/dynamic_modules/abi_conversions.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace DynamicModules {
-namespace HttpFilters {
-
-using Envoy::Extensions::DynamicModules::MetricRegistry;
+// NOLINT(namespace-envoy)
 
 namespace {
+
+using Envoy::enumToInt;
+using Envoy::OptRef;
+using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
+using Envoy::Extensions::DynamicModules::narrowToInt;
+using Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter;
+using Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfig;
+using Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigScheduler;
+using Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr;
+using Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterScheduler;
+using Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpPerRouteFilterConfig;
+using Envoy::Http::RequestHeaderMapImpl;
+using Envoy::Http::RequestHeaderMapOptRef;
+using Envoy::Http::RequestTrailerMapImpl;
+using Envoy::Http::ResponseHeaderMap;
+using Envoy::Http::ResponseHeaderMapImpl;
+using Envoy::Http::ResponseTrailerMapImpl;
+namespace Buffer = Envoy::Buffer;
+namespace Grpc = Envoy::Grpc;
+namespace Http = Envoy::Http;
+namespace Network = Envoy::Network;
+namespace Protobuf = Envoy::Protobuf;
+namespace Router = Envoy::Router;
+namespace Ssl = Envoy::Ssl;
+namespace Stats = Envoy::Stats;
+namespace StreamInfo = Envoy::StreamInfo;
+namespace Tracing = Envoy::Tracing;
+namespace Upstream = Envoy::Upstream;
+
+using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 void bodyBufferToModule(const Buffer::Instance& buffer,
                         envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
@@ -3225,7 +3251,3 @@ void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
 }
 
 } // extern "C"
-} // namespace HttpFilters
-} // namespace DynamicModules
-} // namespace Extensions
-} // namespace Envoy

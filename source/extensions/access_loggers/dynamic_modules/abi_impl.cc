@@ -8,14 +8,23 @@
 
 #include "access_log.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace AccessLoggers {
-namespace DynamicModules {
+// NOLINT(namespace-envoy)
 
+namespace {
+
+namespace Http = Envoy::Http;
+namespace Network = Envoy::Network;
+namespace StreamInfo = Envoy::StreamInfo;
+namespace Stats = Envoy::Stats;
+namespace Tracing = Envoy::Tracing;
+
+using Envoy::Extensions::AccessLoggers::DynamicModules::DynamicModuleAccessLogConfig;
+using Envoy::Extensions::AccessLoggers::DynamicModules::ThreadLocalLogger;
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
+
+} // namespace
 
 extern "C" {
 
@@ -1185,8 +1194,3 @@ uint32_t envoy_dynamic_module_callback_access_logger_get_worker_index(
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace AccessLoggers
-} // namespace Extensions
-} // namespace Envoy

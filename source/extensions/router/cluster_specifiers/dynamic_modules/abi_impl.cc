@@ -11,16 +11,20 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/router/cluster_specifiers/dynamic_modules/cluster_specifier.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace Router {
-namespace DynamicModules {
+// NOLINT(namespace-envoy)
+
+namespace {
+
+using Envoy::Extensions::Router::DynamicModules::ClusterSpecifierContext;
+using Envoy::Extensions::Router::DynamicModules::DynamicModuleClusterSpecifierConfig;
+using Envoy::Extensions::Router::DynamicModules::RouteActionOverride;
+namespace Http = Envoy::Http;
+namespace Protobuf = Envoy::Protobuf;
+namespace Upstream = Envoy::Upstream;
 
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
-
-namespace {
 
 ClusterSpecifierContext*
 clusterSpecifierContext(envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr ptr) {
@@ -576,8 +580,3 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace Router
-} // namespace Extensions
-} // namespace Envoy

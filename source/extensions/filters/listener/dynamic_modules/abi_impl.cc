@@ -18,12 +18,30 @@
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace DynamicModules {
-namespace ListenerFilters {
+// NOLINT(namespace-envoy)
 
+namespace {
+
+namespace Api = Envoy::Api;
+namespace Protobuf = Envoy::Protobuf;
+namespace Buffer = Envoy::Buffer;
+namespace Http = Envoy::Http;
+namespace Network = Envoy::Network;
+namespace Router = Envoy::Router;
+namespace Stats = Envoy::Stats;
+namespace StreamInfo = Envoy::StreamInfo;
+
+using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::isValidModuleBuffer;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
+using Envoy::Extensions::DynamicModules::narrowToInt;
+using Envoy::Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter;
+using Envoy::Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilterConfig;
+using Envoy::Extensions::DynamicModules::ListenerFilters::
+    DynamicModuleListenerFilterConfigScheduler;
+using Envoy::Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilterScheduler;
+
+} // namespace
 
 extern "C" {
 
@@ -1398,8 +1416,3 @@ bool envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
 }
 
 } // extern "C"
-
-} // namespace ListenerFilters
-} // namespace DynamicModules
-} // namespace Extensions
-} // namespace Envoy
