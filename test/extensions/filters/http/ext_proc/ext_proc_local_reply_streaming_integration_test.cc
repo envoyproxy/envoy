@@ -342,6 +342,11 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, RequestWithBodyDuplexAndLocalR
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->body(), "bbbbcccccccc");
   verifyDownstreamResponse(*response, 200);
+  // ext_proc is the terminal filter of a local response: the request does not go upstream.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  // Nor did the router see it (a request it had started, and then reset, would not be counted
+  // by the cluster).
+  EXPECT_EQ(0, test_server_->counter("http.config_test.rq_total")->value());
 }
 
 TEST_P(ExtProcLocalReplyStreamingIntegrationTest,
@@ -428,6 +433,54 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, SpuriousResponse) {
   // Client will still observe the 200 in the response headers.
   ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
+}
+
+// The processor closes its stream before it has finished the local response it started. The
+// response headers have been sent downstream, so the stream is reset.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest, ProcessorClosesBeforeLocalResponseEnds) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          makeLocalResponseHeaders(resp, false);
+                          return true;
+                        });
+
+  response->waitForHeaders();
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+// As above, but an encoder filter is still holding the local response headers when the processor
+// closes its stream: the error response is sent in their place.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest,
+       ProcessorClosesBeforeLocalResponseEndsWithHeadersHeld) {
+  config_helper_.prependFilter(R"EOF(
+name: encode-headers-return-stop-iteration-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopIterationFilterConfig
+)EOF");
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          makeLocalResponseHeaders(resp, false);
+                          return true;
+                        });
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  // The configured `status_on_error` (default 500), not the processor's 200.
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
 }
 
 TEST_P(ExtProcLocalReplyStreamingIntegrationTest, TimeoutWaitingForLocalResponseEndStream) {

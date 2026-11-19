@@ -1298,8 +1298,8 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
 
 FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& trailers) {
   if (processing_complete_) {
-    ENVOY_STREAM_LOG(trace, "trailers: Continue", *decoder_callbacks_);
-    return FilterTrailersStatus::Continue;
+    ENVOY_STREAM_LOG(trace, "trailers: processing complete", *decoder_callbacks_);
+    return state.getTrailersCallbackResultWhenProcessingComplete();
   }
 
   // Send trailer in observability mode.
@@ -2153,6 +2153,18 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   // and response processing.
   closeStream();
   clearAsyncState(status);
+
+  if (decoding_state_.localResponseStarted()) {
+    // The processor closed its stream before it finished the local response it had started.
+    // The filter is the terminal filter of that response, so nothing else can finish it: fail
+    // the request. That resets the stream if the response headers have been sent downstream,
+    // and replaces them with the error response if an encoder filter is still holding them.
+    ImmediateResponse errorResponse;
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
+    errorResponse.set_details(absl::StrCat(ErrorPrefix, "_local_response_incomplete"));
+    sendImmediateResponse(errorResponse);
+  }
 }
 
 void Filter::onMessageTimeout() {

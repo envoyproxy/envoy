@@ -306,6 +306,9 @@ public:
   virtual Http::FilterDataStatus getBodyCallbackResultWhenProcessingComplete() {
     return Http::FilterDataStatus::Continue;
   }
+  virtual Http::FilterTrailersStatus getTrailersCallbackResultWhenProcessingComplete() {
+    return Http::FilterTrailersStatus::Continue;
+  }
 
   /**
    * @return true if the filter state allows it to fail open.
@@ -584,7 +587,11 @@ public:
   }
 
   void injectHeadersToFilterChain(bool end_stream) override {
-    decoder_callbacks_->injectDecodedHeadersToFilterChain(end_stream);
+    // If a local response was started the ext_proc becomes the terminal filter and
+    // will never send the request headers on to the rest of the decoder filter chain.
+    if (!local_response_started_) {
+      decoder_callbacks_->injectDecodedHeadersToFilterChain(end_stream);
+    }
   }
 
   uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
@@ -674,6 +681,12 @@ public:
   Http::FilterDataStatus getBodyCallbackResultWhenProcessingComplete() override {
     return local_response_started_ ? Http::FilterDataStatus::StopIterationNoBuffer
                                    : Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus getTrailersCallbackResultWhenProcessingComplete() override {
+    // As the body: once a local response has started the request is not continued, whether or
+    // not the processor's stream is still open.
+    return local_response_started_ ? Http::FilterTrailersStatus::StopIteration
+                                   : Http::FilterTrailersStatus::Continue;
   }
   bool isValidBodyCallbackState() const override;
   bool isValidTrailersCallbackState() const override;
