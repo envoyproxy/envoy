@@ -887,27 +887,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     use abi::envoy_dynamic_module_type_metadata_source::{Dynamic, Route};
-    use envoy_proxy_dynamic_modules_rust_sdk::MetadataPathComponent::{Index, Key};
     let ns = "envoy.filters.http.jwt_authn";
     // The returned buffer borrows Envoy's metadata, not the temporary path strings.
     let subject = {
       let payload_key = String::from("claims");
       let claim_key = String::from("sub");
       envoy_filter
-        .get_metadata_nested_string(Dynamic, ns, &[Key(&payload_key), Key(&claim_key)])
+        .get_metadata_nested_string(Dynamic, ns, &metadata_path![&payload_key, &claim_key])
         .unwrap()
     };
     assert_eq!(subject.as_slice(), b"user-123");
     assert_eq!(
       envoy_filter
-        .get_metadata_nested_string(Route, ns, &[Key("claims"), Key("sub")])
+        .get_metadata_nested_string(Route, ns, &metadata_path!["claims", "sub"])
         .unwrap()
         .as_slice(),
       b"route-subject"
     );
     assert_eq!(
       envoy_filter
-        .get_metadata_nested_string(Dynamic, ns, &[Key("claims"), Key("")])
+        .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", ""])
         .unwrap()
         .as_slice(),
       b"empty-key"
@@ -918,96 +917,71 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
         .get_metadata_nested_string(
           Dynamic,
           ns,
-          &[
-            Key("claims"),
-            Key("a"),
-            Key("b"),
-            Key("c"),
-            Key("d"),
-            Key("e"),
-            Key("f"),
-            Key("g"),
-            Key("role.name")
-          ]
+          &metadata_path!["claims", "a", "b", "c", "d", "e", "f", "g", "role.name"]
         )
         .unwrap()
         .as_slice(),
       b"admin"
     );
     assert_eq!(
-      envoy_filter.get_metadata_nested_number(Dynamic, ns, &[Key("claims"), Key("exp")]),
+      envoy_filter.get_metadata_nested_number(Dynamic, ns, &metadata_path!["claims", "exp"]),
       Some(123.0)
     );
     assert_eq!(
-      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &[Key("claims"), Key("active")]),
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "active"]),
       Some(false)
     );
     assert_eq!(
-      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &[Key("claims"), Key("verified")]),
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "verified"]),
       Some(true)
     );
-    let path = &[Key("claims"), Key("values")];
+    let path = &metadata_path!["claims", "values"];
     assert_eq!(
       envoy_filter.get_metadata_nested_list_size(Dynamic, ns, path),
       Some(4)
     );
     assert_eq!(
       envoy_filter
-        .get_metadata_nested_string(Dynamic, ns, &[Key("claims"), Key("values"), Index(0)])
+        .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", "values", 0])
         .unwrap()
         .as_slice(),
       b"admin"
     );
     assert_eq!(
-      envoy_filter.get_metadata_nested_number(
-        Dynamic,
-        ns,
-        &[Key("claims"), Key("values"), Index(1)]
-      ),
+      envoy_filter.get_metadata_nested_number(Dynamic, ns, &metadata_path!["claims", "values", 1]),
       Some(42.0)
     );
     assert_eq!(
-      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &[Key("claims"), Key("values"), Index(2)]),
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "values", 2]),
       Some(false)
     );
     assert!(envoy_filter
-      .get_metadata_nested_string(Dynamic, ns, &[Key("claims"), Key("values"), Index(1)])
+      .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", "values", 1])
       .is_none());
     assert!(envoy_filter
-      .get_metadata_nested_number(Dynamic, ns, &[Key("claims"), Key("values"), Index(2)])
+      .get_metadata_nested_number(Dynamic, ns, &metadata_path!["claims", "values", 2])
       .is_none());
     assert!(envoy_filter
-      .get_metadata_nested_bool(Dynamic, ns, &[Key("claims"), Key("values"), Index(0)])
+      .get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "values", 0])
       .is_none());
     assert_eq!(
       envoy_filter
         .get_metadata_nested_string(
           Dynamic,
           ns,
-          &[
-            Key("claims"),
-            Key("values"),
-            Index(3),
-            Key("items"),
-            Index(0),
-            Index(0)
-          ]
+          &metadata_path!["claims", "values", 3, "items", 0, 0]
         )
         .unwrap()
         .as_slice(),
       b"nested"
     );
     assert!(envoy_filter
-      .get_metadata_nested_string(
-        Dynamic,
-        ns,
-        &[Key("claims"), Key("values"), Index(usize::MAX)]
-      )
+      .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", "values", usize::MAX])
       .is_none());
     for path in [
-      &[][..],
-      &[Key("claims"), Key("missing")],
-      &[Key("claims"), Key("sub"), Key("child")],
+      &metadata_path![][..],
+      &metadata_path!["claims", "missing"],
+      &metadata_path!["claims", "sub", "child"],
     ] {
       assert!(envoy_filter
         .get_metadata_nested_string(Dynamic, ns, path)

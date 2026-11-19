@@ -40,6 +40,33 @@ pub enum MetadataPathComponent<'a> {
   Index(usize),
 }
 
+impl<'a, T: AsRef<str> + ?Sized> From<&'a T> for MetadataPathComponent<'a> {
+  fn from(key: &'a T) -> Self {
+    Self::Key(key.as_ref())
+  }
+}
+
+impl From<usize> for MetadataPathComponent<'_> {
+  fn from(index: usize) -> Self {
+    Self::Index(index)
+  }
+}
+
+/// Builds an array of metadata path components from borrowed strings and `usize` indices.
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::{metadata_path, MetadataPathComponent};
+///
+/// let path = metadata_path!["claims", "roles", 0];
+/// assert_eq!(path[2], MetadataPathComponent::Index(0));
+/// ```
+#[macro_export]
+macro_rules! metadata_path {
+  ($($component:expr),* $(,)?) => {
+    [$(<$crate::MetadataPathComponent<'_> as ::core::convert::From<_>>::from($component)),*]
+  };
+}
+
 /// Converts a path to ABI components, storing up to eight components inline.
 ///
 /// Take `as_ptr` on the bound result and keep it in place for the ABI call. Moving an inline
@@ -1482,7 +1509,7 @@ pub trait EnvoyHttpFilter {
   /// Path components select literal struct keys or zero-based list indices.
   /// The first component must be a key; dots and numeric strings in keys are not interpreted.
   /// For JWT claims, use namespace `envoy.filters.http.jwt_authn` and a path such as
-  /// `&[MetadataPathComponent::Key("claims"), MetadataPathComponent::Key("sub")]`,
+  /// `&metadata_path!["claims", "sub"]` (see [`metadata_path!`](crate::metadata_path)),
   /// where `claims` is the configured `payload_in_metadata` key.
   /// Returns `None` for an empty path, unavailable metadata, missing keys, out-of-range indices,
   /// incompatible intermediate types, or a result of the wrong type.
