@@ -98,7 +98,7 @@ private:
 
   bool has_sent_initial_handshake_message_ = false;
   bool is_handshake_complete_ = false;
-  std::unique_ptr<AltsProxy> alts_proxy_ = nullptr;
+  std::unique_ptr<AltsProxy> alts_proxy_;
 
   // The state of an asynchronous handshaker.
   // True while a next() call waits for the handshaker service.
@@ -108,7 +108,7 @@ private:
   std::vector<uint8_t> received_bytes_;
   // Declared last, so that it is destroyed first: its callback uses the members
   // above.
-  std::unique_ptr<AltsAsyncProxy> alts_async_proxy_ = nullptr;
+  std::unique_ptr<AltsAsyncProxy> alts_async_proxy_;
 };
 
 } // namespace Alts

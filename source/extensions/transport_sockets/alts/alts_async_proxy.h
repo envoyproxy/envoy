@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 
@@ -12,6 +11,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/typed_async_client.h"
 
+#include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -36,7 +36,7 @@ class AltsAsyncProxy : public Grpc::AsyncStreamCallbacks<grpc::gcp::HandshakerRe
 public:
   // Receives the handshaker service's response to a request, or the reason why
   // there is none.
-  using OnResponse = std::function<void(absl::StatusOr<grpc::gcp::HandshakerResp>)>;
+  using OnResponse = absl::AnyInvocable<void(absl::StatusOr<grpc::gcp::HandshakerResp>)>;
 
   // Starts a stream to the ALTS handshaker service. handshaker_client must
   // belong to the calling thread.

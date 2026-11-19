@@ -132,7 +132,7 @@ void AltsAsyncProxy::onReceiveMessage(Grpc::ResponsePtr<HandshakerResp>&& respon
     ENVOY_LOG(debug, "ALTS: ignoring an unexpected message from the handshaker service");
     return;
   }
-  const OnResponse on_response = std::move(on_response_);
+  OnResponse on_response = std::move(on_response_);
   on_response_ = nullptr;
   on_response(AltsProxy::checkResponse(std::move(*response)));
 }
@@ -150,7 +150,7 @@ void AltsAsyncProxy::onRemoteClose(const Grpc::Status::GrpcStatus status,
   }
   ENVOY_LOG(debug, "ALTS: handshaker service stream closed: {}", remote_close_status_.ToString());
   if (on_response_ != nullptr) {
-    const OnResponse on_response = std::move(on_response_);
+    OnResponse on_response = std::move(on_response_);
     on_response_ = nullptr;
     on_response(remote_close_status_);
   }

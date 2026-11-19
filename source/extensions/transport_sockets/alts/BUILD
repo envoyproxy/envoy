@@ -164,6 +164,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/protobuf",
+        "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/memory",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
