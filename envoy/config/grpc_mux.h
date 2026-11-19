@@ -76,14 +76,17 @@ public:
    * update(); if that set is empty or contains the wildcard "*", the watch is a catch-all
    * and is routed every resource.
    *
-   * When accept(patterns) is called, the patterns are evaluated FIRST and SUPPRESS the default
-   * wildcard (catch-all) semantics: the watch is then routed only resources matching 'patterns',
-   * plus any concrete names it explicitly watches. Each pattern must be the wildcard "*" (accept
-   * every resource) or a suffix glob -- a prefix followed by a slash and an asterisk -- which
-   * accepts every resource named with that prefix. This is how a watch can subscribe to the
-   * wildcard on the wire (update({"*"})) while routing only a subset -- e.g. VHDS, which accepts
-   * only virtual hosts under its route configuration. To keep wildcard routing while using
-   * accept(), include "*" in the patterns.
+   * When accept(patterns) is called, the patterns are evaluated FIRST and SUPPRESS default
+   * catch-all routing for non-empty updates: the watch is then routed only resources matching
+   * 'patterns', plus any concrete names it explicitly watches. When the wire subscription is
+   * wildcard (empty or "*"), empty delta updates and an initial delta update whose resources were
+   * all filtered out by accept() are still delivered so the watch learns its initial resource set
+   * is empty. Each pattern must be the wildcard "*" (accept every resource) or a suffix glob -- a
+   * prefix followed by a slash and an asterisk -- which accepts every resource named with that
+   * prefix. This is how a watch can subscribe to the wildcard on the wire (update({"*"})) while
+   * routing only a subset -- e.g. VHDS, which accepts only virtual hosts under its route
+   * configuration. To keep wildcard routing for non-empty updates while using accept(), include "*"
+   * in the patterns.
    *
    * Calling accept({}) clears any previously registered patterns and restores the default behavior.
    * @param patterns set of wildcard / suffix-glob patterns to accept.

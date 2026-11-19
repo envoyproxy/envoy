@@ -1,5 +1,7 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
+#include <vector>
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
@@ -65,11 +67,13 @@ void WatchMap::forgetAccept(Watch* watch) {
 
 void WatchMap::updateWildcardWatches(Watch* watch) {
   // accept() patterns are evaluated FIRST and take precedence: a watch that has declared any
-  // accept() pattern is routed by those patterns (plus its concrete names) only, so it is never a
-  // catch-all wildcard watch here -- even if its resource_names_ is empty or contains "*". This is
-  // what lets a watch subscribe to the wildcard on the wire while routing only a subset (e.g.
-  // VHDS). To keep wildcard routing while using accept(), the caller includes "*" in the accept()
-  // patterns, which is tracked separately in accept_wildcard_watches_.
+  // accept() pattern is routed by those patterns (plus its concrete names) only, so it is excluded
+  // from wildcard_watches_ even if its resource_names_ is empty or contains "*". (Empty delta
+  // updates and initial filtered-to-empty delta updates are still delivered in onConfigUpdate()
+  // when the watch's wire subscription is wildcard.) This is what lets a watch subscribe to the
+  // wildcard on the wire while routing only a subset (e.g. VHDS). To keep wildcard routing for
+  // non-empty updates while using accept(), the caller includes "*" in the accept() patterns, which
+  // is tracked separately in accept_wildcard_watches_.
   if (!watch->accept_patterns_.empty()) {
     wildcard_watches_.erase(watch);
     return;
@@ -380,6 +384,24 @@ void WatchMap::onConfigUpdate(
   // Execute external config validators.
   config_validators_->executeValidators(type_url_, decoded_resources, removed_resources);
 
+  const auto is_wildcard_watch = [](const Watch& watch) {
+    return watch.resource_names_.empty() || watch.resource_names_.contains(Wildcard);
+  };
+  const bool wire_update_empty = added_resources.empty() && removed_resources.empty();
+  // Snapshot candidate wildcard watches before invoking any callbacks so a callback that calls
+  // addWatch() neither invalidates watches_ iterators nor causes a newly added watch to receive a
+  // stale empty update for this already-in-flight response.
+  std::vector<Watch*> empty_update_watches;
+  for (const auto& watch : watches_) {
+    if (per_watch_added.contains(watch.get()) || per_watch_removed.contains(watch.get())) {
+      continue;
+    }
+    if (is_wildcard_watch(*watch) &&
+        (wire_update_empty || !watch->delivered_initial_delta_update_)) {
+      empty_update_watches.push_back(watch.get());
+    }
+  }
+
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
@@ -390,10 +412,12 @@ void WatchMap::onConfigUpdate(
       // additions only, no removals
       THROW_IF_NOT_OK(
           cur_watch->callbacks_.onConfigUpdate(resource_to_add, {}, system_version_info));
+      cur_watch->delivered_initial_delta_update_ = true;
     } else {
       // both additions and removals
       THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate(resource_to_add, removed->second,
                                                            system_version_info));
+      cur_watch->delivered_initial_delta_update_ = true;
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
@@ -405,11 +429,19 @@ void WatchMap::onConfigUpdate(
     }
     THROW_IF_NOT_OK(
         cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
+    cur_watch->delivered_initial_delta_update_ = true;
   }
-  // notify empty update
-  if (added_resources.empty() && removed_resources.empty()) {
-    for (auto& cur_watch : wildcard_watches_) {
-      THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
+  // Notify wildcard-subscribed watches of empty updates: either when the wire response itself
+  // is empty, or on the watch's first delta response when all resources on the wire were
+  // filtered out by accept() patterns (establishing that the watch's initial resource set is
+  // canonically empty).
+  for (Watch* watch : empty_update_watches) {
+    if (deferred_removed_during_update_->count(watch) > 0) {
+      continue;
+    }
+    if (is_wildcard_watch(*watch)) {
+      THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
+      watch->delivered_initial_delta_update_ = true;
     }
   }
 

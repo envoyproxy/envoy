@@ -134,6 +134,20 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
 
   // The new route configuration and VHDS subscription have been built without error, now we can
   // update the state and start warming up.
+  if (has_vhds) {
+    if (!base_.initialized_ || vhds_configuration_changed || vhds_subscription_ == nullptr) {
+      warming_blocks_unmatched_requests_ =
+          new_route_config->vhds().has_warming_blocks_unmatched_requests();
+      awaiting_initial_vhds_update_ = warming_blocks_unmatched_requests_;
+    }
+  } else {
+    warming_blocks_unmatched_requests_ = false;
+    awaiting_initial_vhds_update_ = false;
+  }
+  if (awaiting_initial_vhds_update_) {
+    const_cast<ConfigImpl*>(static_cast<const ConfigImpl*>(config.get()))
+        ->setAwaitingInitialVhdsUpdate(true);
+  }
   Protobuf::Any route_config_any;
   MessageUtil::packFrom(route_config_any, *new_route_config);
   base_.updateState(std::move(route_config_any), new_route_config->name(), new_hash, version_info,
@@ -152,10 +166,12 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     // The new subscription holds none of the aliases the old one requested, so nothing
     // guarantees pushes for them any more.
     requested_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
     requested_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -182,6 +198,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   if (rds_virtual_hosts_ == nullptr) {
     rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
   }
+
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
@@ -192,6 +209,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     // ids, so record that, otherwise the ids of the previous update would be resolved against a
     // later publish.
     resource_ids_in_last_update_ = std::move(added_resource_ids);
+    clearAwaitingInitialVhdsUpdate();
     return false;
   }
 
@@ -210,6 +228,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // No exception, the new route configuration is valid, can update the state. This has to happen
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().
+  awaiting_initial_vhds_update_ = false;
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
   // Only ids that were explicitly requested on demand enter the answered cache. The server may
   // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
@@ -227,6 +246,24 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   base_.startWarming();
   return true;
 }
+
+void RouteConfigUpdateReceiverImpl::clearAwaitingInitialVhdsUpdate() {
+  if (!awaiting_initial_vhds_update_) {
+    return;
+  }
+  awaiting_initial_vhds_update_ = false;
+  if (auto* warming_config = dynamic_cast<const ConfigImpl*>(base_.warming_state_.config_.get());
+      warming_config != nullptr) {
+    const_cast<ConfigImpl*>(warming_config)->setAwaitingInitialVhdsUpdate(false);
+  }
+  if (auto* published_config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+      published_config != nullptr) {
+    const_cast<ConfigImpl*>(published_config)->setAwaitingInitialVhdsUpdate(false);
+    onVhdsConfigPublished();
+  }
+}
+
+void RouteConfigUpdateReceiverImpl::onVhdsFailure() { clearAwaitingInitialVhdsUpdate(); }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(
     VirtualHostMap& vhosts, const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
@@ -279,31 +316,36 @@ void RouteConfigUpdateReceiverImpl::requestVirtualHostsUpdate(
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RouteConfigUpdateReceiverImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RouteConfigUpdateReceiverImpl instance is still valid.
-  factory_context_.mainThreadDispatcher().post(
-      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), for_domain,
-       &thread_local_dispatcher, route_config_updated_cb]() -> void {
-        if (!maybe_still_alive.lock()) {
-          return;
-        }
-        const std::string& route_config_name = !base_.warming_state_.route_config_name_.empty()
-                                                   ? base_.warming_state_.route_config_name_
-                                                   : base_.route_config_name_;
-        const std::string alias =
-            VhdsSubscription::domainNameToAlias(route_config_name, for_domain);
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
-            vhdsResourceIdAnswered(alias)) {
-          // The server has already answered for this alias and the published route configuration
-          // reflects that answer, so the request can be answered locally. The delta subscription
-          // to the alias is persistent: if the virtual host appears or changes later, the server
-          // pushes an update on its own.
-          const auto config = std::static_pointer_cast<const ConfigImpl>(parsedConfiguration());
-          notifyCallback(*config, alias, thread_local_dispatcher, route_config_updated_cb);
-          return;
-        }
-        updateOnDemand(alias);
-        config_update_callbacks_.push_back(
-            {alias, thread_local_dispatcher, route_config_updated_cb});
-      });
+  factory_context_.mainThreadDispatcher().post([this,
+                                                maybe_still_alive =
+                                                    std::weak_ptr<bool>(still_alive_),
+                                                for_domain, &thread_local_dispatcher,
+                                                route_config_updated_cb]() -> void {
+    if (!maybe_still_alive.lock()) {
+      return;
+    }
+    const std::string& route_config_name = !base_.warming_state_.route_config_name_.empty()
+                                               ? base_.warming_state_.route_config_name_
+                                               : base_.route_config_name_;
+    const std::string alias = VhdsSubscription::domainNameToAlias(route_config_name, for_domain);
+    const auto* published_config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+    const bool initial_vhds_complete =
+        warming_blocks_unmatched_requests_ && !awaiting_initial_vhds_update_ &&
+        published_config != nullptr && !published_config->awaitingInitialVhdsUpdate();
+    if (published_config != nullptr &&
+        (initial_vhds_complete ||
+         (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
+          vhdsResourceIdAnswered(alias)))) {
+      // The server has already answered for this alias and the published route configuration
+      // reflects that answer, so the request can be answered locally. The delta subscription
+      // to the alias is persistent: if the virtual host appears or changes later, the server
+      // pushes an update on its own.
+      notifyCallback(*published_config, alias, thread_local_dispatcher, route_config_updated_cb);
+      return;
+    }
+    updateOnDemand(alias);
+    config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+  });
 }
 
 void RouteConfigUpdateReceiverImpl::onVhdsConfigPublished() {
@@ -311,16 +353,22 @@ void RouteConfigUpdateReceiverImpl::onVhdsConfigPublished() {
     return;
   }
 
+  const auto* published_config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+  const bool initial_vhds_complete =
+      warming_blocks_unmatched_requests_ && !awaiting_initial_vhds_update_ &&
+      published_config != nullptr && !published_config->awaitingInitialVhdsUpdate();
   const bool check_answered_ids =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
   const auto& aliases = resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) updates don't populate aliases fields in resources, but any publish can
   // resolve a queued callback whose alias an earlier update already answered.
-  if (aliases.empty() && !check_answered_ids) {
+  if (aliases.empty() && !check_answered_ids && !initial_vhds_complete) {
+    return;
+  }
+  if (published_config == nullptr) {
     return;
   }
 
-  const auto config = std::static_pointer_cast<const ConfigImpl>(parsedConfiguration());
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
@@ -329,10 +377,10 @@ void RouteConfigUpdateReceiverImpl::onVhdsConfigPublished() {
     // published update that did: the callback was then queued while that update was still
     // warming, or the update that carried the alias was superseded before it was published and
     // this update is the one delivering its merged result.
-    const bool answered =
-        aliases.contains(it->alias_) || (check_answered_ids && vhdsResourceIdAnswered(it->alias_));
+    const bool answered = initial_vhds_complete || aliases.contains(it->alias_) ||
+                          (check_answered_ids && vhdsResourceIdAnswered(it->alias_));
     if (answered) {
-      notifyCallback(*config, it->alias_, it->thread_local_dispatcher_, it->cb_);
+      notifyCallback(*published_config, it->alias_, it->thread_local_dispatcher_, it->cb_);
       it = config_update_callbacks_.erase(it);
     } else {
       it++;

@@ -409,6 +409,7 @@ private:
       // structure, so it can be atomically created and cleared.
       bool deferred_to_next_io_iteration_ : 1 = false;
       bool deferred_end_stream_ : 1 = false;
+      bool waiting_for_vhds_ : 1 = false;
 
       // If true, the stream is destroyed once both request and response are complete and the
       // response is a success (2xx). Otherwise it is destroyed when the response completes, and
@@ -471,6 +472,8 @@ private:
     // Return true if this stream was deferred and dispatched pending headers, body and trailers (if
     // present). Return false if this stream was not deferred.
     bool onDeferredRequestProcessing();
+    bool createFilterChainAndTraceRequest();
+    void onInitialVhdsUpdateComplete();
 
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
@@ -554,6 +557,7 @@ private:
 
     std::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     std::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
+    Http::RouteConfigUpdatedCallbackSharedPtr vhds_update_callback_;
     Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;

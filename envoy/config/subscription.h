@@ -288,11 +288,14 @@ public:
    *
    * By default (accept() never called), the subscription routes exactly the resources it requested;
    * if that set is empty or contains the wildcard "*", it is a catch-all and routes every resource.
-   * When accept(patterns) is called, the patterns are evaluated first and suppress the default
-   * wildcard (catch-all) semantics: only resources matching 'patterns' (plus explicitly requested
-   * names) are routed. Each pattern must be the wildcard (the "*" string) or a suffix glob (a
-   * prefix followed by a slash and an asterisk), matching every resource under that prefix. To keep
-   * wildcard routing while using accept(), include "*" in the patterns.
+   * When accept(patterns) is called, the patterns are evaluated first and suppress default
+   * catch-all routing for non-empty updates: only resources matching 'patterns' (plus explicitly
+   * requested names) are routed. When the wire subscription is wildcard (empty or "*"), empty
+   * delta updates and an initial delta update whose resources were all filtered out by accept()
+   * are still delivered so the subscription learns its initial resource set is empty. Each pattern
+   * must be the wildcard (the "*" string) or a suffix glob (a prefix followed by a slash and an
+   * asterisk), matching every resource under that prefix. To keep wildcard routing for non-empty
+   * updates while using accept(), include "*" in the patterns.
    *
    * This lets a subscription accept resources it cannot enumerate up front while still subscribing
    * to the wildcard on the wire (e.g. VHDS virtual hosts under a route configuration). Only
