@@ -137,6 +137,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
+  // The buffered data of a direction is shared by its filters. The filter that last buffered data
+  // holds it: it is that filter's to send on, when it continues. A later filter that stopped the
+  // headers, and continues while an earlier filter holds data, must not send that data on.
+  virtual void markBufferedDataHeldHere() PURE;
+  virtual void releaseBufferedDataHeldHere() PURE;
+  // Whether a filter before this one, that is still stopped, holds the buffered data.
+  virtual bool bufferedDataHeldByEarlierFilter() PURE;
   virtual bool observedEndStream() PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
@@ -259,6 +266,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
+  void markBufferedDataHeldHere() override;
+  void releaseBufferedDataHeldHere() override;
+  bool bufferedDataHeldByEarlierFilter() override;
   bool observedEndStream() override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
@@ -351,6 +361,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
+  void markBufferedDataHeldHere() override;
+  void releaseBufferedDataHeldHere() override;
+  bool bufferedDataHeldByEarlierFilter() override;
   bool observedEndStream() override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
@@ -1026,6 +1039,10 @@ protected:
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
     ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
+
+    // The filter, if any, that last buffered data in each direction, and has not continued since.
+    ActiveStreamEncoderFilter* buffered_response_data_holder_{};
+    ActiveStreamDecoderFilter* buffered_request_data_holder_{};
   };
 
   State& state() { return state_; }
