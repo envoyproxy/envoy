@@ -4,6 +4,8 @@
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/base64.h"
+#include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
@@ -51,6 +53,18 @@ absl::StatusOr<Secret::ThreadLocalGenericSecretProviderPtr> createProxyAuthoriza
       server_context.mainThreadDispatcher());
 }
 
+// Builds the Proxy-Authorization header value for Basic credentials (RFC 7617).
+absl::StatusOr<std::string>
+basicProxyAuthorization(const envoy::extensions::transport_sockets::http_11_proxy::v3::
+                            Http11ProxyUpstreamTransport::BasicAuth& config,
+                        Server::Configuration::TransportSocketFactoryContext& context) {
+  auto password_or_error = Config::DataSource::read(config.password(), /*allow_empty=*/true,
+                                                    context.serverFactoryContext().api());
+  RETURN_IF_NOT_OK_REF(password_or_error.status());
+  return absl::StrCat("Basic ",
+                      Base64::encode(absl::StrCat(config.username(), ":", *password_or_error)));
+}
+
 } // namespace
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
@@ -80,7 +94,8 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
   // proxy requires credentials.
   Network::UpstreamTransportSocketFactoryPtr proxy_socket_factory;
   Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization;
-  if (outer_config.has_proxy_transport_socket() || outer_config.has_proxy_authorization()) {
+  if (outer_config.has_proxy_transport_socket() || outer_config.has_proxy_authorization() ||
+      outer_config.has_proxy_basic_auth()) {
     auto proxy_factory_or_error = createInnerFactory(outer_config.has_proxy_transport_socket()
                                                          ? &outer_config.proxy_transport_socket()
                                                          : nullptr,
@@ -94,10 +109,16 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
     RETURN_IF_NOT_OK_REF(provider_or_error.status());
     proxy_authorization = std::move(provider_or_error.value());
   }
+  std::string static_proxy_authorization;
+  if (outer_config.has_proxy_basic_auth()) {
+    auto header_or_error = basicProxyAuthorization(outer_config.proxy_basic_auth(), context);
+    RETURN_IF_NOT_OK_REF(header_or_error.status());
+    static_proxy_authorization = std::move(header_or_error.value());
+  }
 
   return std::make_unique<UpstreamHttp11ConnectSocketFactory>(
       std::move(factory_or_error.value()), proxy_info, std::move(proxy_socket_factory),
-      std::move(proxy_authorization));
+      std::move(proxy_authorization), std::move(static_proxy_authorization));
 }
 
 ProtobufTypes::MessagePtr UpstreamHttp11ConnectSocketConfigFactory::createEmptyConfigProto() {

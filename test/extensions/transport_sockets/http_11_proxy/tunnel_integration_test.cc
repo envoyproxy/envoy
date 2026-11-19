@@ -77,7 +77,13 @@ typed_config:
           ->set_server_listener_name("proxy");
       TestUtility::loadFromYaml(proxyTransportSocketConfig(),
                                 *transport.mutable_proxy_transport_socket());
-      transport.mutable_proxy_authorization()->set_name("proxy-credential");
+      if (basic_auth_password_.has_value()) {
+        transport.mutable_proxy_basic_auth()->set_username("user");
+        transport.mutable_proxy_basic_auth()->mutable_password()->set_inline_string(
+            *basic_auth_password_);
+      } else {
+        transport.mutable_proxy_authorization()->set_name("proxy-credential");
+      }
 
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
@@ -172,6 +178,8 @@ typed_config:
   }
 
   std::string client_credential_{ProxyCredential};
+  // If set, use Basic credentials with username "user" and this password instead of the secret.
+  std::optional<std::string> basic_auth_password_;
   std::string proxy_trusted_ca_{"test/config/integration/certs/cacert.pem"};
 };
 
@@ -187,6 +195,23 @@ TEST_P(Http11TunnelIntegrationTest, TlsProxyTlsOrigin) { testRequestThroughProxy
 TEST_P(Http11TunnelIntegrationTest, TlsProxyPlaintextOrigin) {
   upstream_tls_ = false;
   testRequestThroughProxy();
+}
+
+// Username and password credentials: "user:password" is the credential the proxy expects.
+TEST_P(Http11TunnelIntegrationTest, BasicAuthCredentials) {
+  basic_auth_password_ = "password";
+  testRequestThroughProxy();
+}
+
+// The proxy rejects the CONNECT request when the Basic credentials are wrong.
+TEST_P(Http11TunnelIntegrationTest, WrongBasicAuthCredentials) {
+  basic_auth_password_ = "wrong";
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(0, test_server_->counter("cluster.origin.upstream_cx_total")->value());
 }
 
 // The proxy rejects the CONNECT request when the credential is wrong.

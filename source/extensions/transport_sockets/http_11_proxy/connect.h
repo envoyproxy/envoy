@@ -184,11 +184,15 @@ public:
   //        socket for the connection to the proxy.
   // @param proxy_authorization if set, provides the value of the Proxy-Authorization header sent
   //        in the CONNECT request. Requires proxy_socket_factory to be set.
+  // @param static_proxy_authorization if not empty, the value of the Proxy-Authorization header
+  //        sent in the CONNECT request (e.g. built from Basic credentials). Mutually exclusive with
+  //        proxy_authorization. Requires proxy_socket_factory to be set.
   UpstreamHttp11ConnectSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
       std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = std::nullopt,
       Network::UpstreamTransportSocketFactoryPtr proxy_socket_factory = nullptr,
-      Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization = nullptr);
+      Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization = nullptr,
+      std::string static_proxy_authorization = "");
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -210,6 +214,7 @@ private:
   const std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info_;
   const Network::UpstreamTransportSocketFactoryPtr proxy_socket_factory_;
   const Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization_;
+  const std::string static_proxy_authorization_;
 };
 
 // This is a utility class for isValidConnectResponse. It is only exposed for

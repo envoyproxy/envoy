@@ -16,6 +16,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -835,6 +836,50 @@ public:
     return factory_.createTransportSocketFactory(config, context_);
   }
 
+  // Creates a proxied raw_buffer socket for the given config (with a default proxy address) and
+  // returns the CONNECT request it writes to the connection.
+  std::string connectRequestFor(
+      envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
+          config) {
+    config.mutable_default_proxy_address()->mutable_socket_address()->set_address("127.0.0.1");
+    config.mutable_default_proxy_address()->mutable_socket_address()->set_port_value(8080);
+    auto factory_or_error = create(config);
+    EXPECT_TRUE(factory_or_error.ok()) << factory_or_error.status();
+    if (!factory_or_error.ok()) {
+      return "";
+    }
+    EXPECT_TRUE(factory_or_error.value()->tunnelsHttp11ProxyTraffic());
+
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    host->hostname_ = "www.foo.com";
+    ON_CALL(*host, address())
+        .WillByDefault(Return(Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 443)));
+    auto socket = factory_or_error.value()->createTransportSocket(nullptr, host);
+    EXPECT_NE(nullptr, socket);
+    if (socket == nullptr) {
+      return "";
+    }
+
+    // Both the origin and proxy sockets are raw_buffer sockets: capture the CONNECT request
+    // written to the real IoHandle.
+    NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+    NiceMock<Network::MockIoHandle> io_handle;
+    ON_CALL(callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle));
+    std::string written;
+    EXPECT_CALL(io_handle, write(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+      written = buffer.toString();
+      const uint64_t length = buffer.length();
+      buffer.drain(length);
+      return Api::IoCallUint64Result(length, Api::IoError::none());
+    }));
+    socket->setTransportSocketCallbacks(callbacks);
+    EXPECT_CALL(callbacks, raiseEvent(_)).Times(0);
+    socket->onConnected();
+    Buffer::OwnedImpl buffer;
+    socket->doWrite(buffer, false);
+    return written;
+  }
+
   UpstreamHttp11ConnectSocketConfigFactory factory_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
 };
@@ -874,37 +919,54 @@ TEST_F(TunnelConfigTest, StaticSecretIsSentInConnect) {
 
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
   config.mutable_proxy_authorization()->set_name("proxy-credential");
-  config.mutable_default_proxy_address()->mutable_socket_address()->set_address("127.0.0.1");
-  config.mutable_default_proxy_address()->mutable_socket_address()->set_port_value(8080);
+  EXPECT_EQ(ConnectRequest, connectRequestFor(config));
+}
+
+TEST_F(TunnelConfigTest, BasicAuthInlinePasswordIsSentInConnect) {
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+  config.mutable_proxy_basic_auth()->set_username("user");
+  config.mutable_proxy_basic_auth()->mutable_password()->set_inline_string("pass");
+  // Credential is "Basic " + base64("user:pass").
+  EXPECT_EQ(ConnectRequest, connectRequestFor(config));
+}
+
+TEST_F(TunnelConfigTest, BasicAuthPasswordFromEnvironmentIsSentInConnect) {
+  TestEnvironment::setEnvVar("HTTP11_PROXY_TEST_PASSWORD", "pass", 1);
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+  config.mutable_proxy_basic_auth()->set_username("user");
+  config.mutable_proxy_basic_auth()->mutable_password()->set_environment_variable(
+      "HTTP11_PROXY_TEST_PASSWORD");
+  EXPECT_EQ(ConnectRequest, connectRequestFor(config));
+  TestEnvironment::unsetEnvVar("HTTP11_PROXY_TEST_PASSWORD");
+}
+
+TEST_F(TunnelConfigTest, BasicAuthEmptyPassword) {
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+  config.mutable_proxy_basic_auth()->set_username("user");
+  config.mutable_proxy_basic_auth()->mutable_password()->set_inline_string("");
+  // "Basic " + base64("user:").
+  EXPECT_EQ("CONNECT www.foo.com:443 HTTP/1.1\r\nHost: www.foo.com:443\r\n"
+            "Proxy-Authorization: Basic dXNlcjo=\r\n\r\n",
+            connectRequestFor(config));
+}
+
+TEST_F(TunnelConfigTest, BasicAuthPasswordNotFound) {
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+  config.mutable_proxy_basic_auth()->set_username("user");
+  config.mutable_proxy_basic_auth()->mutable_password()->set_environment_variable(
+      "HTTP11_PROXY_TEST_MISSING_PASSWORD");
   auto factory_or_error = create(config);
-  ASSERT_TRUE(factory_or_error.ok());
-  EXPECT_TRUE(factory_or_error.value()->tunnelsHttp11ProxyTraffic());
+  EXPECT_FALSE(factory_or_error.ok());
+  EXPECT_EQ("Environment variable doesn't exist: HTTP11_PROXY_TEST_MISSING_PASSWORD",
+            factory_or_error.status().message());
+}
 
-  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-  host->hostname_ = "www.foo.com";
-  ON_CALL(*host, address())
-      .WillByDefault(Return(Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 443)));
-  auto socket = factory_or_error.value()->createTransportSocket(nullptr, host);
-  ASSERT_NE(nullptr, socket);
-
-  // Both the origin and proxy sockets are raw_buffer sockets: verify the CONNECT request written
-  // to the real IoHandle.
-  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
-  NiceMock<Network::MockIoHandle> io_handle;
-  ON_CALL(callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle));
-  std::string written;
-  EXPECT_CALL(io_handle, write(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
-    written = buffer.toString();
-    const uint64_t length = buffer.length();
-    buffer.drain(length);
-    return Api::IoCallUint64Result(length, Api::IoError::none());
-  }));
-  socket->setTransportSocketCallbacks(callbacks);
-  EXPECT_CALL(callbacks, raiseEvent(_)).Times(0);
-  socket->onConnected();
-  Buffer::OwnedImpl buffer;
-  socket->doWrite(buffer, false);
-  EXPECT_EQ(ConnectRequest, written);
+TEST_F(TunnelConfigTest, BasicAuthUsernameWithColonIsRejected) {
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+  config.mutable_proxy_basic_auth()->set_username("us:er");
+  config.mutable_proxy_basic_auth()->mutable_password()->set_inline_string("pass");
+  EXPECT_THROW_WITH_REGEX(create(config).IgnoreError(), EnvoyException,
+                          "Proto constraint validation failed.*Username");
 }
 
 } // namespace

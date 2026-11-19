@@ -445,11 +445,15 @@ UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
     std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info,
     Network::UpstreamTransportSocketFactoryPtr proxy_socket_factory,
-    Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization)
+    Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization,
+    std::string static_proxy_authorization)
     : PassthroughFactory(std::move(transport_socket_factory)), proxy_info_(proxy_info),
       proxy_socket_factory_(std::move(proxy_socket_factory)),
-      proxy_authorization_(std::move(proxy_authorization)) {
-  ASSERT(proxy_authorization_ == nullptr || proxy_socket_factory_ != nullptr);
+      proxy_authorization_(std::move(proxy_authorization)),
+      static_proxy_authorization_(std::move(static_proxy_authorization)) {
+  ASSERT((proxy_authorization_ == nullptr && static_proxy_authorization_.empty()) ||
+         proxy_socket_factory_ != nullptr);
+  ASSERT(proxy_authorization_ == nullptr || static_proxy_authorization_.empty());
 }
 
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(
@@ -480,7 +484,7 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
   return std::make_unique<UpstreamHttp11TunnelSocket>(
       std::move(inner_socket), std::move(proxy_socket), target.value(),
       proxy_authorization_ != nullptr ? absl::string_view(proxy_authorization_->secret())
-                                      : absl::string_view());
+                                      : absl::string_view(static_proxy_authorization_));
 }
 
 void UpstreamHttp11ConnectSocketFactory::hashKey(

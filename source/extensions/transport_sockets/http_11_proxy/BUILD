@@ -21,6 +21,8 @@ envoy_cc_extension(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
         "//source/common/secret:secret_provider_impl_lib",
