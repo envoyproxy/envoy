@@ -105,6 +105,26 @@ request, the latter is recorded when the headers end the stream. Envoy records
 records ``last_downstream_ack_received_ns`` when it tracks the final ACK, currently for QUIC. The
 markers do not by themselves measure body buffering or processing.
 
+Load balancer callouts and timers
+---------------------------------
+
+A load balancer module sends a main-thread request with
+``envoy_dynamic_module_callback_lb_config_http_callout``, specifying ``:method``, ``:path``, and
+``host``. In C, the module must implement ``envoy_dynamic_module_on_lb_config_http_callout_done``
+or callouts will not start.
+
+The module arms a main-thread timer with
+``envoy_dynamic_module_callback_lb_config_enable_timer`` and disables it with
+``envoy_dynamic_module_callback_lb_config_disable_timer``. In C, the module must implement
+``envoy_dynamic_module_on_lb_config_timer`` or timer enablement is a no-op. The Rust SDK exports
+both symbols unconditionally and falls back to empty default trait methods. Timers and in-flight
+callouts remain active for the lifetime of the cluster configuration.
+
+The module calls ``envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized`` from
+``on_lb_config_new`` to run ``envoy_dynamic_module_on_lb_config_server_initialized`` once
+cluster-manager thread-local storage is ready. On dynamic cluster updates, this hook runs inline
+while the cluster is warming.
+
 Compatibility
 --------------------------
 
