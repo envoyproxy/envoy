@@ -298,9 +298,12 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
     switch (type) {
     case CodecType::HTTP1: {
       // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
-      // send fully qualified URLs iff the underlying transport is plaintext.
+      // send fully qualified URLs iff the underlying transport is plaintext. When the transport
+      // socket tunnels all proxied traffic with CONNECT, requests are sent to the origin through
+      // the tunnel and must not use fully qualified URLs.
       bool proxied = false;
-      if (options && options->http11ProxyInfo().has_value()) {
+      if (options && options->http11ProxyInfo().has_value() &&
+          !host->transportSocketFactory().tunnelsHttp11ProxyTraffic()) {
         proxied = true;
       }
       codec_ = std::make_unique<Http1::ClientConnectionImpl>(

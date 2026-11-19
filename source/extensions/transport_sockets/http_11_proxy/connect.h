@@ -6,7 +6,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/http1/balsa_parser.h"
+#include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/http_11_proxy/tunnel_io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,11 +58,137 @@ private:
   bool need_to_strip_connect_response_{};
 };
 
+// Tunnel mode socket, used when the connection to the proxy is configured with its own transport
+// socket and/or proxy credentials. The connection to the proxy is handled by proxy_socket_ (for
+// example TLS), a CONNECT request is always sent through it, and once the proxy answers with a 200
+// response, the origin socket (TLS or plaintext) runs inside the tunnel through a TunnelIoHandle.
+class UpstreamHttp11TunnelSocket : public Network::TransportSocket,
+                                   public Logger::Loggable<Logger::Id::connection> {
+public:
+  // Limit the CONNECT response headers to an arbitrary 2000 bytes, as the legacy socket does.
+  static constexpr uint32_t MaxResponseHeaderSize = 2000;
+
+  // Returns the CONNECT target (host:port) for a proxied connection, or nullopt if the connection
+  // to this host is not proxied.
+  // @param options the transport socket options for the connection.
+  // @param host the upstream host.
+  // @param has_default_proxy whether the factory has a default proxy address configured.
+  // @param origin_is_tls whether the origin transport socket is secure. Used to select the default
+  //        port when the target from the transport socket options has none.
+  static std::optional<std::string>
+  connectTarget(const Network::TransportSocketOptionsConstSharedPtr& options,
+                const Upstream::HostDescription* host, bool has_default_proxy, bool origin_is_tls);
+
+  // Builds the CONNECT request for the given target, adding a Proxy-Authorization header if
+  // proxy_authorization is not empty.
+  static std::string formatConnectRequest(absl::string_view target,
+                                          absl::string_view proxy_authorization);
+
+  UpstreamHttp11TunnelSocket(Network::TransportSocketPtr&& origin_socket,
+                             Network::TransportSocketPtr&& proxy_socket, absl::string_view target,
+                             absl::string_view proxy_authorization);
+
+  // Network::TransportSocket
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
+  std::string protocol() const override { return origin_socket_->protocol(); }
+  absl::string_view failureReason() const override;
+  bool canFlushClose() override {
+    return origin_socket_->canFlushClose() && proxy_socket_->canFlushClose();
+  }
+  Api::SysCallIntResult connect(Network::ConnectionSocket& socket) override {
+    return proxy_socket_->connect(socket);
+  }
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
+  Network::IoResult doRead(Buffer::Instance& buffer) override;
+  Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
+  void onConnected() override { proxy_socket_->onConnected(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return origin_socket_->ssl(); }
+  bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override {
+    proxy_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
+  }
+
+  bool tunnelEstablished() const { return tunnel_established_; }
+
+private:
+  // Callbacks handed to the socket that talks to the proxy. It operates on the real IoHandle, but
+  // its Connected event is not propagated: the connection is only connected once the origin socket
+  // is connected through the tunnel.
+  class ProxyCallbacks : public Network::TransportSocketCallbacks {
+  public:
+    explicit ProxyCallbacks(UpstreamHttp11TunnelSocket& parent) : parent_(parent) {}
+    Network::IoHandle& ioHandle() override { return parent_.callbacks_->ioHandle(); }
+    const Network::IoHandle& ioHandle() const override {
+      return static_cast<const Network::TransportSocketCallbacks*>(parent_.callbacks_)->ioHandle();
+    }
+    Network::Connection& connection() override { return parent_.callbacks_->connection(); }
+    bool shouldDrainReadBuffer() override;
+    void setTransportSocketIsReadable() override {
+      parent_.callbacks_->setTransportSocketIsReadable();
+    }
+    void raiseEvent(Network::ConnectionEvent event) override;
+    void flushWriteBuffer() override { parent_.callbacks_->flushWriteBuffer(); }
+
+  private:
+    UpstreamHttp11TunnelSocket& parent_;
+  };
+
+  // Callbacks handed to the origin socket. All I/O goes through the TunnelIoHandle.
+  class TunnelCallbacks : public Network::TransportSocketCallbacks {
+  public:
+    explicit TunnelCallbacks(UpstreamHttp11TunnelSocket& parent) : parent_(parent) {}
+    Network::IoHandle& ioHandle() override { return *parent_.tunnel_io_handle_; }
+    const Network::IoHandle& ioHandle() const override { return *parent_.tunnel_io_handle_; }
+    Network::Connection& connection() override { return parent_.callbacks_->connection(); }
+    bool shouldDrainReadBuffer() override { return parent_.callbacks_->shouldDrainReadBuffer(); }
+    void setTransportSocketIsReadable() override {
+      parent_.callbacks_->setTransportSocketIsReadable();
+    }
+    void raiseEvent(Network::ConnectionEvent event) override {
+      parent_.callbacks_->raiseEvent(event);
+    }
+    void flushWriteBuffer() override { parent_.callbacks_->flushWriteBuffer(); }
+
+  private:
+    UpstreamHttp11TunnelSocket& parent_;
+  };
+
+  // Processes the CONNECT response in the inbound buffer. Returns false if the connection must be
+  // closed.
+  bool processConnectResponse();
+  // Called once the proxy accepted the CONNECT request. Returns false if the connection must be
+  // closed.
+  bool onTunnelEstablished();
+  // Sends the data written by the origin socket to the proxy socket.
+  Network::IoResult flushOutbound();
+  bool socketClosed() const { return !callbacks_->ioHandle().isOpen(); }
+
+  Network::TransportSocketPtr origin_socket_;
+  Network::TransportSocketPtr proxy_socket_;
+  Network::TransportSocketCallbacks* callbacks_{};
+  std::unique_ptr<TunnelIoHandle> tunnel_io_handle_;
+  ProxyCallbacks proxy_callbacks_{*this};
+  TunnelCallbacks tunnel_callbacks_{*this};
+  Buffer::OwnedImpl connect_request_;
+  std::string failure_reason_;
+  bool tunnel_established_{false};
+  bool proxy_end_stream_{false};
+};
+
 class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
+  // @param transport_socket_factory the factory of the origin (inner) transport socket.
+  // @param proxy_info the default proxy information, if any.
+  // @param proxy_socket_factory if set, enables tunnel mode and is used to create the transport
+  //        socket for the connection to the proxy.
+  // @param proxy_authorization if set, provides the value of the Proxy-Authorization header sent
+  //        in the CONNECT request. Requires proxy_socket_factory to be set.
   UpstreamHttp11ConnectSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = std::nullopt);
+      std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = std::nullopt,
+      Network::UpstreamTransportSocketFactoryPtr proxy_socket_factory = nullptr,
+      Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization = nullptr);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -76,9 +204,12 @@ public:
     }
     return {proxy_info_.value()};
   }
+  bool tunnelsHttp11ProxyTraffic() const override { return proxy_socket_factory_ != nullptr; }
 
 private:
   const std::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info_;
+  const Network::UpstreamTransportSocketFactoryPtr proxy_socket_factory_;
+  const Secret::ThreadLocalGenericSecretProviderPtr proxy_authorization_;
 };
 
 // This is a utility class for isValidConnectResponse. It is only exposed for

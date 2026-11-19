@@ -40,6 +40,37 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "tunnel_test",
+    srcs = ["tunnel_test.cc"],
+    extension_names = ["envoy.transport_sockets.http_11_proxy"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
+    deps = [
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/extensions/transport_sockets/http_11_proxy:connect",
+        "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/mocks/network:io_handle_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/network:transport_socket_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "connect_integration_test",
     size = "large",
     srcs = ["connect_integration_test.cc"],
@@ -77,6 +108,35 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/key_value/file_based/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "tunnel_integration_test",
+    size = "large",
+    srcs = ["tunnel_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    extension_names = [
+        "envoy.bootstrap.internal_listener",
+        "envoy.transport_sockets.http_11_proxy",
+        "envoy.transport_sockets.tls",
+    ],
+    rbe_pool = {
+        "default": {"test": "linux_x64_medium"},
+    },
+    deps = [
+        "//source/extensions/bootstrap/internal_listener:config",
+        "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/upstreams/http/generic:config",
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
