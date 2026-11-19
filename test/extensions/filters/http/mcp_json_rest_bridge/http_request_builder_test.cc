@@ -30,7 +30,7 @@ TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) 
       "code": 3,
       "content": "Some random content",
       "active": true,
-      "editions": ["kindle", "hardback", "audobook"],
+      "editions": ["kindle", "hardback", "audiobook"],
       "authors": [
         {"name": "author1"},
         {"name": "author2"}
@@ -51,7 +51,7 @@ TEST(HttpRequestBuilderTest, WildCardHttpRuleBodyContainsAllArgumentsNotInPath) 
                 "code": 3,
                 "content": "Some random content",
                 "active": true,
-                "editions": ["kindle", "hardback", "audobook"],
+                "editions": ["kindle", "hardback", "audiobook"],
                 "authors": [
                   {"name": "author1"},
                   {"name": "author2"}
@@ -74,7 +74,7 @@ TEST(HttpRequestBuilderTest, ExtractHttpRuleBody) {
       "code": 3,
       "content": "Some random content",
       "active": true,
-      "editions": ["kindle", "hardback", "audobook"],
+      "editions": ["kindle", "hardback", "audiobook"],
       "authors": [
         {"name": "author1"},
         {"name": "author2"}
@@ -94,7 +94,7 @@ TEST(HttpRequestBuilderTest, ExtractHttpRuleBody) {
               "code": 3,
               "content": "Some random content",
               "active": true,
-              "editions": ["kindle", "hardback", "audobook"],
+              "editions": ["kindle", "hardback", "audiobook"],
               "authors": [
                 {"name": "author1"},
                 {"name": "author2"}
@@ -110,7 +110,7 @@ TEST(HttpRequestBuilderTest, PrimitiveArrayInQueryParameters) {
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
-      "editions": ["kindle", "hardback", "audobook"]
+      "editions": ["kindle", "hardback", "audiobook"]
     },
     "parent": "projects/123456789"
   })json");
@@ -118,11 +118,9 @@ TEST(HttpRequestBuilderTest, PrimitiveArrayInQueryParameters) {
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(http_rule, arguments);
   ASSERT_TRUE(http_request.ok());
 
-  EXPECT_THAT(
-      http_request->url,
-      StrEq(
-          "/v1/projects/123456789/shelves/"
-          "science-fiction?shelf.editions=kindle&shelf.editions=hardback&shelf.editions=audobook"));
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/"
+                                       "science-fiction?shelf.editions=kindle&shelf.editions="
+                                       "hardback&shelf.editions=audiobook"));
   EXPECT_THAT(http_request->method, StrEq("PUT"));
   EXPECT_TRUE(http_request->body.is_null());
 }
@@ -185,7 +183,7 @@ TEST(HttpRequestBuilderTest, NestedPathInPathTemplate) {
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
-      "editions": ["kindle", "hardback", "audobook"]
+      "editions": ["kindle", "hardback", "audiobook"]
     },
     "parent": "projects/123456789",
     "theme": "Kids"
@@ -198,7 +196,7 @@ TEST(HttpRequestBuilderTest, NestedPathInPathTemplate) {
   EXPECT_THAT(http_request->method, StrEq("GET"));
   EXPECT_EQ(http_request->body, json::parse(R"json({
               "shelf": {
-                "editions": ["kindle", "hardback", "audobook"]
+                "editions": ["kindle", "hardback", "audiobook"]
               },
               "theme": "Kids"
             })json"));
