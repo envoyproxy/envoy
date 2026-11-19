@@ -184,7 +184,7 @@ message TlsKeyLog {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -368,4 +368,9 @@ message CommonTlsContext {
 
   // TLS key log configuration
   TlsKeyLog key_log = 15;
+
+  // Certificate compression (RFC 8879) settings. A listener that enables both algorithms prefers
+  // brotli. On a QUIC listener, every filter chain must use the same settings, and changing them
+  // replaces the listener instead of updating its filter chains in place.
+  CertificateCompression certificate_compression = 17;
 }

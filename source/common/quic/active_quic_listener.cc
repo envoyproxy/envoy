@@ -8,6 +8,7 @@
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/overload/overload_manager.h"
 
@@ -44,6 +45,7 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    const Extensions::TransportSockets::Tls::CertCompression::Algorithms& cert_compression,
     bool reject_new_connections, bool enable_session_idle_list)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
@@ -72,6 +74,9 @@ ActiveQuicListener::ActiveQuicListener(
       proof_source_factory.createQuicProofSource(
           listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource()),
       quic::KeyExchangeSource::Default());
+  Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(
+      crypto_config_->ssl_ctx(), Extensions::TransportSockets::Tls::CertCompression::Mode::Compress,
+      cert_compression);
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
@@ -507,8 +512,40 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_,
-      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_,
-      enable_session_idle_list);
+      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), cert_compression_,
+      reject_new_connections_, enable_session_idle_list);
+}
+
+absl::StatusOr<Extensions::TransportSockets::Tls::CertCompression::Algorithms>
+ActiveQuicListenerFactory::certCompressionForListener(
+    const envoy::config::listener::v3::Listener& config) {
+  using Extensions::TransportSockets::Tls::CertCompression;
+  std::optional<CertCompression::Algorithms> result;
+  auto add = [&](const envoy::config::listener::v3::FilterChain& filter_chain) -> absl::Status {
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_transport;
+    if (!MessageUtil::unpackTo(filter_chain.transport_socket().typed_config(), quic_transport)
+             .ok()) {
+      return absl::OkStatus();
+    }
+    const CertCompression::Algorithms algorithms = CertCompression::enabledAlgorithms(
+        quic_transport.downstream_tls_context().common_tls_context().certificate_compression(),
+        /*quic=*/true);
+    if (result.has_value() && *result != algorithms) {
+      return absl::InvalidArgumentError(
+          fmt::format("All filter chains of QUIC listener '{}' must use the same "
+                      "certificate_compression",
+                      config.name()));
+    }
+    result = algorithms;
+    return absl::OkStatus();
+  };
+  for (const auto& filter_chain : config.filter_chains()) {
+    RETURN_IF_NOT_OK(add(filter_chain));
+  }
+  if (config.has_default_filter_chain()) {
+    RETURN_IF_NOT_OK(add(config.default_filter_chain()));
+  }
+  return result.value_or(CertCompression::enabledAlgorithms({}, /*quic=*/true));
 }
 
 absl::Status ActiveQuicListenerFactory::initializeCidGeneratorAndWorkerRouting() {

@@ -4,6 +4,7 @@
 #include "source/common/tls/cert_compression.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/types/span.h"
@@ -34,8 +35,8 @@ class RegisteredSsl {
 public:
   RegisteredSsl() {
     ctx_.reset(SSL_CTX_new(TLS_method()));
-    CertCompression::registerBrotli(ctx_.get());
-    CertCompression::registerZlib(ctx_.get());
+    CertCompression::registerAlgorithms(ctx_.get(), CertCompression::Mode::Compress,
+                                        {/*brotli=*/true, /*zlib=*/true});
     ssl_.reset(SSL_new(ctx_.get()));
   }
   SSL* get() const { return ssl_.get(); }
@@ -300,8 +301,8 @@ bssl::UniquePtr<SSL_CTX> makeCompressionServerCtx(X509* cert, EVP_PKEY* key) {
   RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
   RELEASE_ASSERT(SSL_CTX_use_certificate(ctx.get(), cert) == 1, "use_certificate failed");
   RELEASE_ASSERT(SSL_CTX_use_PrivateKey(ctx.get(), key) == 1, "use_PrivateKey failed");
-  CertCompression::registerBrotli(ctx.get());
-  CertCompression::registerZlib(ctx.get());
+  CertCompression::registerAlgorithms(ctx.get(), CertCompression::Mode::Compress,
+                                      {/*brotli=*/true, /*zlib=*/true});
   return ctx;
 }
 
@@ -403,38 +404,138 @@ TEST(CertCompressionMatrixTest, CorrectCertPerAlgorithmAcrossHandshakes) {
     }
   }
 }
-#endif // ENVOY_SSL_OPENSSL
+int zlib_decompress_calls = 0;
 
-//
-// Registration Tests
-// These tests verify that the compression algorithms can be registered with SSL_CTX
-//
+int countingDecompressZlib(SSL* ssl, CRYPTO_BUFFER** out, size_t uncompressed_len,
+                           const uint8_t* in, size_t in_len) {
+  ++zlib_decompress_calls;
+  return CertCompression::decompressZlib(ssl, out, uncompressed_len, in, in_len);
+}
 
-class CertCompressionRegistrationTest : public testing::Test {
+bssl::UniquePtr<SSL_CTX> makeTls13Ctx() {
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  RELEASE_ASSERT(SSL_CTX_set_min_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
+  RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
+  return ctx;
+}
+
+class CertCompressionModeTest : public testing::Test {
 protected:
-  void SetUp() override {
-    ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
-    ASSERT_NE(nullptr, ssl_ctx_.get());
+  CertCompressionModeTest()
+      : key_(generateEcdsaKey()), cert_(makeSelfSignedCert(key_.get(), "mode.example.com")) {
+    zlib_decompress_calls = 0;
   }
 
-  bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  bssl::UniquePtr<SSL_CTX> makeServerCtx(CertCompression::Mode mode) {
+    bssl::UniquePtr<SSL_CTX> ctx = makeTls13Ctx();
+    RELEASE_ASSERT(SSL_CTX_use_certificate(ctx.get(), cert_.get()) == 1, "");
+    RELEASE_ASSERT(SSL_CTX_use_PrivateKey(ctx.get(), key_.get()) == 1, "");
+    CertCompression::registerAlgorithms(ctx.get(), mode, {/*brotli=*/false, /*zlib=*/true});
+    return ctx;
+  }
+
+  bssl::UniquePtr<EVP_PKEY> key_;
+  bssl::UniquePtr<X509> cert_;
 };
 
-TEST_F(CertCompressionRegistrationTest, RegisterBrotli) {
-  // Verify brotli registration succeeds without crashing
-  EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
+TEST_F(CertCompressionModeTest, ServerCompressModeCompresses) {
+  bssl::UniquePtr<SSL_CTX> server_ctx = makeServerCtx(CertCompression::Mode::Compress);
+  bssl::UniquePtr<SSL_CTX> client_ctx =
+      makeCompressionClientCtx(TLSEXT_cert_compression_zlib, countingDecompressZlib);
+  bssl::UniquePtr<X509> served = handshakeAndGetServerCert(client_ctx.get(), server_ctx.get());
+  ASSERT_NE(served, nullptr);
+  EXPECT_EQ(0, X509_cmp(served.get(), cert_.get()));
+  EXPECT_EQ(1, zlib_decompress_calls);
 }
 
-TEST_F(CertCompressionRegistrationTest, RegisterZlib) {
-  // Verify zlib registration succeeds without crashing
-  EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
+TEST_F(CertCompressionModeTest, ServerDecompressModeDoesNotCompress) {
+  bssl::UniquePtr<SSL_CTX> server_ctx = makeServerCtx(CertCompression::Mode::Decompress);
+  bssl::UniquePtr<SSL_CTX> client_ctx =
+      makeCompressionClientCtx(TLSEXT_cert_compression_zlib, countingDecompressZlib);
+  bssl::UniquePtr<X509> served = handshakeAndGetServerCert(client_ctx.get(), server_ctx.get());
+  ASSERT_NE(served, nullptr);
+  EXPECT_EQ(0, X509_cmp(served.get(), cert_.get()));
+  EXPECT_EQ(0, zlib_decompress_calls);
 }
 
-TEST_F(CertCompressionRegistrationTest, RegisterAllAlgorithms) {
-  // Verify all algorithms can be registered on the same context
-  // Order matters: brotli > zlib (by priority)
-  EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
-  EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
+TEST_F(CertCompressionModeTest, ClientDecompressModeAcceptsCompressedCertificate) {
+  bssl::UniquePtr<SSL_CTX> server_ctx = makeServerCtx(CertCompression::Mode::Compress);
+  bssl::UniquePtr<SSL_CTX> client_ctx = makeTls13Ctx();
+  SSL_CTX_set_verify(client_ctx.get(), SSL_VERIFY_NONE, nullptr);
+  CertCompression::registerAlgorithms(client_ctx.get(), CertCompression::Mode::Decompress,
+                                      {/*brotli=*/false, /*zlib=*/true});
+  bssl::UniquePtr<X509> served = handshakeAndGetServerCert(client_ctx.get(), server_ctx.get());
+  ASSERT_NE(served, nullptr);
+  EXPECT_EQ(0, X509_cmp(served.get(), cert_.get()));
+}
+
+bool algorithmRegistered(SSL_CTX* ctx, uint16_t alg) {
+  // BoringSSL rejects registering an algorithm that the SSL_CTX already has.
+  return SSL_CTX_add_cert_compression_alg(ctx, alg, nullptr, CertCompression::decompressZlib) == 0;
+}
+
+TEST(CertCompressionRegistrationTest, RegistersOnlyEnabledAlgorithms) {
+  bssl::UniquePtr<SSL_CTX> brotli_ctx(SSL_CTX_new(TLS_method()));
+  CertCompression::registerAlgorithms(brotli_ctx.get(), CertCompression::Mode::Compress,
+                                      {/*brotli=*/true, /*zlib=*/false});
+  EXPECT_TRUE(algorithmRegistered(brotli_ctx.get(), TLSEXT_cert_compression_brotli));
+  EXPECT_FALSE(algorithmRegistered(brotli_ctx.get(), TLSEXT_cert_compression_zlib));
+
+  bssl::UniquePtr<SSL_CTX> zlib_ctx(SSL_CTX_new(TLS_method()));
+  CertCompression::registerAlgorithms(zlib_ctx.get(), CertCompression::Mode::Decompress,
+                                      {/*brotli=*/false, /*zlib=*/true});
+  EXPECT_FALSE(algorithmRegistered(zlib_ctx.get(), TLSEXT_cert_compression_brotli));
+  EXPECT_TRUE(algorithmRegistered(zlib_ctx.get(), TLSEXT_cert_compression_zlib));
+
+  bssl::UniquePtr<SSL_CTX> none_ctx(SSL_CTX_new(TLS_method()));
+  CertCompression::registerAlgorithms(none_ctx.get(), CertCompression::Mode::Compress, {});
+  EXPECT_FALSE(algorithmRegistered(none_ctx.get(), TLSEXT_cert_compression_brotli));
+  EXPECT_FALSE(algorithmRegistered(none_ctx.get(), TLSEXT_cert_compression_zlib));
+}
+#endif // ENVOY_SSL_OPENSSL
+
+using Algorithms = CertCompression::Algorithms;
+
+TEST(CertCompressionEnabledAlgorithmsTest, Defaults) {
+  const envoy::extensions::transport_sockets::tls::v3::CertificateCompression config;
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/false) ==
+               Algorithms{/*brotli=*/false, /*zlib=*/false}));
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/true) ==
+               Algorithms{/*brotli=*/false, /*zlib=*/true}));
+}
+
+TEST(CertCompressionEnabledAlgorithmsTest, DefaultsWithBrotliRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+  const envoy::extensions::transport_sockets::tls::v3::CertificateCompression config;
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/false) ==
+               Algorithms{/*brotli=*/true, /*zlib=*/true}));
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/true) ==
+               Algorithms{/*brotli=*/true, /*zlib=*/true}));
+}
+
+TEST(CertCompressionEnabledAlgorithmsTest, ExplicitValuesOverrideDefaults) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+  envoy::extensions::transport_sockets::tls::v3::CertificateCompression config;
+  config.mutable_brotli()->set_value(false);
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/false) ==
+               Algorithms{/*brotli=*/false, /*zlib=*/true}));
+  config.mutable_zlib()->set_value(false);
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/true) ==
+               Algorithms{/*brotli=*/false, /*zlib=*/false}));
+}
+
+TEST(CertCompressionEnabledAlgorithmsTest, ExplicitValuesEnableWithoutRuntimeGuard) {
+  envoy::extensions::transport_sockets::tls::v3::CertificateCompression config;
+  config.mutable_brotli()->set_value(true);
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/false) ==
+               Algorithms{/*brotli=*/true, /*zlib=*/false}));
+  config.mutable_zlib()->set_value(true);
+  EXPECT_TRUE((CertCompression::enabledAlgorithms(config, /*quic=*/false) ==
+               Algorithms{/*brotli=*/true, /*zlib=*/true}));
 }
 
 } // namespace Tls

@@ -673,3 +673,16 @@ message CertificateValidationContext {
   // unaffected. Defaults to false.
   bool suppress_client_ca_list = 18;
 }
+
+// Certificate compression (RFC 8879) settings. A listener compresses its own certificate chain,
+// and a cluster decompresses the chain sent by the upstream server. Enabling an algorithm is
+// rejected on builds that use OpenSSL.
+message CertificateCompression {
+  // Enables brotli. If unset, brotli is enabled only when the
+  // ``envoy.reloadable_features.tls_certificate_compression_brotli`` runtime guard is ``true``.
+  google.protobuf.BoolValue brotli = 1;
+
+  // Enables zlib. If unset, zlib is enabled for QUIC, and for TCP TLS only when the
+  // ``envoy.reloadable_features.tls_certificate_compression_brotli`` runtime guard is ``true``.
+  google.protobuf.BoolValue zlib = 2;
+}

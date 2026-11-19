@@ -189,6 +189,7 @@ envoy_cc_test(
         "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/tls:cert_compression_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
@@ -450,6 +451,7 @@ envoy_cc_test(
     deps = [
         "//source/common/tls:cert_compression_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

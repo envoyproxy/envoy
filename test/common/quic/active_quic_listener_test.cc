@@ -100,7 +100,8 @@ protected:
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
         packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator), testWorkerSelector, std::nullopt);
+        proof_source_factory, std::move(cid_generator), testWorkerSelector, std::nullopt,
+        cert_compression_);
   }
 };
 
@@ -437,6 +438,49 @@ protected:
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+envoy::config::listener::v3::Listener
+quicListenerWithCompression(const std::vector<std::string>& compression_settings) {
+  envoy::config::listener::v3::Listener config;
+  config.set_name("quic");
+  for (const std::string& compression : compression_settings) {
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+transport_socket:
+  name: envoy.transport_sockets.quic
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+    downstream_tls_context:
+      common_tls_context:
+        certificate_compression: {}
+)EOF",
+                                          compression),
+                              *config.add_filter_chains());
+  }
+  return config;
+}
+
+TEST(ActiveQuicListenerCertCompressionTest, DefaultsToZlib) {
+  auto result = ActiveQuicListenerFactory::certCompressionForListener(
+      quicListenerWithCompression({"{}", "{}"}));
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->brotli);
+  EXPECT_TRUE(result->zlib);
+}
+
+TEST(ActiveQuicListenerCertCompressionTest, FilterChainsThatAgree) {
+  auto result = ActiveQuicListenerFactory::certCompressionForListener(
+      quicListenerWithCompression({"{brotli: true}", "{brotli: true, zlib: true}"}));
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->brotli);
+  EXPECT_TRUE(result->zlib);
+}
+
+TEST(ActiveQuicListenerCertCompressionTest, FilterChainsThatDisagree) {
+  auto result = ActiveQuicListenerFactory::certCompressionForListener(
+      quicListenerWithCompression({"{zlib: false}", "{}"}));
+  EXPECT_EQ(result.status().message(),
+            "All filter chains of QUIC listener 'quic' must use the same certificate_compression");
+}
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();

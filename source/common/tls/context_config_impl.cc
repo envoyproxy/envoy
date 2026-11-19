@@ -209,8 +209,16 @@ ContextConfigImpl::ContextConfigImpl(
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
       factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
-      compliance_policy_(Utility::compliancePolicyFromProto(config.tls_params())) {
+      compliance_policy_(Utility::compliancePolicyFromProto(config.tls_params())),
+      certificate_compression_(config.certificate_compression()) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+#ifdef ENVOY_SSL_OPENSSL
+  if (certificate_compression_.brotli().value() || certificate_compression_.zlib().value()) {
+    creation_status =
+        absl::InvalidArgumentError("Certificate compression is not supported with OpenSSL");
+    return;
+  }
+#endif
   auto list_or_error = Network::Address::IpList::create(config.key_log().local_address_range());
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);
   tls_keylog_local_ = std::move(list_or_error.value());

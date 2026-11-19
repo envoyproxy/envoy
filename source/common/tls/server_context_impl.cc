@@ -27,6 +27,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -129,6 +130,13 @@ ServerContextImpl::ServerContextImpl(
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (!creation_status.ok()) {
     return;
+  }
+
+  const CertCompression::Algorithms cert_compression =
+      CertCompression::enabledAlgorithms(config.certificateCompression(), /*quic=*/false);
+  for (const Ssl::TlsContext& ctx : tls_contexts_) {
+    CertCompression::registerAlgorithms(ctx.ssl_ctx_.get(), CertCompression::Mode::Compress,
+                                        cert_compression);
   }
 
   // Validate certificate-level tls_params so bad values are rejected at config load rather than

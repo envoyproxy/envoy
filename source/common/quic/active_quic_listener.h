@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
@@ -14,6 +15,7 @@
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/server/active_udp_listener.h"
 
 #include "quiche/quic/core/quic_packet_writer.h"
@@ -30,20 +32,19 @@ public:
   // TODO(bencebeky): Tune this value.
   static constexpr size_t kNumSessionsToCreatePerLoop = 16;
 
-  ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
-                     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
-                     Network::SocketSharedPtr&& listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     QuicStatNames& quic_stat_names,
-                     uint32_t packets_to_read_to_connection_count_ratio,
-                     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-                     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-                     QuicConnectionIdGeneratorPtr&& cid_generator,
-                     QuicConnectionIdWorkerSelector worker_selector,
-                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-                     bool reject_new_connections = false, bool enable_session_idle_list = false);
+  ActiveQuicListener(
+      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
+      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      uint32_t packets_to_read_to_connection_count_ratio,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+      const Extensions::TransportSockets::Tls::CertCompression::Algorithms& cert_compression,
+      bool reject_new_connections = false, bool enable_session_idle_list = false);
 
   ~ActiveQuicListener() override;
 
@@ -144,7 +145,17 @@ public:
     disable_kernel_bpf_packet_routing_for_test_ = val;
   }
 
+  static absl::StatusOr<Extensions::TransportSockets::Tls::CertCompression::Algorithms>
+  certCompressionForListener(const envoy::config::listener::v3::Listener& config);
+  void setCertCompression(
+      const Extensions::TransportSockets::Tls::CertCompression::Algorithms& cert_compression) {
+    cert_compression_ = cert_compression;
+  }
+
 protected:
+  Extensions::TransportSockets::Tls::CertCompression::Algorithms cert_compression_{
+      Extensions::TransportSockets::Tls::CertCompression::enabledAlgorithms({}, /*quic=*/true)};
+
   virtual Network::ConnectionHandler::ActiveUdpListenerPtr createActiveQuicListener(
       Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
       Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,

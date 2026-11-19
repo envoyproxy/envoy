@@ -313,9 +313,19 @@ std::vector<uint8_t> certChainPrefixDer(ChainFn chain_fn, int num_certs) {
 // compressed-cert caches) registered, as in production.
 bssl::UniquePtr<SSL_CTX> makeRegisteredCtx() {
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  CertCompression::registerBrotli(ssl_ctx.get());
-  CertCompression::registerZlib(ssl_ctx.get());
+  CertCompression::registerAlgorithms(ssl_ctx.get(), CertCompression::Mode::Compress,
+                                      {/*brotli=*/true, /*zlib=*/true});
   return ssl_ctx;
+}
+
+void registerBrotli(SSL_CTX* ssl_ctx) {
+  CertCompression::registerAlgorithms(ssl_ctx, CertCompression::Mode::Compress,
+                                      {/*brotli=*/true, /*zlib=*/false});
+}
+
+void registerZlib(SSL_CTX* ssl_ctx) {
+  CertCompression::registerAlgorithms(ssl_ctx, CertCompression::Mode::Compress,
+                                      {/*brotli=*/false, /*zlib=*/true});
 }
 
 // Compresses the cert chain prefix once per iteration, mirroring a single handshake.
@@ -418,27 +428,27 @@ BENCHMARK_CAPTURE(benchmarkCompress, zlib_ecdsaP256, CertCompression::compressZl
 
 // Cached path: steady-state per-handshake cost with the per-context cache.
 BENCHMARK_CAPTURE(benchmarkCompressCached, brotli_rsa2048, CertCompression::compressBrotli,
-                  CertCompression::registerBrotli, rsa2048Chain)
+                  registerBrotli, rsa2048Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkCompressCached, brotli_rsa4096, CertCompression::compressBrotli,
-                  CertCompression::registerBrotli, rsa4096Chain)
+                  registerBrotli, rsa4096Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkCompressCached, brotli_ecdsaP256, CertCompression::compressBrotli,
-                  CertCompression::registerBrotli, ecdsaP256Chain)
+                  registerBrotli, ecdsaP256Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_rsa2048, CertCompression::compressZlib,
-                  CertCompression::registerZlib, rsa2048Chain)
+                  registerZlib, rsa2048Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_rsa4096, CertCompression::compressZlib,
-                  CertCompression::registerZlib, rsa4096Chain)
+                  registerZlib, rsa4096Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_ecdsaP256, CertCompression::compressZlib,
-                  CertCompression::registerZlib, ecdsaP256Chain)
+                  registerZlib, ecdsaP256Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, brotli_rsa2048, CertCompression::compressBrotli,

@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
@@ -22,9 +23,18 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+CertCompression::Algorithms CertCompression::enabledAlgorithms(
+    const envoy::extensions::transport_sockets::tls::v3::CertificateCompression& config,
+    bool quic) {
+  const bool brotli_default = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.tls_certificate_compression_brotli");
+  const bool zlib_default = quic || brotli_default;
+  return {config.has_brotli() ? config.brotli().value() : brotli_default,
+          config.has_zlib() ? config.zlib().value() : zlib_default};
+}
+
 #ifdef ENVOY_SSL_OPENSSL
-void CertCompression::registerBrotli(SSL_CTX*) {}
-void CertCompression::registerZlib(SSL_CTX*) {}
+void CertCompression::registerAlgorithms(SSL_CTX*, Mode, const Algorithms&) {}
 #else // ENVOY_SSL_OPENSSL
 
 namespace {
@@ -115,18 +125,24 @@ std::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
 
 } // namespace
 
-void CertCompression::registerBrotli(SSL_CTX* ssl_ctx) {
-  auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
-                                              compressBrotli, decompressBrotli);
-  ASSERT(ret == 1);
-  ensureCompressedCertCache(ssl_ctx);
-}
-
-void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
-  auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
-                                              decompressZlib);
-  ASSERT(ret == 1);
-  ensureCompressedCertCache(ssl_ctx);
+void CertCompression::registerAlgorithms(SSL_CTX* ssl_ctx, Mode mode,
+                                         const Algorithms& algorithms) {
+  const bool compress = mode == Mode::Compress;
+  if (algorithms.brotli) {
+    const int rc = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
+                                                    compress ? compressBrotli : nullptr,
+                                                    compress ? nullptr : decompressBrotli);
+    ASSERT(rc == 1);
+  }
+  if (algorithms.zlib) {
+    const int rc = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib,
+                                                    compress ? compressZlib : nullptr,
+                                                    compress ? nullptr : decompressZlib);
+    ASSERT(rc == 1);
+  }
+  if (compress && (algorithms.brotli || algorithms.zlib)) {
+    ensureCompressedCertCache(ssl_ctx);
+  }
 }
 
 int CertCompression::compressBrotli(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
