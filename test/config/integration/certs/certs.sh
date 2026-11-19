@@ -36,11 +36,26 @@ generate_x509_cert() {
   echo -e "// NOLINT(namespace-envoy)\nconstexpr char TEST_$(echo "$1" | tr "[:lower:]" "[:upper:]")_CERT_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -noout -fingerprint -sha256 | cut -d"=" -f2)\";" > "${1}cert_hash.h"
 }
 
+# $1=<days ago>, as `openssl x509 -not_before` takes it (with GNU or BSD `date`).
+date_days_ago() {
+  date -u -d "${1} days ago" +%Y%m%d%H%M%SZ 2>/dev/null || date -u -v-"${1}"d +%Y%m%d%H%M%SZ
+}
+
 # $1=<certificate name> $2=<CA name> $3=[days]
 generate_expired_x509_cert() {
   local days="${3:-730}"
+  local not_before not_after
+  # Issued 370 days ago, by giving the validity to `openssl x509`.
+  if ! openssl x509 -help 2>&1 | grep -q -- "-not_before"; then
+    echo "OpenSSL 3.4 or later is needed to generate the expired certificate (openssl x509 -not_before)" >&2
+    exit 1
+  fi
+  not_before="$(date_days_ago 370)"
+  not_after="$(date_days_ago "$((370 - days))")"
   openssl req -new -key "${1}key.pem" -out "${1}cert.csr" -config "${1}cert.cfg" -batch -sha256
-  docker run --rm -u root -v "$(pwd):/work" -w /work envoyproxy/envoy-build:gcc-86873047235e9b8232df989a5999b9bebf9db69c sh -c "apt-get update -y && apt-get install -y faketime && faketime '370 days ago' openssl x509 -req -days \"${days}\" -in \"${1}cert.csr\" -sha256 -CA \"${2}cert.pem\" -CAkey \"${2}key.pem\" -CAcreateserial -out \"${1}cert.pem\" -extensions v3_ca -extfile \"${1}cert.cfg\""
+  openssl x509 -req -not_before "${not_before}" -not_after "${not_after}" -in "${1}cert.csr" -sha256 \
+    -CA "${2}cert.pem" -CAkey "${2}key.pem" -CAcreateserial -out "${1}cert.pem" \
+    -extensions v3_ca -extfile "${1}cert.cfg"
   echo -e "// NOLINT(namespace-envoy)\nconstexpr char TEST_$(echo "$1" | tr "[:lower:]" "[:upper:]")_CERT_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -noout -fingerprint -sha256 | cut -d"=" -f2)\";" > "${1}cert_hash.h"
 }
 
