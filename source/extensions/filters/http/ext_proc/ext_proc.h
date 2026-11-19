@@ -652,9 +652,9 @@ public:
                              envoy::config::core::v3::TrafficDirection traffic_direction);
   void onProcessStreamingImmediateResponse(
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status status);
+  void updateDownstreamWatermarkPushback();
 
 private:
-  void updateDownstreamWatermarkPushback();
   const Grpc::GrpcServiceConfigWithHashKey& grpcServiceConfigWithHashKey() const {
     return route_config_with_hash_key_ != nullptr ? *route_config_with_hash_key_
                                                   : config_->grpcServiceConfigWithHashKey();

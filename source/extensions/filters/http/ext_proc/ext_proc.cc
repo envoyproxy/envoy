@@ -723,10 +723,15 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
               : less_specific.processing_request_modifier_factory_cb_) {}
 
 void Filter::updateDownstreamWatermarkPushback() {
-  const bool enabled = decoding_state_.completeBodyAvailable() &&
-                       (decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
-                       (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED);
-  watermark_callbacks_.setDownstreamWatermarkPushbackEnabled(enabled);
+  // Only enable downstream watermark pushback on the side-stream for
+  // FULL_DUPLEX_STREAMED mode, also when the complete downstream request
+  // has arrived. So pausing the side-stream won't cause deadlocks.
+  // For STREAMED mode, the flow control is done by the chunk_queue size check.
+  const bool should_enable =
+      decoding_state_.completeBodyAvailable() &&
+      (decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED);
+  watermark_callbacks_.setDownstreamWatermarkPushbackEnabled(should_enable);
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -981,7 +986,6 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   if (!processing_complete_ && decoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
-  updateDownstreamWatermarkPushback();
   return status;
 }
 
@@ -1300,7 +1304,6 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(trace, "decodeData({}): end_stream = {}", *decoder_callbacks_, data.length(),
                    end_stream);
   const auto status = onData(decoding_state_, data, end_stream);
-  updateDownstreamWatermarkPushback();
   ENVOY_STREAM_LOG(trace, "decodeData returning {}", *decoder_callbacks_, static_cast<int>(status));
   return status;
 }
@@ -1396,7 +1399,6 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(trace, "decodeTrailers", *decoder_callbacks_);
   const auto status = onTrailers(decoding_state_, trailers);
-  updateDownstreamWatermarkPushback();
   ENVOY_STREAM_LOG(trace, "decodeTrailers returning {}", *decoder_callbacks_,
                    static_cast<int>(status));
   return status;

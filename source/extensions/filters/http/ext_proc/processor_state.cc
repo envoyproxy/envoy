@@ -736,6 +736,11 @@ DecodingProcessorState::getBodyCallbackResultInStreamedMode(bool end_stream) {
   return result;
 }
 
+void DecodingProcessorState::setCompleteBodyAvailable(bool d) {
+  ProcessorState::setCompleteBodyAvailable(d);
+  filter_.updateDownstreamWatermarkPushback();
+}
+
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.
