@@ -2899,15 +2899,23 @@ bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
     size_t index, bool* result);
 
 /**
- * A component of a metadata path: a literal struct key or a zero-based list index.
- * When key.ptr is non-null, key selects a struct field and index is ignored. A non-null
- * pointer with zero length selects an empty key. When key.ptr is null, key.length must be
- * zero and index selects a list element.
+ * The kind of selector used by a metadata path component.
  */
-typedef struct {
+typedef enum envoy_dynamic_module_type_metadata_path_component_kind {
+  envoy_dynamic_module_type_metadata_path_component_kind_Key,
+  envoy_dynamic_module_type_metadata_path_component_kind_Index,
+} envoy_dynamic_module_type_metadata_path_component_kind;
+
+/**
+ * A component of a metadata path. The kind selects either a literal struct key or a zero-based
+ * list index. The other field is ignored. A key of length zero selects an empty key and may have a
+ * null pointer.
+ */
+typedef struct envoy_dynamic_module_type_module_metadata_path_component {
+  envoy_dynamic_module_type_metadata_path_component_kind kind;
   envoy_dynamic_module_type_module_buffer key;
   size_t index;
-} envoy_dynamic_module_type_module_metadata_path;
+} envoy_dynamic_module_type_module_metadata_path_component;
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_nested_string gets the
@@ -2933,7 +2941,7 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
@@ -2958,7 +2966,8 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, double* result);
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    double* result);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_nested_bool gets the
@@ -2982,7 +2991,8 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_bool(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, bool* result);
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    bool* result);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_nested_list_size gets the
@@ -3006,7 +3016,8 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, size_t* result);
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    size_t* result);
 
 // -------------------------- Filter State Callbacks ---------------------------
 

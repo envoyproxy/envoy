@@ -40,17 +40,25 @@ pub enum MetadataPathComponent<'a> {
   Index(usize),
 }
 
+/// Converts a path to ABI components, storing up to eight components inline.
+///
+/// Take `as_ptr` on the bound result and keep it in place for the ABI call. Moving an inline
+/// `SmallVec` after taking its pointer invalidates the pointer.
 fn metadata_path_to_abi(
   path: &[MetadataPathComponent<'_>],
-) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_metadata_path; 4]> {
+) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_metadata_path_component; 8]> {
+  use abi::envoy_dynamic_module_type_metadata_path_component_kind::{Index, Key};
+  use abi::envoy_dynamic_module_type_module_metadata_path_component as AbiPathComponent;
   path
     .iter()
     .map(|component| match component {
-      MetadataPathComponent::Key(key) => abi::envoy_dynamic_module_type_module_metadata_path {
+      MetadataPathComponent::Key(key) => AbiPathComponent {
+        kind: Key,
         key: str_to_module_buffer(key),
         index: 0,
       },
-      MetadataPathComponent::Index(index) => abi::envoy_dynamic_module_type_module_metadata_path {
+      MetadataPathComponent::Index(index) => AbiPathComponent {
+        kind: Index,
         key: abi::envoy_dynamic_module_type_module_buffer {
           ptr: std::ptr::null(),
           length: 0,

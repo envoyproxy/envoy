@@ -524,13 +524,18 @@ TEST_F(DynamicModuleHttpNestedMetadataTest, Rust) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   TestUtility::loadFromJson(R"EOF({
     "claims": {
-      "sub": "user-123", "exp": 123, "active": false,
-      "a": {"b": {"c": {"role.name": "admin"}}},
+      "sub": "user-123", "exp": 123, "active": false, "verified": true, "": "empty-key",
+      "a": {"b": {"c": {"d": {"e": {"f": {"g": {"role.name": "admin"}}}}}}},
       "values": ["admin", 42, false, {"items": [["nested"]]}]
     }
   })EOF",
                             (*callbacks.stream_info_.metadata_
                                   .mutable_filter_metadata())["envoy.filters.http.jwt_authn"]);
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  TestUtility::loadFromJson(
+      R"EOF({"claims":{"sub":"route-subject"}})EOF",
+      (*route->metadata_.mutable_filter_metadata())["envoy.filters.http.jwt_authn"]);
+  callbacks.stream_info_.route_ = route;
   filter->setDecoderFilterCallbacks(callbacks);
   Http::TestRequestHeaderMapImpl headers{};
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));

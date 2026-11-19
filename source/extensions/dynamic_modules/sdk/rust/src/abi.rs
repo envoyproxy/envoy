@@ -3091,32 +3091,48 @@ unsafe extern "C" {
         result: *mut bool,
     ) -> bool;
 }
-/** A component of a metadata path: a literal struct key or a zero-based list index.
- When key.ptr is non-null, key selects a struct field and index is ignored. A non-null
- pointer with zero length selects an empty key. When key.ptr is null, key.length must be
- zero and index selects a list element.*/
+#[repr(u32)]
+/// The kind of selector used by a metadata path component.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_metadata_path_component_kind {
+    Key = 0,
+    Index = 1,
+}
+/** A component of a metadata path. The kind selects either a literal struct key or a zero-based
+ list index. The other field is ignored. A key of length zero selects an empty key and may have a
+ null pointer.*/
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct envoy_dynamic_module_type_module_metadata_path {
+pub struct envoy_dynamic_module_type_module_metadata_path_component {
+    pub kind: envoy_dynamic_module_type_metadata_path_component_kind,
     pub key: envoy_dynamic_module_type_module_buffer,
     pub index: usize,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     [
-        "Size of envoy_dynamic_module_type_module_metadata_path",
-    ][::std::mem::size_of::<envoy_dynamic_module_type_module_metadata_path>() - 24usize];
+        "Size of envoy_dynamic_module_type_module_metadata_path_component",
+    ][::std::mem::size_of::<envoy_dynamic_module_type_module_metadata_path_component>()
+        - 32usize];
     [
-        "Alignment of envoy_dynamic_module_type_module_metadata_path",
-    ][::std::mem::align_of::<envoy_dynamic_module_type_module_metadata_path>() - 8usize];
+        "Alignment of envoy_dynamic_module_type_module_metadata_path_component",
+    ][::std::mem::align_of::<envoy_dynamic_module_type_module_metadata_path_component>()
+        - 8usize];
     [
-        "Offset of field: envoy_dynamic_module_type_module_metadata_path::key",
-    ][::std::mem::offset_of!(envoy_dynamic_module_type_module_metadata_path, key)
-        - 0usize];
+        "Offset of field: envoy_dynamic_module_type_module_metadata_path_component::kind",
+    ][::std::mem::offset_of!(
+        envoy_dynamic_module_type_module_metadata_path_component, kind
+    ) - 0usize];
     [
-        "Offset of field: envoy_dynamic_module_type_module_metadata_path::index",
-    ][::std::mem::offset_of!(envoy_dynamic_module_type_module_metadata_path, index)
-        - 16usize];
+        "Offset of field: envoy_dynamic_module_type_module_metadata_path_component::key",
+    ][::std::mem::offset_of!(
+        envoy_dynamic_module_type_module_metadata_path_component, key
+    ) - 8usize];
+    [
+        "Offset of field: envoy_dynamic_module_type_module_metadata_path_component::index",
+    ][::std::mem::offset_of!(
+        envoy_dynamic_module_type_module_metadata_path_component, index
+    ) - 24usize];
 };
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
@@ -3142,7 +3158,7 @@ unsafe extern "C" {
         filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
         metadata_source: envoy_dynamic_module_type_metadata_source,
         ns: envoy_dynamic_module_type_module_buffer,
-        path: *const envoy_dynamic_module_type_module_metadata_path,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
         path_length: usize,
         result: *mut envoy_dynamic_module_type_envoy_buffer,
     ) -> bool;
@@ -3169,7 +3185,7 @@ unsafe extern "C" {
         filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
         metadata_source: envoy_dynamic_module_type_metadata_source,
         ns: envoy_dynamic_module_type_module_buffer,
-        path: *const envoy_dynamic_module_type_module_metadata_path,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
         path_length: usize,
         result: *mut f64,
     ) -> bool;
@@ -3196,7 +3212,7 @@ unsafe extern "C" {
         filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
         metadata_source: envoy_dynamic_module_type_metadata_source,
         ns: envoy_dynamic_module_type_module_buffer,
-        path: *const envoy_dynamic_module_type_module_metadata_path,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
         path_length: usize,
         result: *mut bool,
     ) -> bool;
@@ -3223,7 +3239,7 @@ unsafe extern "C" {
         filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
         metadata_source: envoy_dynamic_module_type_metadata_source,
         ns: envoy_dynamic_module_type_module_buffer,
-        path: *const envoy_dynamic_module_type_module_metadata_path,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
         path_length: usize,
         result: *mut usize,
     ) -> bool;

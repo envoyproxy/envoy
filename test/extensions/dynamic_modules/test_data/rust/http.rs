@@ -869,9 +869,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ClusterCallbacksFilter {
   }
 }
 
-/// A HTTP filter configuration that implements
-/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the dynamic metadata related
-/// callbacks.
+/// An HTTP filter configuration for testing nested metadata callbacks.
 struct NestedMetadataCallbacksFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NestedMetadataCallbacksFilterConfig {
@@ -888,7 +886,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    use abi::envoy_dynamic_module_type_metadata_source::Dynamic;
+    use abi::envoy_dynamic_module_type_metadata_source::{Dynamic, Route};
     use envoy_proxy_dynamic_modules_rust_sdk::MetadataPathComponent::{Index, Key};
     let ns = "envoy.filters.http.jwt_authn";
     // The returned buffer borrows Envoy's metadata, not the temporary path strings.
@@ -900,7 +898,21 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
         .unwrap()
     };
     assert_eq!(subject.as_slice(), b"user-123");
-    // A path longer than four components also exercises the SDK's heap-backed path storage.
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(Route, ns, &[Key("claims"), Key("sub")])
+        .unwrap()
+        .as_slice(),
+      b"route-subject"
+    );
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(Dynamic, ns, &[Key("claims"), Key("")])
+        .unwrap()
+        .as_slice(),
+      b"empty-key"
+    );
+    // Nine components exercise the SDK's heap-backed path storage.
     assert_eq!(
       envoy_filter
         .get_metadata_nested_string(
@@ -911,6 +923,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
             Key("a"),
             Key("b"),
             Key("c"),
+            Key("d"),
+            Key("e"),
+            Key("f"),
+            Key("g"),
             Key("role.name")
           ]
         )
@@ -925,6 +941,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
     assert_eq!(
       envoy_filter.get_metadata_nested_bool(Dynamic, ns, &[Key("claims"), Key("active")]),
       Some(false)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &[Key("claims"), Key("verified")]),
+      Some(true)
     );
     let path = &[Key("claims"), Key("values")];
     assert_eq!(
@@ -1006,6 +1026,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
   }
 }
 
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the dynamic metadata related
+/// callbacks.
 struct DynamicMetadataCallbacksFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DynamicMetadataCallbacksFilterConfig {

@@ -413,32 +413,55 @@ const Protobuf::Value*
 getMetadataValueByPath(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                        envoy_dynamic_module_type_metadata_source metadata_source,
                        envoy_dynamic_module_type_module_buffer ns,
-                       const envoy_dynamic_module_type_module_metadata_path* path,
+                       const envoy_dynamic_module_type_module_metadata_path_component* path,
                        size_t path_length) {
-  if (path_length == 0 || path[0].key.ptr == nullptr) {
+  if (path_length == 0) {
+    return nullptr;
+  }
+  auto& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
+  if (path[0].kind != envoy_dynamic_module_type_metadata_path_component_kind_Key) {
+    ENVOY_LOG_TO_LOGGER(logger, debug, "metadata path must start with a key");
     return nullptr;
   }
   const auto* value = getMetadataValue(filter_envoy_ptr, metadata_source, ns, path[0].key);
+  if (value == nullptr) {
+    return nullptr;
+  }
   for (size_t i = 1; i < path_length; ++i) {
-    if (value == nullptr) {
-      return nullptr;
-    }
-    if (path[i].key.ptr != nullptr) {
+    const auto& component = path[i];
+    switch (component.kind) {
+    case envoy_dynamic_module_type_metadata_path_component_kind_Key: {
+      const absl::string_view key(component.key.ptr, component.key.length);
       if (!value->has_struct_value()) {
+        ENVOY_LOG_TO_LOGGER(logger, debug, "metadata path component {} needs a struct for key '{}'",
+                            i, key);
         return nullptr;
       }
       const auto& fields = value->struct_value().fields();
-      const auto it = fields.find(absl::string_view(path[i].key.ptr, path[i].key.length));
+      const auto it = fields.find(key);
       if (it == fields.end()) {
+        ENVOY_LOG_TO_LOGGER(logger, debug, "metadata path component {} key '{}' not found", i, key);
         return nullptr;
       }
       value = &it->second;
-    } else {
-      if (!value->has_list_value() ||
-          path[i].index >= static_cast<size_t>(value->list_value().values_size())) {
+      break;
+    }
+    case envoy_dynamic_module_type_metadata_path_component_kind_Index: {
+      if (!value->has_list_value()) {
+        ENVOY_LOG_TO_LOGGER(logger, debug, "metadata path component {} needs a list for index {}",
+                            i, component.index);
         return nullptr;
       }
-      value = &value->list_value().values(path[i].index);
+      const auto& list = value->list_value();
+      if (component.index >= static_cast<size_t>(list.values_size())) {
+        ENVOY_LOG_TO_LOGGER(logger, debug,
+                            "metadata path component {} index {} out of range for list of size {}",
+                            i, component.index, list.values_size());
+        return nullptr;
+      }
+      value = &list.values(component.index);
+      break;
+    }
     }
   }
   return value;
@@ -1684,7 +1707,7 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
     envoy_dynamic_module_type_envoy_buffer* result) {
   const auto* value =
       getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
@@ -1700,7 +1723,7 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
     double* result) {
   const auto* value =
       getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
@@ -1715,7 +1738,8 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_bool(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, bool* result) {
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    bool* result) {
   const auto* value =
       getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
   if (value == nullptr || !value->has_bool_value()) {
@@ -1729,7 +1753,7 @@ bool envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns,
-    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
     size_t* result) {
   const auto* value =
       getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
