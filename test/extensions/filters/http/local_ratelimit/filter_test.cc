@@ -1356,8 +1356,8 @@ TEST_P(StreamDoneFilterTest, CompletionUsesPerRouteConfig) {
   setupStreamDone();
   auto per_route_config = config_;
   setup(fmt::format(config_yaml, "false", "100", "false", "\"OFF\"", "false", "429"));
-  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
-      .WillOnce(Return(per_route_config.get()));
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce(Return(Router::RouteSpecificFilterConfigs{per_route_config.get()}));
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "5"}};
   setStreamHeaders(&request_headers, &response_headers);
@@ -1614,6 +1614,237 @@ TEST_F(FilterTest, StatsAreTagged) {
   ASSERT_EQ(1U, enabled.tags().size());
   EXPECT_EQ("envoy.local_http_ratelimit_prefix", enabled.tags()[0].name_);
   EXPECT_EQ("test", enabled.tags()[0].value_);
+}
+
+// Placeholder: the descriptor key of the level.
+static constexpr absl::string_view override_option_level_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 100000
+  tokens_per_fill: 100000
+  fill_interval: 1s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+descriptors:
+- entries:
+  - key: generic_key
+    value: {0}
+  token_bucket:
+    max_tokens: 100000
+    tokens_per_fill: 1
+    fill_interval: 60s
+rate_limits:
+- actions:
+  - generic_key:
+      descriptor_value: {0}
+  )";
+
+class RateLimitsOverrideOptionFilterTest : public FilterTest {
+public:
+  static constexpr auto Unspecified =
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED;
+  static constexpr auto MostSpecificOnly =
+      envoy::extensions::common::ratelimit::v3::MOST_SPECIFIC_ONLY;
+  static constexpr auto AllLevels = envoy::extensions::common::ratelimit::v3::ALL_LEVELS;
+
+  struct Level {
+    envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption option{Unspecified};
+    uint32_t max_tokens{100000};
+    bool shadow_mode{};
+    bool rate_limits{true};
+    bool per_connection{};
+    // Adds an apply_on_stream_done rate limit charging the x-cost response header.
+    bool stream_done{};
+  };
+
+  void setUpTest(const Level& filter_level, const Level& vh_level, const Level& route_level) {
+    EXPECT_CALL(
+        factory_context_.runtime_loader_.snapshot_,
+        featureEnabled(absl::string_view("test_enabled"),
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+        .WillRepeatedly(testing::Return(true));
+    EXPECT_CALL(
+        factory_context_.runtime_loader_.snapshot_,
+        featureEnabled(absl::string_view("test_enforced"),
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+        .WillRepeatedly(testing::Return(true));
+    ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(decoder_callbacks_2_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+
+    config_ = makeConfig("filter-key", filter_level, false);
+    vh_config_ = makeConfig("vh-key", vh_level, true);
+    route_config_ = makeConfig("route-key", route_level, true);
+    filter_ = std::make_shared<Filter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_2_ = std::make_shared<Filter>(config_);
+    filter_2_->setDecoderFilterCallbacks(decoder_callbacks_2_);
+    for (auto* callbacks : {&decoder_callbacks_, &decoder_callbacks_2_}) {
+      ON_CALL(*callbacks, perFilterConfigs())
+          .WillByDefault(
+              Return(Router::RouteSpecificFilterConfigs{vh_config_.get(), route_config_.get()}));
+    }
+  }
+
+  std::shared_ptr<FilterConfig> makeConfig(absl::string_view key, const Level& level,
+                                           bool per_route) {
+    envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
+    TestUtility::loadFromYaml(fmt::format(override_option_level_yaml, key), config);
+    config.set_rate_limits_override_option(level.option);
+    config.mutable_descriptors(0)->mutable_token_bucket()->set_max_tokens(level.max_tokens);
+    config.mutable_descriptors(0)->set_shadow_mode(level.shadow_mode);
+    if (!level.rate_limits) {
+      config.clear_rate_limits();
+    }
+    config.set_local_rate_limit_per_downstream_connection(level.per_connection);
+    if (level.stream_done) {
+      auto* completion_limit = config.add_rate_limits();
+      *completion_limit = config.rate_limits(0);
+      completion_limit->set_apply_on_stream_done(true);
+      completion_limit->mutable_hits_addend()->set_format("%RESP(x-cost)%");
+    }
+    absl::Status creation_status = absl::OkStatus();
+    auto filter_config = std::make_shared<FilterConfig>(
+        config, factory_context_, *stats_.rootScope(), creation_status, per_route);
+    EXPECT_TRUE(creation_status.ok()) << creation_status.message();
+    return filter_config;
+  }
+
+  // Sends two requests and returns the status of the second one.
+  Http::FilterHeadersStatus sendTwoRequests() {
+    Http::TestRequestHeaderMapImpl request_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+    return filter_2_->decodeHeaders(request_headers, false);
+  }
+
+  std::shared_ptr<FilterConfig> route_config_;
+  std::shared_ptr<FilterConfig> vh_config_;
+};
+
+TEST_F(RateLimitsOverrideOptionFilterTest, UnspecifiedUsesMostSpecificOnly) {
+  setUpTest({.max_tokens = 1}, {.max_tokens = 1}, {});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, sendTwoRequests());
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, UnspecifiedFallsBackToLegacyRouteRateLimits) {
+  setUpTest({}, {}, {.max_tokens = 1, .rate_limits = false});
+  NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit;
+  decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
+  decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
+      route_rate_limit);
+  EXPECT_CALL(route_rate_limit, populateDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(
+          std::vector<RateLimit::Descriptor>{{{{"generic_key", "route-key"}}}}));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, OptionSetIgnoresLegacyRouteRateLimits) {
+  setUpTest({}, {}, {.option = MostSpecificOnly, .max_tokens = 1, .rate_limits = false});
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(_))
+      .Times(0);
+  EXPECT_CALL(decoder_callbacks_2_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(_))
+      .Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, sendTwoRequests());
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificNonUnspecifiedWins) {
+  setUpTest({.option = AllLevels, .max_tokens = 1}, {.option = AllLevels, .max_tokens = 1},
+            {.option = MostSpecificOnly});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, sendTwoRequests());
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificOnlyRejected) {
+  setUpTest({}, {}, {.option = MostSpecificOnly, .max_tokens = 1});
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsAppliesLevelRateLimitsToLevelDescriptors) {
+  // The vh-key descriptor only exists in the vh level config.
+  setUpTest({}, {.option = AllLevels, .max_tokens = 1}, {});
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsFromFilterLevelIncludesFilterLevel) {
+  setUpTest({.option = AllLevels, .max_tokens = 1}, {}, {});
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, InheritedOptionIgnoresPerConnection) {
+  // The route level inherits the option, so its token bucket is shared across connections.
+  setUpTest({}, {.option = MostSpecificOnly}, {.max_tokens = 1, .per_connection = true});
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsShadowLevelDoesNotStopLessSpecificLevels) {
+  // The vh level only rejects in shadow mode, the filter level enforces.
+  setUpTest({.max_tokens = 1}, {.option = AllLevels, .max_tokens = 1, .shadow_mode = true}, {});
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, sendTwoRequests());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.shadow_mode"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsShadowLevelOnly) {
+  setUpTest({}, {.option = AllLevels, .max_tokens = 1, .shadow_mode = true}, {});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, sendTwoRequests());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.shadow_mode"));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsChargesStreamDoneOnLessSpecificLevel) {
+  setUpTest({}, {.option = AllLevels, .max_tokens = 3, .stream_done = true}, {});
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "5"}};
+  setStreamHeaders(&request_headers, &response_headers);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  filter_->onDestroy();
+  // The vh level bucket is drained by the completion charge.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_2_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, MostSpecificOnlySkipsStreamDoneOnLessSpecificLevel) {
+  setUpTest({}, {.max_tokens = 3, .stream_done = true}, {.option = MostSpecificOnly});
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "5"}};
+  setStreamHeaders(&request_headers, &response_headers);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  filter_->onDestroy();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsWithoutStreamDoneSkipsCompletionWork) {
+  setUpTest({}, {.option = AllLevels}, {});
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(decoder_callbacks_, requestHeaders()).Times(0);
+  filter_->onDestroy();
+}
+
+TEST_F(RateLimitsOverrideOptionFilterTest, AllLevelsStreamDoneWithoutRequestHeaders) {
+  setUpTest({}, {.option = AllLevels, .max_tokens = 3, .stream_done = true}, {});
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  setStreamHeaders(nullptr);
+  filter_->onDestroy();
+  // Nothing is charged at completion.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(request_headers, false));
 }
 
 } // namespace LocalRateLimitFilter

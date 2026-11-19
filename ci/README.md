@@ -190,7 +190,6 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `docker` &mdash; build Docker images, expects `release` or `release.server_only` to have been run first.
 * `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
 * `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
@@ -198,6 +197,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
 * `release <test>` &mdash; build Envoy static binaries and run a specified test or test dir under `-c opt` with clang.
 * `release.server_only` &mdash; build Envoy static binaries under `-c opt` with clang.
+* `release.containers` &mdash; build the Envoy container images, as OCI tarballs in `$ENVOY_DOCKER_BUILD_DIR/envoy/<arch>/build_images`.
 * `sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
 * `sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
@@ -223,7 +223,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `modules.version` &mdash; set the `module()` version, and the `bazel_dep` versions of in-repo modules (`envoy`, `envoy_api`, `envoy-docs`, `envoy_mobile`, `envoy_build_config`), in all `MODULE.bazel` files to match `VERSION.txt`, then regenerate the lockfiles as `lockfiles` does.
 * `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, release dates/releases (requires `GITHUB_TOKEN`), and dependabot configuration.
 * `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
-* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does, and fix the release date of the module in the dependency metadata (requires `GITHUB_TOKEN`).
 * `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate the lockfiles as `lockfiles` does. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
 * `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
