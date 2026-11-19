@@ -21,6 +21,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hashable_string_test",
     srcs = ["hashable_string_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/common/source:hashable_string_lib",
         "//envoy/common:hashable_interface",

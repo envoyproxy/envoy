@@ -31,7 +31,17 @@ envoy_extension_cc_test(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     extension_names = ["envoy.tracers.datadog"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -51,6 +61,7 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@dd-trace-cpp//:dd_trace_cpp",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
@@ -65,7 +76,12 @@ envoy_extension_cc_test(
         "envoy.filters.http.lua",
         "envoy.tracers.datadog",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

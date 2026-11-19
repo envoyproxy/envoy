@@ -11,7 +11,6 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "kafka_stats_sink_impl_test",
     srcs = ["kafka_stats_sink_impl_test.cc"],
-    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/test/mesh:kafka_mocks_lib",
@@ -24,7 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/stat_sinks/source:config_lib",

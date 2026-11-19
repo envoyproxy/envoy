@@ -31,7 +31,6 @@ envoy_cc_fuzz_test(
     name = "wuffs_json_cursor_fuzz_test",
     srcs = ["wuffs_json_cursor_fuzz_test.cc"],
     corpus = "wuffs_json_cursor_corpus",
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:macros",

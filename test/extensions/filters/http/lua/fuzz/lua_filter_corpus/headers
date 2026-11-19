@@ -1,0 +1,18 @@
+script: HEADERS
+request {
+  headers {
+    headers { key: ":path" value: "/" }
+    headers { key: ":method" value: "GET" }
+    headers { key: "x-fuzz-name" value: "x-added" }
+    headers { key: "x-fuzz-value" value: "v" }
+  }
+  trailers {
+    headers { key: "x-fuzz-name" value: "x-trailer" }
+  }
+}
+response {
+  headers {
+    headers { key: ":status" value: "200" }
+    headers { key: "x-fuzz-reason" value: "Fine" }
+  }
+}

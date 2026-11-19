@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/decoded_resource_impl.h"
 
 #include "test/extensions/config_subscription/grpc/delta_subscription_test_harness.h"
 
@@ -336,6 +337,55 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
 
   subscription->start({"name1"});
   subscription->updateResourceInterest({"name1", "name2"});
+}
+
+class DeltaSubscriptionImplInitFetchTimeoutTest : public DeltaSubscriptionTestHarness,
+                                                  public testing::TestWithParam<LegacyOrUnified> {
+protected:
+  DeltaSubscriptionImplInitFetchTimeoutTest()
+      : DeltaSubscriptionTestHarness(GetParam(), std::chrono::milliseconds(1000)) {}
+
+  void TearDown() override { doSubscriptionTearDown(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplInitFetchTimeoutTest,
+                         DeltaSubscriptionImplInitFetchTimeoutTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+DecodedResourcePtr replayedClusterLoadAssignment(const std::string& name) {
+  auto cla =
+      Protobuf::Arena::MakeUnique<envoy::config::endpoint::v3::ClusterLoadAssignment>(nullptr);
+  cla->set_cluster_name(name);
+  return std::make_unique<DecodedResourceImpl>(std::move(cla), name, std::vector<std::string>{},
+                                               "v1", /*from_cache=*/true);
+}
+
+TEST_P(DeltaSubscriptionImplInitFetchTimeoutTest, RejectedReplayKeepsInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(*init_timeout_timer_, disableTimer()).Times(0);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "v1"))
+      .WillOnce(Return(absl::InvalidArgumentError("rejected")));
+  EXPECT_FALSE(subscription_->onConfigUpdate(refs, {}, "v1").ok());
+
+  // The server will not resend the resource, so the timeout must still fire.
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr));
+  callInitFetchTimeoutCb();
+}
+
+TEST_P(DeltaSubscriptionImplInitFetchTimeoutTest, AcceptedReplayDisablesInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "v1")).WillOnce(Return(absl::OkStatus()));
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_TRUE(subscription_->onConfigUpdate(refs, {}, "v1").ok());
 }
 
 } // namespace

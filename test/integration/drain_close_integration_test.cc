@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 
@@ -8,6 +10,16 @@ using testing::Eq;
 
 class DrainCloseIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
+  DrainCloseIntegrationTest() {
+    // A drain-closed connection stays open for the HCM's drain_timeout (5s by default) after the
+    // response that announced the close, on HTTP/1 as well as HTTP/2 (see
+    // ConnectionManagerImpl::startDrainSequence()). Every test here waits for that close and none
+    // is about the grace period, so keep it short.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_drain_timeout()->set_nanos(100 * 1000 * 1000); });
+  }
+
   // Decides drain-close by polling the listener's DrainDecision rather than from the
   // connection-level drain notification. Tests that start a drain sequence by calling the drain
   // manager directly need this: the connection-level path is driven by the notification that

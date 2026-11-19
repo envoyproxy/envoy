@@ -252,6 +252,15 @@ TEST_F(HotRestartUdpForwardingContextTest,
   EXPECT_FALSE(result.has_value());
 }
 
+TEST_F(HotRestartUdpForwardingContextTest, RegisterUdpForwardingListenerDoesNotOwnConfig) {
+  auto config = std::make_shared<Network::MockUdpListenerConfig>();
+  std::weak_ptr<Network::UdpListenerConfig> weak_config = config;
+  helper_->registerUdpForwardingListener(test_addresses_.ipv4_test_addr_, config);
+  config.reset();
+  EXPECT_TRUE(weak_config.expired());
+  EXPECT_FALSE(helper_->getListenerForDestination(*test_addresses_.ipv4_test_addr_).has_value());
+}
+
 TEST_F(HotRestartImplTest, IsInitializingReflectsLifecyclePhases) {
   const mode_t mode = S_IRUSR | S_IWUSR;
   const std::string socket_path = testDomainSocketName();

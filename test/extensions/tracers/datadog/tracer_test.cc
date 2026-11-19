@@ -11,6 +11,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -205,6 +206,7 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(1234, dd_span.trace_id().low);
   ASSERT_TRUE(dd_span.parent_id());
   EXPECT_EQ(5678, *dd_span.parent_id());
+  EXPECT_EQ(0, store_.counter("tracing.datadog.extraction_errors").value());
 
   // The span continues the extracted trace, with a span ID of its own.
   EXPECT_EQ("000000000000000000000000000004d2", span->getTraceId());
@@ -341,8 +343,12 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   Tracing::TestTraceContextImpl context{{"x-datadog-trace-id", "nope"},
                                         {"x-datadog-parent-id", "nice try"}};
 
-  const Tracing::SpanPtr span =
-      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
+  Tracing::SpanPtr span;
+  // Clients control these headers, so the error is counted and logged at debug level only.
+  EXPECT_LOG_CONTAINS("debug", "Unable to extract span context", {
+    span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name, decision);
+  });
+  EXPECT_EQ(1, store_.counter("tracing.datadog.extraction_errors").value());
   ASSERT_TRUE(span);
   const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
   EXPECT_NE(nullptr, as_dd_span_wrapper);
@@ -350,6 +356,28 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   const datadog::tracing::Optional<datadog::tracing::Span>& maybe_dd_span =
       as_dd_span_wrapper->impl();
   ASSERT_TRUE(maybe_dd_span);
+}
+
+TEST_F(DatadogTracerTest, NoTraceContextIsNotAnExtractionError) {
+  // A request without trace context starts a new trace without counting an
+  // extraction error.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.report_traces = false;
+  config.telemetry.enabled = false;
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  Tracing::Decision decision;
+  decision.reason = Tracing::Reason::Sampling;
+  decision.traced = true;
+
+  Tracing::TestTraceContextImpl context{};
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, "do.thing", decision);
+  ASSERT_TRUE(span);
+  EXPECT_EQ(0, store_.counter("tracing.datadog.extraction_errors").value());
 }
 
 TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {

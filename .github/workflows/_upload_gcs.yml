@@ -52,7 +52,7 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
@@ -153,7 +153,7 @@ jobs:
         fi
     - name: Set up GCP credentials for dry run
       if: inputs.dry-run && inputs.trusted && env.HAS_GCP_KEY == 'true'
-      uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/gcp/setup@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         key: ${{ secrets.gcp-key }}
     - name: Dry-run versioned artifact sync
@@ -188,12 +188,12 @@ jobs:
         else
             echo "::notice::Dry run: would write ${ARTIFACT} to gs://${BUCKET}/${SHA}/${ARTIFACT} (redirect: ${REDIRECT})"
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/gcp/setup@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       if: ${{ !inputs.dry-run }}
       with:
         key: ${{ secrets.gcp-key }}
     - if: ${{ !inputs.dry-run && inputs.layout == 'sha' }}
-      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
       with:
         bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
         path: ${{ matrix.artifact }}

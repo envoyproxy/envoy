@@ -68,8 +68,8 @@ void HdsDelegate::setHdsStreamResponseTimer() {
 
 void HdsDelegate::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  // The local node can change after startup (e.g. dynamic context params), so send its current state
-  // rather than a copy from when the delegate was constructed.
+  // The local node can change after startup (e.g. dynamic context params), so send its current
+  // state rather than a copy from when the delegate was constructed.
   health_check_request_.mutable_health_check_request()->mutable_node()->CopyFrom(
       server_context_.localInfo().node());
   stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());

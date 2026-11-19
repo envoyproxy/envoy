@@ -171,6 +171,19 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 #endif
 }
 
+std::string MessageUtil::serializeDeterministically(const Protobuf::Message& message) {
+  std::string bytes;
+  bytes.resize(message.ByteSizeLong());
+  {
+    // The coded stream writes its last bytes when it goes out of scope.
+    Protobuf::io::ArrayOutputStream stream(bytes.data(), static_cast<int>(bytes.size()));
+    Protobuf::io::CodedOutputStream coded_stream(&stream);
+    coded_stream.SetSerializationDeterministic(true);
+    message.SerializeWithCachedSizes(&coded_stream);
+  }
+  return bytes;
+}
+
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
 // NOLINTNEXTLINE(readability-identifier-naming)
 bool MessageLiteDifferencer::Equals(const Protobuf::Message& message1,
