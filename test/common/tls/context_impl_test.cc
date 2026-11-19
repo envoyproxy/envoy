@@ -2329,10 +2329,13 @@ common_tls_context:
       "ssl.certificate.", tls_certs[0].get().certificateName(), ".expiration_unix_time_seconds");
 
   Stats::SymbolTableImpl symbol_table;
-  Stats::Allocator alloc(symbol_table);
-  Stats::ThreadLocalStoreImpl store(alloc);
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
+  Stats::Allocator alloc(symbol_table);
+  // Declared after tls so it is destroyed first: the store tears down its TLS slot in its
+  // destructor, which touches the MockInstance (same order as the thread_local_store_test
+  // fixture).
+  Stats::ThreadLocalStoreImpl store(alloc);
   store.initializeThreading(main_thread_dispatcher, tls);
 
   {
@@ -2374,10 +2377,13 @@ common_tls_context:
       "ssl.certificate.", tls_certs[0].get().certificateName(), ".expiration_unix_time_seconds");
 
   Stats::SymbolTableImpl symbol_table;
-  Stats::Allocator alloc(symbol_table);
-  Stats::ThreadLocalStoreImpl store(alloc);
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
+  Stats::Allocator alloc(symbol_table);
+  // Declared after tls so it is destroyed first: the store tears down its TLS slot in its
+  // destructor, which touches the MockInstance (same order as the thread_local_store_test
+  // fixture).
+  Stats::ThreadLocalStoreImpl store(alloc);
   store.initializeThreading(main_thread_dispatcher, tls);
 
   {
