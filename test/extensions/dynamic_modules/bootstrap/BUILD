@@ -124,6 +124,7 @@ envoy_extension_cc_dyn_module_test(
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//envoy/common:regex_interface",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
@@ -147,6 +148,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

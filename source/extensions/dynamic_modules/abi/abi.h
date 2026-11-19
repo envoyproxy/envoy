@@ -9463,46 +9463,29 @@ typedef void* envoy_dynamic_module_type_bootstrap_extension_config_snapshot_modu
 
 /**
  * Receives JSON owned by Envoy and valid only during this invocation.
+ *
+ * @param json is the encoded snapshot. Its pointer is non-null.
+ * @param user_data is the opaque pointer supplied to the serialize callback and may be null.
  */
 typedef void (*envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn)(
     envoy_dynamic_module_type_envoy_buffer json, void* user_data);
 
 /**
- * Collects and redacts selected providers synchronously on the main thread after initialization
- * and before shutdown. Missing providers are omitted; an empty selection collects nothing.
- * name_regex applies a full-match resource name filter; a null name_regex.ptr disables filtering.
- * Providers without name filtering ignore it. Cost grows with the selected resources, so combine
- * frequent notifications into one collection.
- *
- * Returns null if collection fails or is unavailable. Collection is refused during cluster and
- * listener lifecycle hooks. Use the bootstrap config scheduler to defer calls from these hooks and
- * other callbacks during xDS updates, including callout failures during cluster removal. Providers
- * may otherwise contain partial updates with previous versions.
- *
- * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
- * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
- * not restrict access.
+ * The result of envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new.
  */
-envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr
-envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
-    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
-    envoy_dynamic_module_type_module_buffer name_regex);
-
-/**
- * Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread.
- * On success, calls json_fn synchronously once; returns false if encoding fails. Does not consume
- * the snapshot. Encoding can fail if an Any contains an unknown or unlinked protobuf type.
- */
-bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
-    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
-    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn, void* user_data);
-
-/**
- * Deletes a snapshot on any thread.
- */
-void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
-    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot);
+typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
+  // the snapshot was collected and redacted
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
+  // called off the main thread, before initialization, during shutdown, from a lifecycle hook,
+  // or while another collection runs
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
+  // the name regex is invalid or exceeds the RE2 program size limit
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
+  // admin support is unavailable
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable = 3,
+  // a provider failed to collect or redact its configuration
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed = 4,
+} envoy_dynamic_module_type_bootstrap_config_snapshot_result;
 
 /**
  * The callback type invoked once per active resource name during enumeration.
@@ -10494,6 +10477,62 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix);
+
+// -------------------- Bootstrap Extension Callbacks - Configuration Snapshots --------------------
+
+/**
+ * Collects and redacts selected providers synchronously on the main thread. Missing providers are
+ * omitted; an empty selection collects nothing. Cost grows with the selected resources, so combine
+ * frequent notifications into one collection.
+ *
+ * Cluster and listener lifecycle hooks run inside manager updates, where providers can contain
+ * partial changes under the previous version. Collection is refused there; defer it with the
+ * bootstrap config scheduler. Callout failures during cluster removal are already reported from
+ * a posted callback.
+ *
+ * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+ * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
+ * not restrict access.
+ *
+ * @param config_envoy_ptr is the non-null pointer to the bootstrap extension configuration.
+ * @param providers is an array of provider keys, borrowed for this call. May be null only when
+ * providers_count is zero. Each key's pointer must be non-null when its length is nonzero.
+ * @param providers_count is the number of entries in providers.
+ * @param name_regex is a full-match RE2 resource name filter, ignored by providers without name
+ * filtering. A null pointer or zero length disables filtering. The buffer is borrowed for this
+ * call.
+ * @param snapshot_out is a non-null output pointer. Receives the module-owned snapshot on success,
+ * or null on failure. Release it with the snapshot delete callback before its config is destroyed.
+ * @return the collection result. A call off the main thread also reports an Envoy bug.
+ */
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out);
+
+/**
+ * Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread without consuming it.
+ * Encoding can be expensive; use a module-owned thread to avoid blocking Envoy's main thread or
+ * workers.
+ *
+ * @param snapshot is a non-null snapshot handle. Must not be used concurrently.
+ * @param json_fn is a non-null callback invoked synchronously once on success, and not on failure.
+ * @param user_data is an opaque pointer passed to json_fn and may be null.
+ * @return true on success, false if encoding fails, including for unknown or unlinked Any types.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn, void* user_data);
+
+/**
+ * Deletes a snapshot on any thread.
+ *
+ * @param snapshot is the snapshot to release, or null. Must not be in use by another call.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot);
 
 // -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
 

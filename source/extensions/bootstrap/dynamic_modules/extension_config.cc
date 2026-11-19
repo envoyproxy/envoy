@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -21,8 +22,9 @@ namespace Bootstrap {
 namespace DynamicModules {
 namespace {
 
-// lifecycle hooks can reenter another bootstrap config on the same thread
+// hooks invoked inside cluster or listener manager updates must set this flag to refuse snapshots
 thread_local bool in_resource_lifecycle_callback = false;
+// both flags are shared across configs because callbacks can reenter another config on this thread
 thread_local bool collecting_config_snapshot = false;
 
 } // namespace
@@ -104,7 +106,7 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
 
 absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
 DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
-    absl::Span<const absl::string_view> providers, std::optional<absl::string_view> name_regex) {
+    absl::Span<const absl::string_view> providers, absl::string_view name_regex) {
   if (!server_initialized_ || shutdown_started_ || extension_destroyed_) {
     return absl::FailedPreconditionError("config providers are unavailable");
   }
@@ -116,10 +118,10 @@ DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
   Cleanup cleanup([]() { collecting_config_snapshot = false; });
   auto server_admin = admin();
   if (!server_admin.has_value()) {
-    return absl::FailedPreconditionError("admin config tracker is unavailable");
+    return absl::UnavailableError("admin config tracker is unavailable");
   }
-  if (name_regex.has_value()) {
-    auto matcher = context_.regexEngine().matcher(std::string(*name_regex));
+  if (!name_regex.empty()) {
+    auto matcher = Regex::CompiledGoogleReMatcher::createAndSizeCheck(std::string(name_regex));
     RETURN_IF_NOT_OK(matcher.status());
     return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers, **matcher);
   }

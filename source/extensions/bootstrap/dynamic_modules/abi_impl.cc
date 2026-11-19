@@ -737,14 +737,16 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
   return admin->removeHandler(prefix_str);
 }
 
-envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
 envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
     const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
-    envoy_dynamic_module_type_module_buffer name_regex) {
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out) {
+  *snapshot_out = nullptr;
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
     IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
-    return nullptr;
+    return envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
   absl::InlinedVector<absl::string_view, 4> names;
@@ -753,15 +755,25 @@ envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
     names.emplace_back(providers[i].ptr, providers[i].length);
   }
   auto snapshot = config->getConfigSnapshot(
-      names, name_regex.ptr != nullptr
-                 ? std::make_optional(absl::string_view(name_regex.ptr, name_regex.length))
-                 : std::nullopt);
+      names, name_regex.ptr != nullptr ? absl::string_view(name_regex.ptr, name_regex.length)
+                                       : absl::string_view{});
   if (!snapshot.ok()) {
-    ENVOY_LOG_MISC(debug, "dynamic modules: config snapshot collection failed: {}",
-                   snapshot.status());
-    return nullptr;
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic modules: config snapshot collection failed: {}",
+                        snapshot.status());
+    switch (snapshot.status().code()) {
+    case absl::StatusCode::kFailedPrecondition:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed;
+    case absl::StatusCode::kInvalidArgument:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex;
+    case absl::StatusCode::kUnavailable:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable;
+    default:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed;
+    }
   }
-  return snapshot.value().release();
+  *snapshot_out = snapshot.value().release();
+  return envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success;
 }
 
 bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(

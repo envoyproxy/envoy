@@ -131,6 +131,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/common:regex_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:message_lib",
         "//source/common/init:target_lib",

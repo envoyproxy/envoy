@@ -191,19 +191,24 @@ Provider keys include ``bootstrap``, ``clusters``, ``listeners``,
 ``routes``, ``route_scopes``, ``secrets`` and the registered ``ecds_filter_*`` providers. Missing keys
 are omitted, duplicates are collected once, and an empty selection collects nothing. Providers
 appear in key order, as in :ref:`/config_dump <operations_admin_interface_config_dump>`.
-Endpoint dumps are not included. An optional full-match regular expression filters resource names
-for providers that support it.
+Endpoint dumps are not included. An optional full-match RE2 regular expression filters resource names
+for providers that support it. A missing or empty expression disables filtering.
 
 Collection and sensitive-field redaction run synchronously on the main thread after server
 initialization and before shutdown begins. Their cost grows with the selected resources. Combine
 frequent notifications into one collection.
 
-Collection is refused inside cluster and listener lifecycle hooks. Schedule it after returning with
-the bootstrap config scheduler. Other callbacks during an xDS update, including callouts failed
-during cluster removal, must also defer collection: providers can contain partially applied changes
-with an old version until the update finishes.
+Cluster and listener lifecycle hooks run inside manager updates, where providers can contain
+partially applied changes with an old version. Collection is refused in those hooks; defer it with
+the bootstrap config scheduler. Callout failures during cluster removal are already reported from a
+posted callback.
 
-JSON encoding and deletion can run on another thread. Release each snapshot before its owning
+Creation returns a result distinguishing a refused call, an invalid or oversized name expression,
+unavailable admin support, and a provider failure. Calls are refused off the main thread, before
+initialization, after shutdown begins, inside lifecycle hooks, or while another collection runs.
+
+JSON encoding can also be expensive. Use a module-owned thread to avoid blocking Envoy's main thread
+or workers. Encoding and deletion can run on any thread. Release each snapshot before its owning
 bootstrap configuration's destroy hook returns. Modules must stop and join workers holding snapshots
 during configuration teardown. A snapshot must not be used concurrently.
 

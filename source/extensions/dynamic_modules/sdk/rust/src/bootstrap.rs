@@ -1,4 +1,7 @@
-use crate::abi::envoy_dynamic_module_type_metrics_result;
+use crate::abi::{
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result as ConfigSnapshotResult,
+  envoy_dynamic_module_type_metrics_result,
+};
 use crate::buffer::EnvoyBuffer;
 use crate::{
   abi,
@@ -85,6 +88,8 @@ impl ConfigSnapshotProvider<'_> {
 #[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyBootstrapExtensionConfigSnapshot: Send {
   /// Encodes the snapshot as ConfigDump JSON.
+  /// Encoding can be expensive; use a module-owned thread to avoid blocking Envoy's main thread or
+  /// workers.
   /// Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
   /// configuration may still contain sensitive data. Encoding fails for unknown or unlinked Any
   /// types.
@@ -140,8 +145,16 @@ impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
 /// A collection or encoding failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSnapshotError {
-  /// The selected configuration could not be collected.
+  /// Called off the main thread, before initialization, after shutdown began, inside a cluster or
+  /// listener lifecycle hook, or while another collection runs. A call off the main thread also
+  /// reports an Envoy bug.
+  NotAllowed,
+  /// The name filter is invalid or exceeds the RE2 program size limit.
+  InvalidRegex,
+  /// Admin support is unavailable.
   Unavailable,
+  /// A provider failed to collect or redact its configuration.
+  CollectionFailed,
   /// The collected messages could not be encoded as JSON.
   EncodingFailed,
 }
@@ -149,7 +162,10 @@ pub enum ConfigSnapshotError {
 impl std::fmt::Display for ConfigSnapshotError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.write_str(match self {
+      Self::NotAllowed => "config snapshot collection not allowed",
+      Self::InvalidRegex => "invalid config snapshot name regex",
       Self::Unavailable => "config snapshot unavailable",
+      Self::CollectionFailed => "config snapshot collection failed",
       Self::EncodingFailed => "config snapshot encoding failed",
     })
   }
@@ -417,13 +433,14 @@ pub trait EnvoyBootstrapExtensionConfig {
 
   /// Collects and redacts selected providers synchronously on the main thread after initialization
   /// and before shutdown. Missing providers are omitted; an empty selection collects nothing.
-  /// `name_regex` applies a full-match resource name filter where supported; `None` selects all
-  /// names. Cost grows with the selected resources, so combine frequent notifications into one
-  /// collection.
+  /// `name_regex` applies a full-match RE2 resource name filter where supported; `None` or an empty
+  /// expression selects all names. Cost grows with the selected resources, so combine frequent
+  /// notifications into one collection.
   ///
-  /// Collection is refused in cluster and listener lifecycle hooks. Use [`Self::new_scheduler`]
-  /// to defer calls from these hooks and other callbacks during xDS updates; providers may contain
-  /// partial updates with previous versions.
+  /// Collection is refused in cluster and listener lifecycle hooks, which run inside manager
+  /// updates where providers can contain partial changes under the previous version. Defer
+  /// collection with [`Self::new_scheduler`]. Callout failures during cluster removal are already
+  /// reported from a posted callback.
   /// No admin listener is needed and admin `allow_paths` does not restrict access.
   fn get_config_snapshot<'a>(
     &self,
@@ -1607,7 +1624,8 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       .iter()
       .map(|provider| str_to_module_buffer(provider.as_str()))
       .collect();
-    let raw = unsafe {
+    let mut raw = std::ptr::null_mut();
+    let result = unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
         self.raw,
         providers.as_ptr(),
@@ -1618,9 +1636,17 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
             length: 0,
           },
         ),
+        &mut raw,
       )
     };
-    let raw = NonNull::new(raw).ok_or(ConfigSnapshotError::Unavailable)?;
+    match result {
+      ConfigSnapshotResult::Success => {},
+      ConfigSnapshotResult::NotAllowed => return Err(ConfigSnapshotError::NotAllowed),
+      ConfigSnapshotResult::InvalidRegex => return Err(ConfigSnapshotError::InvalidRegex),
+      ConfigSnapshotResult::Unavailable => return Err(ConfigSnapshotError::Unavailable),
+      ConfigSnapshotResult::CollectionFailed => return Err(ConfigSnapshotError::CollectionFailed),
+    }
+    let raw = NonNull::new(raw).ok_or(ConfigSnapshotError::CollectionFailed)?;
     Ok(Box::new(EnvoyBootstrapExtensionConfigSnapshotImpl { raw }))
   }
 
@@ -2533,6 +2559,46 @@ mod snapshot_tests {
       .unwrap();
     assert_eq!(snapshot.into_json().unwrap(), b"{\"configs\":[]}");
     assert_eq!(drops.load(Ordering::Relaxed), 1);
+  }
+
+  #[test]
+  fn config_snapshot_collection_preserves_host_errors() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    for (result, error) in [
+      (
+        ConfigSnapshotResult::NotAllowed,
+        ConfigSnapshotError::NotAllowed,
+      ),
+      (
+        ConfigSnapshotResult::InvalidRegex,
+        ConfigSnapshotError::InvalidRegex,
+      ),
+      (
+        ConfigSnapshotResult::Unavailable,
+        ConfigSnapshotError::Unavailable,
+      ),
+      (
+        ConfigSnapshotResult::CollectionFailed,
+        ConfigSnapshotError::CollectionFailed,
+      ),
+    ] {
+      host.result = Some(result);
+      assert!(matches!(envoy.get_config_snapshot(&[], None), Err(actual) if actual == error));
+    }
+  }
+
+  #[test]
+  fn config_snapshot_rejects_success_without_a_handle() {
+    let mut host = TestHost {
+      result: Some(ConfigSnapshotResult::Success),
+      ..TestHost::default()
+    };
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    assert!(matches!(
+      envoy.get_config_snapshot(&[], None),
+      Err(ConfigSnapshotError::CollectionFailed)
+    ));
   }
 
   #[test]

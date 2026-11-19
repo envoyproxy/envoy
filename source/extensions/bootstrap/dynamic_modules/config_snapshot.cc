@@ -18,12 +18,21 @@ ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
                         const Matchers::StringMatcher& name_matcher) {
   auto snapshot = std::make_unique<ConfigSnapshot>();
   TRY_ASSERT_MAIN_THREAD {
-    // keep callbacks alive if a provider unregisters during collection
-    const auto callbacks = tracker.getCallbacksMap();
-    for (const auto& [name, callback] : callbacks) {
-      if (!absl::c_linear_search(providers, name)) {
+    std::vector<std::string> selected;
+    const auto& callbacks = tracker.getCallbacksMap();
+    for (const auto& [name, _] : callbacks) {
+      if (absl::c_linear_search(providers, name)) {
+        selected.push_back(name);
+      }
+    }
+    for (const auto& name : selected) {
+      // an earlier provider may have unregistered or replaced this callback
+      const auto it = callbacks.find(name);
+      if (it == callbacks.end()) {
         continue;
       }
+      // keep the current callback alive if it unregisters itself
+      const auto callback = it->second;
       auto message = callback(name_matcher);
       if (message == nullptr) {
         return absl::InternalError(absl::StrCat("config provider returned no message: ", name));
@@ -43,7 +52,12 @@ absl::StatusOr<std::string> ConfigSnapshot::serialize() const {
       return absl::InternalError("could not pack config provider message");
     }
   }
-  return MessageUtil::getJsonStringFromMessage(dump);
+  // the MessageUtil JSON helper requires YAML support
+  Protobuf::util::JsonPrintOptions options;
+  options.preserve_proto_field_names = true;
+  std::string json;
+  RETURN_IF_NOT_OK(Protobuf::util::MessageToJsonString(dump, &json, options));
+  return json;
 }
 
 } // namespace DynamicModules

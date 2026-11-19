@@ -120,6 +120,7 @@ TEST(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
   ASSERT_OK(snapshot);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("\"static_clusters\""));
   EXPECT_THAT(*json, testing::HasSubstr("selected"));
   EXPECT_THAT(*json, testing::Not(testing::HasSubstr("excluded")));
   const auto clusters_pos = json->find("ClustersConfigDump");
@@ -128,6 +129,47 @@ TEST(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
   ASSERT_NE(listeners_pos, std::string::npos);
   EXPECT_LT(clusters_pos, listeners_pos);
   EXPECT_EQ(json->find("ClustersConfigDump", clusters_pos + 1), std::string::npos);
+}
+
+TEST(ConfigSnapshotTest, SkipsProviderUnregisteredDuringCollection) {
+  Server::ConfigTrackerImpl tracker;
+  auto removed = tracker.add("removed", [](const Matchers::StringMatcher&) {
+    ADD_FAILURE() << "unregistered provider called";
+    return std::make_unique<envoy::admin::v3::ClustersConfigDump>();
+  });
+  auto bootstrap = tracker.add("bootstrap", [&](const Matchers::StringMatcher&) {
+    removed.reset();
+    return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+  });
+  const std::vector<absl::string_view> providers{"bootstrap", "removed"};
+  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("BootstrapConfigDump"));
+  EXPECT_THAT(*json, testing::Not(testing::HasSubstr("ClustersConfigDump")));
+}
+
+TEST(ConfigSnapshotTest, UsesReplacementProviderDuringCollection) {
+  Server::ConfigTrackerImpl tracker;
+  auto replaced = tracker.add("replaced", [](const Matchers::StringMatcher&) {
+    ADD_FAILURE() << "replaced provider called";
+    return std::make_unique<envoy::admin::v3::ClustersConfigDump>();
+  });
+  auto bootstrap = tracker.add("bootstrap", [&](const Matchers::StringMatcher&) {
+    replaced.reset();
+    replaced = tracker.add("replaced", [](const Matchers::StringMatcher&) {
+      return std::make_unique<envoy::admin::v3::ListenersConfigDump>();
+    });
+    return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+  });
+  const std::vector<absl::string_view> providers{"bootstrap", "replaced"};
+  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("ListenersConfigDump"));
+  EXPECT_THAT(*json, testing::Not(testing::HasSubstr("ClustersConfigDump")));
 }
 
 TEST(ConfigSnapshotTest, ContainsProviderExceptions) {

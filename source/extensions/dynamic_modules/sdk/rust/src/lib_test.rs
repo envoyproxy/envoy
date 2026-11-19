@@ -3369,6 +3369,7 @@ fn test_network_filter_watermark_callbacks() {
 
 pub mod config_snapshot_stubs {
   use super::*;
+  use crate::abi::envoy_dynamic_module_type_bootstrap_config_snapshot_result as SnapshotResult;
   use std::sync::atomic::Ordering;
   use std::sync::Arc;
 
@@ -3377,6 +3378,7 @@ pub mod config_snapshot_stubs {
     pub providers: Vec<String>,
     pub name_regex: Option<String>,
     pub snapshot: Option<TestSnapshot>,
+    pub result: Option<SnapshotResult>,
   }
 
   pub struct TestSnapshot {
@@ -3396,7 +3398,8 @@ pub mod config_snapshot_stubs {
     providers: *const abi::envoy_dynamic_module_type_module_buffer,
     count: usize,
     name_regex: abi::envoy_dynamic_module_type_module_buffer,
-  ) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr {
+    output: *mut abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+  ) -> SnapshotResult {
     let host = unsafe { &mut *host.cast::<TestHost>() };
     let providers = unsafe { crate::ffi_helpers::slice_from_raw_or_empty(providers, count) };
     host.providers = providers
@@ -3416,12 +3419,15 @@ pub mod config_snapshot_stubs {
       };
       Some(std::str::from_utf8(bytes).unwrap().to_owned())
     };
-    host
-      .snapshot
-      .take()
-      .map_or(std::ptr::null_mut(), |snapshot| {
-        Box::into_raw(Box::new(snapshot)).cast()
-      })
+    unsafe { *output = std::ptr::null_mut() };
+    if let Some(result) = host.result {
+      return result;
+    }
+    let Some(snapshot) = host.snapshot.take() else {
+      return SnapshotResult::Unavailable;
+    };
+    unsafe { *output = Box::into_raw(Box::new(snapshot)).cast() };
+    SnapshotResult::Success
   }
 
   #[no_mangle]
