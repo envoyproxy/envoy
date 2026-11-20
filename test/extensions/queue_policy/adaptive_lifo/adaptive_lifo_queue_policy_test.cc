@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -128,6 +129,35 @@ TEST(AdaptiveLifoQueueTest, ForEachStopsEarly) {
     return false;
   });
   EXPECT_EQ(visited, (std::vector<int>{2}));
+}
+
+// In LIFO mode the next item to visit is at the back. The callback removes and destroys it, then
+// removes enough items that the queue drops to FIFO mode for the rest of the traversal.
+TEST(AdaptiveLifoQueueTest, ForEachCallbackRemovesUnvisitedItemsAcrossModeChange) {
+  std::vector<std::unique_ptr<TestQueueItem>> items;
+  AdaptiveLifoQueue<TestQueueItem> queue(6, 3);
+  for (int value = 1; value <= 6; ++value) {
+    items.push_back(std::make_unique<TestQueueItem>(value));
+    queue.add(*items.back(), {MonotonicTime{}});
+  }
+  EXPECT_TRUE(queue.isOverloaded());
+
+  std::vector<int> visited;
+  queue.forEach([&](TestQueueItem& item) -> bool {
+    visited.push_back(item.value());
+    if (item.value() == 6) {
+      queue.remove(item);
+      // 5 is next in LIFO order and 1 would be next once the queue drops to FIFO.
+      queue.remove(*items[4]);
+      queue.remove(*items[0]);
+      items[4].reset();
+      items[0].reset();
+      EXPECT_FALSE(queue.isOverloaded());
+    }
+    return true;
+  });
+  EXPECT_EQ(visited, (std::vector<int>{6, 2, 3, 4}));
+  EXPECT_EQ(queue.size(), 3);
 }
 
 TEST(AdaptiveLifoQueueTest, ThresholdOneUsesLifoUntilEmpty) {
