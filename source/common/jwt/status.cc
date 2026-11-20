@@ -171,6 +171,10 @@ std::string getStatusString(Status status) {
 
   case Status::JwtAlgorithmNotAllowed:
     return "Jwt algorithm is not allowed";
+  case Status::JwtHeaderBadCrit:
+    return "Jwt header [crit] field is invalid";
+  case Status::JwtCritHeaderNotAllowed:
+    return "Jwt header [crit] field lists a parameter that is not allowed";
   };
   // Return empty string though switch-case is exhaustive. See issues/91.
   return "";

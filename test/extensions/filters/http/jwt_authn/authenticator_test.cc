@@ -12,6 +12,7 @@
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -185,6 +186,45 @@ TEST_F(AuthenticatorTest, TestAllowedAlgorithms) {
     Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
     expectVerifyStatus(Status::Ok, headers);
   }
+}
+
+// Test authenticator constraints for "crit" header parameters
+TEST_F(AuthenticatorTest, TestAllowedCriticalHeaders) {
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+
+  {
+    // The token lists "exp-extension" in "crit", which the provider does not allow.
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
+    expectVerifyStatus(Status::JwtCritHeaderNotAllowed, headers);
+  }
+
+  {
+    provider.add_allowed_critical_headers("exp-extension");
+    provider.set_forward(true);
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+        .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+          receiver.onJwksSuccess(std::move(jwks_));
+        });
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
+    expectVerifyStatus(Status::Ok, headers);
+  }
+}
+
+// Test that "crit" is ignored with the runtime guard disabled
+TEST_F(AuthenticatorTest, TestCriticalHeadersIgnoredWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_reject_unknown_crit", "false"}});
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      });
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
+  expectVerifyStatus(Status::Ok, headers);
 }
 
 // This test validates a good JWT authentication with a remote Jwks.
