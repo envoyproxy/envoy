@@ -45,7 +45,8 @@ public:
 
   virtual void asyncRefreshAccessToken(const std::string& refresh_token,
                                        const std::string& client_id, const std::string& secret,
-                                       AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+                                       AuthType auth_type = AuthType::UrlEncodedBody,
+                                       const std::string& scopes = "") PURE;
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
   virtual void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) PURE;
@@ -82,7 +83,8 @@ public:
                            const std::string& code_verifier, AuthType auth_type) override;
 
   void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
-                               const std::string& secret, AuthType auth_type) override;
+                               const std::string& secret, AuthType auth_type,
+                               const std::string& scopes) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
